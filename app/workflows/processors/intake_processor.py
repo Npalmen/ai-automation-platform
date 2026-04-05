@@ -17,12 +17,18 @@ def process_intake_job(job: Job) -> Job:
     has_content = bool(subject or message_text or attachments)
 
     if not has_content:
-        job.result = {
+        result = {
             "status": "failed",
             "summary": "Payload saknar innehåll.",
             "requires_human_review": True,
             "payload": {},
         }
+
+        job.processor_history.append({
+            "processor": "universal_intake_processor",
+            "result": result,
+        })
+        job.result = result
         return job
 
     normalized_payload = {
@@ -48,11 +54,17 @@ def process_intake_job(job: Job) -> Job:
         "recommended_next_step": "classification",
     }
 
-    job.result = {
+    result = {
         "status": "completed",
         "summary": "Intake normaliserad.",
         "requires_human_review": False,
         "payload": normalized_payload,
     }
+
+    job.processor_history.append({
+        "processor": "universal_intake_processor",
+        "result": result,
+    })
+    job.result = result
 
     return job

@@ -26,23 +26,7 @@ Status:
 - started and partially implemented
 
 ---
-
-### 2. AI layer
-Current state:
-- regex / heuristics
-
-Needed later:
-- LLM-based extraction
-- AI classification
-- summarization
-- better reasoning for routing and handoff
-
-Status:
-- planned
-
----
-
-### 3. Real integrations
+### 2. Real integrations
 Current state:
 - mock integrations only
 
@@ -51,6 +35,21 @@ Needed:
 - Gmail read/send
 - webhook ingestion
 - real external actions
+
+Status:
+- planned
+
+---
+
+### 3. AI layer
+Current state:
+- regex / heuristics
+
+Needed later:
+- LLM-based extraction
+- AI classification
+- summarization
+- better reasoning for routing and handoff
 
 Status:
 - planned

@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 import uuid
+from typing import List, Dict, Any
 
 from app.domain.workflows.enums import JobType
 from app.domain.workflows.statuses import JobStatus
@@ -15,6 +16,7 @@ class Job(BaseModel):
 
     input_data: Dict[str, Any] = Field(default_factory=dict)
     result: Optional[Dict[str, Any]] = None
+    processor_history: List[Dict[str, Any]] = Field(default_factory=list)
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

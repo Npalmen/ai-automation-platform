@@ -5,7 +5,7 @@ from app.core.settings import get_settings
 from app.core.config import get_tenant_config
 from app.core.tenancy import set_current_tenant, get_current_tenant
 from app.domain.workflows.models import Job
-from app.domain.workflows.schemas import CreateJobRequest
+from app.domain.workflows.schemas import JobCreateRequest
 from app.workflows.job_runner import run_job
 from app.workflows.processor_metadata import PROCESSOR_METADATA
 from app.workflows.policies import is_job_type_enabled_for_tenant
@@ -81,7 +81,7 @@ def tenant_test(tenant_id: str = "TENANT_1001"):
 
 @app.post("/jobs")
 def create_job(
-    payload: CreateJobRequest,
+    payload: JobCreateRequest,
     db: Session = Depends(get_db),
     x_tenant_id: str | None = Header(default=None)
 ):
@@ -102,13 +102,8 @@ def create_job(
         input_data=payload.input_data
     )
 
-    # 🔹 Spara initialt jobb
     JobRepository.create_job(db, job)
-
-    # 🔹 Kör jobbet
     job = run_pipeline(job, db)
-
-    # 🔹 Uppdatera resultat
     JobRepository.update_job(db, job)
 
     return job
@@ -254,6 +249,7 @@ def get_integration_status(
     )
 
     return result
+
 
 @app.get("/integrations/available")
 def get_available_integrations(x_tenant_id: str | None = Header(default=None)):

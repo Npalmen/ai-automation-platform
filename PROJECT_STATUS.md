@@ -100,4 +100,82 @@ Detailed current-state documentation is stored in:
 - `docs/implementation_plan.md`
 - `docs/processor_roadmap.md`
 
+#UPDATE
+
+# PROJECT STATUS — AI Automation Platform
+
+## ✅ Current State
+
+Systemet är nu en fungerande automation backend med:
+
+- Multi-tenant stöd
+- Full pipeline execution
+- Processor-based arkitektur
+- Audit logging
+- Integration framework (förberett)
+
+---
+
+## 🔧 Pipeline (fungerar)
+
+1. Intake
+2. Classification
+3. Entity Extraction
+4. Domain processors:
+   - Lead Processor
+   - Invoice Processor (v2)
+   - Customer Inquiry Processor
+5. Policy Processor (v2)
+6. Human Handoff Processor
+
+---
+
+## 🧠 Decision Engine
+
+### Invoice
+- validation_status: validated / incomplete / duplicate
+- approval_route:
+  - auto_approve
+  - approval_required
+  - manual_review
+
+### Lead
+- lead_score (0–100)
+- priority (low / medium / high)
+- routing:
+  - crm_update
+  - priority_sales_followup
+
+### Inquiry
+- routing:
+  - support_queue
+  - billing_queue
+  - sales_queue
+
+---
+
+## 🧾 Processor Standard
+
+Alla processorer:
+- sätter `result`
+- append:ar till `processor_history`
+- returnerar `job`
+
+---
+
+## ⚠️ Viktiga designbeslut
+
+- `job_type` = affärstyp (inte pipeline-step)
+- pipeline körs via kopior (`step_job`)
+- ALL logik läser från `processor_history`
+- ingen processor får bero direkt på input
+
+---
+
+## 🚀 Next Step
+
+👉 Integration layer (CRM / Webhooks)
+
+Systemet är redo att börja skapa affärsvärde.
+
 These files should be used as the main handoff context for future sessions.

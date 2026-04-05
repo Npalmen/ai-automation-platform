@@ -1,6 +1,6 @@
 from app.domain.workflows.enums import JobType
 from app.domain.workflows.models import Job
-from app.workflows.runner import run_job
+from app.workflows.job_runner import run_job
 
 
 BASE_PIPELINE = [
@@ -12,16 +12,19 @@ BASE_PIPELINE = [
 POST_CLASSIFICATION_PIPELINES = {
     JobType.INVOICE: [
         JobType.ENTITY_EXTRACTION,
+        JobType.INVOICE,
         JobType.POLICY,
         JobType.HUMAN_HANDOFF,
     ],
     JobType.LEAD: [
         JobType.ENTITY_EXTRACTION,
+        JobType.LEAD,
         JobType.POLICY,
         JobType.HUMAN_HANDOFF,
     ],
     JobType.CUSTOMER_INQUIRY: [
         JobType.ENTITY_EXTRACTION,
+        JobType.CUSTOMER_INQUIRY,
         JobType.POLICY,
         JobType.HUMAN_HANDOFF,
     ],
@@ -35,12 +38,12 @@ POST_CLASSIFICATION_PIPELINES = {
 def run_pipeline(job: Job, db):
     current_job = job
 
-    # Kör intake + classification först
+    # Kör intake + classification
     for step in BASE_PIPELINE:
         current_job.job_type = step
         current_job = run_job(current_job, db)
 
-    # Hämta resultat från classification
+    # Läs classification-resultat
     classification_result = current_job.result or {}
     payload = classification_result.get("payload") or {}
 
@@ -51,15 +54,24 @@ def run_pipeline(job: Job, db):
     except ValueError:
         detected_type = JobType.UNKNOWN
 
-    # Hämta rätt pipeline
+    # Sätt affärstyp
+    current_job.job_type = detected_type
+
+    # Hämta pipeline
     next_steps = POST_CLASSIFICATION_PIPELINES.get(
         detected_type,
         POST_CLASSIFICATION_PIPELINES[JobType.UNKNOWN],
     )
 
-    # Kör resten
+    # Kör resterande steg utan att skriva över affärstyp permanent
     for step in next_steps:
-        current_job.job_type = step
-        current_job = run_job(current_job, db)
+        step_job = current_job.model_copy(deep=True)
+        step_job.job_type = step
+        step_result = run_job(step_job, db)
+
+        current_job.result = step_result.result
+        current_job.processor_history = step_result.processor_history
+        current_job.status = step_result.status
+        current_job.updated_at = step_result.updated_at
 
     return current_job

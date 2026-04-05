@@ -1,5 +1,5 @@
-from app.domain.workflows.models import Job
 from app.domain.workflows.enums import JobType
+from app.domain.workflows.models import Job
 
 
 def process_classification_job(job: Job) -> Job:
@@ -21,16 +21,16 @@ def process_classification_job(job: Job) -> Job:
         reasons.append("keyword_invoice")
 
     elif "avtal" in combined_text or "contract" in combined_text:
-        detected_type = JobType.CONTRACT
-        confidence = 0.85
-        reasons.append("keyword_contract")
+        detected_type = JobType.UNKNOWN
+        confidence = 0.60
+        reasons.append("contract_detected_but_not_enabled")
 
-    elif "offert" in combined_text or "quote" in combined_text:
+    elif any(word in combined_text for word in ["offert", "quote", "pris", "price"]):
         detected_type = JobType.LEAD
         confidence = 0.80
         reasons.append("keyword_lead")
 
-    elif "hjälp" in combined_text or "support" in combined_text:
+    elif any(word in combined_text for word in ["hjälp", "support", "problem", "fel"]):
         detected_type = JobType.CUSTOMER_INQUIRY
         confidence = 0.75
         reasons.append("keyword_support")
@@ -60,7 +60,5 @@ def process_classification_job(job: Job) -> Job:
         "processor": "classification_processor",
         "result": result,
     })
-
     job.result = result
-
     return job

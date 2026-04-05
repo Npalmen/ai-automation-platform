@@ -39,7 +39,7 @@ Do not build a separate processor framework outside the existing workflow system
 ---
 
 ## Sales processors
-- [ ] LEAD
+- [x] LEAD
 - [ ] LEAD_QUALIFICATION
 - [ ] QUOTE
 - [ ] SALES_FOLLOWUP
@@ -49,7 +49,7 @@ Do not build a separate processor framework outside the existing workflow system
 ---
 
 ## Support processors
-- [ ] CUSTOMER_INQUIRY
+- [x] CUSTOMER_INQUIRY
 - [ ] SUPPORT_TRIAGE
 - [ ] RESPONSE_DRAFT
 - [ ] ESCALATION
