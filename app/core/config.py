@@ -1,5 +1,3 @@
-# app/core/config.py
-
 from app.domain.workflows.enums import JobType
 from app.integrations.enums import IntegrationType
 
@@ -13,9 +11,9 @@ TENANT_CONFIGS = {
             JobType.CUSTOMER_INQUIRY.value: True,
         },
         "enabled_job_types": [
-            JobType.LEAD,
-            JobType.INVOICE,
-            JobType.CUSTOMER_INQUIRY,
+            "lead",
+            "invoice",
+            "customer_inquiry",
         ],
         "allowed_integrations": [
             IntegrationType.CRM,
@@ -37,8 +35,27 @@ TENANT_CONFIGS = {
             JobType.CUSTOMER_INQUIRY.value: True,
         },
         "enabled_job_types": [
-            JobType.LEAD,
-            JobType.CUSTOMER_INQUIRY,
+            "lead",
+            "customer_inquiry",
+        ],
+        "allowed_integrations": [
+            IntegrationType.CRM,
+            IntegrationType.MONDAY,
+            IntegrationType.GOOGLE_MAIL,
+            IntegrationType.GOOGLE_CALENDAR,
+            IntegrationType.MICROSOFT_MAIL,
+            IntegrationType.MICROSOFT_CALENDAR,
+        ],
+    },
+    "TENANT_2002": {
+        "name": "Sales Tenant 2",
+        "auto_actions": {
+            JobType.LEAD.value: True,
+            JobType.CUSTOMER_INQUIRY.value: True,
+        },
+        "enabled_job_types": [
+            "lead",
+            "customer_inquiry",
         ],
         "allowed_integrations": [
             IntegrationType.CRM,
@@ -55,7 +72,7 @@ TENANT_CONFIGS = {
             JobType.INVOICE.value: True,
         },
         "enabled_job_types": [
-            JobType.INVOICE,
+            "invoice",
         ],
         "allowed_integrations": [
             IntegrationType.ACCOUNTING,

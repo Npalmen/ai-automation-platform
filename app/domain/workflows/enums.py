@@ -6,8 +6,10 @@ class JobType(str, Enum):
     INTAKE = "intake"
     CLASSIFICATION = "classification"
     ENTITY_EXTRACTION = "entity_extraction"
+    DECISIONING = "decisioning"
     POLICY = "policy"
     HUMAN_HANDOFF = "human_handoff"
+    ACTION_DISPATCH = "action_dispatch"
 
     # Legacy / current
     EMAIL = "email"

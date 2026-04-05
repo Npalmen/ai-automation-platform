@@ -99,34 +99,101 @@ def tenant_test(tenant_id: str = "TENANT_1001"):
     }
 
 
-@app.post("/jobs")
+@app.post("/jobs", response_model=Job)
 def create_job(
-    payload: JobCreateRequest,
+    request: JobCreateRequest,
     db: Session = Depends(get_db),
-    x_tenant_id: str | None = Header(default=None),
+    x_tenant_id: str = Header(...),
 ):
-    if x_tenant_id is not None:
-        set_current_tenant(x_tenant_id)
+    set_current_tenant(x_tenant_id)
+    tenant_id = get_current_tenant()
 
-    current_tenant = get_current_tenant()
+    if tenant_id != request.tenant_id:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Tenant mismatch. "
+                f"Header tenant '{tenant_id}' does not match body tenant '{request.tenant_id}'."
+            ),
+        )
 
-    if not is_job_type_enabled_for_tenant(current_tenant, payload.job_type):
+    if not is_job_type_enabled_for_tenant(request.job_type, tenant_id):
         raise HTTPException(
             status_code=403,
-            detail=f"Job type '{payload.job_type.value}' is not enabled for tenant '{current_tenant}'.",
+            detail=f"Job type '{request.job_type.value}' is not enabled for tenant '{tenant_id}'.",
         )
 
     job = Job(
-        tenant_id=current_tenant,
-        job_type=payload.job_type,
-        input_data=payload.input_data,
+        tenant_id=request.tenant_id,
+        job_type=request.job_type,
+        input_data=request.input_data,
+        status="pending",
     )
 
-    JobRepository.create_job(db, job)
-    job = run_pipeline(job, db)
-    JobRepository.update_job(db, job)
+    try:
+        job = JobRepository.create_job(db, job)
 
-    return job
+        create_audit_event(
+            db=db,
+            tenant_id=tenant_id,
+            category="workflow",
+            action="job_created",
+            status="success",
+            details={"job_id": job.job_id},
+        )
+
+        job = run_pipeline(job, db)
+
+        create_audit_event(
+            db=db,
+            tenant_id=tenant_id,
+            category="workflow",
+            action="job_completed",
+            status="success",
+            details={"job_id": job.job_id},
+        )
+
+        return job
+
+    except Exception as e:
+        db.rollback()
+
+        try:
+            create_audit_event(
+                db=db,
+                tenant_id=tenant_id,
+                category="workflow",
+                action="job_failed",
+                status="error",
+                details={"error": str(e)},
+            )
+        except Exception:
+            pass
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"{type(e).__name__}: {str(e)}",
+        )
+
+    except Exception as e:
+        db.rollback()
+
+        try:
+            create_audit_event(
+                db=db,
+                tenant_id=tenant_id,
+                category="workflow",
+                action="job_failed",
+                status="error",
+                details={"error": str(e)},
+            )
+        except Exception:
+            pass
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"{type(e).__name__}: {str(e)}",
+        )
 
 
 @app.get("/job-types")

@@ -1,4 +1,5 @@
 from functools import lru_cache
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -42,6 +43,15 @@ class Settings(BaseSettings):
     MICROSOFT_MAIL_ACCESS_TOKEN: str = ""
     MICROSOFT_CALENDAR_ACCESS_TOKEN: str = ""
     MICROSOFT_CALENDAR_TIMEZONE: str = "W. Europe Standard Time"
+
+    LLM_API_URL: str = "https://api.openai.com/v1/chat/completions"
+    LLM_API_KEY: str = ""
+    LLM_MODEL: str = "gpt-4.1-mini"
+    LLM_TIMEOUT_SECONDS: int = 45
+    LLM_TEMPERATURE: float = 0.0
+    LLM_MAX_TOKENS: int = 1200
+    LLM_RETRY_ATTEMPTS: int = 2
+    LLM_RETRY_DELAY_SECONDS: float = 0.8
 
     model_config = SettingsConfigDict(
         env_file=".env",

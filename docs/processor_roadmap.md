@@ -1,114 +1,48 @@
-# Processor roadmap
+# Processor Roadmap
 
-## Purpose
-This file tracks the full processor roadmap for the AI automation platform.
+## Core Processors
+- Universal Intake Processor ✅
+- Classification AI Processor ✅
+- Entity Extraction AI Processor ✅
+- Policy Processor ✅
+- Human Handoff Processor ✅
+- Decisioning AI Processor ✅
 
-The system should continue using the existing workflow architecture under:
-- `app/workflows/processors/`
-- `app/workflows/pipeline_runner.py`
-- `app/workflows/processor_registry.py`
+## Sales Processors
+- Lead Scoring AI Processor ✅
+- Quote Processor ⏳
+- CRM Update Processor ⏳
+- Sales Follow-up Processor ⏳
+- Opportunity Summary Processor ⏳
 
-Do not build a separate processor framework outside the existing workflow system.
+## Support Processors
+- Customer Inquiry Processor ✅
+- Customer Inquiry AI Upgrade ⏳
+- Support Triage Processor ⏳
+- Response Draft Processor ⏳
+- Escalation Processor ⏳
+- Case Summary Processor ⏳
+- SLA Monitoring Processor ⏳
 
----
+## Finance Processors
+- Invoice Processor ✅
+- Invoice AI Extraction Upgrade ⏳
+- Receipt Processor ⏳
+- Approval Processor ⏳
+- Anomaly Processor ⏳
+- Payment Follow-up Processor ⏳
+- Finance Summary Processor ⏳
 
-## Status legend
-- [x] Implemented
-- [~] Started / partial
-- [ ] Planned
+## Management Processors
+- KPI Processor ⏳
+- Executive Summary Processor ⏳
+- Risk Processor ⏳
+- Decision Support Processor ⏳
+- Report Processor ⏳
 
----
-
-## Core processors
-- [x] INTAKE
-- [x] CLASSIFICATION
-- [x] ENTITY_EXTRACTION
-- [x] POLICY
-- [x] HUMAN_HANDOFF
-
----
-
-## Finance processors
-- [x] INVOICE
-- [ ] RECEIPT
-- [ ] APPROVAL
-- [ ] ANOMALY
-- [ ] PAYMENT_FOLLOWUP
-- [ ] FINANCE_SUMMARY
-
----
-
-## Sales processors
-- [x] LEAD
-- [ ] LEAD_QUALIFICATION
-- [ ] QUOTE
-- [ ] SALES_FOLLOWUP
-- [ ] CRM_UPDATE
-- [ ] OPPORTUNITY_SUMMARY
-
----
-
-## Support processors
-- [x] CUSTOMER_INQUIRY
-- [ ] SUPPORT_TRIAGE
-- [ ] RESPONSE_DRAFT
-- [ ] ESCALATION
-- [ ] CASE_SUMMARY
-- [ ] SLA_MONITORING
-
----
-
-## Management processors
-- [ ] KPI
-- [ ] EXEC_SUMMARY
-- [ ] RISK
-- [ ] DECISION_SUPPORT
-- [ ] REPORT
-
----
-
-## Legacy / utility processors
-- [~] EMAIL
-- [~] CONTRACT
-- [x] UNKNOWN
-
----
-
-## Current implemented flow
-### Base flow
-- intake
-- classification
-
-### Current dynamic invoice flow
-- intake
-- classification
-- entity_extraction
-- invoice
-- policy
-- human_handoff
-
----
-
-## Recommended build order
-1. LEAD
-2. CUSTOMER_INQUIRY
-3. RESPONSE_DRAFT
-4. CRM_UPDATE
-5. APPROVAL
-6. ANOMALY
-7. KPI / EXEC_SUMMARY / REPORT
-
----
-
-## Implementation rule
-Every processor should:
-1. build a `result`
-2. append to `job.processor_history`
-3. assign `job.result = result`
-4. return `job`
-
-## Context
-This roadmap should be read together with:
-- `docs/system_status.md`
-- `docs/implementation_plan.md`
-- `PROJECT_STATUS.md`
+## Design Rules
+- processors must be stateless
+- communication between processors happens via processor history
+- outputs must be strict JSON-compatible payloads
+- routing decisions are made in pipeline layer
+- AI failures must degrade to manual review safely

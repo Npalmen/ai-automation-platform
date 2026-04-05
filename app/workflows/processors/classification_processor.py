@@ -1,64 +1,54 @@
-from app.domain.workflows.enums import JobType
+from app.ai.schemas import ClassificationResponse
 from app.domain.workflows.models import Job
+from app.workflows.processors.ai_processor_utils import run_ai_step
 
 
-def process_classification_job(job: Job) -> Job:
-    payload = job.input_data or {}
+PROCESSOR_NAME = "classification_processor"
+PROMPT_NAME = "classification"
 
-    subject = (payload.get("subject") or "").strip().lower()
-    message_text = (payload.get("message_text") or "").strip().lower()
-    attachments = payload.get("attachments") or []
 
-    combined_text = f"{subject} {message_text}"
+def _build_source_context(job: Job) -> dict:
+    input_data = job.input_data or {}
+    sender = input_data.get("sender") or {}
+    attachments = input_data.get("attachments") or []
 
-    detected_type = JobType.UNKNOWN
-    confidence = 0.50
-    reasons = []
-
-    if "faktura" in combined_text or "invoice" in combined_text:
-        detected_type = JobType.INVOICE
-        confidence = 0.90
-        reasons.append("keyword_invoice")
-
-    elif "avtal" in combined_text or "contract" in combined_text:
-        detected_type = JobType.UNKNOWN
-        confidence = 0.60
-        reasons.append("contract_detected_but_not_enabled")
-
-    elif any(word in combined_text for word in ["offert", "quote", "pris", "price"]):
-        detected_type = JobType.LEAD
-        confidence = 0.80
-        reasons.append("keyword_lead")
-
-    elif any(word in combined_text for word in ["hjälp", "support", "problem", "fel"]):
-        detected_type = JobType.CUSTOMER_INQUIRY
-        confidence = 0.75
-        reasons.append("keyword_support")
-
-    elif attachments and any(
-        (att.get("filename") or "").lower().endswith(".pdf")
-        for att in attachments
-    ):
-        detected_type = JobType.INVOICE
-        confidence = 0.70
-        reasons.append("pdf_attachment_hint")
-
-    result = {
-        "status": "completed",
-        "summary": "Ärendet klassificerat.",
-        "requires_human_review": confidence < 0.70,
-        "payload": {
-            "processor_name": "classification_processor",
-            "detected_job_type": detected_type.value,
-            "confidence": confidence,
-            "reasons": reasons,
-            "recommended_next_step": detected_type.value,
+    return {
+        "job_id": job.job_id,
+        "tenant_id": job.tenant_id,
+        "input_data": {
+            "subject": input_data.get("subject"),
+            "message_text": input_data.get("message_text"),
+            "sender": {
+                "name": sender.get("name"),
+                "email": sender.get("email"),
+                "phone": sender.get("phone"),
+            },
+            "attachments": attachments,
         },
     }
 
-    job.processor_history.append({
-        "processor": "classification_processor",
-        "result": result,
-    })
-    job.result = result
-    return job
+
+def process_classification_job(job: Job) -> Job:
+    context = _build_source_context(job)
+
+    return run_ai_step(
+        job=job,
+        processor_name=PROCESSOR_NAME,
+        prompt_name = "classification_v1",
+        context=context,
+        response_model=ClassificationResponse,
+        success_summary="Ärendet klassificerat med AI.",
+        success_payload_builder=lambda parsed: {
+            "detected_job_type": parsed.detected_job_type,
+            "confidence": parsed.confidence,
+            "reasons": parsed.reasons,
+            "recommended_next_step": parsed.detected_job_type,
+        },
+        fallback_payload_builder=lambda error_message: {
+            "detected_job_type": "unknown",
+            "confidence": 0.0,
+            "reasons": ["classification_failed"],
+            "error": error_message,
+            "recommended_next_step": "manual_review",
+        },
+    )

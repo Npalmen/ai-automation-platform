@@ -1,5 +1,3 @@
-# app/integrations/google/mail_client.py
-
 import requests
 
 

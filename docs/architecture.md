@@ -74,7 +74,10 @@ Responsibilities:
 
 Currently implemented adapters:
 - Google
+- Microsoft
 - Visma
+- Fortnox
+- Monday
 
 ## Request flow: jobs
 1. request enters `POST /jobs`

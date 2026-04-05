@@ -1,132 +1,68 @@
-# System status
+# System Status
 
-## Current platform state
-The project is already a real platform foundation, not a prototype.
-
-### Stack
+## Core Platform
+Implemented:
 - FastAPI
 - PostgreSQL
 - SQLAlchemy
-- Pydantic
-
-### Logical structure
-```text
-app/
-  core/                  # config, tenant, audit
-  domain/workflows/      # models + schemas
-  workflows/             # job runner + processors
-  integrations/          # adapters + factory + policies
-  repositories/postgres/ # DB layer
-
-#### SYSTEM STATUS - Update
-
-###### Core Architecture
-
-Stack:
-- FastAPI
-- PostgreSQL
-- SQLAlchemy
-- Pydantic
-
----
+- Repository layer
+- tenant middleware
+- audit logging
+- integration event tracking
 
 ## Workflow Engine
+Implemented:
+- job creation
+- processor registry
+- dynamic pipeline runner
+- processor history tracking
+- policy gate
+- human handoff
 
-### Files
-- pipeline_runner.py
-- job_runner.py
-- processor_registry.py
-- processors/*
+## AI Core
+Implemented:
+- LLM client
+- prompt registry
+- Pydantic schemas for AI responses
+- safe fail handling
+- reusable AI processor utilities
 
----
+## Active AI Workflow
+Lead flow is active:
 
-## Pipeline Logic
+`intake -> classification -> entity_extraction -> lead_scoring -> decisioning -> policy -> human_handoff`
 
-```python
-BASE_PIPELINE = [
-    INTAKE,
-    CLASSIFICATION
-]
+## Current Verified Lead Result
+Example verified behavior:
+- request for offer on laddbox + elcentral
+- classified as `lead`
+- extracted contact details and requested service
+- scored as high-priority lead
+- decisioned to `priority_sales_followup`
+- approved by policy
+- no human handoff required
 
-POST_CLASSIFICATION_PIPELINES = {
-    INVOICE: [
-        ENTITY_EXTRACTION,
-        INVOICE,
-        POLICY,
-        HUMAN_HANDOFF
-    ],
-    LEAD: [
-        ENTITY_EXTRACTION,
-        LEAD,
-        POLICY,
-        HUMAN_HANDOFF
-    ],
-    CUSTOMER_INQUIRY: [
-        ENTITY_EXTRACTION,
-        CUSTOMER_INQUIRY,
-        POLICY,
-        HUMAN_HANDOFF
-    ],
-    UNKNOWN: [
-        POLICY,
-        HUMAN_HANDOFF
-    ]
-}
+## Reliability
+Implemented:
+- LLM request error handling
+- invalid JSON fallback
+- schema validation fallback
+- manual review fallback path
 
-# System Status - Update
+## Persistence
+Implemented:
+- DB save on job creation
+- DB save after each workflow step
 
-## Architecture
+## Audit Coverage
+Implemented for workflow:
+- job created
+- processor step completed
+- pipeline completed
+- pipeline failed
 
-Systemet är byggt som:
-
-- Event-driven pipeline
-- Processor-based execution
-- Integration dispatcher (async)
-
----
-
-## Data Flow
-
-1. Request → `/jobs`
-2. Job skapas
-3. Pipeline körs
-4. Processor_history uppdateras
-5. Dispatcher triggas
-6. Integration events skapas
-7. Retry worker hanterar leverans
-
----
-
-## Guarantees
-
-- Idempotency på integrationer
-- Retry med exponential backoff
-- Dead state efter max försök
-- Audit logging på alla actions
-
----
-
-## AI Status
-
-- LLM integration finns
-- Prompt system finns
-- Classification AI aktiv
-
----
-
-## Known Constraints
-
-- Tokens lagras statiskt (ingen OAuth ännu)
-- Ingen rate limiting ännu
-- Ingen caching av AI responses
-
----
-
-## System Health
-
-✔ stabil startup  
-✔ stabil DB  
-✔ stabil pipeline  
-✔ stabil integrations  
-
-→ redo för nästa lager
+## Risks Remaining
+- no invoice AI flow yet
+- customer inquiry AI not yet implemented
+- no direct integration dispatch from decisioning yet
+- persistence path should get integration tests

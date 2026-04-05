@@ -1,42 +1,73 @@
 from sqlalchemy.orm import Session
 
+from app.domain.workflows.enums import JobType
 from app.domain.workflows.models import Job
 from app.repositories.postgres.job_models import JobRecord
 
 
 class JobRepository:
+    @staticmethod
+    def _to_domain(record: JobRecord) -> Job:
+        stored_result = record.result or {}
+        processor_history = stored_result.get("processor_history", [])
+
+        result = stored_result.copy() if isinstance(stored_result, dict) else stored_result
+        if isinstance(result, dict) and "processor_history" in result:
+            result = result.copy()
+            result.pop("processor_history", None)
+
+        return Job(
+            job_id=record.job_id,
+            tenant_id=record.tenant_id,
+            job_type=JobType(record.job_type),
+            status=record.status,
+            input_data=record.input_data or {},
+            result=result,
+            processor_history=processor_history,
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+        )
 
     @staticmethod
-    def create_job(db: Session, job: Job) -> JobRecord:
+    def create_job(db: Session, job: Job) -> Job:
         record = JobRecord(
             job_id=job.job_id,
             tenant_id=job.tenant_id,
             job_type=job.job_type.value,
-            status=job.status.value,
+            status=job.status,
             input_data=job.input_data,
-            result=job.result,
+            result={
+                **(job.result or {}),
+                "processor_history": job.processor_history,
+            },
             created_at=job.created_at,
             updated_at=job.updated_at,
         )
         db.add(record)
         db.commit()
         db.refresh(record)
-        return record
+        return JobRepository._to_domain(record)
 
     @staticmethod
-    def update_job(db: Session, job: Job) -> JobRecord:
-        record = db.query(JobRecord).filter_by(job_id=job.job_id).first()
+    def update_job(db: Session, job: Job) -> Job:
+        db_job = JobRepository.get_job_by_id_record(db, job.tenant_id, job.job_id)
 
-        if record is None:
-            raise ValueError(f"Job {job.job_id} not found in database")
+        if not db_job:
+            raise ValueError("Job not found")
 
-        record.status = job.status.value
-        record.result = job.result
-        record.updated_at = job.updated_at
+        db_job.job_type = job.job_type.value if hasattr(job.job_type, "value") else str(job.job_type)
+        db_job.status = job.status
+        db_job.input_data = job.input_data
+        db_job.result = {
+            **(job.result or {}),
+            "processor_history": job.processor_history,
+        }
+        db_job.updated_at = job.updated_at
 
         db.commit()
-        db.refresh(record)
-        return record
+        db.refresh(db_job)
+
+        return JobRepository._to_domain(db_job)
 
     @staticmethod
     def list_jobs_for_tenant(
@@ -47,7 +78,6 @@ class JobRepository:
         job_type: str | None = None,
         status: str | None = None,
     ) -> list[JobRecord]:
-
         query = db.query(JobRecord).filter_by(tenant_id=tenant_id)
 
         if job_type is not None:
@@ -71,7 +101,6 @@ class JobRepository:
         job_type: str | None = None,
         status: str | None = None,
     ) -> int:
-
         query = db.query(JobRecord).filter_by(tenant_id=tenant_id)
 
         if job_type is not None:
@@ -83,9 +112,16 @@ class JobRepository:
         return query.count()
 
     @staticmethod
-    def get_job_by_id(db: Session, tenant_id: str, job_id: str) -> JobRecord | None:
+    def get_job_by_id_record(db: Session, tenant_id: str, job_id: str) -> JobRecord | None:
         return (
             db.query(JobRecord)
             .filter_by(tenant_id=tenant_id, job_id=job_id)
             .first()
         )
+
+    @staticmethod
+    def get_job_by_id(db: Session, tenant_id: str, job_id: str) -> Job | None:
+        record = JobRepository.get_job_by_id_record(db, tenant_id, job_id)
+        if record is None:
+            return None
+        return JobRepository._to_domain(record)
