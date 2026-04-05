@@ -106,3 +106,9 @@ Every processor should:
 2. append to `job.processor_history`
 3. assign `job.result = result`
 4. return `job`
+
+## Context
+This roadmap should be read together with:
+- `docs/system_status.md`
+- `docs/implementation_plan.md`
+- `PROJECT_STATUS.md`

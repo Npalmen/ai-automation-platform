@@ -93,3 +93,11 @@ Current implementation status:
 - Core: implemented
 - Invoice: implemented
 - Remaining finance, sales, support, and management processors: planned
+
+## Additional documentation
+Detailed current-state documentation is stored in:
+- `docs/system_status.md`
+- `docs/implementation_plan.md`
+- `docs/processor_roadmap.md`
+
+These files should be used as the main handoff context for future sessions.
