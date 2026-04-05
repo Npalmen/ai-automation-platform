@@ -9,9 +9,10 @@ class JobType(str, Enum):
     POLICY = "policy"
     HUMAN_HANDOFF = "human_handoff"
 
-    # Legacy / current active
+    # Legacy / current
     EMAIL = "email"
     CONTRACT = "contract"
+    UNKNOWN = "unknown"
 
     # Finance
     INVOICE = "invoice"
@@ -43,5 +44,3 @@ class JobType(str, Enum):
     RISK = "risk"
     DECISION_SUPPORT = "decision_support"
     REPORT = "report"
-
-    UNKNOWN = "unknown"
