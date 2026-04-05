@@ -1,6 +1,9 @@
 from app.domain.workflows.enums import JobType
 from app.domain.workflows.models import Job
 from app.workflows.job_runner import run_job
+from app.workflows.processor_registry import get_pipeline_for_job_type
+from app.integrations.dispatcher import IntegrationDispatcher
+from app.repositories.postgres.session import SessionLocal
 
 
 BASE_PIPELINE = [
@@ -75,3 +78,19 @@ def run_pipeline(job: Job, db):
         current_job.updated_at = step_result.updated_at
 
     return current_job
+
+
+async def run_pipeline(job):
+    pipeline = get_pipeline_for_job_type(job.job_type)
+
+    for processor_name in pipeline:
+        job = await run_job(job, processor_name)
+
+    db = SessionLocal()
+    try:
+        dispatcher = IntegrationDispatcher(db)
+        await dispatcher.dispatch(job)
+    finally:
+        db.close()
+
+    return job

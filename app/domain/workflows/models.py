@@ -1,8 +1,7 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 import uuid
-from typing import List, Dict, Any
 
 from app.domain.workflows.enums import JobType
 from app.domain.workflows.statuses import JobStatus

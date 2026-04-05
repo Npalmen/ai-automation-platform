@@ -78,3 +78,63 @@ Current state:
 Target:
 ```text
 intake -> classification -> extraction -> policy -> domain processor
+
+# Implementation Plan - update
+
+## Phase 1 – Core (DONE)
+- FastAPI
+- DB
+- Multi-tenant
+- Job system
+
+---
+
+## Phase 2 – Pipeline (DONE)
+- Processor system
+- History-driven logic
+- Business processors
+
+---
+
+## Phase 3 – Integrations (DONE)
+- Dispatcher
+- Retry worker
+- Idempotency
+- Manual retry
+- Smoke tests
+- Adapters
+
+---
+
+## Phase 4 – AI Layer (IN PROGRESS)
+
+### Step 1 (DONE)
+- LLM client
+- Prompt loader
+- Classification AI
+
+### Step 2 (NEXT)
+- Entity extraction AI
+- Lead scoring AI
+- Invoice validation AI
+
+### Step 3
+- Decision processor
+- Dynamic routing
+
+---
+
+## Phase 5 – Intelligence Layer
+
+- Auto decision making
+- Confidence thresholds
+- Hybrid human/AI system
+
+---
+
+## Phase 6 – Production
+
+- OAuth
+- Rate limiting
+- Monitoring
+- Alerting

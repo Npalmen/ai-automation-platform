@@ -72,3 +72,61 @@ POST_CLASSIFICATION_PIPELINES = {
         HUMAN_HANDOFF
     ]
 }
+
+# System Status - Update
+
+## Architecture
+
+Systemet är byggt som:
+
+- Event-driven pipeline
+- Processor-based execution
+- Integration dispatcher (async)
+
+---
+
+## Data Flow
+
+1. Request → `/jobs`
+2. Job skapas
+3. Pipeline körs
+4. Processor_history uppdateras
+5. Dispatcher triggas
+6. Integration events skapas
+7. Retry worker hanterar leverans
+
+---
+
+## Guarantees
+
+- Idempotency på integrationer
+- Retry med exponential backoff
+- Dead state efter max försök
+- Audit logging på alla actions
+
+---
+
+## AI Status
+
+- LLM integration finns
+- Prompt system finns
+- Classification AI aktiv
+
+---
+
+## Known Constraints
+
+- Tokens lagras statiskt (ingen OAuth ännu)
+- Ingen rate limiting ännu
+- Ingen caching av AI responses
+
+---
+
+## System Health
+
+✔ stabil startup  
+✔ stabil DB  
+✔ stabil pipeline  
+✔ stabil integrations  
+
+→ redo för nästa lager

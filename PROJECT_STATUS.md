@@ -178,4 +178,100 @@ Alla processorer:
 
 Systemet är redo att börja skapa affärsvärde.
 
+# AI Automation Platform – Project Status Update
+
+## 🟢 CURRENT STATE
+
+Systemet är nu en **production-ready multi-tenant automation backend** med:
+
+### Core
+- FastAPI backend
+- PostgreSQL (eller SQLite lokalt)
+- SQLAlchemy ORM
+- Multi-tenant stöd via header (`X-Tenant-ID`)
+- Tenant policy system (job_types + integrations)
+
+---
+
+## 🔧 WORKFLOW ENGINE
+
+### Arkitektur
+- `pipeline_runner` → styr flödet
+- `job_runner` → kör processor
+- `processor_registry` → mappar processor → funktion
+- `processor_history` → state management
+
+### Principer
+- job_type = affärstyp (inte steg)
+- processors är stateless
+- ALLT läser från `processor_history`
+- inga hårda beroenden mellan processors
+
+---
+
+## ⚙️ PROCESSORS (NU)
+
+### Core processors (fungerar)
+- Intake
+- Classification (AI + fallback)
+- Entity extraction
+- Policy
+- Human handoff
+
+### Business processors
+- Invoice validation
+- Duplicate detection
+- Approval
+- Lead scoring
+- Routing
+
+---
+
+## 🔌 INTEGRATION LAYER (KLART)
+
+### Funktioner
+- Dispatcher (async)
+- Idempotency
+- Retry logic (backoff)
+- Dead-letter state
+- Event storage i DB
+- Manual retry endpoint
+- Smoke test endpoints
+- Audit logging
+
+### Integrationer
+- CRM (webhook)
+- Accounting (webhook)
+- Support (webhook)
+- Monday
+- Fortnox
+- Visma
+- Google Mail
+- Google Calendar
+- Microsoft Mail
+- Microsoft Calendar
+
+---
+
+## 📡 API CAPABILITIES
+
+- `/jobs`
+- `/integrations`
+- `/integrations/events`
+- `/integrations/events/{id}/retry`
+- `/integrations/{type}/status`
+- `/integrations/{type}/smoke-test`
+- `/audit/events`
+
+---
+
+## 🧠 AI LAYER (STARTAT)
+
+### Implementerat
+- LLM client
+- Prompt system
+- Classification AI processor
+
+### Struktur
+
 These files should be used as the main handoff context for future sessions.

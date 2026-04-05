@@ -23,3 +23,36 @@ PROCESSOR_REGISTRY: dict[JobType, Processor] = {
     JobType.POLICY: process_policy_job,
     JobType.HUMAN_HANDOFF: process_human_handoff_job,
 }
+
+
+PIPELINES = {
+    "lead_processing": [
+        "universal_intake",
+        "classification",
+        "entity_extraction",
+        "lead_scoring",
+        "automation_policy",
+        "human_handoff",
+    ],
+    "invoice_processing": [
+        "universal_intake",
+        "classification",
+        "entity_extraction",
+        "invoice_validation",
+        "duplicate_detection",
+        "approval",
+        "automation_policy",
+        "human_handoff",
+    ],
+    "inquiry_processing": [
+        "universal_intake",
+        "classification",
+        "entity_extraction",
+        "automation_policy",
+        "human_handoff",
+    ],
+}
+
+
+def get_pipeline_for_job_type(job_type: str):
+    return PIPELINES.get(job_type, [])

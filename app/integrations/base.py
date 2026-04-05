@@ -1,17 +1,17 @@
+# app/integrations/base.py
+
 from abc import ABC, abstractmethod
-from typing import Any, Dict
-
-from app.integrations.config_models import IntegrationConnectionConfig
+from typing import Any
 
 
-class IntegrationAdapter(ABC):
-    def __init__(self, connection_config: IntegrationConnectionConfig | None = None):
-        self.connection_config = connection_config
+class BaseIntegrationAdapter(ABC):
+    def __init__(self, connection_config: dict[str, Any] | None = None):
+        self.connection_config = connection_config or {}
 
     @abstractmethod
-    def get_status(self) -> Dict[str, Any]:
-        pass
+    def execute_action(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
+        raise NotImplementedError
 
     @abstractmethod
-    def execute_action(self, action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        pass
+    def get_status(self) -> dict[str, Any]:
+        raise NotImplementedError
