@@ -1,111 +1,135 @@
 # AI Automation Platform
 
-## Status: AI Core Complete (v1)
+## Overview
 
-Systemet är nu en fungerande AI-driven workflow engine med:
+This system is a **multi-tenant AI workflow engine** designed to automate business processes such as:
 
-- Multi-tenant stöd
-- Pipeline-baserad job processing
-- AI-processorer (LLM)
-- Validation layer
-- Observability (audit + processor logs)
-- Integration dispatch
+- Lead handling
+- Invoice processing
+- Customer inquiries
+- Internal workflows
 
----
+The system combines:
 
-## Arkitektur
-
-### Pipeline
-1. Intake
-2. Classification
-3. Entity Extraction
-4. Domain Processor (Lead / Invoice / Inquiry)
-5. Decisioning
-6. Policy
-7. Human Handoff
+- AI processors
+- Deterministic orchestration
+- Human-in-the-loop approvals
+- Action execution (email, slack, etc.)
 
 ---
 
-## AI Processorer
+## Core Concept
 
-- Classification (ärendetyp)
-- Entity Extraction (datautvinning)
-- Lead Scoring
-- Customer Inquiry
-- Invoice Processing
-- Decisioning
+Each request becomes a **Job**.
 
-Alla använder:
-- `run_ai_step`
-- central prompt registry
-- fallback + validation
+A Job flows through:
+
+
+INTAKE → CLASSIFICATION → DOMAIN PROCESSORS → POLICY → ACTION / APPROVAL / HANDOFF
+
 
 ---
 
-## Funktioner
+## Key Features
 
-### Lead flow
-- Identifierar lead
-- Extraherar kontaktinfo
-- Score + prioritet
-- Routing → CRM / queue
-
-### Invoice flow
-- Extraherar fakturadata
-- Validerar
-- Duplicate detection
-- Approval route
-
-### Inquiry flow
-- Förstår kundfråga
-- Klassificerar intent
-- Skapar svar/route
+### AI Processing Pipeline
+- Classification (what is this?)
+- Entity extraction (what data is inside?)
+- Domain processors (lead, invoice, etc.)
+- Decisioning (what should happen?)
+- Policy (what is allowed?)
 
 ---
 
-## Observability
+### Orchestrator (Core Engine)
 
-- Audit events
-- Processor history
-- Full trace per job
+Handles:
 
----
-
-## Integrationer
-
-- Dispatcher kopplad till decisioning
-- Stöd för:
-  - CRM
-  - Notifications
-  - framtida system
+- Step execution
+- Dynamic routing
+- Error handling
+- Audit logging
+- Approval gating
 
 ---
 
-## Nästa steg
+### Human-in-the-loop
 
-### 1. CRM Integration (PRIO 1)
-- skapa leads automatiskt
-- koppla till riktig affär
+Supports:
 
-### 2. Queue system
-- manual_review
-- priority_sales_followup
-
-### 3. UI / Dashboard
-- lista jobb
-- se pipeline
-- hantera manuella ärenden
-
-### 4. Prompt tuning
-- bättre precision
-- stabil confidence
-
-### 5. Tenant config i DB
-- flytta från kod → databas
+- Manual review
+- Approval flows (email, slack, dashboard)
 
 ---
 
-## Kör projektet
+### Action Execution
 
-```bash
-uvicorn app.main:app --reload
+Executes:
+
+- Send email
+- Notify Slack
+- Create internal tasks
+
+---
+
+## Architecture
+
+
+app/
+core/ # config, audit, tenant
+domain/workflows/ # models, enums, schemas
+workflows/ # orchestrator, processors
+integrations/ # adapters (email, slack)
+repositories/ # DB layer
+
+
+---
+
+## Current Status
+
+### Completed
+- Multi-tenant system
+- Job system
+- AI processors
+- Orchestrator
+- Approval system
+- Action dispatcher
+
+### In Progress
+- Integrations (real providers)
+- UI
+- Persistence improvements
+
+---
+
+## Example Flow
+
+### Lead (auto execution)
+
+
+Lead → classified → scored → policy approves → action executed → completed
+
+
+### Invoice (manual review)
+
+
+Invoice → extracted → validation fails → policy → manual_review
+
+
+### Approval flow
+
+
+Policy → send_for_approval → approval_dispatch → await approval
+→ approve → action_dispatch → completed
+
+
+---
+
+## Philosophy
+
+- AI decides → system enforces
+- Always auditable
+- Always overrideable by human
+- Scalable across industries
+
+---

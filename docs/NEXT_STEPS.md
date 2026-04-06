@@ -1,56 +1,54 @@
 # Next Steps
 
-## Fas 1 – Monetisering (NU)
+## Phase 1 – MVP (Immediate)
 
-### CRM Integration
-- skapa lead automatiskt
-- koppla till:
-  - HubSpot / Salesforce / custom
+### Backend
+- [ ] Approval persistence (DB tables)
+- [ ] Action logs table
+- [ ] Email integration (SMTP / Sendgrid)
+- [ ] Slack integration (webhook)
 
-### Queue System
-- priority_sales_followup
-- manual_review
+### API
+- [ ] GET /jobs
+- [ ] GET /jobs/{id}
+- [ ] POST /approvals/{id}/approve
 
----
-
-## Fas 2 – Operativ UI
-
-Dashboard:
-- lista jobs
-- filter (status, typ)
-- visa processor history
-- manuell hantering
+### UI (minimal)
+- [ ] Job list
+- [ ] Approval buttons
+- [ ] Manual review queue
 
 ---
 
-## Fas 3 – Skalning
+## Phase 2 – First Customers
 
-- tenant config i DB
-- rate limiting
-- async processing / queue (Celery / Redis)
-
----
-
-## Fas 4 – Smart automation
-
-- auto-replies
-- auto-offers
-- document generation
+- [ ] Connect real input (email / webhook)
+- [ ] Deploy production instance
+- [ ] Onboard first business (lead automation)
 
 ---
 
-## Fas 5 – Produkt
+## Phase 3 – Scaling
 
-- onboarding flow
-- self-service setup
-- billing
+- [ ] Async workers (Celery / Redis)
+- [ ] Retry logic
+- [ ] Dead letter handling
 
 ---
 
-## Prioritet
+## Phase 4 – Productization
 
-1. CRM integration
-2. Queue
-3. UI
-4. Prompt tuning
-5. Skalning
+- [ ] Workflow configuration (DB-driven)
+- [ ] Tenant configs in DB
+- [ ] Role-based access
+
+---
+
+## Phase 5 – Advanced Features
+
+- [ ] Folder scanning / classification
+- [ ] Document automation
+- [ ] AI-driven routing improvements
+- [ ] Analytics dashboard
+
+---
