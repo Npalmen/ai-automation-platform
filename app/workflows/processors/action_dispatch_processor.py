@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from sqlalchemy.orm import Session
+
 from app.domain.workflows.models import Job
+from app.repositories.postgres.action_execution_repository import ActionExecutionRepository
 from app.workflows.action_executor import execute_action
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
@@ -15,7 +18,6 @@ PROCESSOR_NAME = "action_dispatch_processor"
 def _build_actions_from_input(job: Job) -> list[dict[str, Any]]:
     input_data = job.input_data or {}
     actions = input_data.get("actions")
-
     if actions is None:
         return []
 
@@ -34,7 +36,6 @@ def _build_actions_from_input(job: Job) -> list[dict[str, Any]]:
 def _build_actions_from_decisioning(job: Job) -> list[dict[str, Any]]:
     decisioning_payload = get_latest_processor_payload(job, "decisioning_processor")
     actions = decisioning_payload.get("actions")
-
     if actions is None:
         return []
 
@@ -53,6 +54,7 @@ def _build_actions_from_decisioning(job: Job) -> list[dict[str, Any]]:
 def _build_fallback_actions(job: Job) -> list[dict[str, Any]]:
     input_data = job.input_data or {}
     classification_payload = get_latest_processor_payload(job, "classification_processor")
+
     detected_job_type = classification_payload.get("detected_job_type", job.job_type.value)
     subject = input_data.get("subject") or f"New {detected_job_type}"
     message_text = input_data.get("message_text") or ""
@@ -121,24 +123,76 @@ def _resolve_actions(job: Job) -> list[dict[str, Any]]:
     return _build_fallback_actions(job)
 
 
-def process_action_dispatch_job(job: Job) -> Job:
-    actions = _resolve_actions(job)
+def _persist_successful_action(
+    db: Session | None,
+    job: Job,
+    request_action: dict[str, Any],
+    executed_action: dict[str, Any],
+    attempt_no: int,
+) -> None:
+    if db is None:
+        return
 
+    ActionExecutionRepository.create_from_executed_action(
+        db=db,
+        tenant_id=job.tenant_id,
+        job_id=job.job_id,
+        request_action=request_action,
+        executed_action=executed_action,
+        attempt_no=attempt_no,
+    )
+
+
+def _persist_failed_action(
+    db: Session | None,
+    job: Job,
+    request_action: dict[str, Any],
+    failure_payload: dict[str, Any],
+    attempt_no: int,
+) -> None:
+    if db is None:
+        return
+
+    ActionExecutionRepository.create_from_failed_action(
+        db=db,
+        tenant_id=job.tenant_id,
+        job_id=job.job_id,
+        request_action=request_action,
+        failure_payload=failure_payload,
+        attempt_no=attempt_no,
+    )
+
+
+def process_action_dispatch_job(job: Job, db: Session | None = None) -> Job:
+    actions = _resolve_actions(job)
     executed_actions: list[dict[str, Any]] = []
     failed_actions: list[dict[str, Any]] = []
 
-    for action in actions:
+    for index, action in enumerate(actions, start=1):
         try:
             executed = execute_action(action)
             executed_actions.append(executed)
+            _persist_successful_action(
+                db=db,
+                job=job,
+                request_action=action,
+                executed_action=executed,
+                attempt_no=index,
+            )
         except Exception as exc:
-            failed_actions.append(
-                {
-                    "type": action.get("type"),
-                    "status": "failed",
-                    "error": str(exc),
-                    "payload": action,
-                }
+            failure_payload = {
+                "type": action.get("type"),
+                "status": "failed",
+                "error": str(exc),
+                "payload": action,
+            }
+            failed_actions.append(failure_payload)
+            _persist_failed_action(
+                db=db,
+                job=job,
+                request_action=action,
+                failure_payload=failure_payload,
+                attempt_no=index,
             )
 
     requires_human_review = len(failed_actions) > 0

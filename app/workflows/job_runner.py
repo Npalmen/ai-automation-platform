@@ -1,54 +1,37 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import inspect
 from datetime import datetime, timezone
 
-from app.domain.workflows.enums import JobType
 from app.domain.workflows.models import Job
-from app.domain.workflows.statuses import JobStatus
-from app.workflows.processor_registry import get_processor
+from app.workflows.processor_registry import PROCESSOR_REGISTRY
 
 
-@dataclass(slots=True)
 class WorkflowStepExecutionError(Exception):
-    step: JobType
-    message: str
-
-    def __str__(self) -> str:
-        return f"Workflow step '{self.step.value}' failed: {self.message}"
-
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(message)
 
 
 def run_job(job: Job, db=None) -> Job:
-    """
-    Executes exactly one workflow step based on job.job_type.
+    processor = PROCESSOR_REGISTRY.get(job.job_type)
+    if processor is None:
+        raise ValueError(f"No processor registered for job type '{job.job_type.value}'")
 
-    The db argument is accepted for compatibility with existing callers,
-    but persistence is handled by the pipeline/orchestrator layer.
-    """
-    step = job.job_type
-    processor = get_processor(step)
-
-    working_job = job.model_copy(deep=True)
-    working_job.status = JobStatus.PROCESSING
-    working_job.updated_at = _utcnow()
+    job.status = "running"
+    job.updated_at = datetime.now(timezone.utc)
 
     try:
-        processed_job = processor(working_job)
+        signature = inspect.signature(processor)
+        if "db" in signature.parameters:
+            processed_job = processor(job, db=db)
+        else:
+            processed_job = processor(job)
+    except WorkflowStepExecutionError:
+        raise
     except Exception as exc:
-        raise WorkflowStepExecutionError(step=step, message=str(exc)) from exc
+        raise WorkflowStepExecutionError(str(exc)) from exc
 
-    processed_job.updated_at = _utcnow()
+    processed_job.status = "completed"
+    processed_job.updated_at = datetime.now(timezone.utc)
     return processed_job
-
-
-def run_job_step(job: Job, step: JobType) -> Job:
-    """
-    Explicit step execution helper for future orchestrator use.
-    """
-    working_job = job.model_copy(deep=True)
-    working_job.job_type = step
-    return run_job(working_job)

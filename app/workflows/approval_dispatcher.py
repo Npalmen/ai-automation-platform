@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit_service import create_audit_event
 from app.domain.workflows.models import Job
+from app.repositories.postgres.approval_repository import ApprovalRequestRepository
 from app.repositories.postgres.job_repository import JobRepository
 from app.workflows.approval_service import get_pending_approval
 from app.workflows.processors.ai_processor_utils import append_processor_result
@@ -64,7 +65,6 @@ def dispatch_approval_request(db: Session | None, job: Job) -> Job:
         return job
 
     payload = (job.result or {}).get("payload") or {}
-
     if payload.get("approval_delivery"):
         return job
 
@@ -86,17 +86,26 @@ def dispatch_approval_request(db: Session | None, job: Job) -> Job:
 
     if db:
         updated_job = JobRepository.update_job(db, updated_job)
-
-        create_audit_event(
+        ApprovalRequestRepository.upsert_from_payload(
             db=db,
             tenant_id=updated_job.tenant_id,
-            category="workflow",
-            action="approval_dispatched",
-            status="success",
-            details={
-                "job_id": updated_job.job_id,
-                "channel": delivery["channel"],
-            },
+            job_id=updated_job.job_id,
+            job_type=updated_job.job_type.value if hasattr(updated_job.job_type, "value") else str(updated_job.job_type),
+            approval_request=approval_request,
+            delivery_payload=delivery,
         )
+
+    create_audit_event(
+        db=db,
+        tenant_id=updated_job.tenant_id,
+        category="workflow",
+        action="approval_dispatched",
+        status="success",
+        details={
+            "job_id": updated_job.job_id,
+            "approval_id": approval_request.get("approval_id"),
+            "channel": delivery["channel"],
+        },
+    )
 
     return updated_job

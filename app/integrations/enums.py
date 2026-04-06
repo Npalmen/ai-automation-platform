@@ -5,6 +5,7 @@ class IntegrationType(str, Enum):
     CRM = "crm"
     ACCOUNTING = "accounting"
     SUPPORT = "support"
+    SLACK = "slack"
     MONDAY = "monday"
     FORTNOX = "fortnox"
     VISMA = "visma"

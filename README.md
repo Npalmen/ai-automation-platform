@@ -1,121 +1,192 @@
 # AI Automation Platform
 
-Multi-tenant AI automation backend för att ta emot ärenden, klassificera dem, extrahera data, fatta beslut, tillämpa policy och därefter antingen köra åtgärder automatiskt, skicka för approval eller lämna över till människa.
+Multi-tenant AI automation backend för att ta emot inkommande arbete, förstå det, fatta kontrollerade beslut och därefter:
 
-## Status
+- köra åtgärder automatiskt
+- pausa för approval
+- lämna över till människa
+
+Plattformen är byggd för att bli en osynlig AI-operatör för små bolag, växande bolag och enterprise use cases.
+
+---
+
+## Syfte
+
+Systemet automatiserar och orkestrerar arbetsflöden för exempelvis:
+
+- leads
+- fakturor
+- kundärenden
+- interna processer
+- notifieringar och uppföljningar
+
+Målet är inte “fri AI”, utan kontrollerad AI i en deterministisk workflow-motor där:
+
+- processors är stateless
+- jobs är stateful
+- orchestratorn styr flödet
+- AI används för strukturerade beslut, inte för att styra systemflödet direkt
+
+---
+
+## Nuvarande status
 
 Projektet är förbi ren prototyp och har nu en fungerande backend-kärna med:
 
 - FastAPI API
 - PostgreSQL persistence
-- SQLAlchemy repositories
+- SQLAlchemy repository layer
 - multi-tenant tenant-context via `X-Tenant-ID`
 - orchestrator-baserad workflow pipeline
 - AI-processorer med typed outputs
+- approval flow med pause/resume
+- action dispatch
 - audit events
-- integration dispatcher
-- approval flow med resume efter godkännande
+- approval persistence i DB
+- action execution persistence i DB
+- read-endpoints för approvals och actions
+- live-testad Gmail integration via Google Mail provider
 
-## Vad plattformen gör
+Detta är nu en teknisk MVP med riktig exekveringsförmåga, inte bara en konceptuell arkitektur.
 
-Plattformen tar in ett jobb via API och kör det genom en processor-pipeline:
+---
 
-1. Intake
-2. Classification
-3. Entity Extraction
-4. Domänprocessor
-5. Decisioning
-6. Policy
-7. Action Dispatch eller Approval / Human Handoff
+## Arkitektur i korthet
 
-Målet är att göra inkommande arbete maskinellt behandlingsbart utan att förlora kontroll, spårbarhet eller fallback till människa.
-
-## Nuvarande pipeline-logik
-
-### Bassteg
-
-Alla workflows börjar med:
-
-- `intake`
-- `classification`
-
-### Därefter per ärendetyp
-
-#### Lead
-- `entity_extraction`
-- `lead`
-- `decisioning`
-- `policy`
-- `action_dispatch`
-- `human_handoff`
-
-#### Customer inquiry
-- `entity_extraction`
-- `customer_inquiry`
-- `decisioning`
-- `policy`
-- `action_dispatch`
-- `human_handoff`
-
-#### Invoice
-- `entity_extraction`
-- `invoice`
-- `policy`
-- `human_handoff`
-
-#### Unknown
-- `policy`
-- `human_handoff`
-
-## Kärnprinciper
+### Kärnregler
 
 - Alla processors är stateless
-- Kommunikation mellan steg sker via `processor_history`
-- AI-svar ska vara strukturerade och validerbara
-- Failures ska degradera säkert
-- Policy avgör om systemet får exekvera, kräver approval eller ska stanna för manuell hantering
+- Jobbet bär historik via `processor_history`
+- Orchestratorn styr pipeline, skip logic och resume-logik
+- Policy avgör om systemet får autoexekvera, kräver approval eller måste stanna för manuell hantering
+- AI-output ska vara strukturerad, validerbar och sparbar
+
+### Workflow-princip
+
+Bassteg:
+
+1. `intake`
+2. `classification`
+
+Därefter dynamisk pipeline beroende på ärendetyp.
+
+### Exempel: lead flow
+
+1. `intake`
+2. `classification`
+3. `entity_extraction`
+4. `lead`
+5. `decisioning`
+6. `policy`
+7. `action_dispatch`
+8. `human_handoff` vid behov
+
+### Approval flow
+
+1. pipeline når policy
+2. policy kräver approval
+3. approval request skapas
+4. jobbet pausas som `awaiting_approval`
+5. approve/reject via API
+6. approve återupptar post-approval path
+7. reject skickar till `manual_review`
+
+---
+
+## Vad som fungerar nu
+
+### Core
+- FastAPI backend
+- settings, logging och tenant middleware
+- PostgreSQL + repositories
+- job persistence
+
+### AI pipeline
+- intake
+- classification
+- entity extraction
+- lead processor
+- invoice processor
+- decisioning
+- policy
+
+### Workflow engine
+- dynamisk pipeline
+- skip logic
+- audit logging
+- error handling
+- approval resume
+
+### Integrations
+- Google Mail / Gmail provider fungerar live för `send_email`
+- Slack finns som integrationsspår
+- Monday, Visma, Google och Microsoft ligger i integrationsarkitekturen
+
+### Persistence
+- jobs
+- audit events
+- approval requests
+- action executions
+
+### Read/API surface
+- job list
+- job detail
+- pending approvals
+- job approvals
+- job actions
+- approve / reject
+
+---
+
+## Vad som saknas för säljbar produkt
+
+Nästa stora fokus är inte mer kärnarkitektur, utan produktisering:
+
+1. minimal operator/admin UI
+2. input connectors
+3. DB-driven tenant config
+4. auth / API keys / roller
+5. bättre testtäckning
+6. riktig integration event persistence för direkta integrationstest-endpoints
+7. onboardingflöde för kundkoppling av Gmail, Visma, Monday och Slack
+
+---
 
 ## API-översikt
 
 ### Core
 - `GET /`
 - `GET /tenant`
-- `GET /tenant/test`
-- `GET /job-types`
 - `GET /jobs`
 - `GET /jobs/{job_id}`
 - `POST /jobs`
 
-### Approvals
-- `GET /approvals/{job_id}`
-- `POST /approvals/{job_id}/approve`
-- `POST /approvals/{job_id}/reject`
+### Actions / approvals
+- `GET /jobs/{job_id}/actions`
+- `GET /jobs/{job_id}/approvals`
+- `GET /approvals/pending`
+- `POST /approvals/{approval_id}/approve`
+- `POST /approvals/{approval_id}/reject`
 
 ### Integrations
 - `GET /integrations`
-- `GET /integrations/available`
-- `GET /integrations/{integration_type}/status`
-- `POST /integrations/{integration_type}/action`
-- `POST /integrations/{integration_type}/smoke-test`
-- `GET /integrations/events`
-- `GET /integrations/events/{event_id}`
-- `POST /integrations/events/{event_id}/retry`
-- `GET /integrations/events/all`
+- `POST /integrations/{integration_type}/execute`
 
 ### Audit
-- `GET /audit/events`
-- `GET /audit/events/all`
+- `GET /audit-events`
+
+---
 
 ## Mappstruktur
 
 ```text
 app/
-  ai/                     # LLM client, prompts, AI schemas/exceptions
-  api/                    # API routes + dependencies
-  core/                   # settings, logging, tenancy, config, audit service
-  domain/                 # domain models, enums, schemas
-  integrations/           # adapters, enums, factory, dispatcher
-  repositories/postgres/  # persistence layer
-  workflows/              # orchestrator, pipeline, processors, approval logic
-tests/
+  ai/
+  api/
+  core/
+  domain/
+  integrations/
+  repositories/postgres/
+  workflows/
 docs/
+tests/

@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     STORAGE_PATH: str = "./storage/local_dev"
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/ai_platform"
 
+    EMAIL_PROVIDER: str = "google_mail"
+
     CRM_WEBHOOK_URL: str = ""
     CRM_API_KEY: str | None = None
 
@@ -19,6 +21,10 @@ class Settings(BaseSettings):
 
     SUPPORT_WEBHOOK_URL: str = ""
     SUPPORT_API_KEY: str | None = None
+
+    SLACK_PROVIDER: str = "webhook"
+    SLACK_WEBHOOK_URL: str = ""
+    SLACK_TIMEOUT_SECONDS: int = 10
 
     MONDAY_API_URL: str = "https://api.monday.com/v2"
     MONDAY_API_KEY: str = ""

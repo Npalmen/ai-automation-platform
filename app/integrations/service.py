@@ -1,7 +1,48 @@
 # app/integrations/service.py
+from __future__ import annotations
+
+import os
+import re
 
 from app.core.settings import get_settings
 from app.integrations.enums import IntegrationType
+
+
+def _normalize_tenant_key(tenant_id: str) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9]", "_", tenant_id or "")
+    normalized = re.sub(r"_+", "_", normalized).strip("_")
+    return normalized.upper()
+
+
+def _tenant_override(tenant_id: str, key: str) -> str | None:
+    tenant_key = _normalize_tenant_key(tenant_id)
+    if not tenant_key:
+        return None
+
+    candidates = (
+        f"TENANT_{tenant_key}__{key}",
+        f"TENANT_{tenant_key}_{key}",
+    )
+
+    for candidate in candidates:
+        value = os.getenv(candidate)
+        if value not in (None, ""):
+            return value
+
+    return None
+
+
+def _tenant_or_default(tenant_id: str, key: str, default):
+    override = _tenant_override(tenant_id, key)
+    if override is None:
+        return default
+    return override
+
+
+def _as_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def get_integration_connection_config(
@@ -9,6 +50,24 @@ def get_integration_connection_config(
     integration_type: IntegrationType,
 ) -> dict:
     settings = get_settings()
+    
+
+    if integration_type == IntegrationType.SLACK:
+        return {
+            "provider": _tenant_or_default(tenant_id, "SLACK_PROVIDER", settings.SLACK_PROVIDER),
+            "webhook_url": _tenant_or_default(
+                tenant_id,
+                "SLACK_WEBHOOK_URL",
+                settings.SLACK_WEBHOOK_URL,
+            ),
+            "timeout_seconds": int(
+                _tenant_or_default(
+                    tenant_id,
+                    "SLACK_TIMEOUT_SECONDS",
+                    settings.SLACK_TIMEOUT_SECONDS,
+                )
+            ),
+        }
 
     if integration_type == IntegrationType.MONDAY:
         return {
@@ -78,3 +137,19 @@ def get_integration_connection_config(
     raise ValueError(
         f"Unsupported integration type '{integration_type.value}' for tenant '{tenant_id}'."
     )
+
+
+def is_integration_configured(connection_config: dict) -> bool:
+    provider = str(connection_config.get("provider") or "").strip().lower()
+
+    if provider == "smtp":
+        return bool(
+            connection_config.get("host")
+            and connection_config.get("port")
+            and connection_config.get("from_email")
+        )
+
+    if provider == "webhook":
+        return bool(connection_config.get("webhook_url"))
+
+    return False
