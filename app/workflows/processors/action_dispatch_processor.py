@@ -1,97 +1,165 @@
-from app.domain.workflows.models import Job
-from app.integrations.enums import IntegrationType
-from app.integrations.factory import get_integration_adapter
-from app.integrations.service import get_integration_connection_config
+from __future__ import annotations
 
+from typing import Any
+
+from app.domain.workflows.models import Job
+from app.workflows.action_executor import execute_action
+from app.workflows.processors.ai_processor_utils import (
+    append_processor_result,
+    get_latest_processor_payload,
+)
 
 PROCESSOR_NAME = "action_dispatch_processor"
 
 
-def get_last_payload(job: Job, processor_name: str) -> dict:
-    for item in reversed(job.processor_history):
-        if item["processor"] == processor_name:
-            return item["result"]["payload"]
-    return {}
+def _build_actions_from_input(job: Job) -> list[dict[str, Any]]:
+    input_data = job.input_data or {}
+    actions = input_data.get("actions")
+
+    if actions is None:
+        return []
+
+    if not isinstance(actions, list):
+        raise ValueError("input_data.actions must be a list.")
+
+    normalized: list[dict[str, Any]] = []
+    for item in actions:
+        if not isinstance(item, dict):
+            raise ValueError("Each item in input_data.actions must be an object.")
+        normalized.append(item)
+
+    return normalized
+
+
+def _build_actions_from_decisioning(job: Job) -> list[dict[str, Any]]:
+    decisioning_payload = get_latest_processor_payload(job, "decisioning_processor")
+    actions = decisioning_payload.get("actions")
+
+    if actions is None:
+        return []
+
+    if not isinstance(actions, list):
+        raise ValueError("decisioning_processor payload.actions must be a list.")
+
+    normalized: list[dict[str, Any]] = []
+    for item in actions:
+        if not isinstance(item, dict):
+            raise ValueError("Each decisioning action must be an object.")
+        normalized.append(item)
+
+    return normalized
+
+
+def _build_fallback_actions(job: Job) -> list[dict[str, Any]]:
+    input_data = job.input_data or {}
+    classification_payload = get_latest_processor_payload(job, "classification_processor")
+    detected_job_type = classification_payload.get("detected_job_type", job.job_type.value)
+    subject = input_data.get("subject") or f"New {detected_job_type}"
+    message_text = input_data.get("message_text") or ""
+
+    owner_email = input_data.get("owner_email")
+    slack_channel = input_data.get("slack_channel")
+    teams_channel = input_data.get("teams_channel")
+
+    actions: list[dict[str, Any]] = []
+
+    if owner_email:
+        actions.append(
+            {
+                "type": "send_email",
+                "to": owner_email,
+                "subject": f"[AI Automation] {subject}",
+                "body": message_text or f"A new {detected_job_type} job was processed.",
+            }
+        )
+
+    if slack_channel:
+        actions.append(
+            {
+                "type": "notify_slack",
+                "channel": slack_channel,
+                "message": f"Processed job '{subject}' as {detected_job_type}.",
+            }
+        )
+
+    if teams_channel:
+        actions.append(
+            {
+                "type": "notify_teams",
+                "channel": teams_channel,
+                "message": f"Processed job '{subject}' as {detected_job_type}.",
+            }
+        )
+
+    if not actions:
+        actions.append(
+            {
+                "type": "create_internal_task",
+                "title": f"Follow up: {subject}",
+                "description": message_text or f"Review processed {detected_job_type} job.",
+                "assignee": None,
+                "metadata": {
+                    "job_id": job.job_id,
+                    "tenant_id": job.tenant_id,
+                    "detected_job_type": detected_job_type,
+                },
+            }
+        )
+
+    return actions
+
+
+def _resolve_actions(job: Job) -> list[dict[str, Any]]:
+    input_actions = _build_actions_from_input(job)
+    if input_actions:
+        return input_actions
+
+    decisioning_actions = _build_actions_from_decisioning(job)
+    if decisioning_actions:
+        return decisioning_actions
+
+    return _build_fallback_actions(job)
 
 
 def process_action_dispatch_job(job: Job) -> Job:
-    decision = get_last_payload(job, "decisioning_processor")
-    policy = get_last_payload(job, "policy_processor")
-    extraction = get_last_payload(job, "entity_extraction_processor")
-    lead = get_last_payload(job, "lead_processor")
-    inquiry = get_last_payload(job, "customer_inquiry_processor")
-    invoice = get_last_payload(job, "invoice_processor")
+    actions = _resolve_actions(job)
 
-    action_flags = decision.get("action_flags", {})
-    target_queue = decision.get("target_queue")
-    allow_auto = policy.get("decision") == "allow_auto"
+    executed_actions: list[dict[str, Any]] = []
+    failed_actions: list[dict[str, Any]] = []
 
-    actions_executed: list[str] = []
-    dispatch_errors: list[str] = []
-
-    if allow_auto:
+    for action in actions:
         try:
-            if action_flags.get("create_crm_lead"):
-                connection_config = get_integration_connection_config(
-                    job.tenant_id,
-                    IntegrationType.CRM,
-                )
-                adapter = get_integration_adapter(
-                    IntegrationType.CRM,
-                    connection_config=connection_config,
-                )
-
-                adapter.execute_action(
-                    action="create_lead",
-                    payload={
-                        "job_id": job.job_id,
-                        "tenant_id": job.tenant_id,
-                        "target_queue": target_queue,
-                        "input_data": job.input_data,
-                        "entities": extraction.get("entities", {}),
-                        "lead_score": lead.get("lead_score"),
-                        "priority": lead.get("priority"),
-                        "routing": lead.get("routing"),
-                        "processor_history": job.processor_history,
-                    },
-                )
-
-                actions_executed.append("crm_lead_created")
-
-            if invoice and invoice.get("approval_route") == "auto_approve":
-                actions_executed.append("invoice_ready_for_accounting")
-
-            if target_queue in {"support_queue", "billing_queue", "case_queue", "sales_queue"}:
-                actions_executed.append(f"routed_to_{target_queue}")
-
-            if inquiry.get("routing") == "manual_review":
-                dispatch_errors.append("inquiry_requires_manual_review")
-
+            executed = execute_action(action)
+            executed_actions.append(executed)
         except Exception as exc:
-            dispatch_errors.append(str(exc))
+            failed_actions.append(
+                {
+                    "type": action.get("type"),
+                    "status": "failed",
+                    "error": str(exc),
+                    "payload": action,
+                }
+            )
 
-    requires_human_review = len(dispatch_errors) > 0
+    requires_human_review = len(failed_actions) > 0
 
     result = {
         "status": "completed",
-        "summary": "Actions dispatched." if not dispatch_errors else "Action dispatch failed.",
+        "summary": (
+            "Actions dispatched successfully."
+            if not requires_human_review
+            else "One or more actions failed during dispatch."
+        ),
         "requires_human_review": requires_human_review,
         "payload": {
             "processor_name": PROCESSOR_NAME,
-            "actions_executed": actions_executed,
-            "dispatch_errors": dispatch_errors,
-            "target_queue": target_queue,
-            "recommended_next_step": "manual_review" if requires_human_review else target_queue,
+            "actions_requested": actions,
+            "actions_executed": executed_actions,
+            "actions_failed": failed_actions,
+            "executed_count": len(executed_actions),
+            "failed_count": len(failed_actions),
+            "recommended_next_step": "manual_review" if requires_human_review else "completed",
         },
     }
 
-    job.result = result
-    job.processor_history.append(
-        {
-            "processor": PROCESSOR_NAME,
-            "result": result,
-        }
-    )
-
-    job.status = "completed"
-    return job
+    return append_processor_result(job, PROCESSOR_NAME, result)

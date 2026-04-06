@@ -40,11 +40,13 @@ from app.repositories.postgres.integration_repository import IntegrationReposito
 from app.repositories.postgres.base import Base
 from app.repositories.postgres.session import engine
 
+from app.api.approval_routes import router as approval_router
+
 settings = get_settings()
 setup_logging()
 
 app = FastAPI(title=settings.APP_NAME)
-
+app.include_router(approval_router)
 
 @app.on_event("startup")
 async def on_startup():

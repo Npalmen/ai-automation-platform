@@ -1,186 +1,252 @@
+from __future__ import annotations
+
+from typing import Any
+
 from app.domain.workflows.models import Job
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
     get_latest_processor_payload,
 )
 
-
 PROCESSOR_NAME = "policy_processor"
 
-LOW_CONFIDENCE_THRESHOLD = 0.70
-VERY_LOW_CONFIDENCE_THRESHOLD = 0.50
 
+def _as_float(value: Any) -> float | None:
+    if value is None:
+        return None
 
-def _to_float(value, default: float = 0.0) -> float:
-    try:
+    if isinstance(value, (int, float)):
         return float(value)
+
+    try:
+        return float(str(value).replace(",", ".").strip())
     except (TypeError, ValueError):
-        return default
+        return None
+
+
+def _dedupe(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+
+    for item in items:
+        if not item:
+            continue
+        if item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+
+    return result
 
 
 def process_policy_job(job: Job) -> Job:
+    input_data = job.input_data or {}
+    latest_payload = (job.result or {}).get("payload") or {}
+
     classification_payload = get_latest_processor_payload(job, "classification_processor")
     extraction_payload = get_latest_processor_payload(job, "entity_extraction_processor")
     invoice_payload = get_latest_processor_payload(job, "invoice_processor")
     lead_payload = get_latest_processor_payload(job, "lead_processor")
     inquiry_payload = get_latest_processor_payload(job, "customer_inquiry_processor")
     decisioning_payload = get_latest_processor_payload(job, "decisioning_processor")
-    dispatch_payload = get_latest_processor_payload(job, "action_dispatch_processor")
 
-    detected_job_type = classification_payload.get("detected_job_type", "unknown")
+    detected_job_type = (
+        classification_payload.get("detected_job_type")
+        or latest_payload.get("detected_job_type")
+        or job.job_type.value
+    )
 
-    classification_confidence = _to_float(classification_payload.get("confidence"))
-    extraction_confidence = _to_float(extraction_payload.get("confidence"))
-    lead_confidence = _to_float(lead_payload.get("confidence"))
-    inquiry_confidence = _to_float(inquiry_payload.get("confidence"))
-    invoice_confidence = _to_float(invoice_payload.get("confidence"))
-    decisioning_confidence = _to_float(decisioning_payload.get("confidence"))
+    classification_confidence = _as_float(classification_payload.get("confidence"))
+    extraction_confidence = _as_float(extraction_payload.get("confidence"))
+    lead_confidence = _as_float(lead_payload.get("confidence"))
+    inquiry_confidence = _as_float(inquiry_payload.get("confidence"))
+    invoice_confidence = _as_float(invoice_payload.get("confidence"))
+    decisioning_confidence = _as_float(decisioning_payload.get("confidence"))
 
-    validation_status = invoice_payload.get("validation_status")
-    missing_critical = invoice_payload.get("missing_critical", [])
-    duplicate_suspected = bool(invoice_payload.get("duplicate_suspected", False))
-    approval_route = invoice_payload.get("approval_route")
+    extraction_validation = extraction_payload.get("validation") or {}
+    extraction_issues = extraction_validation.get("issues") or []
 
-    extraction_validation = extraction_payload.get("validation", {}) or {}
-    invoice_validation = invoice_payload.get("validation", {}) or {}
+    invoice_validation = invoice_payload.get("validation") or {}
+    invoice_issues = invoice_validation.get("issues") or []
+    invoice_missing_critical = invoice_payload.get("missing_critical") or []
+    invoice_duplicate_suspected = bool(invoice_payload.get("duplicate_suspected", False))
+    invoice_validation_status = invoice_payload.get("validation_status")
 
     lead_routing = lead_payload.get("routing")
+    lead_target_queue = lead_payload.get("target_queue")
+
     inquiry_routing = inquiry_payload.get("routing")
-    decision = decisioning_payload.get("decision")
-    target_queue = decisioning_payload.get("target_queue")
+    inquiry_target_queue = inquiry_payload.get("target_queue")
 
-    dispatch_errors = dispatch_payload.get("dispatch_errors", []) or []
+    decisioning_decision = decisioning_payload.get("decision")
+    decisioning_target_queue = decisioning_payload.get("target_queue")
+    decisioning_actions = decisioning_payload.get("actions") or []
 
-    requires_human_review = False
     reasons: list[str] = []
-    final_decision = "allow_auto"
+    missing_critical: list[str] = []
+    duplicate_suspected = False
+    validation_status: str | None = None
+    target_queue: str | None = None
+    approval_route: str | None = None
+    decision = "assist"
+    requires_human_review = False
+    recommended_next_step = "continue_automation"
 
-    # hard fail / unknown
-    if detected_job_type == "unknown":
-        requires_human_review = True
-        reasons.append("unknown_job_type")
-        final_decision = "hold_for_review"
+    if extraction_issues:
+        reasons.extend(extraction_issues)
 
-    # base confidence gate
-    if classification_confidence < LOW_CONFIDENCE_THRESHOLD:
-        requires_human_review = True
-        reasons.append("low_classification_confidence")
+    if input_data.get("force_approval_test") is True:
+        result = {
+            "status": "completed",
+            "summary": "Policy bedömd.",
+            "requires_human_review": False,
+            "payload": {
+                "processor_name": PROCESSOR_NAME,
+                "decision": "send_for_approval",
+                "reasons": ["forced_approval_test"],
+                "detected_job_type": detected_job_type,
+                "classification_confidence": classification_confidence,
+                "extraction_confidence": extraction_confidence,
+                "lead_confidence": lead_confidence,
+                "inquiry_confidence": inquiry_confidence,
+                "invoice_confidence": invoice_confidence,
+                "decisioning_confidence": decisioning_confidence,
+                "target_queue": None,
+                "validation_status": "approval_test_mode",
+                "missing_critical": [],
+                "duplicate_suspected": False,
+                "approval_route": "approval_required",
+                "recommended_next_step": "awaiting_approval",
+            },
+        }
+        return append_processor_result(job, PROCESSOR_NAME, result)
 
-    # extraction gate
-    if extraction_payload:
-        if extraction_confidence < LOW_CONFIDENCE_THRESHOLD:
-            requires_human_review = True
-            reasons.append("low_extraction_confidence")
+    if detected_job_type == "invoice":
+        missing_critical.extend(invoice_missing_critical)
+        duplicate_suspected = invoice_duplicate_suspected
+        validation_status = invoice_validation_status
 
-        if not extraction_validation.get("is_valid", True):
-            requires_human_review = True
-            reasons.extend(extraction_validation.get("issues", []))
+        if invoice_issues:
+            reasons.extend(invoice_issues)
 
-    # domain-specific gates
-    if detected_job_type == "lead":
-        if lead_confidence < LOW_CONFIDENCE_THRESHOLD:
-            requires_human_review = True
-            reasons.append("low_lead_confidence")
-
-        if lead_routing == "manual_review":
-            requires_human_review = True
-            reasons.append("lead_requires_manual_review")
-
-        # conflict: AI says lead, but decision route is missing/weird
-        if decisioning_payload:
-            if decisioning_confidence < LOW_CONFIDENCE_THRESHOLD:
-                requires_human_review = True
-                reasons.append("low_decisioning_confidence")
-
-            if decision == "manual_review":
-                requires_human_review = True
-                reasons.append("decisioning_manual_review")
-
-            elif decision == "hold":
-                requires_human_review = True
-                reasons.append("decisioning_hold")
-
-            elif decision == "auto_route" and not target_queue:
-                requires_human_review = True
-                reasons.append("missing_target_queue")
-
-    elif detected_job_type == "customer_inquiry":
-        if inquiry_confidence < LOW_CONFIDENCE_THRESHOLD:
-            requires_human_review = True
-            reasons.append("low_inquiry_confidence")
-
-        if inquiry_routing == "manual_review":
-            requires_human_review = True
-            reasons.append("inquiry_requires_manual_review")
-
-        if decisioning_payload:
-            if decisioning_confidence < LOW_CONFIDENCE_THRESHOLD:
-                requires_human_review = True
-                reasons.append("low_decisioning_confidence")
-
-            if decision == "manual_review":
-                requires_human_review = True
-                reasons.append("decisioning_manual_review")
-
-            elif decision == "hold":
-                requires_human_review = True
-                reasons.append("decisioning_hold")
-
-    elif detected_job_type == "invoice":
-        if invoice_confidence < LOW_CONFIDENCE_THRESHOLD:
-            requires_human_review = True
-            reasons.append("low_invoice_confidence")
-
-        if not invoice_validation.get("is_valid", True):
-            requires_human_review = True
-            reasons.extend(invoice_validation.get("issues", []))
-
-        if validation_status in {"incomplete", "manual_review"}:
-            requires_human_review = True
+        if invoice_validation_status == "manual_review":
             reasons.append("invoice_not_validated")
 
-        if duplicate_suspected:
-            requires_human_review = True
-            reasons.append("invoice_duplicate_suspected")
-
-        if approval_route in {"approval_required", "manual_review"}:
-            requires_human_review = True
+        invoice_requires_review = bool(
+            invoice_payload.get("recommended_next_step") == "manual_review"
+            or latest_payload.get("recommended_next_step") == "manual_review"
+        )
+        if invoice_requires_review:
             reasons.append("invoice_requires_review")
 
-    # very low confidence gate across processors
-    confidence_map = {
-        "classification": classification_confidence,
-        "extraction": extraction_confidence,
-        "lead": lead_confidence,
-        "inquiry": inquiry_confidence,
-        "invoice": invoice_confidence,
-        "decisioning": decisioning_confidence,
-    }
+        if duplicate_suspected:
+            reasons.append("duplicate_suspected")
 
-    for name, value in confidence_map.items():
-        if value and value < VERY_LOW_CONFIDENCE_THRESHOLD:
+        if reasons or missing_critical or duplicate_suspected:
+            decision = "hold_for_review"
             requires_human_review = True
-            reasons.append(f"very_low_{name}_confidence")
-
-    # dispatch gate
-    if dispatch_errors:
-        requires_human_review = True
-        reasons.append("dispatch_failed")
-
-    # final decision
-    if detected_job_type == "invoice":
-        if not requires_human_review and approval_route == "auto_approve":
-            final_decision = "auto_approve"
-        elif requires_human_review:
-            final_decision = "hold_for_review"
+            approval_route = "manual_review"
+            recommended_next_step = "manual_review"
+            target_queue = None
         else:
-            final_decision = "send_for_approval"
+            decision = "send_for_approval"
+            requires_human_review = False
+            approval_route = "approval_required"
+            recommended_next_step = "awaiting_approval"
+            target_queue = None
+
+    elif detected_job_type == "lead":
+        target_queue = decisioning_target_queue or lead_target_queue
+        approval_route = decisioning_payload.get("approval_route")
+
+        low_confidence = bool(
+            lead_payload.get("low_confidence", False)
+            or decisioning_payload.get("low_confidence", False)
+        )
+
+        if low_confidence:
+            reasons.append("lead_low_confidence")
+
+        if extraction_issues:
+            reasons.append("lead_missing_identity")
+
+        if decisioning_decision == "send_for_approval":
+            decision = "send_for_approval"
+            requires_human_review = False
+            approval_route = approval_route or "approval_required"
+            recommended_next_step = "awaiting_approval"
+        elif decisioning_decision == "auto_execute":
+            decision = "auto_execute"
+            requires_human_review = False
+            approval_route = None
+            recommended_next_step = "action_dispatch"
+        elif low_confidence:
+            decision = "hold_for_review"
+            requires_human_review = True
+            approval_route = "manual_review"
+            recommended_next_step = "manual_review"
+            target_queue = target_queue or "manual_review"
+        else:
+            decision = "auto_execute"
+            requires_human_review = False
+            approval_route = None
+            recommended_next_step = (
+                decisioning_payload.get("recommended_next_step")
+                or lead_routing
+                or "action_dispatch"
+            )
+
+    elif detected_job_type == "customer_inquiry":
+        target_queue = decisioning_target_queue or inquiry_target_queue
+        approval_route = decisioning_payload.get("approval_route")
+
+        low_confidence = bool(
+            inquiry_payload.get("low_confidence", False)
+            or decisioning_payload.get("low_confidence", False)
+        )
+
+        if low_confidence:
+            reasons.append("inquiry_low_confidence")
+
+        if extraction_issues:
+            reasons.append("inquiry_missing_identity")
+
+        if decisioning_decision == "send_for_approval":
+            decision = "send_for_approval"
+            requires_human_review = False
+            approval_route = approval_route or "approval_required"
+            recommended_next_step = "awaiting_approval"
+        elif decisioning_decision == "auto_execute":
+            decision = "auto_execute"
+            requires_human_review = False
+            approval_route = None
+            recommended_next_step = "action_dispatch"
+        elif low_confidence:
+            decision = "hold_for_review"
+            requires_human_review = True
+            approval_route = "manual_review"
+            recommended_next_step = "manual_review"
+            target_queue = target_queue or "manual_review"
+        else:
+            decision = "auto_execute"
+            requires_human_review = False
+            approval_route = None
+            recommended_next_step = (
+                decisioning_payload.get("recommended_next_step")
+                or inquiry_routing
+                or "action_dispatch"
+            )
 
     else:
-        final_decision = "hold_for_review" if requires_human_review else "allow_auto"
+        decision = "hold_for_review"
+        requires_human_review = True
+        approval_route = "manual_review"
+        recommended_next_step = "manual_review"
+        target_queue = "manual_review"
+        reasons.append("unknown_job_type")
 
-    # dedupe reasons
-    reasons = sorted(set(reasons))
+    reasons = _dedupe(reasons)
+    missing_critical = _dedupe(missing_critical)
 
     result = {
         "status": "completed",
@@ -188,25 +254,22 @@ def process_policy_job(job: Job) -> Job:
         "requires_human_review": requires_human_review,
         "payload": {
             "processor_name": PROCESSOR_NAME,
-            "decision": final_decision,
+            "decision": decision,
             "reasons": reasons,
             "detected_job_type": detected_job_type,
             "classification_confidence": classification_confidence,
             "extraction_confidence": extraction_confidence,
-            "lead_confidence": lead_confidence or None,
-            "inquiry_confidence": inquiry_confidence or None,
-            "invoice_confidence": invoice_confidence or None,
-            "decisioning_confidence": decisioning_confidence or None,
+            "lead_confidence": lead_confidence,
+            "inquiry_confidence": inquiry_confidence,
+            "invoice_confidence": invoice_confidence,
+            "decisioning_confidence": decisioning_confidence,
             "target_queue": target_queue,
             "validation_status": validation_status,
             "missing_critical": missing_critical,
             "duplicate_suspected": duplicate_suspected,
             "approval_route": approval_route,
-            "recommended_next_step": (
-                "manual_review"
-                if requires_human_review
-                else (target_queue or final_decision)
-            ),
+            "recommended_next_step": recommended_next_step,
+            "actions_present": bool(decisioning_actions or input_data.get("actions")),
         },
     }
 
