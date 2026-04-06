@@ -1,72 +1,126 @@
 # AI Architecture
 
-## Core Principle
+## Purpose
 
-Alla AI-steg använder:
+AI-lagret ger plattformen förmågan att:
 
-- Standardiserad runner (`run_ai_step`)
-- Typed responses (Pydantic)
-- Validation layer
-- Fallback handling
+- klassificera inkommande jobb
+- extrahera strukturerad data
+- scorea och prioritera ärenden
+- fatta riktade beslut inför routing och exekvering
+- stödja policy- och approval-flöden
 
----
-
-## run_ai_step
-
-Ansvar:
-- LLM call
-- parsing
-- validation
-- fallback
-- logging
+Målet är inte “fri AI”, utan kontrollerad AI i en deterministisk workflow-ram.
 
 ---
 
-## Prompt System
+## Core Design Principle
 
-Alla prompts ligger i:
+Alla AI-steg ska följa samma modell:
 
-app/workflows/prompts/
-
-Ex:
-- classification.txt
-- entity_extraction.txt
-- lead_scoring.txt
-- decisioning.txt
-- invoice.txt
-- inquiry.txt
+1. bygg processor-specifikt context
+2. kalla AI via standardiserad runner
+3. validera svaret mot typed schema
+4. returnera standardiserad payload
+5. degradera säkert vid fel eller låg tillit
 
 ---
 
-## Validation Layer
+## AI Building Blocks
 
-Regler:
-- missing critical → manual_review
-- low confidence → manual_review
-- duplicate detection → invoice
+### 1. LLM Client
+LLM-klienten kapslar anrop till modellen och isolerar AI-kommunikation från processorlogiken.
+
+### 2. Prompt Registry
+Prompts hålls centralt så att varje processor använder definierade instruktioner och inte hårdkodad prompttext utspridd i systemet.
+
+### 3. Typed Schemas
+AI-svar ska valideras strukturellt, inte bara tolkas löst.
+
+### 4. Fallback Handling
+Felaktigt JSON-svar, låg confidence eller schemafel ska inte ge okontrollerad automation.
+
+---
+
+## AI-enabled Processors
+
+Nuvarande AI-centrerade steg i systemet inkluderar minst:
+
+- classification
+- entity extraction
+- lead scoring / lead processor
+- decisioning
+
+Arkitekturen är också upplagd för att utöka invoice och inquiry-flöden med mer AI-tyngd.
+
+---
+
+## Relationship to Workflow Engine
+
+AI fattar inte ensam slutgiltig exekveringsrätt.
+
+Istället gäller:
+
+- AI producerar strukturerad output
+- workflow-lagret använder outputen
+- policy avgör om automation är tillåten
+- approval eller human handoff fångar osäkra fall
+
+Det betyder att AI är en beslutsmotor i delsteg, inte systemets ensamma kontrollpunkt.
+
+---
+
+## Input and Output Contract
+
+Varje AI-processor ska lämna ifrån sig payload som:
+
+- är JSON-kompatibel
+- är möjlig att spara i `processor_history`
+- kan användas av nästa steg
+- kan granskas av människa i efterhand
+
+Detta är centralt för:
+- traceability
+- debugging
+- replay/resume
+- policy reasoning
+
+---
+
+## Confidence and Safety
+
+Confidence används som en styrsignal, inte som enda sanning.
+
+Exempel på konsekvenser:
+- låg confidence kan ge manual review
+- tveksamt case kan ge approval
+- schemafel ska trigga fallback
+- invalid output får inte trigga automation
 
 ---
 
 ## Processor Pattern
 
-Varje processor:
-1. bygger context
-2. kör `run_ai_step`
-3. returnerar standard payload
+Varje AI-processor bör följa samma interna struktur:
+
+1. läs relevant historik och input
+2. bygg context
+3. kör AI-anrop
+4. validera schema
+5. paketera resultat
+6. append till `processor_history`
+7. lämna över till orchestrator
 
 ---
 
-## Observability
+## Why This Matters
 
-- processor_history
-- audit_events
-- full trace per job
+Den här modellen gör att systemet blir:
 
----
+- testbart
+- robust
+- utbyggbart
+- säkert att automatisera stegvis
+- begripligt för både utveckling och drift
 
-## Designmål
-
-- deterministiskt beteende ovanpå AI
-- robust fallback
-- enkel att testa
-- enkel att expandera
+Det är avgörande om plattformen ska bli kundbar inom dokumenthantering, lead automation eller supporttriage där felaktig automation annars snabbt blir dyr.

@@ -1,135 +1,121 @@
 # AI Automation Platform
 
-## Overview
+Multi-tenant AI automation backend för att ta emot ärenden, klassificera dem, extrahera data, fatta beslut, tillämpa policy och därefter antingen köra åtgärder automatiskt, skicka för approval eller lämna över till människa.
 
-This system is a **multi-tenant AI workflow engine** designed to automate business processes such as:
+## Status
 
-- Lead handling
-- Invoice processing
-- Customer inquiries
-- Internal workflows
+Projektet är förbi ren prototyp och har nu en fungerande backend-kärna med:
 
-The system combines:
+- FastAPI API
+- PostgreSQL persistence
+- SQLAlchemy repositories
+- multi-tenant tenant-context via `X-Tenant-ID`
+- orchestrator-baserad workflow pipeline
+- AI-processorer med typed outputs
+- audit events
+- integration dispatcher
+- approval flow med resume efter godkännande
 
-- AI processors
-- Deterministic orchestration
-- Human-in-the-loop approvals
-- Action execution (email, slack, etc.)
+## Vad plattformen gör
 
----
+Plattformen tar in ett jobb via API och kör det genom en processor-pipeline:
 
-## Core Concept
+1. Intake
+2. Classification
+3. Entity Extraction
+4. Domänprocessor
+5. Decisioning
+6. Policy
+7. Action Dispatch eller Approval / Human Handoff
 
-Each request becomes a **Job**.
+Målet är att göra inkommande arbete maskinellt behandlingsbart utan att förlora kontroll, spårbarhet eller fallback till människa.
 
-A Job flows through:
+## Nuvarande pipeline-logik
 
+### Bassteg
 
-INTAKE → CLASSIFICATION → DOMAIN PROCESSORS → POLICY → ACTION / APPROVAL / HANDOFF
+Alla workflows börjar med:
 
+- `intake`
+- `classification`
 
----
+### Därefter per ärendetyp
 
-## Key Features
+#### Lead
+- `entity_extraction`
+- `lead`
+- `decisioning`
+- `policy`
+- `action_dispatch`
+- `human_handoff`
 
-### AI Processing Pipeline
-- Classification (what is this?)
-- Entity extraction (what data is inside?)
-- Domain processors (lead, invoice, etc.)
-- Decisioning (what should happen?)
-- Policy (what is allowed?)
+#### Customer inquiry
+- `entity_extraction`
+- `customer_inquiry`
+- `decisioning`
+- `policy`
+- `action_dispatch`
+- `human_handoff`
 
----
+#### Invoice
+- `entity_extraction`
+- `invoice`
+- `policy`
+- `human_handoff`
 
-### Orchestrator (Core Engine)
+#### Unknown
+- `policy`
+- `human_handoff`
 
-Handles:
+## Kärnprinciper
 
-- Step execution
-- Dynamic routing
-- Error handling
-- Audit logging
-- Approval gating
+- Alla processors är stateless
+- Kommunikation mellan steg sker via `processor_history`
+- AI-svar ska vara strukturerade och validerbara
+- Failures ska degradera säkert
+- Policy avgör om systemet får exekvera, kräver approval eller ska stanna för manuell hantering
 
----
+## API-översikt
 
-### Human-in-the-loop
+### Core
+- `GET /`
+- `GET /tenant`
+- `GET /tenant/test`
+- `GET /job-types`
+- `GET /jobs`
+- `GET /jobs/{job_id}`
+- `POST /jobs`
 
-Supports:
+### Approvals
+- `GET /approvals/{job_id}`
+- `POST /approvals/{job_id}/approve`
+- `POST /approvals/{job_id}/reject`
 
-- Manual review
-- Approval flows (email, slack, dashboard)
+### Integrations
+- `GET /integrations`
+- `GET /integrations/available`
+- `GET /integrations/{integration_type}/status`
+- `POST /integrations/{integration_type}/action`
+- `POST /integrations/{integration_type}/smoke-test`
+- `GET /integrations/events`
+- `GET /integrations/events/{event_id}`
+- `POST /integrations/events/{event_id}/retry`
+- `GET /integrations/events/all`
 
----
+### Audit
+- `GET /audit/events`
+- `GET /audit/events/all`
 
-### Action Execution
+## Mappstruktur
 
-Executes:
-
-- Send email
-- Notify Slack
-- Create internal tasks
-
----
-
-## Architecture
-
-
+```text
 app/
-core/ # config, audit, tenant
-domain/workflows/ # models, enums, schemas
-workflows/ # orchestrator, processors
-integrations/ # adapters (email, slack)
-repositories/ # DB layer
-
-
----
-
-## Current Status
-
-### Completed
-- Multi-tenant system
-- Job system
-- AI processors
-- Orchestrator
-- Approval system
-- Action dispatcher
-
-### In Progress
-- Integrations (real providers)
-- UI
-- Persistence improvements
-
----
-
-## Example Flow
-
-### Lead (auto execution)
-
-
-Lead → classified → scored → policy approves → action executed → completed
-
-
-### Invoice (manual review)
-
-
-Invoice → extracted → validation fails → policy → manual_review
-
-
-### Approval flow
-
-
-Policy → send_for_approval → approval_dispatch → await approval
-→ approve → action_dispatch → completed
-
-
----
-
-## Philosophy
-
-- AI decides → system enforces
-- Always auditable
-- Always overrideable by human
-- Scalable across industries
-
----
+  ai/                     # LLM client, prompts, AI schemas/exceptions
+  api/                    # API routes + dependencies
+  core/                   # settings, logging, tenancy, config, audit service
+  domain/                 # domain models, enums, schemas
+  integrations/           # adapters, enums, factory, dispatcher
+  repositories/postgres/  # persistence layer
+  workflows/              # orchestrator, pipeline, processors, approval logic
+tests/
+docs/

@@ -1,99 +1,140 @@
-# PROJECT STATUS
+# Project Status
 
-## Current Status
-Platform is running with:
-- FastAPI API layer
-- PostgreSQL persistence
-- SQLAlchemy repositories
-- Multi-tenant policy controls
-- Processor-based workflow engine
-- Integration dispatcher with retry support
-- AI Core with LLM client and prompt system
-- AI-driven lead pipeline
+## Executive Summary
 
-## Verified Workflow State
-The following lead pipeline is working end-to-end:
+AI Automation Platform har nu en fungerande backend-kärna för multi-tenant workflow automation med AI-steg, policykontroll, approval-hantering, integration dispatch, audit trail och PostgreSQL-baserad persistence.
 
-1. universal_intake_processor
-2. classification_processor
-3. entity_extraction_processor
-4. lead_processor
-5. decisioning_processor
-6. policy_processor
-7. human_handoff_processor
+Det här är inte längre bara en konceptuell arkitektur. Kärnflödet finns och kan köras via API.
 
-Verified output:
-- classification identifies lead correctly
-- entity extraction returns strict JSON
-- lead scoring returns score/priority/routing
-- decisioning returns target queue and action flags
-- policy uses AI confidence and routing output
-- human handoff is skipped when automation is allowed
+---
 
-## AI Core Status
-Implemented:
-- `app/ai/llm/client.py`
-- `app/ai/prompts/registry.py`
-- `app/ai/schemas.py`
-- `app/ai/exceptions.py`
+## Nuvarande status
 
-Behavior:
-- strict JSON response handling
-- schema validation with Pydantic
-- safe fallback to manual review on AI failure
-- processor outputs always written to `processor_history`
+### Klart och fungerande
 
-## Processor Status
+- FastAPI-applikation med tenant-aware middleware
+- PostgreSQL/SQLAlchemy persistence via repository layer
+- workflow orchestration via `WorkflowOrchestrator`
+- AI-baserade processorsteg för klassificering, extraktion, scoring och decisioning
+- policy-steg som avgör auto / approval / review
+- approval-routes med approve/reject
+- resume efter approval
+- integration event tracking och retry
+- audit events för workflow och integrationsaktiviteter
+- jobb-listning och jobb-detalj via API
 
-### Implemented and Active
-- Universal Intake Processor
-- Classification AI Processor
-- Entity Extraction AI Processor
-- Lead Scoring AI Processor
-- Decisioning AI Processor
-- Policy Processor
-- Human Handoff Processor
+### Delvis klart
 
-### Existing Domain Processors
-- Invoice Processor
-- Customer Inquiry Processor
+- invoice-flödet finns i pipeline men behöver hårdare AI-extraktion och affärslogik
+- customer inquiry-flödet finns men behöver uppgraderas funktionellt för verklig support/sales-triage
+- action dispatch finns i arkitekturen men behöver fler riktiga adapters och säkrare exekveringsregler
 
-## Persistence Status
-Current state:
-- workflow runs correctly in memory through the full processor chain
-- audit events are written during workflow execution
-- repository-based persistence for per-step job state is not fully wired yet
+### Inte klart
 
-Note:
-- direct SQLAlchemy `Session.add/merge` on `app.domain.workflows.models.Job` is not valid in the current architecture
-- next implementation step is to persist workflow state through the repository layer instead of direct ORM session usage
+- admin/dashboard UI
+- full DB-driven tenant config
+- full workflow configuration UI
+- produktionshärdad auth/roles
+- full observability/dashboarding
+- deployment story för säljbar SaaS eller managed install
 
-## Audit Status
-Implemented:
-- job_created
-- processor_step_completed
-- job_pipeline_completed
-- job_pipeline_failed
+---
 
-## Testing Status
-Passing:
-- AI classification success
-- AI classification fallback
-- entity extraction success
-- lead scoring success
-- decisioning fallback
-- low-confidence classification manual review
+## Verifierat systembeteende
 
-## Current Architecture Rules
-- processors are stateless
-- all inter-step communication goes via `processor_history`
-- no direct processor-to-processor dependencies
-- AI outputs must be strict JSON
-- workflow routing is done in pipeline layer, not in LLM client
+### Workflow orchestration
 
-## Next Recommended Phase
-1. Customer Inquiry AI
-2. Invoice AI extraction/decisioning
-3. Integration dispatch from decisioning output
-4. More test coverage for full pipeline and DB persistence
-5. Update docs continuously with each completed phase
+Systemet kör:
+- baspipeline med `intake` och `classification`
+- därefter dynamisk pipeline beroende på klassificerat jobb
+
+### Lead path
+
+Lead-flödet går vidare till:
+- `entity_extraction`
+- `lead`
+- `decisioning`
+- `policy`
+- `action_dispatch`
+- `human_handoff`
+
+### Approval behavior
+
+Om policy kräver approval:
+- `action_dispatch` hoppas över
+- jobbet går till `awaiting_approval`
+- approval request byggs och skickas
+- godkännande kan återuppta exekvering från post-approval path
+
+### Safe degradation
+
+Vid fel eller osäkerhet ska plattformen falla tillbaka till:
+- approval
+- manual review
+- human handoff
+beroende på policy och workflow-resultat
+
+---
+
+## API-status
+
+### Jobb
+- skapa jobb
+- lista jobb per tenant
+- hämta enskilt jobb
+
+### Approvals
+- hämta approval-status
+- approve
+- reject
+
+### Integrations
+- lista tillgängliga integrationer
+- statuskontroll
+- action execution
+- smoke test
+- event listing
+- retry av integration event
+
+### Audit
+- tenant-scope audit listing
+- global audit listing
+
+---
+
+## Teknisk mognad
+
+### MVP backend
+Projektet har nu tillräcklig backend-yta för att fungera som intern MVP eller pilotplattform.
+
+### Inte ännu “produktklar”
+För att bli säljbar produkt behövs främst:
+- bättre ops-yta
+- säkrare tenant/admin-modell
+- fler riktiga integrationer
+- hårdare testning
+- tydligare deploymentmodell
+- kommersiellt paketerade use cases
+
+---
+
+## Största dokumentationsproblem just nu
+
+Tidigare docs blandar gammal och ny arkitektur. Vissa filer beskriver fortfarande:
+- ingen riktig persistence
+- ingen audit trail
+- enklare processorstruktur
+
+Det stämmer inte längre fullt ut och bör därför ersättas av uppdaterade docs i repo.
+
+---
+
+## Rekommenderad tolkning av nuläget
+
+Det här projektet är nu i övergången mellan:
+- avancerad intern teknisk MVP
+och
+- första verkliga kundbara versionen
+
+Backend-kärnan finns.
+Nästa arbete bör fokusera på produktisering, inte bara mer grundarkitektur.
