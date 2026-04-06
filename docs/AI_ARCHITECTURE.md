@@ -6,121 +6,110 @@ AI-lagret ger plattformen förmågan att:
 
 - klassificera inkommande jobb
 - extrahera strukturerad data
-- scorea och prioritera ärenden
-- fatta riktade beslut inför routing och exekvering
-- stödja policy- och approval-flöden
+- prioritera och scorea ärenden
+- ge beslutsunderlag till policy och routing
+- stödja approval- och human handoff-flöden
 
-Målet är inte “fri AI”, utan kontrollerad AI i en deterministisk workflow-ram.
+Målet är inte autonom AI utan kontrollerad AI i en deterministisk workflow-motor.
 
 ---
 
-## Core Design Principle
+## Design Principle
 
-Alla AI-steg ska följa samma modell:
+Varje AI-steg ska följa samma modell:
 
 1. bygg processor-specifikt context
 2. kalla AI via standardiserad runner
-3. validera svaret mot typed schema
+3. validera mot typed schema
 4. returnera standardiserad payload
-5. degradera säkert vid fel eller låg tillit
+5. skriv resultat till `processor_history`
+6. degradera säkert vid fel eller låg tillit
+
+---
+
+## Viktig gränsdragning
+
+AI ska inte styra systemflödet direkt.
+
+Det som gäller är:
+
+- AI producerar strukturerad output
+- workflow-lagret läser outputen
+- policy avgör om automation är tillåten
+- approval eller human handoff fångar osäkra fall
+
+Det gör att plattformen förblir testbar, replaybar och spårbar.
 
 ---
 
 ## AI Building Blocks
 
 ### 1. LLM Client
-LLM-klienten kapslar anrop till modellen och isolerar AI-kommunikation från processorlogiken.
+Isolerar modellanrop från processorlogik.
 
 ### 2. Prompt Registry
-Prompts hålls centralt så att varje processor använder definierade instruktioner och inte hårdkodad prompttext utspridd i systemet.
+Centraliserar instruktioner per processor.
 
 ### 3. Typed Schemas
-AI-svar ska valideras strukturellt, inte bara tolkas löst.
+Tvingar AI-svar till validerbar struktur.
 
 ### 4. Fallback Handling
-Felaktigt JSON-svar, låg confidence eller schemafel ska inte ge okontrollerad automation.
+Schemafel, låg confidence eller trasig output får inte leda till okontrollerad automation.
 
 ---
 
 ## AI-enabled Processors
 
-Nuvarande AI-centrerade steg i systemet inkluderar minst:
+Nuvarande AI-centrerade steg inkluderar:
 
 - classification
 - entity extraction
-- lead scoring / lead processor
+- lead processor
 - decisioning
 
-Arkitekturen är också upplagd för att utöka invoice och inquiry-flöden med mer AI-tyngd.
+Invoice och inquiry har arkitekturmässig plats men behöver hårdnas vidare.
 
 ---
 
-## Relationship to Workflow Engine
+## Output Contract
 
-AI fattar inte ensam slutgiltig exekveringsrätt.
-
-Istället gäller:
-
-- AI producerar strukturerad output
-- workflow-lagret använder outputen
-- policy avgör om automation är tillåten
-- approval eller human handoff fångar osäkra fall
-
-Det betyder att AI är en beslutsmotor i delsteg, inte systemets ensamma kontrollpunkt.
-
----
-
-## Input and Output Contract
-
-Varje AI-processor ska lämna ifrån sig payload som:
+Varje AI-processor ska lämna payload som:
 
 - är JSON-kompatibel
-- är möjlig att spara i `processor_history`
-- kan användas av nästa steg
-- kan granskas av människa i efterhand
+- kan sparas i `processor_history`
+- kan läsas av nästa steg
+- kan granskas i efterhand
+- kan ligga till grund för approval, audit och replay
 
 Detta är centralt för:
+
 - traceability
 - debugging
-- replay/resume
+- resume
 - policy reasoning
 
 ---
 
 ## Confidence and Safety
 
-Confidence används som en styrsignal, inte som enda sanning.
+Confidence är en styrsignal, inte ensam sanning.
 
-Exempel på konsekvenser:
-- låg confidence kan ge manual review
-- tveksamt case kan ge approval
-- schemafel ska trigga fallback
-- invalid output får inte trigga automation
+Konsekvenser kan vara:
 
----
-
-## Processor Pattern
-
-Varje AI-processor bör följa samma interna struktur:
-
-1. läs relevant historik och input
-2. bygg context
-3. kör AI-anrop
-4. validera schema
-5. paketera resultat
-6. append till `processor_history`
-7. lämna över till orchestrator
+- låg confidence → manual review
+- osäkert case → approval
+- schemafel → fallback
+- invalid output → ingen automation
 
 ---
 
-## Why This Matters
+## Strategic AI Direction
 
-Den här modellen gör att systemet blir:
+Nästa steg för AI-lagret är inte fler generella features först, utan:
 
-- testbart
-- robust
-- utbyggbart
-- säkert att automatisera stegvis
-- begripligt för både utveckling och drift
+1. högre precision i inquiry triage
+2. säkrare invoice extraction
+3. bättre testbarhet och evals
+4. tydligare contracts mellan AI-output och action-paths
 
-Det är avgörande om plattformen ska bli kundbar inom dokumenthantering, lead automation eller supporttriage där felaktig automation annars snabbt blir dyr.
+Det viktigaste är att AI:n fortsätter vara kontrollerad och affärsmässigt säker.

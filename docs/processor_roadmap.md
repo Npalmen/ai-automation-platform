@@ -17,11 +17,11 @@ Detta dokument beskriver processorlandskapet i plattformen: vad som finns, vad s
 - Human Handoff Processor
 
 ### Kommentar
-Dessa steg utgör plattformens generiska backbone.
+Dessa steg utgör plattformens generiska backbone och ska hållas generella.
 
 ---
 
-## Sales Processors
+## Sales / Lead Processors
 
 ### Implementerade
 - Lead Processor
@@ -29,33 +29,31 @@ Dessa steg utgör plattformens generiska backbone.
 
 ### Nästa rimliga steg
 - CRM Create/Update Processor
-- Quote Preparation Processor
 - Follow-up Processor
 - Opportunity Summary Processor
 
 ### Kommentar
-Lead-automation är närmast att bli första verkliga kundbara use caset.
+Lead-automation är det närmaste spåret till tydligt kommersiellt värde.
 
 ---
 
-## Support Processors
+## Support / Inquiry Processors
 
 ### Implementerade
 - Customer Inquiry Processor
 
 ### Behöver stärkas
-- Inquiry AI Upgrade
 - Triage Processor
 - Response Draft Processor
 - Escalation Processor
 - Case Summary Processor
 
 ### Kommentar
-Support-spåret har bra arkitekturposition men behöver mer produktnivålogik.
+Inquiry-spåret är strategiskt viktigt, men måste bli mer operativt innan det är säljklart.
 
 ---
 
-## Finance Processors
+## Finance / Invoice Processors
 
 ### Implementerade
 - Invoice Processor
@@ -64,20 +62,21 @@ Support-spåret har bra arkitekturposition men behöver mer produktnivålogik.
 - Invoice AI Extraction
 - Validation / Approval Processor
 - Duplicate / Anomaly Processor
-- Payment Follow-up Processor
 - Finance Summary Processor
 
 ### Kommentar
-Finance-spåret bör byggas försiktigt eftersom riskkostnaden för fel är högre.
+Finance-spåret ska byggas försiktigt eftersom felkostnaden är högre.
 
 ---
 
-## Governance / Control Processors
+## Governance / Control
 
 ### Implementerade
 - Policy Processor
 - Human Handoff Processor
-- Approval Engine (workflow service-lager snarare än vanlig processor)
+- Approval engine/service-lager
+- Action execution logging
+- Approval persistence
 
 ### Potentiella tillägg
 - SLA / Timeout Processor
@@ -87,7 +86,7 @@ Finance-spåret bör byggas försiktigt eftersom riskkostnaden för fel är hög
 
 ---
 
-## Management / Analytics Processors
+## Management / Analytics
 
 ### Ej prioriterat för första säljbara version
 - KPI Processor
@@ -96,7 +95,7 @@ Finance-spåret bör byggas försiktigt eftersom riskkostnaden för fel är hög
 - Report Generator
 
 ### Kommentar
-Dessa bör komma efter att operativa workflows ger affärsvärde.
+Dessa bör komma efter att operativa workflows ger tydligt affärsvärde.
 
 ---
 
@@ -107,15 +106,15 @@ Alla processors ska:
 - vara stateless
 - använda standardiserad payload-struktur
 - kunna skriva till `processor_history`
-- tåla att köras i orchestrerad pipeline
-- degradera säkert vid osäkerhet eller fel
+- tåla orchestrerad pipeline
+- degradera säkert vid fel eller osäkerhet
 
 ---
 
 ## Strategic Priority Order
 
-1. Lead / CRM execution
+1. Lead / CRM execution hardening
 2. Inquiry triage + response/ticket path
-3. Invoice extraction + approval
+3. Invoice extraction + approval hardening
 4. Governance enhancers
 5. Analytics / management processors

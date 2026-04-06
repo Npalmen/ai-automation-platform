@@ -1,97 +1,110 @@
 # Next Steps
 
-## Immediate Priority
+## Mål nu
 
-Målet nu är att gå från tekniskt fungerande backend till första verkligt användbara kundflöde.
+Målet nu är att gå från fungerande backend-engine till första verkligt säljbara version.
+
+Det som finns nu räcker för att visa teknik och köra kontrollerade live actions. Det som saknas är operatörsyta, ingestion, konfigurerbarhet och paketering.
 
 ---
 
-## Phase A – Close the Lead Loop
+## Phase A – Productize the Operator Surface
 
 ### Must do
-- koppla `action_dispatch` till verklig CRM- eller notifieringsintegration
-- säkra event logging runt verklig dispatch
-- definiera tydliga action contracts från decisioning/policy
-- verifiera hela lead-flödet end-to-end
+- bygg minimal admin/dashboard UI
+- visa job list
+- visa job detail
+- visa processor history
+- visa actions per job
+- visa approvals per job
+- visa pending approvals
+- approve / reject från UI
 
 ### Outcome
-Ett lead kan tas emot, förstås, prioriteras och skickas vidare utan manuell handpåläggning när policy tillåter.
+Systemet blir körbart av operatör utan Swagger, databas eller kodinsyn.
 
 ---
 
-## Phase B – Build the Operator Surface
+## Phase B – Build Input Connectors
 
 ### Must do
-- enkel UI för job list
-- enkel UI för job detail
-- approval queue
-- manual review queue
-- integration event visibility
-- audit visibility
+- webhook ingestion endpoint
+- email ingestion path
+- skapa jobs automatiskt från inkommande signaler
+- normalisera input till samma job format
 
 ### Outcome
-Systemet blir körbart av en operatör utan direkt databas- eller kodinsyn.
+Systemet går från “API-driven demo” till faktisk arbetsingång.
 
 ---
 
-## Phase C – Harden Inquiry Flow
-
-### Must do
-- förbättra inquiry processor
-- strukturera intent till support / sales / billing
-- skapa response-draft eller ticket-dispatch
-- förstärk fallback-regler
-
-### Outcome
-Plattformen kan användas för fler verkliga kundärenden än enbart leads.
-
----
-
-## Phase D – Harden Invoice Flow
-
-### Must do
-- förbättra AI extraction
-- definiera valideringsregler
-- approval path för osäkra eller känsliga fall
-- säkra att ekonomi-flödet aldrig autoexekverar för aggressivt
-
-### Outcome
-Ekonomiflödet blir användbart utan att risknivån blir oacceptabel.
-
----
-
-## Phase E – Productization
+## Phase C – Move Tenant Config out of Code
 
 ### Must do
 - tenant config i DB
-- auth / RBAC
-- deploymentstandard
-- environment strategy
-- onboarding-/supportmodell
-- bättre dokumentation för drift
+- provider-val per tenant
+- approval channel per tenant
+- action defaults per tenant
+- workflow toggles per tenant
 
 ### Outcome
-Plattformen blir paketerbar som riktig produkt eller managed service.
+Nya kunder kan onboardas utan kodändring eller redeploy för varje konfiguration.
+
+---
+
+## Phase D – Add Basic Product Security
+
+### Must do
+- enkel auth eller API key per tenant
+- säkra read/write endpoints
+- skydda approvals och integrationstest
+- förbered rollmodell för admin/operator senare
+
+### Outcome
+Systemet blir säkrare att ge till extern pilotkund.
+
+---
+
+## Phase E – Harden Real Use Cases
+
+### Lead / sales
+- live-testa Monday
+- definiera konkret CRM action contract
+- säkra end-to-end lead loop
+
+### Finance
+- live-testa Visma
+- definiera säkra invoice actions
+- håll auto-graden konservativ
+
+### Communication
+- live-testa Slack fullt
+- gör approval channel och notifieringar mer operativa
+
+### Outcome
+Plattformen går från generell motor till konkret kundvärde per use case.
 
 ---
 
 ## Parallel Track – Quality
 
-Detta bör gå parallellt med alla faser:
+Detta ska gå parallellt:
 
 - integration tests
 - orchestrator tests
 - approval lifecycle tests
+- repository tests
 - tenant isolation tests
-- dispatch tests
+- direct integration execution tests
 
 ---
 
 ## Definition of Done for Next Major Milestone
 
-Nästa större milstolpe är uppnådd när:
+Nästa större milstolpe är nådd när:
 
-- lead flow kör verklig dispatch
-- approval flow kan användas operativt
-- jobb och events kan övervakas via enkel UI eller tydligt API
-- testtäckning räcker för säker fortsatt utveckling
+- en operatör kan se jobs, approvals och actions i UI
+- ett inkommande event kan skapa job automatiskt
+- en tenant kan konfigureras utan kodändring
+- Gmail, Slack, Visma eller Monday är live-verifierade i minst ett riktigt flöde
+- systemet kan demonstreras som en kontrollerad kundpilot

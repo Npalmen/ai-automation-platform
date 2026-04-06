@@ -2,7 +2,17 @@
 
 ## Summary
 
-Systemet har en fungerande backend-kärna för AI-driven workflow automation med persistence, audit, approval handling och integrationslager.
+Systemet har en fungerande backend-kärna för AI-driven workflow automation med:
+
+- workflow orchestration
+- approval handling
+- action dispatch
+- audit
+- persistence
+- read endpoints
+- verklig integrationsförmåga
+
+Det är nu tillräckligt moget för intern MVP och kontrollerad pilot.
 
 ---
 
@@ -12,13 +22,13 @@ Systemet har en fungerande backend-kärna för AI-driven workflow automation med
 - FastAPI
 - SQLAlchemy
 - PostgreSQL repository layer
-- startup-init av DB metadata
+- startup-init av metadata
 - tenant middleware
 - settings och logging
 - audit service
 
 ### Bedömning
-Core-plattformen är tillräckligt mogen för intern MVP och pilotkörning.
+Core-plattformen är stabil nog för fortsatt produktisering.
 
 ---
 
@@ -29,11 +39,12 @@ Core-plattformen är tillräckligt mogen för intern MVP och pilotkörning.
 - baspipeline
 - dynamisk routing efter classification
 - step-by-step persistence
-- policy-baserad skip/logik för action dispatch
-- finalisering till `completed`, `awaiting_approval`, `manual_review` eller `failed`
+- policy-baserad skip/logik
+- resume efter approval
+- finalisering till flera säkra job-statusar
 
 ### Bedömning
-Workflow engine är en av de starkaste delarna i projektet just nu.
+Workflow engine är en av projektets starkaste delar.
 
 ---
 
@@ -44,10 +55,10 @@ Workflow engine är en av de starkaste delarna i projektet just nu.
 - prompt registry
 - AI schemas
 - AI exceptions
-- AI-drivna processors för klassificering, extraktion, lead-hantering och decisioning
+- AI-drivna processors för klassificering, extraktion, lead och decisioning
 
 ### Bedömning
-AI-kärnan är tillräckligt modulariserad för att kunna återanvändas i fler processors.
+AI-kärnan är modulariserad och återanvändbar, men bör nu stödja färre nya features och mer operativ kvalitet.
 
 ---
 
@@ -55,14 +66,14 @@ AI-kärnan är tillräckligt modulariserad för att kunna återanvändas i fler 
 
 ### Implementerat
 - approval request creation
-- approval status endpoint
+- approval dispatch
 - approve/reject endpoints
-- audit event vid resolution
 - resume efter approve
-- manual review vid reject
+- manual review efter reject
+- approval persistence i DB
 
 ### Bedömning
-Approval-systemet är en stark brygga mellan automation och mänsklig kontroll.
+Approval-systemet är nu operativt användbart som kontrollskikt mellan automation och människa.
 
 ---
 
@@ -71,26 +82,30 @@ Approval-systemet är en stark brygga mellan automation och mänsklig kontroll.
 ### Implementerat
 - integration enums och metadata
 - adapter factory
-- action/status endpoints
-- smoke-test endpoint
-- integration event listing
-- retry endpoint
+- providerstruktur för Google/Microsoft m.fl.
+- direkt integration execution endpoint
+- Gmail live test för `send_email`
 
 ### Bedömning
-Strukturen är på plats, men det avgörande nu är att öka andelen verkliga adapters och verkliga affärsactions.
+Integrationslagret fungerar nu praktiskt, inte bara strukturellt.
+
+### Kvar
+- riktig event persistence för direkta integrationstest
+- fler live-verifierade providers
+- bättre onboarding av credentials per tenant
 
 ---
 
 ## Persistence
 
 ### Implementerat
-- job creation i DB
-- job update under pipeline
-- audit repository
-- integration event repository
+- jobs
+- audit events
+- approval requests
+- action executions
 
 ### Bedömning
-Persistence finns och är inte längre bara planerad arkitektur. Nästa steg är att stärka integrationstester och migrationsdisciplin.
+Persistence finns nu på de viktigaste workflow-objekten. Detta höjer spårbarheten avsevärt.
 
 ---
 
@@ -101,38 +116,42 @@ Persistence finns och är inte längre bara planerad arkitektur. Nästa steg är
 - job creation
 - job list
 - job detail
-- approvals
-- integrations
+- pending approvals
+- job approvals
+- approve / reject
+- job actions
+- direct integration execute
 - audit listing
 
 ### Bedömning
-API:t är nu tillräckligt brett för att en enkel admin- eller ops-frontend ska kunna byggas ovanpå utan att backend först behöver göras om.
+API:t är nu tillräckligt brett för att UI kan byggas utan större backend-refactor.
 
 ---
 
 ## Testing
 
-### Synligt i repo
-- testfil för AI-processorer finns
+### Verifierat
+- kärnflöden för workflow
+- approval flow
+- Gmail live send
 
-### Rekommendation
-Utöka med:
+### Behöver stärkas
 - orchestrator tests
-- approval lifecycle tests
-- integration dispatch tests
 - repository tests
+- integration tests
 - tenant isolation tests
+- regressiontests för approval/action persistence
 
 ---
 
 ## Biggest Remaining Gaps
 
 1. UI/admin panel
-2. production auth/RBAC
-3. verkliga integrationer
-4. invoice flow hardening
-5. customer inquiry hardening
-6. DB-driven tenant/workflow config
+2. input connectors
+3. DB-driven tenant config
+4. auth / API keys / RBAC
+5. live-verifiering av fler integrationer
+6. hårdare invoice/inquiry flow
 7. bättre testtäckning
 
 ---
@@ -143,7 +162,7 @@ Utöka med:
 Ja
 
 ### För första kundprojekt med kontrollerad scope
-Nästan, om deployment och någon verklig integration hårdnas
+Ja, med begränsad onboarding och tydlig use-case-scope
 
 ### För bred produktlansering
 Inte ännu
