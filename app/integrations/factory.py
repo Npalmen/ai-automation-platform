@@ -1,12 +1,12 @@
 # app/integrations/factory.py
-
 from app.integrations.base import BaseIntegrationAdapter
 from app.integrations.enums import IntegrationType
-from app.integrations.monday.adapter import MondayAdapter
 from app.integrations.fortnox.adapter import FortnoxAdapter
+from app.integrations.google.adapter import GoogleCalendarAdapter, GoogleMailAdapter
+from app.integrations.microsoft.adapter import MicrosoftCalendarAdapter, MicrosoftMailAdapter
+from app.integrations.monday.adapter import MondayAdapter
+from app.integrations.slack.adapter import SlackAdapter
 from app.integrations.visma.adapter import VismaAdapter
-from app.integrations.google.adapter import GoogleMailAdapter, GoogleCalendarAdapter
-from app.integrations.microsoft.adapter import MicrosoftMailAdapter, MicrosoftCalendarAdapter
 
 
 class WebhookPassthroughAdapter(BaseIntegrationAdapter):
@@ -31,6 +31,9 @@ def get_integration_adapter(
     integration_type: IntegrationType,
     connection_config: dict | None = None,
 ) -> BaseIntegrationAdapter:
+    if integration_type == IntegrationType.SLACK:
+        return SlackAdapter(connection_config=connection_config)
+
     if integration_type == IntegrationType.MONDAY:
         return MondayAdapter(connection_config=connection_config)
 

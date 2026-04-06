@@ -1,85 +1,75 @@
-import base64
+from __future__ import annotations
+
 from typing import Any
 
 from app.integrations.base import BaseIntegrationAdapter
-from app.integrations.google.mail_client import GoogleMailClient
 from app.integrations.google.calendar_client import GoogleCalendarClient
+from app.integrations.google.mail_client import GoogleMailClient
 
 
 class GoogleMailAdapter(BaseIntegrationAdapter):
     def __init__(self, connection_config: dict[str, Any] | None = None):
         super().__init__(connection_config=connection_config)
 
-        access_token = self.connection_config.get("access_token")
-        api_url = self.connection_config.get(
-            "api_url",
-            "https://gmail.googleapis.com/gmail/v1",
-        )
-        user_id = self.connection_config.get("user_id", "me")
-
-        if not access_token:
-            raise ValueError("Missing google mail access_token in connection_config.")
-
-        self.user_id = user_id
         self.client = GoogleMailClient(
-            access_token=access_token,
-            api_url=api_url,
+            api_url=str(self.connection_config.get("api_url") or "").strip(),
+            access_token=str(self.connection_config.get("access_token") or "").strip(),
+            user_id=str(self.connection_config.get("user_id") or "me").strip(),
+            timeout_seconds=int(self.connection_config.get("timeout_seconds") or 30),
         )
 
     def execute_action(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
-        if action == "send_email":
-            to = payload.get("to")
-            subject = payload.get("subject")
-            body = payload.get("body", "")
-            cc = payload.get("cc")
-            bcc = payload.get("bcc")
-            from_email = payload.get("from_email")
+        if action != "send_email":
+            raise ValueError(f"Unsupported Google Mail action '{action}'.")
 
-            if not to:
-                raise ValueError("Missing 'to' for google send_email action.")
-            if not subject:
-                raise ValueError("Missing 'subject' for google send_email action.")
+        to = payload.get("to")
+        subject = payload.get("subject")
+        body = payload.get("body")
 
-            lines = []
-            if from_email:
-                lines.append(f"From: {from_email}")
-            lines.append(f"To: {to}")
-            if cc:
-                lines.append(f"Cc: {cc}")
-            if bcc:
-                lines.append(f"Bcc: {bcc}")
-            lines.append("Content-Type: text/plain; charset=utf-8")
-            lines.append("MIME-Version: 1.0")
-            lines.append(f"Subject: {subject}")
-            lines.append("")
-            lines.append(body)
+        if not to:
+            raise ValueError("Google Mail payload requires 'to'.")
+        if not subject:
+            raise ValueError("Google Mail payload requires 'subject'.")
+        if body is None:
+            raise ValueError("Google Mail payload requires 'body'.")
 
-            raw_message = "\r\n".join(lines)
-            raw_message_base64 = base64.urlsafe_b64encode(
-                raw_message.encode("utf-8")
-            ).decode("utf-8")
-
-            result = self.client.send_message(
-                raw_message_base64=raw_message_base64,
-                user_id=self.user_id,
-            )
-
-            return {
-                "status": "success",
-                "integration": "google_mail",
-                "action": action,
-                "result": result,
-            }
-
-        raise ValueError(f"Unsupported google mail action: {action}")
-
-    def get_status(self) -> dict[str, Any]:
-        result = self.client.get_profile(user_id=self.user_id)
+        result = self.client.send_message(
+            to=to,
+            subject=str(subject),
+            body=str(body),
+            cc=payload.get("cc"),
+            bcc=payload.get("bcc"),
+            html_body=payload.get("html_body"),
+            from_email=payload.get("from_email"),
+            from_name=payload.get("from_name"),
+        )
 
         return {
-            "status": "connected",
+            "status": result["status"],
             "integration": "google_mail",
-            "result": result,
+            "provider": result["provider"],
+            "action": action,
+            "payload": result["payload"],
+            "message": result["message"],
+            "external_id": result.get("external_id"),
+        }
+
+    def get_status(self) -> dict[str, Any]:
+        is_configured = bool(
+            self.connection_config.get("api_url")
+            and self.connection_config.get("access_token")
+            and self.connection_config.get("user_id")
+        )
+
+        return {
+            "status": "connected" if is_configured else "not_configured",
+            "integration": "google_mail",
+            "provider": "google_mail",
+            "message": (
+                "Google Mail integration ready."
+                if is_configured
+                else "Google Mail integration is not configured."
+            ),
         }
 
 
@@ -87,79 +77,41 @@ class GoogleCalendarAdapter(BaseIntegrationAdapter):
     def __init__(self, connection_config: dict[str, Any] | None = None):
         super().__init__(connection_config=connection_config)
 
-        access_token = self.connection_config.get("access_token")
-        api_url = self.connection_config.get(
-            "api_url",
-            "https://www.googleapis.com/calendar/v3",
-        )
-        calendar_id = self.connection_config.get("calendar_id", "primary")
-
-        if not access_token:
-            raise ValueError("Missing google calendar access_token in connection_config.")
-
-        self.calendar_id = calendar_id
         self.client = GoogleCalendarClient(
-            access_token=access_token,
-            api_url=api_url,
+            api_url=str(self.connection_config.get("api_url") or "").strip(),
+            access_token=str(self.connection_config.get("access_token") or "").strip(),
+            calendar_id=str(self.connection_config.get("calendar_id") or "primary").strip(),
         )
 
     def execute_action(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
-        if action == "create_calendar_event":
-            summary = payload.get("summary")
-            start = payload.get("start")
-            end = payload.get("end")
-            description = payload.get("description")
-            location = payload.get("location")
-            attendees = payload.get("attendees", [])
-            conference_data = payload.get("conferenceData")
-            timezone = payload.get("timezone", "Europe/Stockholm")
-
-            if not summary:
-                raise ValueError("Missing 'summary' for google create_calendar_event action.")
-            if not start:
-                raise ValueError("Missing 'start' for google create_calendar_event action.")
-            if not end:
-                raise ValueError("Missing 'end' for google create_calendar_event action.")
-
-            event = {
-                "summary": summary,
-                "description": description,
-                "location": location,
-                "start": {
-                    "dateTime": start,
-                    "timeZone": timezone,
-                },
-                "end": {
-                    "dateTime": end,
-                    "timeZone": timezone,
-                },
-                "attendees": [{"email": email} for email in attendees],
-            }
-
-            if conference_data:
-                event["conferenceData"] = conference_data
-
-            event = {k: v for k, v in event.items() if v not in (None, "", [])}
-
-            result = self.client.create_event(
-                calendar_id=self.calendar_id,
-                event=event,
-            )
-
+        if action == "create_event":
+            result = self.client.create_event(payload)
             return {
                 "status": "success",
                 "integration": "google_calendar",
+                "provider": "google_calendar",
                 "action": action,
-                "result": result,
+                "payload": result,
+                "message": "Google Calendar event created successfully.",
+                "external_id": result.get("id"),
             }
 
-        raise ValueError(f"Unsupported google calendar action: {action}")
+        raise ValueError(f"Unsupported Google Calendar action '{action}'.")
 
     def get_status(self) -> dict[str, Any]:
-        result = self.client.get_calendar(calendar_id=self.calendar_id)
+        is_configured = bool(
+            self.connection_config.get("api_url")
+            and self.connection_config.get("access_token")
+            and self.connection_config.get("calendar_id")
+        )
 
         return {
-            "status": "connected",
+            "status": "connected" if is_configured else "not_configured",
             "integration": "google_calendar",
-            "result": result,
+            "provider": "google_calendar",
+            "message": (
+                "Google Calendar integration ready."
+                if is_configured
+                else "Google Calendar integration is not configured."
+            ),
         }

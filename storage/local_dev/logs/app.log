@@ -7736,3 +7736,6 @@ FROM audit_events
 WHERE audit_events.event_id = %(pk_1)s
 2026-04-06 01:52:17,741 | INFO | sqlalchemy.engine.Engine | [cached since 34.6s ago] {'pk_1': '18a3c5a8-5495-48d1-a3cb-b2efce3298d6'}
 2026-04-06 01:52:17,742 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-06 13:54:08,727 | INFO | app.integrations.google.mail_client | Sending Gmail message
+2026-04-06 13:58:50,954 | INFO | app.integrations.google.mail_client | Sending Gmail message
+2026-04-06 14:02:37,167 | INFO | app.integrations.google.mail_client | Sending Gmail message
