@@ -677,12 +677,3 @@ def test_invoice_duplicate_detection(monkeypatch):
     assert payload["duplicate_suspected"] is True
     assert payload["approval_route"] == "manual_review"
     assert result.result["requires_human_review"] is True
-
-
-
-    result = process_invoice_job(job)
-    payload = result.result["payload"]
-
-    assert payload["duplicate_suspected"] is True
-    assert payload["approval_route"] == "manual_review"
-    assert result.result["requires_human_review"] is True

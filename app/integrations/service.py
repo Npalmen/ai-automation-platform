@@ -152,4 +152,9 @@ def is_integration_configured(connection_config: dict) -> bool:
     if provider == "webhook":
         return bool(connection_config.get("webhook_url"))
 
+    # Token-based integrations (Google Mail, Microsoft, etc.) are configured
+    # when an access_token and api_url are both present.
+    if connection_config.get("access_token") and connection_config.get("api_url"):
+        return True
+
     return False

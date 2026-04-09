@@ -1,0 +1,896 @@
+2026-04-09 22:16:43,245 | INFO | sqlalchemy.engine.Engine | select pg_catalog.version()
+2026-04-09 22:16:43,245 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-09 22:16:43,246 | INFO | sqlalchemy.engine.Engine | select current_schema()
+2026-04-09 22:16:43,246 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-09 22:16:43,247 | INFO | sqlalchemy.engine.Engine | show standard_conforming_strings
+2026-04-09 22:16:43,247 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-09 22:16:43,247 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 22:16:43,250 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s ORDER BY approval_requests.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-09 22:16:43,251 | INFO | sqlalchemy.engine.Engine | [generated in 0.00041s] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending', 'param_1': 100, 'param_2': 0}
+2026-04-09 22:16:43,268 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-09 22:28:50,878 | INFO | sqlalchemy.engine.Engine | select pg_catalog.version()
+2026-04-09 22:28:50,878 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-09 22:28:50,879 | INFO | sqlalchemy.engine.Engine | select current_schema()
+2026-04-09 22:28:50,879 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-09 22:28:50,880 | INFO | sqlalchemy.engine.Engine | show standard_conforming_strings
+2026-04-09 22:28:50,880 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-09 22:28:50,880 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 22:28:50,882 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s ORDER BY jobs.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-09 22:28:50,883 | INFO | sqlalchemy.engine.Engine | [generated in 0.00028s] {'tenant_id_1': 'TENANT_1001', 'param_1': 50, 'param_2': 0}
+2026-04-09 22:28:50,901 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s) AS anon_1
+2026-04-09 22:28:50,901 | INFO | sqlalchemy.engine.Engine | [generated in 0.00031s] {'tenant_id_1': 'TENANT_1001'}
+2026-04-09 22:28:50,909 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-09 22:29:02,950 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 22:29:02,953 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s ORDER BY approval_requests.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-09 22:29:02,953 | INFO | sqlalchemy.engine.Engine | [generated in 0.00049s] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending', 'param_1': 100, 'param_2': 0}
+2026-04-09 22:29:02,956 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-09 22:42:21,302 | INFO | sqlalchemy.engine.Engine | select pg_catalog.version()
+2026-04-09 22:42:21,303 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-09 22:42:21,303 | INFO | sqlalchemy.engine.Engine | select current_schema()
+2026-04-09 22:42:21,304 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-09 22:42:21,304 | INFO | sqlalchemy.engine.Engine | show standard_conforming_strings
+2026-04-09 22:42:21,304 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-09 22:42:21,305 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 22:42:21,307 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s ORDER BY jobs.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-09 22:42:21,307 | INFO | sqlalchemy.engine.Engine | [generated in 0.00030s] {'tenant_id_1': 'TENANT_1001', 'param_1': 50, 'param_2': 0}
+2026-04-09 22:42:21,322 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s) AS anon_1
+2026-04-09 22:42:21,323 | INFO | sqlalchemy.engine.Engine | [generated in 0.00032s] {'tenant_id_1': 'TENANT_1001'}
+2026-04-09 22:42:21,329 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-09 22:42:31,663 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 22:42:31,665 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s ORDER BY approval_requests.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-09 22:42:31,665 | INFO | sqlalchemy.engine.Engine | [generated in 0.00048s] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending', 'param_1': 100, 'param_2': 0}
+2026-04-09 22:42:31,685 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s) AS anon_1
+2026-04-09 22:42:31,686 | INFO | sqlalchemy.engine.Engine | [generated in 0.00048s] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending'}
+2026-04-09 22:42:31,688 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-09 22:43:55,061 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 22:43:55,062 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s ORDER BY approval_requests.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-09 22:43:55,062 | INFO | sqlalchemy.engine.Engine | [cached since 83.4s ago] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending', 'param_1': 100, 'param_2': 0}
+2026-04-09 22:43:55,063 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s) AS anon_1
+2026-04-09 22:43:55,063 | INFO | sqlalchemy.engine.Engine | [cached since 83.38s ago] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending'}
+2026-04-09 22:43:55,065 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-09 23:02:20,299 | INFO | sqlalchemy.engine.Engine | select pg_catalog.version()
+2026-04-09 23:02:20,299 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-09 23:02:20,300 | INFO | sqlalchemy.engine.Engine | select current_schema()
+2026-04-09 23:02:20,300 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-09 23:02:20,301 | INFO | sqlalchemy.engine.Engine | show standard_conforming_strings
+2026-04-09 23:02:20,301 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-09 23:02:20,302 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:20,303 | INFO | sqlalchemy.engine.Engine | INSERT INTO jobs (job_id, tenant_id, job_type, status, input_data, result, created_at, updated_at, created_by) VALUES (%(job_id)s, %(tenant_id)s, %(job_type)s, %(status)s, %(input_data)s::JSON, %(result)s::JSON, %(created_at)s, %(updated_at)s, %(created_by)s)
+2026-04-09 23:02:20,304 | INFO | sqlalchemy.engine.Engine | [generated in 0.00032s] {'job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'tenant_id': 'TENANT_1001', 'job_type': 'lead', 'status': <JobStatus.PENDING: 'pending'>, 'input_data': '{"subject": "Smoke test laddbox", "message_text": "Hej, vill ha pris p\\u00e5 laddbox.", "sender": {"name": "Test", "email": "test@example.com"}, "owner_email": "YOUR_EMAIL@example.com", "force_approval_test": true}', 'result': '{"processor_history": []}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 20, 253903, tzinfo=datetime.timezone.utc), 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 20, 253906, tzinfo=datetime.timezone.utc), 'created_by': None}
+2026-04-09 23:02:20,328 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:20,330 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:20,331 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:20,331 | INFO | sqlalchemy.engine.Engine | [generated in 0.00023s] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:20,334 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:20,334 | INFO | sqlalchemy.engine.Engine | [generated in 0.00020s] {'event_id': '8b11a7ab-269c-482a-9a7f-0af1c81e9d96', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'job_created', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "job_type": "lead"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 20, 334004, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:20,347 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:20,348 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:20,349 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:20,349 | INFO | sqlalchemy.engine.Engine | [generated in 0.00020s] {'pk_1': '8b11a7ab-269c-482a-9a7f-0af1c81e9d96'}
+2026-04-09 23:02:20,353 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:20,353 | INFO | sqlalchemy.engine.Engine | [generated in 0.00027s] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:20,355 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET status=%(status)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:20,355 | INFO | sqlalchemy.engine.Engine | [generated in 0.00020s] {'status': <JobStatus.PROCESSING: 'processing'>, 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 20, 352753, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:20,357 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:20,358 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:20,358 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:20,358 | INFO | sqlalchemy.engine.Engine | [cached since 0.02689s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:20,359 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:20,359 | INFO | sqlalchemy.engine.Engine | [cached since 0.006061s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:20,360 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET job_type=%(job_type)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:20,360 | INFO | sqlalchemy.engine.Engine | [generated in 0.00017s] {'job_type': 'intake', 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 20, 359183, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:20,361 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:20,361 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:20,362 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:20,362 | INFO | sqlalchemy.engine.Engine | [cached since 0.03042s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:20,362 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:20,362 | INFO | sqlalchemy.engine.Engine | [cached since 0.0282s ago] {'event_id': '99ce3125-ba77-45df-89e2-554ebd6870d7', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_started', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "step": "intake"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 20, 362582, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:20,363 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:20,364 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:20,364 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:20,364 | INFO | sqlalchemy.engine.Engine | [cached since 0.0151s ago] {'pk_1': '99ce3125-ba77-45df-89e2-554ebd6870d7'}
+2026-04-09 23:02:20,365 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:20,365 | INFO | sqlalchemy.engine.Engine | [cached since 0.0118s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:20,366 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET result=%(result)s::JSON, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:20,366 | INFO | sqlalchemy.engine.Engine | [generated in 0.00018s] {'result': '{"status": "completed", "summary": "Intake normaliserad.", "requires_human_review": false, "payload": {"processor_name": "universal_intake_processor" ... (928 characters truncated) ... ha pris p\\u00e5 laddbox.", "attachment_count": 0}, "attachments": [], "requires_human_review": false, "recommended_next_step": "classification"}}}]}', 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 20, 364943, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:20,366 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:20,367 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:20,367 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:20,367 | INFO | sqlalchemy.engine.Engine | [cached since 0.03586s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:20,368 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:20,368 | INFO | sqlalchemy.engine.Engine | [cached since 0.03364s ago] {'event_id': 'f2afc5d6-1623-4614-80b1-2879b256363b', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_completed', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "step": "intake", "processor": "universal_intake_processor", "confidence": null, "requires_human_review": false, "approval_requested": false, "executed_count": null, "failed_count": null}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 20, 368060, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:20,368 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:20,369 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:20,369 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:20,369 | INFO | sqlalchemy.engine.Engine | [cached since 0.02031s ago] {'pk_1': 'f2afc5d6-1623-4614-80b1-2879b256363b'}
+2026-04-09 23:02:20,370 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:20,370 | INFO | sqlalchemy.engine.Engine | [cached since 0.01695s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:20,371 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET job_type=%(job_type)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:20,371 | INFO | sqlalchemy.engine.Engine | [cached since 0.01076s ago] {'job_type': 'classification', 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 20, 370088, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:20,371 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:20,371 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:20,372 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:20,372 | INFO | sqlalchemy.engine.Engine | [cached since 0.04056s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:20,372 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:20,373 | INFO | sqlalchemy.engine.Engine | [cached since 0.03827s ago] {'event_id': 'c312ced2-0b41-4dd0-8abf-6787258fb9a3', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_started', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "step": "classification"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 20, 372717, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:20,373 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:20,373 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:20,374 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:20,374 | INFO | sqlalchemy.engine.Engine | [cached since 0.02487s ago] {'pk_1': 'c312ced2-0b41-4dd0-8abf-6787258fb9a3'}
+2026-04-09 23:02:23,302 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:23,302 | INFO | sqlalchemy.engine.Engine | [cached since 2.949s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:23,304 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET result=%(result)s::JSON, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:23,304 | INFO | sqlalchemy.engine.Engine | [cached since 2.938s ago] {'result': '{"status": "completed", "summary": "\\u00c4rendet klassificerat med AI.", "requires_human_review": false, "payload": {"detected_job_type": "lead", "c ... (1280 characters truncated) ... ssor_name": "classification_processor", "prompt_name": "classification_v1", "used_fallback": false, "duration_ms": 2927, "low_confidence": false}}}]}', 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 23, 301993, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:23,305 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:23,305 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:23,306 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:23,306 | INFO | sqlalchemy.engine.Engine | [cached since 2.975s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:23,307 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:23,307 | INFO | sqlalchemy.engine.Engine | [cached since 2.973s ago] {'event_id': '2c478d0f-85eb-4549-9055-0259e7b5b259', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_completed', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "step": "classification", "processor": "classification_processor", "confidence": 0.95, "requires_human_review": false, "approval_requested": false, "executed_count": null, "failed_count": null}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 23, 307205, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:23,308 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:23,309 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:23,309 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:23,309 | INFO | sqlalchemy.engine.Engine | [cached since 2.96s ago] {'pk_1': '2c478d0f-85eb-4549-9055-0259e7b5b259'}
+2026-04-09 23:02:23,310 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:23,310 | INFO | sqlalchemy.engine.Engine | [cached since 2.957s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:23,311 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET job_type=%(job_type)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:23,311 | INFO | sqlalchemy.engine.Engine | [cached since 2.951s ago] {'job_type': 'entity_extraction', 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 23, 310186, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:23,312 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:23,312 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:23,312 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:23,312 | INFO | sqlalchemy.engine.Engine | [cached since 2.981s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:23,313 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:23,313 | INFO | sqlalchemy.engine.Engine | [cached since 2.979s ago] {'event_id': '64803f73-9382-45f9-b766-2c40cf5692ad', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_started', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "step": "entity_extraction"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 23, 313352, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:23,314 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:23,314 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:23,314 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:23,314 | INFO | sqlalchemy.engine.Engine | [cached since 2.966s ago] {'pk_1': '64803f73-9382-45f9-b766-2c40cf5692ad'}
+2026-04-09 23:02:26,771 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:26,771 | INFO | sqlalchemy.engine.Engine | [cached since 6.418s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:26,772 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET result=%(result)s::JSON, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:26,773 | INFO | sqlalchemy.engine.Engine | [cached since 6.407s ago] {'result': '{"status": "completed", "summary": "Entiteter extraherade med AI.", "requires_human_review": false, "payload": {"processor_name": "entity_extraction_ ... (2253 characters truncated) ...  []}, "recommended_next_step": null, "prompt_name": "entity_extraction_v1", "used_fallback": false, "duration_ms": 3448, "low_confidence": false}}}]}', 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 26, 771188, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:26,774 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:26,774 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:26,775 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:26,775 | INFO | sqlalchemy.engine.Engine | [cached since 6.443s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:26,775 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:26,776 | INFO | sqlalchemy.engine.Engine | [cached since 6.441s ago] {'event_id': '98112e6a-3e6d-449d-b7d5-810cbd9d0056', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_completed', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "step": "entity_extraction", "processor": "entity_extraction_processor", "confidence": 0.95, "requires_human_review": false, "approval_requested": false, "executed_count": null, "failed_count": null}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 26, 775700, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:26,776 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:26,777 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:26,777 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:26,777 | INFO | sqlalchemy.engine.Engine | [cached since 6.428s ago] {'pk_1': '98112e6a-3e6d-449d-b7d5-810cbd9d0056'}
+2026-04-09 23:02:26,778 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:26,778 | INFO | sqlalchemy.engine.Engine | [cached since 6.425s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:26,779 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET job_type=%(job_type)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:26,779 | INFO | sqlalchemy.engine.Engine | [cached since 6.419s ago] {'job_type': 'lead', 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 26, 778075, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:26,779 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:26,780 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:26,780 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:26,780 | INFO | sqlalchemy.engine.Engine | [cached since 6.449s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:26,781 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:26,781 | INFO | sqlalchemy.engine.Engine | [cached since 6.447s ago] {'event_id': '6db71328-a244-4bbe-b272-9f2fde79d43d', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_started', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "step": "lead"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 26, 781064, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:26,781 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:26,782 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:26,782 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:26,783 | INFO | sqlalchemy.engine.Engine | [cached since 6.434s ago] {'pk_1': '6db71328-a244-4bbe-b272-9f2fde79d43d'}
+2026-04-09 23:02:29,399 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:29,399 | INFO | sqlalchemy.engine.Engine | [cached since 9.046s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:29,401 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET result=%(result)s::JSON, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:29,401 | INFO | sqlalchemy.engine.Engine | [cached since 9.035s ago] {'result': '{"status": "completed", "summary": "Lead score ber\\u00e4knad med AI.", "requires_human_review": false, "payload": {"lead_score": 85, "priority": "me ... (2655 characters truncated) ... ate", "processor_name": "lead_processor", "prompt_name": "lead_scoring_v1", "used_fallback": false, "duration_ms": 2614, "low_confidence": false}}}]}', 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 29, 398413, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:29,411 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:29,412 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:29,412 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:29,412 | INFO | sqlalchemy.engine.Engine | [cached since 9.081s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:29,414 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:29,414 | INFO | sqlalchemy.engine.Engine | [cached since 9.08s ago] {'event_id': 'bceef1cb-ffb4-4970-8cbc-775f35209743', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_completed', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "step": "lead", "processor": "lead_processor", "confidence": 0.95, "requires_human_review": false, "approval_requested": false, "executed_count": null, "failed_count": null}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 29, 413867, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:29,415 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:29,416 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:29,416 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:29,416 | INFO | sqlalchemy.engine.Engine | [cached since 9.068s ago] {'pk_1': 'bceef1cb-ffb4-4970-8cbc-775f35209743'}
+2026-04-09 23:02:29,418 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:29,418 | INFO | sqlalchemy.engine.Engine | [cached since 9.065s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:29,419 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET job_type=%(job_type)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:29,420 | INFO | sqlalchemy.engine.Engine | [cached since 9.06s ago] {'job_type': 'decisioning', 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 29, 417915, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:29,420 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:29,421 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:29,422 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:29,422 | INFO | sqlalchemy.engine.Engine | [cached since 9.091s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:29,423 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:29,423 | INFO | sqlalchemy.engine.Engine | [cached since 9.089s ago] {'event_id': '2d23f09d-2418-489d-8ca7-6d14a7fe5f65', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_started', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "step": "decisioning"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 29, 423274, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:29,424 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:29,425 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:29,425 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:29,425 | INFO | sqlalchemy.engine.Engine | [cached since 9.077s ago] {'pk_1': '2d23f09d-2418-489d-8ca7-6d14a7fe5f65'}
+2026-04-09 23:02:32,308 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:32,308 | INFO | sqlalchemy.engine.Engine | [cached since 11.95s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:32,309 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET result=%(result)s::JSON, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:32,310 | INFO | sqlalchemy.engine.Engine | [cached since 11.94s ago] {'result': '{"status": "completed", "summary": "N\\u00e4sta steg beslutat med AI.", "requires_human_review": false, "payload": {"decision": "auto_route", "target ... (3547 characters truncated) ... "processor_name": "decisioning_processor", "prompt_name": "decisioning_v1", "used_fallback": false, "duration_ms": 2880, "low_confidence": false}}}]}', 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 307716, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:32,310 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:32,312 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:32,312 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:32,312 | INFO | sqlalchemy.engine.Engine | [cached since 11.98s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:32,313 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:32,313 | INFO | sqlalchemy.engine.Engine | [cached since 11.98s ago] {'event_id': 'e36853e7-1c6a-4fbe-9530-8e363c6dc4e9', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_completed', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "step": "decisioning", "processor": "decisioning_processor", "confidence": 0.95, "requires_human_review": false, "approval_requested": false, "executed_count": null, "failed_count": null}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 313484, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:32,314 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:32,315 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:32,315 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:32,315 | INFO | sqlalchemy.engine.Engine | [cached since 11.97s ago] {'pk_1': 'e36853e7-1c6a-4fbe-9530-8e363c6dc4e9'}
+2026-04-09 23:02:32,317 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:32,317 | INFO | sqlalchemy.engine.Engine | [cached since 11.96s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:32,318 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET job_type=%(job_type)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:32,318 | INFO | sqlalchemy.engine.Engine | [cached since 11.96s ago] {'job_type': 'policy', 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 316598, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:32,319 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:32,319 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:32,319 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:32,320 | INFO | sqlalchemy.engine.Engine | [cached since 11.99s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:32,321 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:32,321 | INFO | sqlalchemy.engine.Engine | [cached since 11.99s ago] {'event_id': '3bcdd163-31cd-4a2a-9bbe-7fe6511119a3', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_started', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "step": "policy"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 320959, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:32,322 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:32,322 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:32,323 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:32,323 | INFO | sqlalchemy.engine.Engine | [cached since 11.97s ago] {'pk_1': '3bcdd163-31cd-4a2a-9bbe-7fe6511119a3'}
+2026-04-09 23:02:32,324 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:32,324 | INFO | sqlalchemy.engine.Engine | [cached since 11.97s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:32,325 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET result=%(result)s::JSON, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:32,325 | INFO | sqlalchemy.engine.Engine | [cached since 11.96s ago] {'result': '{"status": "completed", "summary": "Policy bed\\u00f6md.", "requires_human_review": false, "payload": {"processor_name": "policy_processor", "decisio ... (4162 characters truncated) ... mode", "missing_critical": [], "duplicate_suspected": false, "approval_route": "approval_required", "recommended_next_step": "awaiting_approval"}}}]}', 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 324173, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:32,326 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:32,327 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:32,327 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:32,327 | INFO | sqlalchemy.engine.Engine | [cached since 12s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:32,328 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:32,328 | INFO | sqlalchemy.engine.Engine | [cached since 11.99s ago] {'event_id': '40f20bdf-58bb-4c67-9c70-b7409320eacf', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_completed', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "step": "policy", "processor": "policy_processor", "confidence": null, "requires_human_review": false, "approval_requested": false, "executed_count": null, "failed_count": null}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 328547, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:32,329 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:32,330 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:32,330 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:32,330 | INFO | sqlalchemy.engine.Engine | [cached since 11.98s ago] {'pk_1': '40f20bdf-58bb-4c67-9c70-b7409320eacf'}
+2026-04-09 23:02:32,331 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:32,331 | INFO | sqlalchemy.engine.Engine | [cached since 11.98s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:32,332 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET job_type=%(job_type)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:32,333 | INFO | sqlalchemy.engine.Engine | [cached since 11.97s ago] {'job_type': 'human_handoff', 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 331375, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:32,333 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:32,334 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:32,334 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:32,335 | INFO | sqlalchemy.engine.Engine | [cached since 12s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:32,336 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:32,336 | INFO | sqlalchemy.engine.Engine | [cached since 12s ago] {'event_id': 'afc2c52f-0bab-4573-a67b-71d14156b76e', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_started', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "step": "human_handoff"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 335939, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:32,337 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:32,337 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:32,338 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:32,338 | INFO | sqlalchemy.engine.Engine | [cached since 11.99s ago] {'pk_1': 'afc2c52f-0bab-4573-a67b-71d14156b76e'}
+2026-04-09 23:02:32,339 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:32,340 | INFO | sqlalchemy.engine.Engine | [cached since 11.99s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:32,341 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET result=%(result)s::JSON, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:32,341 | INFO | sqlalchemy.engine.Engine | [cached since 11.98s ago] {'result': '{"status": "completed", "summary": "Approval request created.", "requires_human_review": false, "payload": {"processor_name": "human_handoff_processo ... (6291 characters truncated) ... ns": ["approve", "reject"], "next_on_approve": "action_dispatch", "next_on_reject": "manual_review"}, "suggested_next_step": "awaiting_approval"}}}]}', 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 339457, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:32,351 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:32,352 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:32,353 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:32,353 | INFO | sqlalchemy.engine.Engine | [cached since 12.02s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:32,354 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:32,354 | INFO | sqlalchemy.engine.Engine | [cached since 12.02s ago] {'event_id': '15cb7407-1da7-461f-96ea-b6a7311834fb', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_completed', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "step": "human_handoff", "processor": "human_handoff_processor", "confidence": null, "requires_human_review": false, "approval_requested": true, "executed_count": null, "failed_count": null}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 354341, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:32,355 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:32,356 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:32,356 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:32,356 | INFO | sqlalchemy.engine.Engine | [cached since 12.01s ago] {'pk_1': '15cb7407-1da7-461f-96ea-b6a7311834fb'}
+2026-04-09 23:02:32,358 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:32,358 | INFO | sqlalchemy.engine.Engine | [cached since 12.01s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:32,360 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET job_type=%(job_type)s, status=%(status)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:32,360 | INFO | sqlalchemy.engine.Engine | [generated in 0.00024s] {'job_type': 'lead', 'status': <JobStatus.AWAITING_APPROVAL: 'awaiting_approval'>, 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 357961, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:32,361 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:32,361 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:32,362 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:32,362 | INFO | sqlalchemy.engine.Engine | [cached since 12.03s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:32,363 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:32,363 | INFO | sqlalchemy.engine.Engine | [cached since 12.01s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'param_1': 1}
+2026-04-09 23:02:32,365 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET result=%(result)s::JSON, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:02:32,365 | INFO | sqlalchemy.engine.Engine | [cached since 12s ago] {'result': '{"status": "completed", "summary": "Approval dispatched via dashboard.", "requires_human_review": false, "payload": {"processor_name": "approval_disp ... (7916 characters truncated) ... d: Smoke test laddbox", "summary": "Job type: lead. Reasons: forced_approval_test Recommended next step: awaiting_approval. Confidence: 0.95."}}}}}]}', 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 363182, tzinfo=datetime.timezone.utc), 'jobs_job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:32,366 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:32,367 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:32,368 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:02:32,368 | INFO | sqlalchemy.engine.Engine | [cached since 12.04s ago] {'pk_1': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763'}
+2026-04-09 23:02:32,371 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.approval_id = %(approval_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:02:32,371 | INFO | sqlalchemy.engine.Engine | [generated in 0.00033s] {'tenant_id_1': 'TENANT_1001', 'approval_id_1': '2cf8afbc-5e82-4d50-aee1-4f9be58b0af1', 'param_1': 1}
+2026-04-09 23:02:32,376 | INFO | sqlalchemy.engine.Engine | INSERT INTO approval_requests (approval_id, tenant_id, job_id, job_type, state, channel, title, summary, requested_by, requested_at, resolved_at, resolved_by, resolved_via, resolution_note, next_on_approve, next_on_reject, request_payload, delivery_payload, created_at, updated_at) VALUES (%(approval_id)s, %(tenant_id)s, %(job_id)s, %(job_type)s, %(state)s, %(channel)s, %(title)s, %(summary)s, %(requested_by)s, %(requested_at)s, %(resolved_at)s, %(resolved_by)s, %(resolved_via)s, %(resolution_note)s, %(next_on_approve)s, %(next_on_reject)s, %(request_payload)s::JSON, %(delivery_payload)s::JSON, %(created_at)s, %(updated_at)s)
+2026-04-09 23:02:32,376 | INFO | sqlalchemy.engine.Engine | [generated in 0.00044s] {'approval_id': '2cf8afbc-5e82-4d50-aee1-4f9be58b0af1', 'tenant_id': 'TENANT_1001', 'job_id': 'cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763', 'job_type': 'lead', 'state': 'pending', 'channel': 'dashboard', 'title': 'Approval required: Smoke test laddbox', 'summary': 'Job type: lead. Reasons: forced_approval_test Recommended next step: awaiting_approval. Confidence: 0.95.', 'requested_by': 'system', 'requested_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 339389, tzinfo=datetime.timezone.utc), 'resolved_at': None, 'resolved_by': None, 'resolved_via': None, 'resolution_note': None, 'next_on_approve': 'action_dispatch', 'next_on_reject': 'manual_review', 'request_payload': '{"approval_id": "2cf8afbc-5e82-4d50-aee1-4f9be58b0af1", "job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "tenant_id": "TENANT_1001", "job_type": "le ... (603 characters truncated) ... asons": ["forced_approval_test"]}, "allowed_actions": ["approve", "reject"], "next_on_approve": "action_dispatch", "next_on_reject": "manual_review"}', 'delivery_payload': '{"delivery_id": "2cf8afbc-5e82-4d50-aee1-4f9be58b0af1:dashboard", "channel": "dashboard", "target": "default", "status": "sent", "sent_at": "2026-04- ... (60 characters truncated) ... quired: Smoke test laddbox", "summary": "Job type: lead. Reasons: forced_approval_test Recommended next step: awaiting_approval. Confidence: 0.95."}}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 375130, tzinfo=datetime.timezone.utc), 'updated_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 375130, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:32,379 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:32,380 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:32,381 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id, approval_requests.tenant_id, approval_requests.job_id, approval_requests.job_type, approval_requests.state, approval_requests.channel, approval_requests.title, approval_requests.summary, approval_requests.requested_by, approval_requests.requested_at, approval_requests.resolved_at, approval_requests.resolved_by, approval_requests.resolved_via, approval_requests.resolution_note, approval_requests.next_on_approve, approval_requests.next_on_reject, approval_requests.request_payload, approval_requests.delivery_payload, approval_requests.created_at, approval_requests.updated_at 
+FROM approval_requests 
+WHERE approval_requests.approval_id = %(pk_1)s
+2026-04-09 23:02:32,381 | INFO | sqlalchemy.engine.Engine | [generated in 0.00026s] {'pk_1': '2cf8afbc-5e82-4d50-aee1-4f9be58b0af1'}
+2026-04-09 23:02:32,383 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:32,383 | INFO | sqlalchemy.engine.Engine | [cached since 12.05s ago] {'event_id': '2df4d969-2ee8-4c19-bf3a-828dd4579ea5', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'approval_dispatched', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "approval_id": "2cf8afbc-5e82-4d50-aee1-4f9be58b0af1", "channel": "dashboard"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 382810, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:32,384 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:32,384 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:32,385 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:32,385 | INFO | sqlalchemy.engine.Engine | [cached since 12.04s ago] {'pk_1': '2df4d969-2ee8-4c19-bf3a-828dd4579ea5'}
+2026-04-09 23:02:32,386 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:02:32,386 | INFO | sqlalchemy.engine.Engine | [cached since 12.05s ago] {'event_id': '17149db1-ec64-4db8-8f0e-42036555f5ba', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'workflow_completed', 'status': 'success', 'details': '{"job_id": "cd6109f4-67b2-4b55-ba7f-1cb2ec5b4763", "resolved_job_type": "lead", "final_status": "awaiting_approval", "awaiting_approval": true}', 'created_at': datetime.datetime(2026, 4, 9, 21, 2, 32, 386351, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:02:32,387 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:02:32,388 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:32,388 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:02:32,388 | INFO | sqlalchemy.engine.Engine | [cached since 12.04s ago] {'pk_1': '17149db1-ec64-4db8-8f0e-42036555f5ba'}
+2026-04-09 23:02:32,392 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-09 23:02:58,334 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:02:58,336 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s ORDER BY approval_requests.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-09 23:02:58,336 | INFO | sqlalchemy.engine.Engine | [generated in 0.00047s] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending', 'param_1': 100, 'param_2': 0}
+2026-04-09 23:02:58,342 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s) AS anon_1
+2026-04-09 23:02:58,342 | INFO | sqlalchemy.engine.Engine | [generated in 0.00042s] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending'}
+2026-04-09 23:02:58,345 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-09 23:04:25,523 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:04:25,523 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s ORDER BY approval_requests.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-09 23:04:25,524 | INFO | sqlalchemy.engine.Engine | [cached since 87.19s ago] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending', 'param_1': 100, 'param_2': 0}
+2026-04-09 23:04:25,526 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s) AS anon_1
+2026-04-09 23:04:25,526 | INFO | sqlalchemy.engine.Engine | [cached since 87.18s ago] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending'}
+2026-04-09 23:04:25,528 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-09 23:10:33,652 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:10:33,653 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s ORDER BY approval_requests.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-09 23:10:33,653 | INFO | sqlalchemy.engine.Engine | [cached since 455.3s ago] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending', 'param_1': 100, 'param_2': 0}
+2026-04-09 23:10:33,667 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s) AS anon_1
+2026-04-09 23:10:33,667 | INFO | sqlalchemy.engine.Engine | [cached since 455.3s ago] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending'}
+2026-04-09 23:10:33,669 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-09 23:12:56,194 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:12:56,194 | INFO | sqlalchemy.engine.Engine | INSERT INTO jobs (job_id, tenant_id, job_type, status, input_data, result, created_at, updated_at, created_by) VALUES (%(job_id)s, %(tenant_id)s, %(job_type)s, %(status)s, %(input_data)s::JSON, %(result)s::JSON, %(created_at)s, %(updated_at)s, %(created_by)s)
+2026-04-09 23:12:56,194 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'tenant_id': 'TENANT_1001', 'job_type': 'lead', 'status': <JobStatus.PENDING: 'pending'>, 'input_data': '{"subject": "Smoke test laddbox", "message_text": "Hej, vill ha pris p\\u00e5 laddbox.", "sender": {"name": "Test", "email": "test@example.com"}, "owner_email": "YOUR_EMAIL@example.com", "force_approval_test": true}', 'result': '{"processor_history": []}', 'created_at': datetime.datetime(2026, 4, 9, 21, 12, 56, 193747, tzinfo=datetime.timezone.utc), 'updated_at': datetime.datetime(2026, 4, 9, 21, 12, 56, 193749, tzinfo=datetime.timezone.utc), 'created_by': None}
+2026-04-09 23:12:56,195 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:12:56,203 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:12:56,204 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:12:56,204 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:12:56,205 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:12:56,205 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'event_id': 'ea801e93-7905-4360-a62f-b5bb1198a7dc', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'job_created', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "job_type": "lead"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 12, 56, 205509, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:12:56,206 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:12:56,207 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:12:56,207 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:12:56,207 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'pk_1': 'ea801e93-7905-4360-a62f-b5bb1198a7dc'}
+2026-04-09 23:12:56,208 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:12:56,208 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:12:56,209 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET status=%(status)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:12:56,209 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'status': <JobStatus.PROCESSING: 'processing'>, 'updated_at': datetime.datetime(2026, 4, 9, 21, 12, 56, 208266, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:12:56,209 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:12:56,210 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:12:56,210 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:12:56,210 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:12:56,211 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:12:56,211 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:12:56,212 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET job_type=%(job_type)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:12:56,212 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'job_type': 'intake', 'updated_at': datetime.datetime(2026, 4, 9, 21, 12, 56, 211312, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:12:56,212 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:12:56,213 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:12:56,213 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:12:56,213 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:12:56,214 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:12:56,214 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'event_id': 'ff96b9aa-9c5a-4057-8c39-c8c9c8b2fd44', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_started', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "step": "intake"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 12, 56, 213966, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:12:56,214 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:12:56,215 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:12:56,215 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:12:56,215 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'pk_1': 'ff96b9aa-9c5a-4057-8c39-c8c9c8b2fd44'}
+2026-04-09 23:12:56,216 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:12:56,216 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:12:56,216 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET result=%(result)s::JSON, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:12:56,216 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'result': '{"status": "completed", "summary": "Intake normaliserad.", "requires_human_review": false, "payload": {"processor_name": "universal_intake_processor" ... (928 characters truncated) ... ha pris p\\u00e5 laddbox.", "attachment_count": 0}, "attachments": [], "requires_human_review": false, "recommended_next_step": "classification"}}}]}', 'updated_at': datetime.datetime(2026, 4, 9, 21, 12, 56, 215840, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:12:56,217 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:12:56,217 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:12:56,217 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:12:56,218 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:12:56,218 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:12:56,218 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'event_id': 'bca24a9d-b9e5-42c9-8a29-84282d0d2651', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_completed', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "step": "intake", "processor": "universal_intake_processor", "confidence": null, "requires_human_review": false, "approval_requested": false, "executed_count": null, "failed_count": null}', 'created_at': datetime.datetime(2026, 4, 9, 21, 12, 56, 218493, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:12:56,219 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:12:56,219 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:12:56,220 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:12:56,220 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'pk_1': 'bca24a9d-b9e5-42c9-8a29-84282d0d2651'}
+2026-04-09 23:12:56,220 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:12:56,221 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:12:56,221 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET job_type=%(job_type)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:12:56,221 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'job_type': 'classification', 'updated_at': datetime.datetime(2026, 4, 9, 21, 12, 56, 220674, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:12:56,222 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:12:56,222 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:12:56,222 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:12:56,222 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:12:56,223 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:12:56,223 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'event_id': 'ee0c8719-46fe-459e-a368-6331ea56a03f', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_started', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "step": "classification"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 12, 56, 223369, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:12:56,224 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:12:56,224 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:12:56,224 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:12:56,225 | INFO | sqlalchemy.engine.Engine | [cached since 635.9s ago] {'pk_1': 'ee0c8719-46fe-459e-a368-6331ea56a03f'}
+2026-04-09 23:12:58,318 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:12:58,319 | INFO | sqlalchemy.engine.Engine | [cached since 638s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:12:58,320 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET result=%(result)s::JSON, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:12:58,320 | INFO | sqlalchemy.engine.Engine | [cached since 638s ago] {'result': '{"status": "completed", "summary": "\\u00c4rendet klassificerat med AI.", "requires_human_review": false, "payload": {"detected_job_type": "lead", "c ... (1384 characters truncated) ... ssor_name": "classification_processor", "prompt_name": "classification_v1", "used_fallback": false, "duration_ms": 2092, "low_confidence": false}}}]}', 'updated_at': datetime.datetime(2026, 4, 9, 21, 12, 58, 318259, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:12:58,321 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:12:58,322 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:12:58,322 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:12:58,323 | INFO | sqlalchemy.engine.Engine | [cached since 638s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:12:58,323 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:12:58,324 | INFO | sqlalchemy.engine.Engine | [cached since 638s ago] {'event_id': '0f3eb0e4-df92-4fe1-9279-d3a095e86057', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_completed', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "step": "classification", "processor": "classification_processor", "confidence": 0.95, "requires_human_review": false, "approval_requested": false, "executed_count": null, "failed_count": null}', 'created_at': datetime.datetime(2026, 4, 9, 21, 12, 58, 323686, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:12:58,324 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:12:58,324 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:12:58,325 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:12:58,325 | INFO | sqlalchemy.engine.Engine | [cached since 638s ago] {'pk_1': '0f3eb0e4-df92-4fe1-9279-d3a095e86057'}
+2026-04-09 23:12:58,326 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:12:58,326 | INFO | sqlalchemy.engine.Engine | [cached since 638s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:12:58,326 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET job_type=%(job_type)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:12:58,326 | INFO | sqlalchemy.engine.Engine | [cached since 638s ago] {'job_type': 'entity_extraction', 'updated_at': datetime.datetime(2026, 4, 9, 21, 12, 58, 325832, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:12:58,327 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:12:58,328 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:12:58,328 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:12:58,328 | INFO | sqlalchemy.engine.Engine | [cached since 638s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:12:58,329 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:12:58,329 | INFO | sqlalchemy.engine.Engine | [cached since 638s ago] {'event_id': 'b91f1bfb-3e3c-4c5a-b188-c2c063af67b0', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_started', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "step": "entity_extraction"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 12, 58, 328844, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:12:58,329 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:12:58,330 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:12:58,330 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:12:58,330 | INFO | sqlalchemy.engine.Engine | [cached since 638s ago] {'pk_1': 'b91f1bfb-3e3c-4c5a-b188-c2c063af67b0'}
+2026-04-09 23:13:00,828 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:13:00,829 | INFO | sqlalchemy.engine.Engine | [cached since 640.5s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:13:00,830 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET result=%(result)s::JSON, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:13:00,830 | INFO | sqlalchemy.engine.Engine | [cached since 640.5s ago] {'result': '{"status": "completed", "summary": "Entiteter extraherade med AI.", "requires_human_review": false, "payload": {"processor_name": "entity_extraction_ ... (2303 characters truncated) ...  []}, "recommended_next_step": null, "prompt_name": "entity_extraction_v1", "used_fallback": false, "duration_ms": 2497, "low_confidence": false}}}]}', 'updated_at': datetime.datetime(2026, 4, 9, 21, 13, 0, 828339, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:00,831 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:00,840 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:00,840 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:13:00,840 | INFO | sqlalchemy.engine.Engine | [cached since 640.5s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:00,841 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:13:00,841 | INFO | sqlalchemy.engine.Engine | [cached since 640.5s ago] {'event_id': '15693b8d-5c56-467f-880a-db0c3aad098c', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_completed', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "step": "entity_extraction", "processor": "entity_extraction_processor", "confidence": 0.9, "requires_human_review": false, "approval_requested": false, "executed_count": null, "failed_count": null}', 'created_at': datetime.datetime(2026, 4, 9, 21, 13, 0, 841505, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:13:00,842 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:00,843 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:00,843 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:13:00,843 | INFO | sqlalchemy.engine.Engine | [cached since 640.5s ago] {'pk_1': '15693b8d-5c56-467f-880a-db0c3aad098c'}
+2026-04-09 23:13:00,844 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:13:00,844 | INFO | sqlalchemy.engine.Engine | [cached since 640.5s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:13:00,845 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET job_type=%(job_type)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:13:00,845 | INFO | sqlalchemy.engine.Engine | [cached since 640.5s ago] {'job_type': 'lead', 'updated_at': datetime.datetime(2026, 4, 9, 21, 13, 0, 844455, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:00,846 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:00,846 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:00,846 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:13:00,847 | INFO | sqlalchemy.engine.Engine | [cached since 640.5s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:00,847 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:13:00,847 | INFO | sqlalchemy.engine.Engine | [cached since 640.5s ago] {'event_id': 'c76cdeee-b389-4bb4-bb27-07871994d355', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_started', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "step": "lead"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 13, 0, 847484, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:13:00,848 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:00,848 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:00,849 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:13:00,849 | INFO | sqlalchemy.engine.Engine | [cached since 640.5s ago] {'pk_1': 'c76cdeee-b389-4bb4-bb27-07871994d355'}
+2026-04-09 23:13:03,022 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:13:03,022 | INFO | sqlalchemy.engine.Engine | [cached since 642.7s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:13:03,023 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET result=%(result)s::JSON, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:13:03,023 | INFO | sqlalchemy.engine.Engine | [cached since 642.7s ago] {'result': '{"status": "completed", "summary": "Lead score ber\\u00e4knad med AI.", "requires_human_review": false, "payload": {"lead_score": 85, "priority": "me ... (2728 characters truncated) ... ate", "processor_name": "lead_processor", "prompt_name": "lead_scoring_v1", "used_fallback": false, "duration_ms": 2171, "low_confidence": false}}}]}', 'updated_at': datetime.datetime(2026, 4, 9, 21, 13, 3, 21589, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:03,024 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:03,032 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:03,032 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:13:03,033 | INFO | sqlalchemy.engine.Engine | [cached since 642.7s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:03,034 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:13:03,034 | INFO | sqlalchemy.engine.Engine | [cached since 642.7s ago] {'event_id': '6838a101-94ac-48e5-a4c7-b915032373d5', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_completed', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "step": "lead", "processor": "lead_processor", "confidence": 0.9, "requires_human_review": false, "approval_requested": false, "executed_count": null, "failed_count": null}', 'created_at': datetime.datetime(2026, 4, 9, 21, 13, 3, 34207, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:13:03,035 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:03,035 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:03,035 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:13:03,035 | INFO | sqlalchemy.engine.Engine | [cached since 642.7s ago] {'pk_1': '6838a101-94ac-48e5-a4c7-b915032373d5'}
+2026-04-09 23:13:03,036 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:13:03,036 | INFO | sqlalchemy.engine.Engine | [cached since 642.7s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:13:03,037 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET job_type=%(job_type)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:13:03,037 | INFO | sqlalchemy.engine.Engine | [cached since 642.7s ago] {'job_type': 'decisioning', 'updated_at': datetime.datetime(2026, 4, 9, 21, 13, 3, 36251, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:03,038 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:03,038 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:03,038 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:13:03,038 | INFO | sqlalchemy.engine.Engine | [cached since 642.7s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:03,039 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:13:03,039 | INFO | sqlalchemy.engine.Engine | [cached since 642.7s ago] {'event_id': 'c17c9aca-062d-4b8d-97fe-ef9e4d76a1c1', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_started', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "step": "decisioning"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 13, 3, 39409, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:13:03,040 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:03,040 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:03,040 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:13:03,041 | INFO | sqlalchemy.engine.Engine | [cached since 642.7s ago] {'pk_1': 'c17c9aca-062d-4b8d-97fe-ef9e4d76a1c1'}
+2026-04-09 23:13:05,254 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:13:05,254 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:13:05,255 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET result=%(result)s::JSON, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:13:05,255 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'result': '{"status": "completed", "summary": "N\\u00e4sta steg beslutat med AI.", "requires_human_review": false, "payload": {"decision": "hold", "target_queue ... (3409 characters truncated) ... "processor_name": "decisioning_processor", "prompt_name": "decisioning_v1", "used_fallback": false, "duration_ms": 2211, "low_confidence": false}}}]}', 'updated_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 253610, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:05,256 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:05,257 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:05,258 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:13:05,258 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:05,259 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:13:05,259 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'event_id': 'b0f5ef8a-fe11-4b94-89e1-1f9b6c1c2a23', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_completed', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "step": "decisioning", "processor": "decisioning_processor", "confidence": 0.9, "requires_human_review": false, "approval_requested": false, "executed_count": null, "failed_count": null}', 'created_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 258986, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:13:05,260 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:05,260 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:05,261 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:13:05,261 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'pk_1': 'b0f5ef8a-fe11-4b94-89e1-1f9b6c1c2a23'}
+2026-04-09 23:13:05,262 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:13:05,262 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:13:05,263 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET job_type=%(job_type)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:13:05,263 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'job_type': 'policy', 'updated_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 262246, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:05,264 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:05,264 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:05,264 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:13:05,264 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:05,265 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:13:05,265 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'event_id': 'acd823bf-d168-48c2-9e85-3c6ff8f121ec', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_started', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "step": "policy"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 265446, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:13:05,266 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:05,266 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:05,266 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:13:05,266 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'pk_1': 'acd823bf-d168-48c2-9e85-3c6ff8f121ec'}
+2026-04-09 23:13:05,267 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:13:05,267 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:13:05,268 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET result=%(result)s::JSON, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:13:05,268 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'result': '{"status": "completed", "summary": "Policy bed\\u00f6md.", "requires_human_review": false, "payload": {"processor_name": "policy_processor", "decisio ... (4118 characters truncated) ... mode", "missing_critical": [], "duplicate_suspected": false, "approval_route": "approval_required", "recommended_next_step": "awaiting_approval"}}}]}', 'updated_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 267418, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:05,269 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:05,269 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:05,269 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:13:05,269 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:05,270 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:13:05,270 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'event_id': 'db5667cb-7b4c-4aea-baf3-bac9bd28fa5a', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_completed', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "step": "policy", "processor": "policy_processor", "confidence": null, "requires_human_review": false, "approval_requested": false, "executed_count": null, "failed_count": null}', 'created_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 270187, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:13:05,270 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:05,271 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:05,271 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:13:05,271 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'pk_1': 'db5667cb-7b4c-4aea-baf3-bac9bd28fa5a'}
+2026-04-09 23:13:05,272 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:13:05,272 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:13:05,272 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET job_type=%(job_type)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:13:05,272 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'job_type': 'human_handoff', 'updated_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 271966, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:05,273 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:05,273 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:05,273 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:13:05,274 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:05,274 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:13:05,274 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'event_id': '49dcb264-a559-44d9-ad16-ca0087aa9eb4', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_started', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "step": "human_handoff"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 274539, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:13:05,275 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:05,275 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:05,275 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:13:05,276 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'pk_1': '49dcb264-a559-44d9-ad16-ca0087aa9eb4'}
+2026-04-09 23:13:05,276 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:13:05,277 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:13:05,277 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET result=%(result)s::JSON, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:13:05,277 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'result': '{"status": "completed", "summary": "Approval request created.", "requires_human_review": false, "payload": {"processor_name": "human_handoff_processo ... (6246 characters truncated) ... ns": ["approve", "reject"], "next_on_approve": "action_dispatch", "next_on_reject": "manual_review"}, "suggested_next_step": "awaiting_approval"}}}]}', 'updated_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 276612, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:05,278 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:05,279 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:05,279 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:13:05,279 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:05,280 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:13:05,280 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'event_id': '80d605b5-f88a-499c-af12-ee504fa51ded', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'step_completed', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "step": "human_handoff", "processor": "human_handoff_processor", "confidence": null, "requires_human_review": false, "approval_requested": true, "executed_count": null, "failed_count": null}', 'created_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 280396, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:13:05,281 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:05,281 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:05,281 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:13:05,282 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'pk_1': '80d605b5-f88a-499c-af12-ee504fa51ded'}
+2026-04-09 23:13:05,282 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:13:05,283 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:13:05,283 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET job_type=%(job_type)s, status=%(status)s, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:13:05,284 | INFO | sqlalchemy.engine.Engine | [cached since 632.9s ago] {'job_type': 'lead', 'status': <JobStatus.AWAITING_APPROVAL: 'awaiting_approval'>, 'updated_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 282606, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:05,284 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:05,284 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:05,285 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:13:05,285 | INFO | sqlalchemy.engine.Engine | [cached since 645s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:05,285 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:13:05,286 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:13:05,286 | INFO | sqlalchemy.engine.Engine | UPDATE jobs SET result=%(result)s::JSON, updated_at=%(updated_at)s WHERE jobs.job_id = %(jobs_job_id)s
+2026-04-09 23:13:05,286 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'result': '{"status": "completed", "summary": "Approval dispatched via dashboard.", "requires_human_review": false, "payload": {"processor_name": "approval_disp ... (7869 characters truncated) ... ed: Smoke test laddbox", "summary": "Job type: lead. Reasons: forced_approval_test Recommended next step: awaiting_approval. Confidence: 0.9."}}}}}]}', 'updated_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 285735, tzinfo=datetime.timezone.utc), 'jobs_job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:05,287 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:05,288 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:05,288 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id, jobs.tenant_id, jobs.job_type, jobs.status, jobs.input_data, jobs.result, jobs.created_at, jobs.updated_at, jobs.created_by 
+FROM jobs 
+WHERE jobs.job_id = %(pk_1)s
+2026-04-09 23:13:05,288 | INFO | sqlalchemy.engine.Engine | [cached since 645s ago] {'pk_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0'}
+2026-04-09 23:13:05,289 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.approval_id = %(approval_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:13:05,289 | INFO | sqlalchemy.engine.Engine | [cached since 632.9s ago] {'tenant_id_1': 'TENANT_1001', 'approval_id_1': '43e8fd17-4c49-40c0-9318-159b64134eb9', 'param_1': 1}
+2026-04-09 23:13:05,289 | INFO | sqlalchemy.engine.Engine | INSERT INTO approval_requests (approval_id, tenant_id, job_id, job_type, state, channel, title, summary, requested_by, requested_at, resolved_at, resolved_by, resolved_via, resolution_note, next_on_approve, next_on_reject, request_payload, delivery_payload, created_at, updated_at) VALUES (%(approval_id)s, %(tenant_id)s, %(job_id)s, %(job_type)s, %(state)s, %(channel)s, %(title)s, %(summary)s, %(requested_by)s, %(requested_at)s, %(resolved_at)s, %(resolved_by)s, %(resolved_via)s, %(resolution_note)s, %(next_on_approve)s, %(next_on_reject)s, %(request_payload)s::JSON, %(delivery_payload)s::JSON, %(created_at)s, %(updated_at)s)
+2026-04-09 23:13:05,290 | INFO | sqlalchemy.engine.Engine | [cached since 632.9s ago] {'approval_id': '43e8fd17-4c49-40c0-9318-159b64134eb9', 'tenant_id': 'TENANT_1001', 'job_id': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'job_type': 'lead', 'state': 'pending', 'channel': 'dashboard', 'title': 'Approval required: Smoke test laddbox', 'summary': 'Job type: lead. Reasons: forced_approval_test Recommended next step: awaiting_approval. Confidence: 0.9.', 'requested_by': 'system', 'requested_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 276568, tzinfo=datetime.timezone.utc), 'resolved_at': None, 'resolved_by': None, 'resolved_via': None, 'resolution_note': None, 'next_on_approve': 'action_dispatch', 'next_on_reject': 'manual_review', 'request_payload': '{"approval_id": "43e8fd17-4c49-40c0-9318-159b64134eb9", "job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "tenant_id": "TENANT_1001", "job_type": "le ... (602 characters truncated) ... asons": ["forced_approval_test"]}, "allowed_actions": ["approve", "reject"], "next_on_approve": "action_dispatch", "next_on_reject": "manual_review"}', 'delivery_payload': '{"delivery_id": "43e8fd17-4c49-40c0-9318-159b64134eb9:dashboard", "channel": "dashboard", "target": "default", "status": "sent", "sent_at": "2026-04- ... (59 characters truncated) ... equired: Smoke test laddbox", "summary": "Job type: lead. Reasons: forced_approval_test Recommended next step: awaiting_approval. Confidence: 0.9."}}', 'created_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 289686, tzinfo=datetime.timezone.utc), 'updated_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 289686, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:13:05,290 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:05,291 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:05,291 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id, approval_requests.tenant_id, approval_requests.job_id, approval_requests.job_type, approval_requests.state, approval_requests.channel, approval_requests.title, approval_requests.summary, approval_requests.requested_by, approval_requests.requested_at, approval_requests.resolved_at, approval_requests.resolved_by, approval_requests.resolved_via, approval_requests.resolution_note, approval_requests.next_on_approve, approval_requests.next_on_reject, approval_requests.request_payload, approval_requests.delivery_payload, approval_requests.created_at, approval_requests.updated_at 
+FROM approval_requests 
+WHERE approval_requests.approval_id = %(pk_1)s
+2026-04-09 23:13:05,291 | INFO | sqlalchemy.engine.Engine | [cached since 632.9s ago] {'pk_1': '43e8fd17-4c49-40c0-9318-159b64134eb9'}
+2026-04-09 23:13:05,292 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:13:05,292 | INFO | sqlalchemy.engine.Engine | [cached since 645s ago] {'event_id': 'c9f1632d-9cf2-4ff3-853b-efe3fe9161aa', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'approval_dispatched', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "approval_id": "43e8fd17-4c49-40c0-9318-159b64134eb9", "channel": "dashboard"}', 'created_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 292157, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:13:05,292 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:05,293 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:05,293 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:13:05,293 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'pk_1': 'c9f1632d-9cf2-4ff3-853b-efe3fe9161aa'}
+2026-04-09 23:13:05,294 | INFO | sqlalchemy.engine.Engine | INSERT INTO audit_events (event_id, tenant_id, category, action, status, details, created_at) VALUES (%(event_id)s, %(tenant_id)s, %(category)s, %(action)s, %(status)s, %(details)s::JSON, %(created_at)s)
+2026-04-09 23:13:05,294 | INFO | sqlalchemy.engine.Engine | [cached since 645s ago] {'event_id': 'e0cedc2f-ae42-45ee-98fb-4d09af09d981', 'tenant_id': 'TENANT_1001', 'category': 'workflow', 'action': 'workflow_completed', 'status': 'success', 'details': '{"job_id": "5479dce3-d51a-45ba-85a7-5a4a539db2e0", "resolved_job_type": "lead", "final_status": "awaiting_approval", "awaiting_approval": true}', 'created_at': datetime.datetime(2026, 4, 9, 21, 13, 5, 294005, tzinfo=datetime.timezone.utc)}
+2026-04-09 23:13:05,294 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-09 23:13:05,295 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:05,295 | INFO | sqlalchemy.engine.Engine | SELECT audit_events.event_id, audit_events.tenant_id, audit_events.category, audit_events.action, audit_events.status, audit_events.details, audit_events.created_at 
+FROM audit_events 
+WHERE audit_events.event_id = %(pk_1)s
+2026-04-09 23:13:05,295 | INFO | sqlalchemy.engine.Engine | [cached since 644.9s ago] {'pk_1': 'e0cedc2f-ae42-45ee-98fb-4d09af09d981'}
+2026-04-09 23:13:05,296 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-09 23:13:28,668 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:13:28,669 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:13:28,669 | INFO | sqlalchemy.engine.Engine | [cached since 668.3s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:13:28,671 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-09 23:14:51,549 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-09 23:14:51,549 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-09 23:14:51,549 | INFO | sqlalchemy.engine.Engine | [cached since 751.2s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '5479dce3-d51a-45ba-85a7-5a4a539db2e0', 'param_1': 1}
+2026-04-09 23:14:51,553 | INFO | sqlalchemy.engine.Engine | ROLLBACK

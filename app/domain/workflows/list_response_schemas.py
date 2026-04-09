@@ -1,11 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.domain.workflows.response_schemas import JobResponse
 
 
 class JobListResponse(BaseModel):
-    tenant_id: str
-    total: int
-    limit: int
-    offset: int
-    jobs: list[JobResponse]
+    items: list[JobResponse] = Field(default_factory=list)
+    total: int = 0

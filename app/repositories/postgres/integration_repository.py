@@ -116,3 +116,19 @@ class IntegrationRepository:
             query = query.filter(IntegrationEvent.integration_type == integration_type)
 
         return query.count()
+
+    # Static aliases used by main.py
+    @staticmethod
+    def list_events(
+        db: Session,
+        tenant_id: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list:
+        return IntegrationRepository(db).list_events_for_tenant(
+            tenant_id=tenant_id, limit=limit, offset=offset
+        )
+
+    @staticmethod
+    def count_events(db: Session, tenant_id: str) -> int:
+        return IntegrationRepository(db).count_events_for_tenant(tenant_id=tenant_id)

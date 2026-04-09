@@ -125,3 +125,29 @@ class JobRepository:
         if record is None:
             return None
         return JobRepository._to_domain(record)
+
+    # Aliases used by main.py
+    @staticmethod
+    def list_jobs(
+        db: Session,
+        tenant_id: str,
+        limit: int = 20,
+        offset: int = 0,
+        job_type: str | None = None,
+        status: str | None = None,
+    ) -> list[Job]:
+        records = JobRepository.list_jobs_for_tenant(
+            db, tenant_id, limit=limit, offset=offset, job_type=job_type, status=status
+        )
+        return [JobRepository._to_domain(r) for r in records]
+
+    @staticmethod
+    def count_jobs(
+        db: Session,
+        tenant_id: str,
+        job_type: str | None = None,
+        status: str | None = None,
+    ) -> int:
+        return JobRepository.count_jobs_for_tenant(
+            db, tenant_id, job_type=job_type, status=status
+        )

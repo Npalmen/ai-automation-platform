@@ -30,12 +30,30 @@ lead intake → classification → entity extraction → decisioning → policy 
 - Do not build broad frontend before official backend MVP flow is verified
 - Do not let chat history become the source of truth
 
+## Completed slice (2026-04-09)
+MVP flow verification and hardening. All tasks completed:
+- Official lead flow traced and verified end-to-end
+- Three critical bugs patched (asyncio.run on sync fn, EMAIL enum missing, is_integration_configured blind to token auth)
+- 23 new tests in tests/test_mvp_flow.py; 36/36 pass
+- Docs updated
+
+## Completed slice (2026-04-09 — read endpoint hardening)
+All MVP read endpoints were 500ing at runtime due to missing repository method names.
+Six alias methods added; 10 new tests; 46/46 pass.
+
+## Completed slice (2026-04-09 — schema and table bootstrap hardening)
+Two more runtime blockers patched:
+- JobListResponse schema aligned with main.py (items/total)
+- main.py Base import fixed to database.Base so create_all creates all four tables
+46/46 tests pass.
+
 ## Current slice
-Documentation consolidation + official MVP flow verification.
+All official MVP endpoints are patched and unit-tested. Remaining work:
+1. Full end-to-end smoke test against real DB (run uvicorn, POST /jobs, approve, verify Gmail)
+2. Operator/admin UI
+3. Auth / API keys
+4. DB-driven tenant config
 
 ## Expected output from next implementation chat
-- Identify exact files involved in official lead flow
-- Verify or patch end-to-end flow
-- Add/update relevant tests
-- Produce exact smoke-test instructions
-- Propose docs updates after implementation
+- Pick one next slice option above
+- Continue from this repo state; all docs and 46 tests are current

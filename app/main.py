@@ -1,4 +1,3 @@
-import asyncio
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -38,7 +37,7 @@ from app.integrations.service import get_integration_connection_config
 from app.repositories.postgres.action_execution_repository import ActionExecutionRepository
 from app.repositories.postgres.approval_repository import ApprovalRequestRepository
 from app.repositories.postgres.audit_repository import AuditRepository
-from app.repositories.postgres.base import Base
+from app.repositories.postgres.database import Base
 from app.repositories.postgres.integration_repository import IntegrationRepository
 from app.repositories.postgres.job_repository import JobRepository
 from app.repositories.postgres.session import engine
@@ -118,7 +117,7 @@ def create_job(
             detail=f"Tenant mismatch. Header tenant '{tenant_id}' does not match payload tenant '{request.tenant_id}'.",
         )
 
-    if not is_job_type_enabled_for_tenant(tenant_id, request.job_type):
+    if not is_job_type_enabled_for_tenant(request.job_type, tenant_id):
         raise HTTPException(
             status_code=403,
             detail=f"Job type '{request.job_type}' is not enabled for tenant '{tenant_id}'.",
@@ -144,7 +143,7 @@ def create_job(
         },
     )
 
-    processed_job = asyncio.run(run_pipeline(saved_job, db))
+    processed_job = run_pipeline(saved_job, db)
 
     return processed_job
 

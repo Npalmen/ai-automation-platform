@@ -59,3 +59,17 @@ class AuditRepository:
     @staticmethod
     def count_all_events(db: Session) -> int:
         return db.query(AuditEventRecord).count()
+
+    # Aliases used by main.py
+    @staticmethod
+    def list_events(
+        db: Session,
+        tenant_id: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[AuditEventRecord]:
+        return AuditRepository.list_events_for_tenant(db, tenant_id, limit=limit, offset=offset)
+
+    @staticmethod
+    def count_events(db: Session, tenant_id: str) -> int:
+        return AuditRepository.count_events_for_tenant(db, tenant_id)

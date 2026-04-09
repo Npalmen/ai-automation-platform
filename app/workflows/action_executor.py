@@ -98,7 +98,7 @@ def _build_email_result(action: dict[str, Any]) -> dict[str, Any]:
 
     connection_config = get_integration_connection_config(
         tenant_id=tenant_id,
-        integration_type=IntegrationType.EMAIL,
+        integration_type=IntegrationType.GOOGLE_MAIL,
     )
 
     if not is_integration_configured(connection_config):
@@ -111,7 +111,7 @@ def _build_email_result(action: dict[str, Any]) -> dict[str, Any]:
         )
 
     adapter = get_integration_adapter(
-        integration_type=IntegrationType.EMAIL,
+        integration_type=IntegrationType.GOOGLE_MAIL,
         connection_config=connection_config,
     )
     result = adapter.execute_action(action="send_email", payload=payload)
