@@ -1,192 +1,173 @@
 # AI Automation Platform
 
-Multi-tenant AI automation backend för att ta emot inkommande arbete, förstå det, fatta kontrollerade beslut och därefter:
+## Overview
 
-- köra åtgärder automatiskt
-- pausa för approval
-- lämna över till människa
+AI Automation Platform är en backend-first, multi-tenant plattform för att automatisera företagsprocesser med hjälp av AI, regler och integrationsflöden.
 
-Plattformen är byggd för att bli en osynlig AI-operatör för små bolag, växande bolag och enterprise use cases.
+Systemet tar emot inkommande ärenden (jobs), klassificerar dem, extraherar data, tillämpar policy, kräver approval vid behov och exekverar åtgärder via integrationer.
 
 ---
 
-## Syfte
+## Current Status
 
-Systemet automatiserar och orkestrerar arbetsflöden för exempelvis:
+Projektet har en fungerande backend-kärna med:
 
-- leads
-- fakturor
-- kundärenden
-- interna processer
-- notifieringar och uppföljningar
+* FastAPI API
+* PostgreSQL persistence
+* Multi-tenant via X-Tenant-ID
+* Workflow/orchestrator
+* AI-processorer
+* Approval flow (pause/resume)
+* Action execution
+* Audit logging
+* Gmail integration (testad)
 
-Målet är inte “fri AI”, utan kontrollerad AI i en deterministisk workflow-motor där:
+👉 Se aktuell status:
 
-- processors är stateless
-- jobs är stateful
-- orchestratorn styr flödet
-- AI används för strukturerade beslut, inte för att styra systemflödet direkt
-
----
-
-## Nuvarande status
-
-Projektet är förbi ren prototyp och har nu en fungerande backend-kärna med:
-
-- FastAPI API
-- PostgreSQL persistence
-- SQLAlchemy repository layer
-- multi-tenant tenant-context via `X-Tenant-ID`
-- orchestrator-baserad workflow pipeline
-- AI-processorer med typed outputs
-- approval flow med pause/resume
-- action dispatch
-- audit events
-- approval persistence i DB
-- action execution persistence i DB
-- read-endpoints för approvals och actions
-- live-testad Gmail integration via Google Mail provider
-
-Detta är nu en teknisk MVP med riktig exekveringsförmåga, inte bara en konceptuell arkitektur.
+* docs/05-current-state.md
+* docs/08-handoff.md
 
 ---
 
-## Arkitektur i korthet
+## Repository Structure
 
-### Kärnregler
-
-- Alla processors är stateless
-- Jobbet bär historik via `processor_history`
-- Orchestratorn styr pipeline, skip logic och resume-logik
-- Policy avgör om systemet får autoexekvera, kräver approval eller måste stanna för manuell hantering
-- AI-output ska vara strukturerad, validerbar och sparbar
-
-### Workflow-princip
-
-Bassteg:
-
-1. `intake`
-2. `classification`
-
-Därefter dynamisk pipeline beroende på ärendetyp.
-
-### Exempel: lead flow
-
-1. `intake`
-2. `classification`
-3. `entity_extraction`
-4. `lead`
-5. `decisioning`
-6. `policy`
-7. `action_dispatch`
-8. `human_handoff` vid behov
-
-### Approval flow
-
-1. pipeline når policy
-2. policy kräver approval
-3. approval request skapas
-4. jobbet pausas som `awaiting_approval`
-5. approve/reject via API
-6. approve återupptar post-approval path
-7. reject skickar till `manual_review`
+app/                # Core backend (API, workflows, integrations)
+docs/               # Source of truth (product, scope, architecture, etc.)
+docs/archive/       # Legacy documentation (read-only)
+tests/              # Test suite
+scripts/            # Utility scripts
+docker-compose.yml  # Local environment setup
 
 ---
 
-## Vad som fungerar nu
+## Quick Start (Local Development)
+
+### Requirements
+
+* Python 3.10+
+* PostgreSQL
+* (Optional) Docker
+
+### Installation
+
+pip install -r requirements.txt
+
+### Environment Setup
+
+Create a .env file with required configuration (database, API keys, etc.).
+
+### Start Database (if not running locally)
+
+docker-compose up -d
+
+### Run Backend
+
+uvicorn app.main:app --reload
+
+### Verify Server
+
+Open:
+http://localhost:8000/
+
+---
+
+## Smoke Test (MVP Flow)
+
+After starting the server:
+
+1. Create a job
+   POST /jobs
+
+2. List jobs
+   GET /jobs
+
+3. Check pending approvals
+   GET /approvals/pending
+
+4. Approve a job
+   POST /approvals/{id}/approve
+
+5. Verify actions and audit logs
+   GET /jobs/{job_id}/actions
+   GET /audit-events
+
+---
+
+## Core MVP Flow
+
+The official MVP flow:
+
+1. Job intake
+2. Classification
+3. Entity extraction
+4. Decisioning / policy
+5. Approval (if required)
+6. Resume workflow
+7. Execute action (e.g. Gmail)
+8. Audit logging
+
+---
+
+## API Overview
 
 ### Core
-- FastAPI backend
-- settings, logging och tenant middleware
-- PostgreSQL + repositories
-- job persistence
 
-### AI pipeline
-- intake
-- classification
-- entity extraction
-- lead processor
-- invoice processor
-- decisioning
-- policy
+* POST /jobs
+* GET /jobs
+* GET /jobs/{job_id}
 
-### Workflow engine
-- dynamisk pipeline
-- skip logic
-- audit logging
-- error handling
-- approval resume
+### Approvals
+
+* GET /approvals/pending
+* POST /approvals/{id}/approve
+* POST /approvals/{id}/reject
+
+### Actions
+
+* GET /jobs/{job_id}/actions
 
 ### Integrations
-- Google Mail / Gmail provider fungerar live för `send_email`
-- Slack finns som integrationsspår
-- Monday, Visma, Google och Microsoft ligger i integrationsarkitekturen
 
-### Persistence
-- jobs
-- audit events
-- approval requests
-- action executions
-
-### Read/API surface
-- job list
-- job detail
-- pending approvals
-- job approvals
-- job actions
-- approve / reject
-
----
-
-## Vad som saknas för säljbar produkt
-
-Nästa stora fokus är inte mer kärnarkitektur, utan produktisering:
-
-1. minimal operator/admin UI
-2. input connectors
-3. DB-driven tenant config
-4. auth / API keys / roller
-5. bättre testtäckning
-6. riktig integration event persistence för direkta integrationstest-endpoints
-7. onboardingflöde för kundkoppling av Gmail, Visma, Monday och Slack
-
----
-
-## API-översikt
-
-### Core
-- `GET /`
-- `GET /tenant`
-- `GET /jobs`
-- `GET /jobs/{job_id}`
-- `POST /jobs`
-
-### Actions / approvals
-- `GET /jobs/{job_id}/actions`
-- `GET /jobs/{job_id}/approvals`
-- `GET /approvals/pending`
-- `POST /approvals/{approval_id}/approve`
-- `POST /approvals/{approval_id}/reject`
-
-### Integrations
-- `GET /integrations`
-- `POST /integrations/{integration_type}/execute`
+* GET /integrations
+* POST /integrations/{type}/execute
 
 ### Audit
-- `GET /audit-events`
+
+* GET /audit-events
 
 ---
 
-## Mappstruktur
+## Documentation (Source of Truth)
 
-```text
-app/
-  ai/
-  api/
-  core/
-  domain/
-  integrations/
-  repositories/postgres/
-  workflows/
-docs/
-tests/
+Start here:
+
+* docs/02-mvp-scope.md
+* docs/03-system-architecture.md
+* docs/05-current-state.md
+* docs/06-backlog.md
+* docs/07-decisions.md
+* docs/08-handoff.md
+
+---
+
+## Working Model
+
+* Development is done in vertical slices
+* The repository is the source of truth, not chat history
+* Docs in docs/01–11 define the system
+* Legacy documents are stored in docs/archive/
+
+---
+
+## Current Limitations
+
+* Full authentication system not implemented
+* Frontend is not established or minimal
+* Tenant configuration is partially static
+* Some integrations exist as architecture paths, not production-ready features
+
+---
+
+## Goal
+
+Deliver a deployable MVP where a complete end-to-end workflow can be demonstrated to an external user.
