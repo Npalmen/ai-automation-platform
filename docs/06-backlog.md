@@ -34,11 +34,20 @@
 - [x] `X-Tenant-ID` sent on every request via editable tenant field
 - [x] 74/74 tests pass; no backend business logic changed (DEC-003)
 
+## Done (operability and docs hardening — 2026-04-10)
+- [x] `requirements.txt` created with all pinned runtime + test dependencies
+- [x] `docker-compose.yml` written — Postgres 15, port 5432, correct DB name
+- [x] `env.example` created — full template with all env vars documented
+- [x] `scripts/create_tables.py` fixed — imports all four model modules; all tables confirmed via output
+- [x] README fully rewritten — setup, DB verification, full curl smoke test, Gmail notes, API table, limitations
+- [x] `force_approval_test` flag documented as the official golden-path trigger
+- [x] 74/74 tests pass; no code logic changed
+
 ## Next (priority order)
-- [ ] **Smoke test with real DB** — run full lead flow with `force_approval_test=true`, approve via API, verify Gmail `send_email` actually fires (requires `.env` with Google credentials)
 - [ ] **Auth / API keys** — per-tenant API key validation on all endpoints
-- [ ] **DB-driven tenant config** — move hardcoded tenant config from env to `tenant_config` DB table
+- [ ] **DB-driven tenant config** — move hardcoded tenant config from code to `tenant_config` DB table
 - [ ] **Integration event persistence** — persist results from `/integrations/{type}/execute` to `integration_events` table
+- [ ] **Gmail OAuth refresh** — build token refresh flow so Gmail integration stays live
 
 ## Future UI improvements (out of current scope)
 - [ ] Authentication — API key or session-based, gating the `/ui` route

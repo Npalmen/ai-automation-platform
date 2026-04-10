@@ -1,173 +1,295 @@
 # AI Automation Platform
 
-## Overview
+Backend-first, multi-tenant platform for AI-driven workflow automation.
 
-AI Automation Platform är en backend-first, multi-tenant plattform för att automatisera företagsprocesser med hjälp av AI, regler och integrationsflöden.
-
-Systemet tar emot inkommande ärenden (jobs), klassificerar dem, extraherar data, tillämpar policy, kräver approval vid behov och exekverar åtgärder via integrationer.
+Jobs are received, classified, processed through a pipeline, paused for human approval when required, and resumed to execute real integration actions. Everything is auditable.
 
 ---
 
 ## Current Status
 
-Projektet har en fungerande backend-kärna med:
+All core MVP slices are complete and verified:
 
-* FastAPI API
-* PostgreSQL persistence
-* Multi-tenant via X-Tenant-ID
-* Workflow/orchestrator
-* AI-processorer
-* Approval flow (pause/resume)
-* Action execution
-* Audit logging
-* Gmail integration (testad)
+- FastAPI backend with PostgreSQL persistence
+- Multi-tenant via `X-Tenant-ID` header
+- Workflow orchestrator with AI processors
+- Approval flow (pause / resume)
+- Action dispatch with controlled failure handling
+- Audit logging
+- Thin operator UI at `/ui`
 
-👉 Se aktuell status:
-
-* docs/05-current-state.md
-* docs/08-handoff.md
+See [docs/05-current-state.md](docs/05-current-state.md) for the full status.
 
 ---
 
 ## Repository Structure
 
-app/                # Core backend (API, workflows, integrations)
-docs/               # Source of truth (product, scope, architecture, etc.)
-docs/archive/       # Legacy documentation (read-only)
-tests/              # Test suite
-scripts/            # Utility scripts
-docker-compose.yml  # Local environment setup
+```
+app/          Core backend (API, workflows, integrations, UI)
+docs/         Source of truth (scope, architecture, decisions, state)
+tests/        Automated test suite (74 tests)
+scripts/      Utility scripts (DB setup, connection check)
+```
 
 ---
 
-## Quick Start (Local Development)
+## Local Setup
 
 ### Requirements
 
-* Python 3.10+
-* PostgreSQL
-* (Optional) Docker
+- Python 3.10+
+- PostgreSQL 14+ (local install or Docker)
 
-### Installation
+### 1. Clone and install dependencies
 
+```bash
+git clone https://github.com/Npalmen/ai-automation-platform
+cd ai-automation-platform
 pip install -r requirements.txt
+```
 
-### Environment Setup
+### 2. Configure environment
 
-Create a .env file with required configuration (database, API keys, etc.).
+```bash
+cp env.example .env
+```
 
-### Start Database (if not running locally)
+Edit `.env` and set at minimum:
 
+```
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_platform
+LLM_API_KEY=<your OpenAI key>
+```
+
+The LLM key is required for the AI classification and extraction processors.
+All other keys (Gmail, Slack, etc.) are optional unless you are testing a specific integration.
+
+### 3. Start PostgreSQL
+
+**Option A — Docker (recommended):**
+
+```bash
 docker-compose up -d
+```
 
-### Run Backend
+This starts a Postgres 15 instance on port 5432 with user `postgres`, password `postgres`, database `ai_platform`.
 
+**Option B — local Postgres:**
+
+Create a database named `ai_platform` and set the matching `DATABASE_URL` in `.env`.
+
+### 4. Verify the database connection
+
+```bash
+python -m scripts.test_db_connection
+# Expected: DB OK: 1
+```
+
+### 5. Start the backend
+
+```bash
 uvicorn app.main:app --reload
+```
 
-### Verify Server
+Tables are created automatically on first startup.
 
-Open:
-http://localhost:8000/
+### 6. Verify the server
 
----
+```bash
+curl http://localhost:8000/
+# Expected: {"status":"ok","app_name":"AI Automation Platform","env":"dev"}
+```
 
-## Smoke Test (MVP Flow)
-
-After starting the server:
-
-1. Create a job
-   POST /jobs
-
-2. List jobs
-   GET /jobs
-
-3. Check pending approvals
-   GET /approvals/pending
-
-4. Approve a job
-   POST /approvals/{id}/approve
-
-5. Verify actions and audit logs
-   GET /jobs/{job_id}/actions
-   GET /audit-events
+Or open the operator UI: **http://localhost:8000/ui**
 
 ---
 
-## Core MVP Flow
+## Running Tests
 
-The official MVP flow:
+```bash
+python -m pytest
+```
 
-1. Job intake
-2. Classification
-3. Entity extraction
-4. Decisioning / policy
-5. Approval (if required)
-6. Resume workflow
-7. Execute action (e.g. Gmail)
-8. Audit logging
+Expected: 74 passed.
 
 ---
 
-## API Overview
+## Official Smoke Test — MVP Flow
+
+This is the golden path for the lead flow with forced approval.
+Run it after a clean local start.
+
+All curl commands assume the server is running at `http://localhost:8000`.
+
+### Step 1 — Create a job (lead, forced approval)
+
+```bash
+curl -s -X POST http://localhost:8000/jobs \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: TENANT_1001" \
+  -d '{
+    "tenant_id": "TENANT_1001",
+    "job_type": "lead",
+    "input_data": {
+      "subject": "New lead from website",
+      "message_text": "Hi, I am interested in your services.",
+      "owner_email": "owner@example.com",
+      "force_approval_test": true
+    }
+  }'
+```
+
+`force_approval_test: true` forces the policy processor to require approval regardless of AI confidence.
+
+**Expected response:** a job object with `"status": "awaiting_approval"`.
+
+Note the `job_id` from the response — you will need it in step 3.
+
+### Step 2 — Confirm the approval request was created
+
+```bash
+curl -s http://localhost:8000/approvals/pending \
+  -H "X-Tenant-ID: TENANT_1001"
+```
+
+**Expected:** `{"items": [{...}], "total": 1}` containing one pending approval.
+
+Note the `approval_id` from the response.
+
+### Step 3 — Approve the job
+
+```bash
+curl -s -X POST http://localhost:8000/approvals/<approval_id>/approve \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: TENANT_1001" \
+  -d '{"actor": "operator", "channel": "api"}'
+```
+
+Replace `<approval_id>` with the value from step 2.
+
+**Expected response:** a job object with `"status": "completed"` (or `"failed"` if no Gmail credentials are configured — see note below).
+
+### Step 4 — Inspect the job result
+
+```bash
+curl -s http://localhost:8000/jobs/<job_id> \
+  -H "X-Tenant-ID: TENANT_1001"
+```
+
+**Expected:** `"status": "completed"` or `"failed"`, with a populated `result` payload.
+
+### Step 5 — Inspect executed actions
+
+```bash
+curl -s http://localhost:8000/jobs/<job_id>/actions \
+  -H "X-Tenant-ID: TENANT_1001"
+```
+
+**Expected:** `{"items": [{...}], "total": N}` — action records showing what was attempted.
+
+### Step 6 — Verify the audit trail
+
+```bash
+curl -s http://localhost:8000/audit-events \
+  -H "X-Tenant-ID: TENANT_1001"
+```
+
+**Expected:** a list of audit events including `job_created`, `step_started`, `step_completed`, `workflow_completed` (or `workflow_failed`).
+
+---
+
+## Gmail Integration
+
+If `GOOGLE_MAIL_ACCESS_TOKEN` is set in `.env`, the `send_email` action will make a real Gmail API call. Without it, the action falls back to a stub and is marked as a non-live execution.
+
+Gmail access tokens are short-lived (1 hour). To use a real token:
+
+1. Obtain an OAuth2 access token for the Gmail API
+2. Set `GOOGLE_MAIL_ACCESS_TOKEN=<token>` in `.env`
+3. Set `GOOGLE_MAIL_USER_ID=me`
+
+If the token is expired, the action will fail and the job will be set to `FAILED` status. This is expected and handled — the error is persisted in `action_executions` and an audit event is emitted.
+
+---
+
+## Operator UI
+
+Open `http://localhost:8000/ui` after starting the server.
+
+- Enter the tenant ID in the header field (default: `TENANT_1001`)
+- **Jobs tab** — lists all jobs; click a row to open job detail
+- **Job detail** — shows status, result, approvals, and actions for that job
+- **Pending Approvals tab** — lists pending approvals with Approve/Reject buttons
+
+See [docs/08-handoff.md](docs/08-handoff.md) for full UI usage instructions.
+
+---
+
+## API Reference
 
 ### Core
 
-* POST /jobs
-* GET /jobs
-* GET /jobs/{job_id}
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/` | Health check |
+| `GET` | `/ui` | Operator UI |
+| `POST` | `/jobs` | Create and process a job |
+| `GET` | `/jobs` | List jobs for tenant |
+| `GET` | `/jobs/{job_id}` | Get job detail |
+| `GET` | `/jobs/{job_id}/actions` | Get actions for a job |
+| `GET` | `/jobs/{job_id}/approvals` | Get approvals for a job |
 
 ### Approvals
 
-* GET /approvals/pending
-* POST /approvals/{id}/approve
-* POST /approvals/{id}/reject
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/approvals/pending` | List pending approvals |
+| `POST` | `/approvals/{id}/approve` | Approve and resume job |
+| `POST` | `/approvals/{id}/reject` | Reject job |
 
-### Actions
+### Integrations & Audit
 
-* GET /jobs/{job_id}/actions
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/integrations` | List enabled integrations for tenant |
+| `POST` | `/integrations/{type}/execute` | Execute an integration action directly |
+| `GET` | `/audit-events` | List audit events for tenant |
 
-### Integrations
-
-* GET /integrations
-* POST /integrations/{type}/execute
-
-### Audit
-
-* GET /audit-events
-
----
-
-## Documentation (Source of Truth)
-
-Start here:
-
-* docs/02-mvp-scope.md
-* docs/03-system-architecture.md
-* docs/05-current-state.md
-* docs/06-backlog.md
-* docs/07-decisions.md
-* docs/08-handoff.md
+All endpoints require the `X-Tenant-ID` header.
 
 ---
 
-## Working Model
+## Tenants
 
-* Development is done in vertical slices
-* The repository is the source of truth, not chat history
-* Docs in docs/01–11 define the system
-* Legacy documents are stored in docs/archive/
+Tenant configuration is currently static in `app/core/config.py`.
 
----
-
-## Current Limitations
-
-* Full authentication system not implemented
-* Frontend is not established or minimal
-* Tenant configuration is partially static
-* Some integrations exist as architecture paths, not production-ready features
+| Tenant ID | Name | Enabled job types |
+|-----------|------|-------------------|
+| `TENANT_1001` | Default Tenant | lead, invoice, customer_inquiry |
+| `TENANT_2001` | Sales Tenant | lead, customer_inquiry |
+| `TENANT_3001` | Finance Tenant | invoice |
 
 ---
 
-## Goal
+## Known Limitations
 
-Deliver a deployable MVP where a complete end-to-end workflow can be demonstrated to an external user.
+- No authentication — `X-Tenant-ID` is trusted without validation
+- Tenant configuration is static in code, not database-driven
+- Gmail access tokens expire and require manual refresh
+- No pagination controls in the operator UI (backend supports it via query params)
+- `docker-compose.yml` starts PostgreSQL only; the app itself must be run with `uvicorn`
+
+---
+
+## Documentation
+
+| File | Description |
+|------|-------------|
+| [docs/02-mvp-scope.md](docs/02-mvp-scope.md) | MVP scope and success criteria |
+| [docs/03-system-architecture.md](docs/03-system-architecture.md) | Architecture overview |
+| [docs/05-current-state.md](docs/05-current-state.md) | Current implementation status |
+| [docs/06-backlog.md](docs/06-backlog.md) | Completed and upcoming work |
+| [docs/07-decisions.md](docs/07-decisions.md) | Architectural decisions log |
+| [docs/08-handoff.md](docs/08-handoff.md) | Handoff notes and UI usage guide |
+| [docs/10-test-strategy.md](docs/10-test-strategy.md) | Test strategy |
+| [docs/11-release-checklist.md](docs/11-release-checklist.md) | Release checklist |

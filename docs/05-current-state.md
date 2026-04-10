@@ -93,15 +93,25 @@ Projektet har passerat konceptstadiet och har en fungerande backend-kärna med r
 - No retries or advanced action controls
 - No auto-refresh — operator triggers all loads manually
 
+## Operability and docs hardening (2026-04-10)
+- [x] `requirements.txt` created — all runtime and test dependencies pinned
+- [x] `docker-compose.yml` written — starts Postgres 15 on port 5432 with correct DB name
+- [x] `env.example` created — full environment variable template with inline docs
+- [x] `scripts/create_tables.py` fixed — now imports all four model modules so standalone table creation works; must be run as `python -m scripts.create_tables` from repo root
+- [x] README fully rewritten — concrete local setup, DB verification step, full golden-path smoke test with curl commands, Gmail notes, API reference table, known limitations
+- [x] `force_approval_test` flag documented in README smoke test
+- [x] 74/74 tests still pass; no code logic changed
+
 ## Partially implemented / needs hardening
 - [ ] DB-driven tenant config
-- [ ] Auth / API keys / roller
-- [ ] Riktig integration event persistence för direkta integrationstest-endpoints
-- [ ] Kundonboarding för Gmail, Visma, Monday och Slack
-- [ ] End-to-end integration test with real DB
+- [ ] Auth / API keys
+- [ ] Integration event persistence for direct integration test endpoints
+- [ ] Gmail OAuth refresh flow (tokens are short-lived)
 
-## Known risks
-- Dokumentationen är idag splittrad över flera filer
-- Huvudplan riskerar att drifta mellan chattar om docs inte konsolideras
-- Frontend saknas eller är inte officiellt etablerad som MVP-del
-- Vissa integrationsspår finns i arkitekturen men ska inte tolkas som produktionklara
+## Known risks / filesystem issues
+- `pyproject.toml` is a directory (not a file) in the local filesystem — not tracked in git; does not affect runtime but cannot be used as a package manifest
+- `.env.example` is an empty directory in the local filesystem — workaround: use `env.example` (no dot prefix) as the template file
+- `docker-compose.yml` was previously an empty tracked file — now contains a working Postgres definition
+- `app/api/routes/jobs.py` is dead code (not mounted in `main.py`) — not a blocker, noted for future cleanup
+- No DB migration tooling — tables are created via `create_all` on startup; schema changes require manual intervention
+- Gmail access tokens expire (~1 hour); no OAuth refresh flow is built

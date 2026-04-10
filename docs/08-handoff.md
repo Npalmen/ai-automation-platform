@@ -93,12 +93,23 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - No retries or re-run controls for failed jobs
 - No auto-refresh — all data loads are triggered manually
 
-## Current slice
-All official MVP slices are complete. Remaining work:
-1. Full end-to-end smoke test against real DB (run uvicorn, POST /jobs, approve, verify Gmail)
-2. Auth / API keys
-3. DB-driven tenant config
+## Completed slice (2026-04-10 — operability and docs hardening)
+- `requirements.txt` created; `docker-compose.yml` filled in (Postgres 15); `env.example` written
+- `scripts/create_tables.py` fixed to import all four model modules
+- README fully rewritten with concrete setup, DB verification step, and curl smoke test
+- `force_approval_test` flag documented as the official golden-path trigger
+- 74/74 tests pass; no code logic changed
+
+## Current state
+All official MVP slices are complete and documented. The system is reproducibly runnable from a clean local setup following the README.
+
+## Remaining work (priority order)
+1. Auth / API keys — per-tenant key validation
+2. DB-driven tenant config — remove hardcoded `TENANT_CONFIGS` from code
+3. Integration event persistence — persist direct integration endpoint results
+4. Gmail OAuth refresh — tokens expire; no refresh flow built
 
 ## Expected output from next implementation chat
-- Pick one next slice option above
-- Continue from this repo state; all docs and 74 tests are current
+- Pick one remaining work item above
+- Continue from this repo state; README, all docs, and 74 tests are current
+- Suggested next: Auth / API keys (smallest scope, highest value for operability)

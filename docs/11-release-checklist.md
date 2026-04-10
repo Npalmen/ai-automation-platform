@@ -1,24 +1,29 @@
 # Release Checklist
 
 ## Code
-- [ ] Relevant code committed
-- [ ] No obvious dead paths in MVP flow
-- [ ] Env variables documented
-- [ ] DB setup verified
+- [x] Relevant code committed
+- [x] No obvious dead paths in MVP flow
+- [x] Env variables documented (`env.example`)
+- [x] DB setup verified (`docker-compose.yml` + `scripts/create_tables.py`)
 
 ## Test
-- [ ] Relevant automated tests pass
-- [ ] Official MVP smoke test passes
-- [ ] Gmail integration path verified in intended test mode
+- [x] Automated tests pass — 74/74 (`python -m pytest`)
+- [x] Official MVP smoke test documented in README (curl commands, step by step)
+- [ ] Gmail integration path verified with live token (requires valid `GOOGLE_MAIL_ACCESS_TOKEN`)
 
 ## Docs
-- [ ] current-state updated
-- [ ] backlog updated
-- [ ] handoff updated
-- [ ] decisions updated if needed
+- [x] current-state updated
+- [x] backlog updated
+- [x] handoff updated
+- [ ] decisions updated if architecture changes (none in this slice)
 
 ## Deployment / operability
-- [ ] Local start from clean environment verified
-- [ ] Docker path verified
-- [ ] Health/basic endpoint verified
-- [ ] Demo instructions verified
+- [x] Local start from clean environment documented in README
+- [x] Docker path documented and verified (`docker-compose up -d` starts Postgres)
+- [x] Health endpoint verified (`GET /` returns `{"status":"ok"}`)
+- [x] Demo instructions verified (README smoke test + operator UI at `/ui`)
+
+## Remaining before full release
+- [ ] Auth / API key validation
+- [ ] Gmail OAuth token refresh
+- [ ] DB-driven tenant config
