@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class IntegrationEventResponse(BaseModel):
@@ -22,8 +22,5 @@ class IntegrationEventResponse(BaseModel):
 
 
 class IntegrationEventListResponse(BaseModel):
-    tenant_id: str | None = None
-    total: int
-    limit: int
-    offset: int
-    events: list[IntegrationEventResponse]
+    items: list[IntegrationEventResponse] = Field(default_factory=list)
+    total: int = 0

@@ -65,6 +65,14 @@ Projektet har passerat konceptstadiet och har en fungerande backend-kärna med r
 - [x] Verified: `Base.metadata.tables` now contains all four expected tables after startup import
 - [x] All 46 tests still pass
 
+## Action error handling hardening (2026-04-09)
+- [x] `action_dispatch_processor`: result `status` is now `"failed"` (not `"completed"`) when any action fails
+- [x] `action_dispatch_processor`: audit event `action_dispatch_failed` emitted on failure (with failed action types and error strings)
+- [x] `orchestrator._finalize_success`: detects `failed_count > 0` in action_dispatch payload → routes to `_finalize_failure` → job status `FAILED` (not `MANUAL_REVIEW`)
+- [x] `get_db` dependency: added `except: db.rollback(); raise` to prevent dirty sessions after partial commits
+- [x] `tests/test_action_failure.py` added: 11 tests covering failure shape, audit event, orchestrator routing, and success/non-action-dispatch paths
+- [x] All 68 tests pass
+
 ## Partially implemented / needs hardening
 - [ ] Operator/admin UI
 - [ ] DB-driven tenant config

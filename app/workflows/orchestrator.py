@@ -178,6 +178,22 @@ class WorkflowOrchestrator:
         final_job = job.model_copy(deep=True)
         final_job.job_type = resolved_job_type
 
+        action_dispatch_payload = self._get_latest_processor_payload(final_job, "action_dispatch_processor")
+        action_dispatch_failed = action_dispatch_payload.get("failed_count", 0) > 0
+
+        if action_dispatch_failed:
+            failed_actions = action_dispatch_payload.get("actions_failed", [])
+            error_summary = "; ".join(
+                f"{f.get('type', 'unknown')}: {f.get('error', 'unknown error')}"
+                for f in failed_actions
+            )
+            return self._finalize_failure(
+                job=final_job,
+                resolved_job_type=resolved_job_type,
+                failed_step=JobType.ACTION_DISPATCH,
+                error_message=error_summary or "Action dispatch failed",
+            )
+
         requires_human_review = bool(
             (final_job.result or {}).get("requires_human_review", False)
         )

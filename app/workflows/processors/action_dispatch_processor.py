@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.core.audit_service import create_audit_event
 from app.domain.workflows.models import Job
 from app.repositories.postgres.action_execution_repository import ActionExecutionRepository
 from app.workflows.action_executor import execute_action
@@ -195,16 +196,32 @@ def process_action_dispatch_job(job: Job, db: Session | None = None) -> Job:
                 attempt_no=index,
             )
 
-    requires_human_review = len(failed_actions) > 0
+    has_failures = len(failed_actions) > 0
+
+    if has_failures and db is not None:
+        create_audit_event(
+            db=db,
+            tenant_id=job.tenant_id,
+            category="workflow",
+            action="action_dispatch_failed",
+            status="failed",
+            details={
+                "job_id": job.job_id,
+                "failed_count": len(failed_actions),
+                "executed_count": len(executed_actions),
+                "failed_actions": [f.get("type") for f in failed_actions],
+                "errors": [f.get("error") for f in failed_actions],
+            },
+        )
 
     result = {
-        "status": "completed",
+        "status": "failed" if has_failures else "completed",
         "summary": (
             "Actions dispatched successfully."
-            if not requires_human_review
+            if not has_failures
             else "One or more actions failed during dispatch."
         ),
-        "requires_human_review": requires_human_review,
+        "requires_human_review": has_failures,
         "payload": {
             "processor_name": PROCESSOR_NAME,
             "actions_requested": actions,
@@ -212,7 +229,7 @@ def process_action_dispatch_job(job: Job, db: Session | None = None) -> Job:
             "actions_failed": failed_actions,
             "executed_count": len(executed_actions),
             "failed_count": len(failed_actions),
-            "recommended_next_step": "manual_review" if requires_human_review else "completed",
+            "recommended_next_step": "manual_review" if has_failures else "completed",
         },
     }
 

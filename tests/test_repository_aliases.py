@@ -236,3 +236,69 @@ class TestJobRepositoryToDomain:
 
         assert job.processor_history == []
         assert job.result == {}
+
+
+# ---------------------------------------------------------------------------
+# Response schema shape: list endpoints use {items, total}
+# ---------------------------------------------------------------------------
+
+class TestListResponseSchemaShapes:
+    """
+    Regression: all list response schemas must use {items, total}
+    matching what main.py actually constructs.
+    Previously AuditEventListResponse used {events, tenant_id, limit, offset}
+    and IntegrationEventListResponse used {events, ...} — both caused 500s.
+    """
+
+    def test_audit_event_list_response_accepts_items_and_total(self):
+        from app.core.audit_list_response_schemas import AuditEventListResponse
+
+        resp = AuditEventListResponse(items=[], total=0)
+        assert resp.items == []
+        assert resp.total == 0
+
+    def test_audit_event_list_response_has_no_events_field(self):
+        from app.core.audit_list_response_schemas import AuditEventListResponse
+
+        assert not hasattr(AuditEventListResponse.model_fields, "events"), (
+            "AuditEventListResponse must use 'items', not 'events'"
+        )
+        assert "events" not in AuditEventListResponse.model_fields
+
+    def test_audit_event_list_response_has_no_legacy_fields(self):
+        from app.core.audit_list_response_schemas import AuditEventListResponse
+
+        fields = AuditEventListResponse.model_fields
+        for legacy in ("tenant_id", "limit", "offset", "events"):
+            assert legacy not in fields, f"Unexpected legacy field '{legacy}' in AuditEventListResponse"
+
+    def test_integration_event_list_response_accepts_items_and_total(self):
+        from app.domain.integrations.response_schemas import IntegrationEventListResponse
+
+        resp = IntegrationEventListResponse(items=[], total=0)
+        assert resp.items == []
+        assert resp.total == 0
+
+    def test_integration_event_list_response_has_no_events_field(self):
+        from app.domain.integrations.response_schemas import IntegrationEventListResponse
+
+        assert "events" not in IntegrationEventListResponse.model_fields
+
+    def test_audit_event_response_serializes_from_orm_record(self):
+        """AuditEventResponse must deserialize from an ORM-like object (from_attributes)."""
+        from app.core.audit_response_schemas import AuditEventResponse
+
+        now = datetime.now(timezone.utc)
+        rec = MagicMock()
+        rec.event_id = "evt-42"
+        rec.tenant_id = "TENANT_1001"
+        rec.category = "workflow"
+        rec.action = "job_created"
+        rec.status = "success"
+        rec.details = {"job_id": "job-1"}
+        rec.created_at = now
+
+        resp = AuditEventResponse.model_validate(rec, from_attributes=True)
+        assert resp.event_id == "evt-42"
+        assert resp.action == "job_created"
+        assert resp.details == {"job_id": "job-1"}

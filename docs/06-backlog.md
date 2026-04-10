@@ -20,6 +20,12 @@
 - [x] Add tests/test_mvp_flow.py (23 tests, 36/36 total pass)
 - [x] Update docs/05-current-state.md and docs/08-handoff.md
 
+## Done (action error handling hardening — 2026-04-09)
+- [x] `action_dispatch_processor`: result `status="failed"` when any action fails; audit event emitted with error detail
+- [x] `orchestrator._finalize_success`: routes to `FAILED` (not `MANUAL_REVIEW`) when `failed_count > 0` in action_dispatch payload
+- [x] `get_db`: added `except: db.rollback(); raise` for defensive session handling
+- [x] `tests/test_action_failure.py` (11 tests); 68/68 pass
+
 ## Next (priority order)
 - [ ] **Smoke test with real DB** — run full lead flow with `force_approval_test=true`, approve via API, verify Gmail `send_email` actually fires (requires `.env` with Google credentials)
 - [ ] **Operator/admin UI** — thin read-only dashboard: job list, approval queue, audit log (DEC-003)
