@@ -1,6 +1,8 @@
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_db
@@ -75,6 +77,12 @@ def root():
         "app_name": settings.APP_NAME,
         "env": settings.ENV,
     }
+
+
+@app.get("/ui", response_class=HTMLResponse, include_in_schema=False)
+def operator_ui():
+    html = (Path(__file__).parent / "ui" / "index.html").read_text(encoding="utf-8")
+    return HTMLResponse(content=html)
 
 
 @app.get("/tenant")

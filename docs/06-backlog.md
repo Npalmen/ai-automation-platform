@@ -26,12 +26,28 @@
 - [x] `get_db`: added `except: db.rollback(); raise` for defensive session handling
 - [x] `tests/test_action_failure.py` (11 tests); 68/68 pass
 
+## Done (thin operator/admin UI — 2026-04-10)
+- [x] `app/ui/index.html` — single-file UI, no build toolchain
+- [x] `GET /ui` route in `app/main.py` — serves HTML directly via FastAPI
+- [x] Jobs list, job detail (approvals + actions), pending approvals tab
+- [x] Approve/Reject buttons call existing endpoints; UI refreshes after decision
+- [x] `X-Tenant-ID` sent on every request via editable tenant field
+- [x] 74/74 tests pass; no backend business logic changed (DEC-003)
+
 ## Next (priority order)
 - [ ] **Smoke test with real DB** — run full lead flow with `force_approval_test=true`, approve via API, verify Gmail `send_email` actually fires (requires `.env` with Google credentials)
-- [ ] **Operator/admin UI** — thin read-only dashboard: job list, approval queue, audit log (DEC-003)
 - [ ] **Auth / API keys** — per-tenant API key validation on all endpoints
 - [ ] **DB-driven tenant config** — move hardcoded tenant config from env to `tenant_config` DB table
 - [ ] **Integration event persistence** — persist results from `/integrations/{type}/execute` to `integration_events` table
+
+## Future UI improvements (out of current scope)
+- [ ] Authentication — API key or session-based, gating the `/ui` route
+- [ ] Filtering and search — filter jobs by status, type, date range
+- [ ] Pagination controls — currently UI fetches first 100; add next/prev
+- [ ] Audit log view — surface `GET /audit-events` in the UI
+- [ ] Retries / re-run — trigger re-processing of failed jobs
+- [ ] Notifications — surface action failures inline without manual refresh
+- [ ] Improved UX — replace inline HTML/CSS with a proper component approach if scope grows
 
 ## Known risks
 - `app/api/routes/jobs.py` is dead code (not mounted in main.py) — remove or wire up

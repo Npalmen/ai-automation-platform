@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Automation — Operator UI</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: monospace; font-size: 14px; background: #f5f5f5; color: #222; }
+  header { background: #1a1a2e; color: #eee; padding: 12px 20px; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 16px; font-weight: bold; flex: 1; }
+  header label { font-size: 12px; color: #aaa; }
+  header input { padding: 4px 8px; border: 1px solid #555; background: #2a2a3e; color: #eee; border-radius: 3px; width: 160px; }
+  .layout { display: flex; height: calc(100vh - 45px); }
+  .panel { padding: 16px; overflow-y: auto; }
+  .left { width: 340px; border-right: 1px solid #ddd; background: #fff; flex-shrink: 0; }
+  .right { flex: 1; background: #fafafa; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #555; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+  .btn { display: inline-block; padding: 5px 12px; border: none; border-radius: 3px; cursor: pointer; font-family: monospace; font-size: 13px; }
+  .btn-sm { padding: 3px 8px; font-size: 12px; }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-success { background: #16a34a; color: #fff; }
+  .btn-danger  { background: #dc2626; color: #fff; }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .job-row { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+  .job-row:hover { background: #f0f4ff; }
+  .job-row.selected { background: #dbeafe; }
+  .job-id { font-weight: bold; font-size: 12px; }
+  .job-meta { font-size: 11px; color: #666; display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+  .badge-completed  { background: #dcfce7; color: #166534; }
+  .badge-failed     { background: #fee2e2; color: #991b1b; }
+  .badge-awaiting_approval { background: #fef9c3; color: #854d0e; }
+  .badge-manual_review     { background: #fde8d8; color: #9a3412; }
+  .badge-processing { background: #e0f2fe; color: #075985; }
+  .badge-pending    { background: #f3f4f6; color: #374151; }
+  .badge-default    { background: #e5e7eb; color: #374151; }
+  .section { margin-bottom: 20px; }
+  .kv-table { width: 100%; border-collapse: collapse; }
+  .kv-table td { padding: 4px 6px; border-bottom: 1px solid #eee; vertical-align: top; }
+  .kv-table td:first-child { color: #777; width: 140px; white-space: nowrap; }
+  pre { background: #1e1e2e; color: #cdd6f4; padding: 10px; border-radius: 4px; font-size: 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow-y: auto; }
+  .approval-card { border: 1px solid #fbbf24; border-radius: 4px; padding: 10px; margin-bottom: 8px; background: #fffbeb; }
+  .approval-card .approval-meta { font-size: 12px; color: #555; margin-bottom: 6px; }
+  .approval-card .approval-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .action-card { border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 10px; margin-bottom: 6px; background: #fff; }
+  .action-card .action-meta { font-size: 11px; color: #777; display: flex; gap: 10px; flex-wrap: wrap; }
+  .msg { padding: 8px 10px; border-radius: 4px; font-size: 12px; margin-bottom: 8px; }
+  .msg-error { background: #fee2e2; color: #991b1b; }
+  .msg-ok    { background: #dcfce7; color: #166534; }
+  .empty { color: #aaa; font-size: 12px; font-style: italic; padding: 6px 0; }
+  .tabs { display: flex; gap: 2px; margin-bottom: 12px; }
+  .tab { padding: 5px 12px; border: 1px solid #ddd; background: #f3f4f6; cursor: pointer; border-radius: 3px 3px 0 0; font-size: 12px; }
+  .tab.active { background: #fff; border-bottom-color: #fff; font-weight: bold; }
+  .refresh-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .spinner { display: none; font-size: 12px; color: #888; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AI Automation — Operator UI</h1>
+  <label>Tenant&nbsp;
+    <input id="tenantInput" value="TENANT_1001" placeholder="TENANT_1001">
+  </label>
+  <button class="btn btn-primary btn-sm" onclick="loadAll()">Refresh All</button>
+</header>
+
+<div class="layout">
+  <!-- LEFT: jobs list + pending approvals tab -->
+  <div class="left panel">
+    <div class="tabs">
+      <div class="tab active" id="tabJobs" onclick="switchTab('jobs')">Jobs</div>
+      <div class="tab" id="tabApprovals" onclick="switchTab('approvals')">Pending Approvals</div>
+    </div>
+
+    <div id="paneJobs">
+      <div class="refresh-bar">
+        <button class="btn btn-primary btn-sm" onclick="loadJobs()">Load Jobs</button>
+        <span class="spinner" id="spinJobs">loading…</span>
+      </div>
+      <div id="msgJobs"></div>
+      <div id="jobsList"><span class="empty">Press "Load Jobs".</span></div>
+    </div>
+
+    <div id="paneApprovals" style="display:none">
+      <div class="refresh-bar">
+        <button class="btn btn-primary btn-sm" onclick="loadPendingApprovals()">Load Pending</button>
+        <span class="spinner" id="spinApprovals">loading…</span>
+      </div>
+      <div id="msgApprovals"></div>
+      <div id="approvalsList"><span class="empty">Press "Load Pending".</span></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: job detail -->
+  <div class="right panel">
+    <div id="jobDetail"><span class="empty">Select a job from the list.</span></div>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+let selectedJobId = null;
+
+function tenant() {
+  return document.getElementById('tenantInput').value.trim() || 'TENANT_1001';
+}
+
+function headers() {
+  return { 'Content-Type': 'application/json', 'X-Tenant-ID': tenant() };
+}
+
+// ---------------------------------------------------------------------------
+// Tabs
+// ---------------------------------------------------------------------------
+function switchTab(name) {
+  document.getElementById('paneJobs').style.display     = name === 'jobs'      ? '' : 'none';
+  document.getElementById('paneApprovals').style.display = name === 'approvals' ? '' : 'none';
+  document.getElementById('tabJobs').classList.toggle('active',      name === 'jobs');
+  document.getElementById('tabApprovals').classList.toggle('active', name === 'approvals');
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function statusBadge(status) {
+  const cls = ['completed','failed','awaiting_approval','manual_review','processing','pending']
+    .includes(status) ? `badge-${status}` : 'badge-default';
+  return `<span class="badge ${cls}">${status || '—'}</span>`;
+}
+
+function setMsg(elId, text, isError) {
+  const el = document.getElementById(elId);
+  if (!text) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="msg ${isError ? 'msg-error' : 'msg-ok'}">${text}</div>`;
+}
+
+function spin(id, on) {
+  document.getElementById(id).style.display = on ? 'inline' : 'none';
+}
+
+async function apiFetch(path, opts) {
+  const resp = await fetch(path, { headers: headers(), ...opts });
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`HTTP ${resp.status}: ${body}`);
+  }
+  return resp.json();
+}
+
+// ---------------------------------------------------------------------------
+// Jobs list
+// ---------------------------------------------------------------------------
+async function loadJobs() {
+  spin('spinJobs', true);
+  setMsg('msgJobs', '');
+  try {
+    const data = await apiFetch('/jobs?limit=100&offset=0');
+    renderJobsList(data.items || []);
+  } catch (e) {
+    setMsg('msgJobs', e.message, true);
+  } finally {
+    spin('spinJobs', false);
+  }
+}
+
+function renderJobsList(jobs) {
+  const el = document.getElementById('jobsList');
+  if (!jobs.length) { el.innerHTML = '<span class="empty">No jobs found.</span>'; return; }
+  el.innerHTML = jobs.map(j => {
+    const sel = j.job_id === selectedJobId ? ' selected' : '';
+    return `<div class="job-row${sel}" onclick="selectJob('${j.job_id}')">
+      <div class="job-id">${j.job_id}</div>
+      <div class="job-meta">
+        <span>${j.job_type || '—'}</span>
+        ${statusBadge(j.status)}
+        <span>${j.created_at ? j.created_at.slice(0,19).replace('T',' ') : ''}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function selectJob(jobId) {
+  selectedJobId = jobId;
+  // update selected highlight
+  document.querySelectorAll('.job-row').forEach(el => {
+    el.classList.toggle('selected', el.querySelector('.job-id')?.textContent === jobId);
+  });
+  await loadJobDetail(jobId);
+}
+
+// ---------------------------------------------------------------------------
+// Job detail
+// ---------------------------------------------------------------------------
+async function loadJobDetail(jobId) {
+  const el = document.getElementById('jobDetail');
+  el.innerHTML = '<span class="empty">Loading…</span>';
+  try {
+    const [job, approvals, actions] = await Promise.all([
+      apiFetch(`/jobs/${jobId}`),
+      apiFetch(`/jobs/${jobId}/approvals`),
+      apiFetch(`/jobs/${jobId}/actions`),
+    ]);
+    renderJobDetail(job, approvals.items || [], actions.items || []);
+  } catch (e) {
+    el.innerHTML = `<div class="msg msg-error">${e.message}</div>`;
+  }
+}
+
+function renderJobDetail(job, approvals, actions) {
+  const result = job.result || {};
+  const summary = result.summary || result.status || '';
+  const failedCount = (result.payload || {}).failed_count;
+  const el = document.getElementById('jobDetail');
+
+  el.innerHTML = `
+    <div class="section">
+      <h2>Job — ${job.job_id}</h2>
+      <table class="kv-table">
+        <tr><td>Status</td><td>${statusBadge(job.status)}</td></tr>
+        <tr><td>Job type</td><td>${job.job_type || '—'}</td></tr>
+        <tr><td>Tenant</td><td>${job.tenant_id || '—'}</td></tr>
+        <tr><td>Created</td><td>${job.created_at ? job.created_at.replace('T',' ').slice(0,19) : '—'}</td></tr>
+        <tr><td>Updated</td><td>${job.updated_at ? job.updated_at.replace('T',' ').slice(0,19) : '—'}</td></tr>
+        ${summary ? `<tr><td>Summary</td><td>${summary}</td></tr>` : ''}
+        ${failedCount !== undefined ? `<tr><td>Failed actions</td><td>${failedCount}</td></tr>` : ''}
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Result payload</h2>
+      <pre>${JSON.stringify(result, null, 2)}</pre>
+    </div>
+
+    <div class="section">
+      <h2>Approvals for this job (${approvals.length})</h2>
+      <div id="jobApprovals">${renderApprovalCards(approvals, true)}</div>
+    </div>
+
+    <div class="section">
+      <h2>Actions for this job (${actions.length})</h2>
+      ${renderActionCards(actions)}
+    </div>
+  `;
+}
+
+// ---------------------------------------------------------------------------
+// Approval cards (used in job detail and pending list)
+// ---------------------------------------------------------------------------
+function renderApprovalCards(approvals, fromJobDetail) {
+  if (!approvals.length) return '<span class="empty">No approvals.</span>';
+  return approvals.map(a => {
+    const isPending = a.state === 'pending';
+    const btns = isPending ? `
+      <div class="approval-actions">
+        <button class="btn btn-success btn-sm" onclick="doApprove('${a.approval_id}', ${fromJobDetail})">Approve</button>
+        <button class="btn btn-danger btn-sm"  onclick="doReject('${a.approval_id}',  ${fromJobDetail})">Reject</button>
+      </div>` : '';
+    return `<div class="approval-card">
+      <div class="approval-meta">
+        <strong>${a.approval_id}</strong> &nbsp;|&nbsp; state: <strong>${a.state || '—'}</strong>
+        &nbsp;|&nbsp; job: ${a.job_id || '—'}
+        ${a.created_at ? '&nbsp;|&nbsp; ' + a.created_at.slice(0,19).replace('T',' ') : ''}
+      </div>
+      ${a.summary ? `<div style="font-size:12px;color:#555;">${a.summary}</div>` : ''}
+      ${a.resolution_note ? `<div style="font-size:12px;color:#555;">Note: ${a.resolution_note}</div>` : ''}
+      ${btns}
+    </div>`;
+  }).join('');
+}
+
+function renderActionCards(actions) {
+  if (!actions.length) return '<span class="empty">No actions.</span>';
+  return actions.map(a => `<div class="action-card">
+    <div class="job-meta" style="margin-bottom:4px;">
+      <strong>${a.action_type || '—'}</strong>
+      ${statusBadge(a.status)}
+    </div>
+    <div class="action-meta">
+      ${a.attempt_no !== undefined ? `<span>attempt #${a.attempt_no}</span>` : ''}
+      ${a.created_at ? `<span>${a.created_at.slice(0,19).replace('T',' ')}</span>` : ''}
+      ${a.error_message ? `<span style="color:#dc2626;">error: ${a.error_message}</span>` : ''}
+    </div>
+  </div>`).join('');
+}
+
+// ---------------------------------------------------------------------------
+// Pending approvals list (left panel)
+// ---------------------------------------------------------------------------
+async function loadPendingApprovals() {
+  spin('spinApprovals', true);
+  setMsg('msgApprovals', '');
+  try {
+    const data = await apiFetch('/approvals/pending?limit=100&offset=0');
+    renderPendingList(data.items || []);
+  } catch (e) {
+    setMsg('msgApprovals', e.message, true);
+  } finally {
+    spin('spinApprovals', false);
+  }
+}
+
+function renderPendingList(approvals) {
+  const el = document.getElementById('approvalsList');
+  if (!approvals.length) { el.innerHTML = '<span class="empty">No pending approvals.</span>'; return; }
+  el.innerHTML = renderApprovalCards(approvals, false);
+}
+
+// ---------------------------------------------------------------------------
+// Approve / Reject
+// ---------------------------------------------------------------------------
+async function doApprove(approvalId, fromJobDetail) {
+  await doDecision(approvalId, 'approve', fromJobDetail);
+}
+
+async function doReject(approvalId, fromJobDetail) {
+  await doDecision(approvalId, 'reject', fromJobDetail);
+}
+
+async function doDecision(approvalId, decision, fromJobDetail) {
+  const body = { actor: 'operator', channel: 'ui', note: null };
+  try {
+    await apiFetch(`/approvals/${approvalId}/${decision}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    if (fromJobDetail && selectedJobId) {
+      await loadJobDetail(selectedJobId);
+    } else {
+      await loadPendingApprovals();
+    }
+  } catch (e) {
+    if (fromJobDetail) {
+      document.getElementById('jobApprovals').innerHTML =
+        `<div class="msg msg-error">${e.message}</div>`;
+    } else {
+      setMsg('msgApprovals', e.message, true);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Load all on startup
+// ---------------------------------------------------------------------------
+async function loadAll() {
+  await Promise.all([loadJobs(), loadPendingApprovals()]);
+}
+
+loadAll();
+</script>
+</body>
+</html>
