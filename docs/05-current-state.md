@@ -79,19 +79,27 @@ Projektet har passerat konceptstadiet och har en fungerande backend-kärna med r
 - [x] Jobs list with status badges, click to open job detail
 - [x] Job detail: id, status, type, tenant, timestamps, result payload, per-job approvals, per-job actions
 - [x] Pending approvals tab with Approve/Reject buttons
-- [x] All fetches send `X-Tenant-ID` from an editable tenant input field
+- [x] All fetches send `X-API-Key` from an editable key input (updated in UI auth slice)
 - [x] Approve/Reject POSTs to existing endpoints; UI refreshes after decision
 - [x] No React, no Vite, no separate frontend toolchain — pure HTML/CSS/JS inline
-- [x] 74/74 tests still pass
+- [x] 74/74 tests at time of implementation
 
 **UI limitations (by design — out of MVP scope):**
-- No authentication — tenant ID is entered manually and not validated
 - No pagination controls — UI fetches first 100 jobs/approvals; backend supports pagination
 - No filtering or search
 - No audit log view in the UI (data exists in API at `GET /audit-events`)
 - No job creation form
 - No retries or advanced action controls
 - No auto-refresh — operator triggers all loads manually
+
+## UI auth alignment (2026-04-11)
+- [x] `app/ui/index.html` — API key input added to header (replaces tenant ID input)
+- [x] All fetch calls now send `X-API-Key` header instead of `X-Tenant-ID`
+- [x] Key persisted to `localStorage` — survives page refresh
+- [x] Warning banner shown when no key is entered
+- [x] Auto-load on page open only fires when a saved key exists (avoids immediate 401)
+- [x] Dev mode (auth disabled server-side) still works — key field can be left empty
+- [x] 88/88 tests pass; no backend changes
 
 ## Auth / API key enforcement (2026-04-11)
 - [x] `app/core/auth.py` — `get_verified_tenant` FastAPI dependency added

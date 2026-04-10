@@ -70,8 +70,8 @@ uvicorn app.main:app --reload
 http://localhost:8000/ui
 ```
 
-**Tenant ID:**
-Enter the tenant ID in the header input field (default: `TENANT_1001`). Every API request sends this value as `X-Tenant-ID`.
+**API Key:**
+Enter your API key in the header input field. The key is saved to `localStorage` and reloaded on next visit. Every API request sends this value as `X-API-Key`. If left empty, a warning banner is shown; the UI still functions against a server with auth disabled.
 
 **View jobs:**
 The Jobs tab loads automatically on page open. Click "Load Jobs" to refresh. Each row shows job ID, type, status, and timestamp.
@@ -86,7 +86,6 @@ Click the "Pending Approvals" tab. Press "Load Pending" to fetch all pending app
 Pending approvals show Approve (green) and Reject (red) buttons. Clicking either POSTs to the existing API endpoint with `{"actor": "operator", "channel": "ui"}`. The UI refreshes the relevant view automatically after the decision.
 
 **UI limitations:**
-- No authentication — tenant ID is entered manually and not validated server-side
 - No filtering or search — all jobs/approvals are returned in a flat list
 - No pagination controls — UI fetches first 100 records; backend supports pagination via query params but the UI does not expose it
 - No audit log view — audit data exists at `GET /audit-events` but is not surfaced in the UI
@@ -106,14 +105,17 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - Auth disabled (empty key map) → dev mode with logged warning; no breaking change locally
 - 14 new auth tests; 88/88 pass; no business logic changed
 
-## Current state
-All core MVP slices are complete and documented. Auth enforcement is in place. The system is runnable locally from the README with optional API key protection.
+## Completed slice (2026-04-11 — UI auth alignment)
+- `app/ui/index.html` updated: API key input replaces tenant ID input
+- All fetch calls now send `X-API-Key`; key persisted in `localStorage`
+- Warning banner shown when no key is set; auto-load deferred until key is present
+- 88/88 tests pass; no backend changes
 
-**Known limitation:** The operator UI sends `X-Tenant-ID` not `X-API-Key`. It works when `TENANT_API_KEYS` is not configured. Auth-aware UI is the next candidate.
+## Current state
+All core MVP slices are complete. Auth is enforced end-to-end: API key required on protected endpoints, UI sends the key consistently.
 
 ## Remaining work (priority order)
-1. UI auth — update `/ui` to send `X-API-Key` (or use a separate auth mechanism)
-2. DB-driven tenant config — remove hardcoded `TENANT_CONFIGS` from code
+1. DB-driven tenant config — remove hardcoded `TENANT_CONFIGS` from code
 3. Integration event persistence — persist direct integration endpoint results
 4. Gmail OAuth refresh — tokens expire; no refresh flow built
 

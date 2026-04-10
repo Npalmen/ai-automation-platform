@@ -50,8 +50,13 @@
 - [x] `tests/test_auth.py` (14 tests); 88/88 pass
 - [x] `env.example`, README, and docs updated
 
+## Done (UI auth alignment — 2026-04-11)
+- [x] `app/ui/index.html` — API key input replaces tenant ID input
+- [x] All fetch calls send `X-API-Key`; key persisted to `localStorage`
+- [x] Warning banner when no key set; auto-load skipped on fresh open without key
+- [x] 88/88 tests pass; no backend changes
+
 ## Next (priority order)
-- [ ] **UI auth** — operator UI (`/ui`) sends `X-Tenant-ID` not `X-API-Key`; needs update when auth is enabled
 - [ ] **DB-driven tenant config** — move hardcoded tenant config from code to `tenant_config` DB table
 - [ ] **Integration event persistence** — persist results from `/integrations/{type}/execute` to `integration_events` table
 - [ ] **Gmail OAuth refresh** — build token refresh flow so Gmail integration stays live

@@ -9,7 +9,8 @@
   header { background: #1a1a2e; color: #eee; padding: 12px 20px; display: flex; align-items: center; gap: 16px; }
   header h1 { font-size: 16px; font-weight: bold; flex: 1; }
   header label { font-size: 12px; color: #aaa; }
-  header input { padding: 4px 8px; border: 1px solid #555; background: #2a2a3e; color: #eee; border-radius: 3px; width: 160px; }
+  header input { padding: 4px 8px; border: 1px solid #555; background: #2a2a3e; color: #eee; border-radius: 3px; width: 200px; }
+  .auth-banner { background: #7f1d1d; color: #fca5a5; padding: 6px 20px; font-size: 12px; text-align: center; display: none; }
   .layout { display: flex; height: calc(100vh - 45px); }
   .panel { padding: 16px; overflow-y: auto; }
   .left { width: 340px; border-right: 1px solid #ddd; background: #fff; flex-shrink: 0; }
@@ -60,11 +61,14 @@
 
 <header>
   <h1>AI Automation — Operator UI</h1>
-  <label>Tenant&nbsp;
-    <input id="tenantInput" value="TENANT_1001" placeholder="TENANT_1001">
+  <label>API Key&nbsp;
+    <input id="apiKeyInput" type="password" placeholder="X-API-Key" oninput="onKeyInput()">
   </label>
   <button class="btn btn-primary btn-sm" onclick="loadAll()">Refresh All</button>
 </header>
+<div class="auth-banner" id="authBanner">
+  No API key entered. Requests will fail unless the server has auth disabled (dev mode).
+</div>
 
 <div class="layout">
   <!-- LEFT: jobs list + pending approvals tab -->
@@ -105,12 +109,34 @@
 // ---------------------------------------------------------------------------
 let selectedJobId = null;
 
-function tenant() {
-  return document.getElementById('tenantInput').value.trim() || 'TENANT_1001';
+const LS_KEY = 'ui_api_key';
+
+function apiKey() {
+  return document.getElementById('apiKeyInput').value.trim();
 }
 
 function headers() {
-  return { 'Content-Type': 'application/json', 'X-Tenant-ID': tenant() };
+  const h = { 'Content-Type': 'application/json' };
+  const key = apiKey();
+  if (key) h['X-API-Key'] = key;
+  return h;
+}
+
+function onKeyInput() {
+  const key = apiKey();
+  // Persist to localStorage so the key survives page refresh.
+  if (key) {
+    localStorage.setItem(LS_KEY, key);
+  } else {
+    localStorage.removeItem(LS_KEY);
+  }
+  document.getElementById('authBanner').style.display = key ? 'none' : 'block';
+}
+
+function initApiKey() {
+  const saved = localStorage.getItem(LS_KEY) || '';
+  document.getElementById('apiKeyInput').value = saved;
+  document.getElementById('authBanner').style.display = saved ? 'none' : 'block';
 }
 
 // ---------------------------------------------------------------------------
@@ -343,13 +369,18 @@ async function doDecision(approvalId, decision, fromJobDetail) {
 }
 
 // ---------------------------------------------------------------------------
-// Load all on startup
+// Load all
 // ---------------------------------------------------------------------------
 async function loadAll() {
   await Promise.all([loadJobs(), loadPendingApprovals()]);
 }
 
-loadAll();
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
+initApiKey();
+// Auto-load only if a key is already saved (avoids immediate 401 on fresh open).
+if (apiKey()) loadAll();
 </script>
 </body>
 </html>

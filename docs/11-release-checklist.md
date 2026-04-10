@@ -24,6 +24,6 @@
 - [x] Demo instructions verified (README smoke test + operator UI at `/ui`)
 
 ## Remaining before full release
-- [ ] UI auth — operator UI sends X-API-Key when auth is enabled
+- [x] UI auth — operator UI sends X-API-Key; key stored in localStorage
 - [ ] Gmail OAuth token refresh
 - [ ] DB-driven tenant config

@@ -238,12 +238,12 @@ If the token is expired, the action will fail and the job will be set to `FAILED
 
 Open `http://localhost:8000/ui` after starting the server.
 
-> **Note:** The operator UI currently sends `X-Tenant-ID`, not `X-API-Key`. It works correctly when `TENANT_API_KEYS` is not configured (dev mode). Auth-aware UI support is a future improvement.
-
-- Enter the tenant ID in the header field (default: `TENANT_1001`)
+- Enter your **API key** in the header field. The key is saved to `localStorage` so it persists across refreshes.
+- If no key is entered, a warning banner is shown. The UI still works against a server with auth disabled (dev mode).
+- All API requests send `X-API-Key` with the entered key.
 - **Jobs tab** — lists all jobs; click a row to open job detail
 - **Job detail** — shows status, result, approvals, and actions for that job
-- **Pending Approvals tab** — lists pending approvals with Approve/Reject buttons
+- **Pending Approvals tab** — lists pending approvals with Approve/Reject buttons; approve/reject send `X-API-Key`
 
 See [docs/08-handoff.md](docs/08-handoff.md) for full UI usage instructions.
 
