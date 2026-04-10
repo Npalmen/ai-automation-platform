@@ -11,7 +11,7 @@ Jobs are received, classified, processed through a pipeline, paused for human ap
 All core MVP slices are complete and verified:
 
 - FastAPI backend with PostgreSQL persistence
-- Multi-tenant via `X-Tenant-ID` header
+- Multi-tenant with per-tenant API key auth (`X-API-Key`)
 - Workflow orchestrator with AI processors
 - Approval flow (pause / resume)
 - Action dispatch with controlled failure handling
@@ -27,7 +27,7 @@ See [docs/05-current-state.md](docs/05-current-state.md) for the full status.
 ```
 app/          Core backend (API, workflows, integrations, UI)
 docs/         Source of truth (scope, architecture, decisions, state)
-tests/        Automated test suite (74 tests)
+tests/        Automated test suite (88 tests)
 scripts/      Utility scripts (DB setup, connection check)
 ```
 
@@ -59,9 +59,11 @@ Edit `.env` and set at minimum:
 ```
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_platform
 LLM_API_KEY=<your OpenAI key>
+TENANT_API_KEYS={"TENANT_1001": "key-abc123"}
 ```
 
 The LLM key is required for the AI classification and extraction processors.
+`TENANT_API_KEYS` configures per-tenant API key auth (see [Authentication](#authentication) below).
 All other keys (Gmail, Slack, etc.) are optional unless you are testing a specific integration.
 
 ### 3. Start PostgreSQL
@@ -110,23 +112,43 @@ Or open the operator UI: **http://localhost:8000/ui**
 python -m pytest
 ```
 
-Expected: 74 passed.
+Expected: 88 passed.
+
+---
+
+## Authentication
+
+Protected endpoints require the `X-API-Key` header. Tenant identity is resolved from the key — the `X-Tenant-ID` header is **ignored** when auth is enabled.
+
+Configure keys in `.env`:
+
+```
+TENANT_API_KEYS={"TENANT_1001": "key-abc123", "TENANT_2001": "key-def456"}
+```
+
+**Missing key** → `401 Unauthorized`
+**Invalid key** → `403 Forbidden`
+
+If `TENANT_API_KEYS` is empty or not set, auth is **disabled** and the `X-Tenant-ID` header is trusted directly. This is acceptable for local development only.
+
+Unprotected endpoints (no key required): `GET /`, `GET /ui`, `GET /processors`
 
 ---
 
 ## Official Smoke Test — MVP Flow
 
 This is the golden path for the lead flow with forced approval.
-Run it after a clean local start.
+Run it after a clean local start with `TENANT_API_KEYS` configured.
 
-All curl commands assume the server is running at `http://localhost:8000`.
+All curl commands assume the server is running at `http://localhost:8000`
+and `TENANT_API_KEYS={"TENANT_1001": "key-abc123"}` is set in `.env`.
 
 ### Step 1 — Create a job (lead, forced approval)
 
 ```bash
 curl -s -X POST http://localhost:8000/jobs \
   -H "Content-Type: application/json" \
-  -H "X-Tenant-ID: TENANT_1001" \
+  -H "X-API-Key: key-abc123" \
   -d '{
     "tenant_id": "TENANT_1001",
     "job_type": "lead",
@@ -143,13 +165,13 @@ curl -s -X POST http://localhost:8000/jobs \
 
 **Expected response:** a job object with `"status": "awaiting_approval"`.
 
-Note the `job_id` from the response — you will need it in step 3.
+Note the `job_id` from the response — you will need it in later steps.
 
 ### Step 2 — Confirm the approval request was created
 
 ```bash
 curl -s http://localhost:8000/approvals/pending \
-  -H "X-Tenant-ID: TENANT_1001"
+  -H "X-API-Key: key-abc123"
 ```
 
 **Expected:** `{"items": [{...}], "total": 1}` containing one pending approval.
@@ -161,19 +183,19 @@ Note the `approval_id` from the response.
 ```bash
 curl -s -X POST http://localhost:8000/approvals/<approval_id>/approve \
   -H "Content-Type: application/json" \
-  -H "X-Tenant-ID: TENANT_1001" \
+  -H "X-API-Key: key-abc123" \
   -d '{"actor": "operator", "channel": "api"}'
 ```
 
 Replace `<approval_id>` with the value from step 2.
 
-**Expected response:** a job object with `"status": "completed"` (or `"failed"` if no Gmail credentials are configured — see note below).
+**Expected response:** a job object with `"status": "completed"` (or `"failed"` if no Gmail credentials are configured — see Gmail note below).
 
 ### Step 4 — Inspect the job result
 
 ```bash
 curl -s http://localhost:8000/jobs/<job_id> \
-  -H "X-Tenant-ID: TENANT_1001"
+  -H "X-API-Key: key-abc123"
 ```
 
 **Expected:** `"status": "completed"` or `"failed"`, with a populated `result` payload.
@@ -182,7 +204,7 @@ curl -s http://localhost:8000/jobs/<job_id> \
 
 ```bash
 curl -s http://localhost:8000/jobs/<job_id>/actions \
-  -H "X-Tenant-ID: TENANT_1001"
+  -H "X-API-Key: key-abc123"
 ```
 
 **Expected:** `{"items": [{...}], "total": N}` — action records showing what was attempted.
@@ -191,7 +213,7 @@ curl -s http://localhost:8000/jobs/<job_id>/actions \
 
 ```bash
 curl -s http://localhost:8000/audit-events \
-  -H "X-Tenant-ID: TENANT_1001"
+  -H "X-API-Key: key-abc123"
 ```
 
 **Expected:** a list of audit events including `job_created`, `step_started`, `step_completed`, `workflow_completed` (or `workflow_failed`).
@@ -215,6 +237,8 @@ If the token is expired, the action will fail and the job will be set to `FAILED
 ## Operator UI
 
 Open `http://localhost:8000/ui` after starting the server.
+
+> **Note:** The operator UI currently sends `X-Tenant-ID`, not `X-API-Key`. It works correctly when `TENANT_API_KEYS` is not configured (dev mode). Auth-aware UI support is a future improvement.
 
 - Enter the tenant ID in the header field (default: `TENANT_1001`)
 - **Jobs tab** — lists all jobs; click a row to open job detail

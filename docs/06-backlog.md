@@ -43,8 +43,15 @@
 - [x] `force_approval_test` flag documented as the official golden-path trigger
 - [x] 74/74 tests pass; no code logic changed
 
+## Done (auth / API key enforcement — 2026-04-11)
+- [x] `app/core/auth.py` — `get_verified_tenant` dependency; key map loaded from `TENANT_API_KEYS` env var
+- [x] All protected endpoints use `Depends(get_verified_tenant)`; `X-Tenant-ID` no longer trusted directly
+- [x] Auth disabled (empty `TENANT_API_KEYS`) → dev mode with warning; auth enabled → 401/403 on bad keys
+- [x] `tests/test_auth.py` (14 tests); 88/88 pass
+- [x] `env.example`, README, and docs updated
+
 ## Next (priority order)
-- [ ] **Auth / API keys** — per-tenant API key validation on all endpoints
+- [ ] **UI auth** — operator UI (`/ui`) sends `X-Tenant-ID` not `X-API-Key`; needs update when auth is enabled
 - [ ] **DB-driven tenant config** — move hardcoded tenant config from code to `tenant_config` DB table
 - [ ] **Integration event persistence** — persist results from `/integrations/{type}/execute` to `integration_events` table
 - [ ] **Gmail OAuth refresh** — build token refresh flow so Gmail integration stays live

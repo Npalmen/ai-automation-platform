@@ -100,16 +100,24 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - `force_approval_test` flag documented as the official golden-path trigger
 - 74/74 tests pass; no code logic changed
 
+## Completed slice (2026-04-11 — auth / API key enforcement)
+- `app/core/auth.py` created — `get_verified_tenant` FastAPI dependency
+- `TENANT_API_KEYS` env var added to settings; all protected endpoints updated
+- Auth disabled (empty key map) → dev mode with logged warning; no breaking change locally
+- 14 new auth tests; 88/88 pass; no business logic changed
+
 ## Current state
-All official MVP slices are complete and documented. The system is reproducibly runnable from a clean local setup following the README.
+All core MVP slices are complete and documented. Auth enforcement is in place. The system is runnable locally from the README with optional API key protection.
+
+**Known limitation:** The operator UI sends `X-Tenant-ID` not `X-API-Key`. It works when `TENANT_API_KEYS` is not configured. Auth-aware UI is the next candidate.
 
 ## Remaining work (priority order)
-1. Auth / API keys — per-tenant key validation
+1. UI auth — update `/ui` to send `X-API-Key` (or use a separate auth mechanism)
 2. DB-driven tenant config — remove hardcoded `TENANT_CONFIGS` from code
 3. Integration event persistence — persist direct integration endpoint results
 4. Gmail OAuth refresh — tokens expire; no refresh flow built
 
 ## Expected output from next implementation chat
 - Pick one remaining work item above
-- Continue from this repo state; README, all docs, and 74 tests are current
-- Suggested next: Auth / API keys (smallest scope, highest value for operability)
+- Continue from this repo state; README, all docs, and 88 tests are current
+- Suggested next: UI auth (small, closes the gap between API and UI auth)

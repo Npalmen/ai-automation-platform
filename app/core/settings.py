@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     STORAGE_PATH: str = "./storage/local_dev"
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/ai_platform"
 
+    # Per-tenant API keys — JSON string mapping tenant_id to api_key.
+    # Example: '{"TENANT_1001": "key-abc123", "TENANT_2001": "key-def456"}'
+    # Set via TENANT_API_KEYS env var. If empty, auth is disabled (dev mode only).
+    TENANT_API_KEYS: str = ""
+
     EMAIL_PROVIDER: str = "google_mail"
 
     CRM_WEBHOOK_URL: str = ""

@@ -93,6 +93,20 @@ Projektet har passerat konceptstadiet och har en fungerande backend-kärna med r
 - No retries or advanced action controls
 - No auto-refresh — operator triggers all loads manually
 
+## Auth / API key enforcement (2026-04-11)
+- [x] `app/core/auth.py` — `get_verified_tenant` FastAPI dependency added
+- [x] `app/core/settings.py` — `TENANT_API_KEYS` setting added (JSON string, loaded from env)
+- [x] All protected endpoints updated to use `Depends(get_verified_tenant)` instead of `x_tenant_id: str = Header(...)`
+- [x] Auth behaviour: when `TENANT_API_KEYS` is set, `X-API-Key` header required; tenant derived from key; `X-Tenant-ID` ignored
+- [x] Auth disabled mode: when `TENANT_API_KEYS` is empty, `X-Tenant-ID` trusted directly (dev mode); warning logged
+- [x] Missing key → `401`; invalid key → `403`; malformed config → `RuntimeError` at startup
+- [x] `tests/test_auth.py` added: 14 tests covering all auth paths (disabled/enabled/missing/invalid/malformed)
+- [x] `env.example` updated with `TENANT_API_KEYS` entry and documentation
+- [x] README updated: Authentication section, smoke test curl commands use `X-API-Key`, UI limitation noted
+- [x] 88/88 tests pass; no business logic changed
+
+**UI limitation:** operator UI (`/ui`) still sends `X-Tenant-ID` — works in dev mode (auth disabled). Auth-aware UI support is a future improvement.
+
 ## Operability and docs hardening (2026-04-10)
 - [x] `requirements.txt` created — all runtime and test dependencies pinned
 - [x] `docker-compose.yml` written — starts Postgres 15 on port 5432 with correct DB name

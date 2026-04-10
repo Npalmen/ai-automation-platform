@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import get_db
 from app.core.audit_list_response_schemas import AuditEventListResponse
 from app.core.audit_service import create_audit_event
+from app.core.auth import get_verified_tenant
 from app.core.config import get_tenant_config
 from app.core.logging import setup_logging
 from app.core.settings import get_settings
@@ -114,10 +115,8 @@ def tenant_test(tenant_id: str = "TENANT_1001"):
 def create_job(
     request: JobCreateRequest,
     db: Session = Depends(get_db),
-    x_tenant_id: str = Header(...),
+    tenant_id: str = Depends(get_verified_tenant),
 ):
-    set_current_tenant(x_tenant_id)
-    tenant_id = get_current_tenant()
 
     if tenant_id != request.tenant_id:
         raise HTTPException(
@@ -160,10 +159,8 @@ def create_job(
 def get_job(
     job_id: str,
     db: Session = Depends(get_db),
-    x_tenant_id: str = Header(...),
+    tenant_id: str = Depends(get_verified_tenant),
 ):
-    set_current_tenant(x_tenant_id)
-    tenant_id = get_current_tenant()
 
     job = JobRepository.get_job_by_id(db, tenant_id, job_id)
     if job is None:
@@ -175,12 +172,10 @@ def get_job(
 @app.get("/jobs", response_model=JobListResponse)
 def list_jobs(
     db: Session = Depends(get_db),
-    x_tenant_id: str = Header(...),
+    tenant_id: str = Depends(get_verified_tenant),
     limit: int = 50,
     offset: int = 0,
 ):
-    set_current_tenant(x_tenant_id)
-    tenant_id = get_current_tenant()
 
     jobs = JobRepository.list_jobs(db, tenant_id=tenant_id, limit=limit, offset=offset)
     total = JobRepository.count_jobs(db, tenant_id=tenant_id)
@@ -195,10 +190,8 @@ def list_jobs(
 def get_job_actions(
     job_id: str,
     db: Session = Depends(get_db),
-    x_tenant_id: str = Header(...),
+    tenant_id: str = Depends(get_verified_tenant),
 ):
-    set_current_tenant(x_tenant_id)
-    tenant_id = get_current_tenant()
 
     job = JobRepository.get_job_by_id(db, tenant_id, job_id)
     if job is None:
@@ -223,10 +216,8 @@ def get_job_actions(
 def get_job_approvals(
     job_id: str,
     db: Session = Depends(get_db),
-    x_tenant_id: str = Header(...),
+    tenant_id: str = Depends(get_verified_tenant),
 ):
-    set_current_tenant(x_tenant_id)
-    tenant_id = get_current_tenant()
 
     job = JobRepository.get_job_by_id(db, tenant_id, job_id)
     if job is None:
@@ -250,12 +241,10 @@ def get_job_approvals(
 @app.get("/approvals/pending", response_model=ApprovalRequestListResponse)
 def list_pending_approvals(
     db: Session = Depends(get_db),
-    x_tenant_id: str = Header(...),
+    tenant_id: str = Depends(get_verified_tenant),
     limit: int = 100,
     offset: int = 0,
 ):
-    set_current_tenant(x_tenant_id)
-    tenant_id = get_current_tenant()
 
     records = ApprovalRequestRepository.list_pending_for_tenant(
         db=db,
@@ -282,10 +271,8 @@ def approve_request(
     approval_id: str,
     request: ApprovalDecisionRequest,
     db: Session = Depends(get_db),
-    x_tenant_id: str = Header(...),
+    tenant_id: str = Depends(get_verified_tenant),
 ):
-    set_current_tenant(x_tenant_id)
-    tenant_id = get_current_tenant()
 
     approval = ApprovalRequestRepository.get_by_approval_id(
         db=db,
@@ -313,10 +300,8 @@ def reject_request(
     approval_id: str,
     request: ApprovalDecisionRequest,
     db: Session = Depends(get_db),
-    x_tenant_id: str = Header(...),
+    tenant_id: str = Depends(get_verified_tenant),
 ):
-    set_current_tenant(x_tenant_id)
-    tenant_id = get_current_tenant()
 
     approval = ApprovalRequestRepository.get_by_approval_id(
         db=db,
@@ -348,9 +333,7 @@ def list_processors():
 
 
 @app.get("/integrations")
-def list_integrations(x_tenant_id: str = Header(...)):
-    set_current_tenant(x_tenant_id)
-    tenant_id = get_current_tenant()
+def list_integrations(tenant_id: str = Depends(get_verified_tenant)):
 
     items = []
     for integration_type in IMPLEMENTED_INTEGRATIONS:
@@ -368,10 +351,8 @@ def execute_integration_action(
     integration_type: IntegrationType,
     request: IntegrationActionRequest,
     db: Session = Depends(get_db),
-    x_tenant_id: str = Header(...),
+    tenant_id: str = Depends(get_verified_tenant),
 ):
-    set_current_tenant(x_tenant_id)
-    tenant_id = get_current_tenant()
 
     if not is_integration_enabled_for_tenant(tenant_id, integration_type):
         raise HTTPException(
@@ -412,12 +393,10 @@ def execute_integration_action(
 @app.get("/integration-events", response_model=IntegrationEventListResponse)
 def list_integration_events(
     db: Session = Depends(get_db),
-    x_tenant_id: str = Header(...),
+    tenant_id: str = Depends(get_verified_tenant),
     limit: int = 50,
     offset: int = 0,
 ):
-    set_current_tenant(x_tenant_id)
-    tenant_id = get_current_tenant()
 
     events = IntegrationRepository.list_events(
         db=db,
@@ -439,12 +418,10 @@ def list_integration_events(
 @app.get("/audit-events", response_model=AuditEventListResponse)
 def list_audit_events(
     db: Session = Depends(get_db),
-    x_tenant_id: str = Header(...),
+    tenant_id: str = Depends(get_verified_tenant),
     limit: int = 50,
     offset: int = 0,
 ):
-    set_current_tenant(x_tenant_id)
-    tenant_id = get_current_tenant()
 
     events = AuditRepository.list_events(
         db=db,
