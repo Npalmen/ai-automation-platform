@@ -233,12 +233,25 @@ async function loadJobDetail(jobId) {
   const el = document.getElementById('jobDetail');
   el.innerHTML = '<span class="empty">Loading…</span>';
   try {
-    const [job, approvals, actions] = await Promise.all([
+    const [job, pendingData, actions] = await Promise.all([
       apiFetch(`/jobs/${jobId}`),
-      apiFetch(`/jobs/${jobId}/approvals`),
+      apiFetch(`/approvals/pending?limit=100&offset=0`),
       apiFetch(`/jobs/${jobId}/actions`),
     ]);
-    renderJobDetail(job, approvals.items || [], actions.items || []);
+
+    // Primary source: filter pending approvals by job_id.
+    let approvals = (pendingData.items || []).filter(a => a.job_id === jobId);
+
+    // Fallback: if job is awaiting_approval and no approval found, synthesise
+    // a minimal approval object from the result payload so the operator can act.
+    if (approvals.length === 0 && job.status === 'awaiting_approval') {
+      const ar = ((job.result || {}).payload || {}).approval_request;
+      if (ar && ar.approval_id) {
+        approvals = [{ ...ar, state: 'pending', job_id: jobId }];
+      }
+    }
+
+    renderJobDetail(job, approvals, actions.items || []);
   } catch (e) {
     el.innerHTML = `<div class="msg msg-error">${e.message}</div>`;
   }
