@@ -5,7 +5,13 @@
       "Bash(.venv/Scripts/python -m pytest tests/test_repository_aliases.py -v)",
       "Bash(.venv/Scripts/python -m pytest tests/ -v)",
       "Bash(python -c ':*)",
-      "Bash(.venv/Scripts/python -m pytest tests/test_policies.py tests/test_mvp_flow.py tests/test_repository_aliases.py tests/test_ai_processors.py -v)"
+      "Bash(.venv/Scripts/python -m pytest tests/test_policies.py tests/test_mvp_flow.py tests/test_repository_aliases.py tests/test_ai_processors.py -v)",
+      "Bash(pip list:*)",
+      "Bash(python -m pytest --tb=short -q)",
+      "Bash(ls /c/ai_automation_platform/app/repositories/postgres/*.py)",
+      "Bash(xargs -I{} basename {})",
+      "Bash(python scripts/create_tables.py)",
+      "Bash(python -m scripts.create_tables)"
     ]
   }
 }
