@@ -17,7 +17,7 @@ lead intake → classification → entity extraction → decisioning → policy 
 
 ## What is already true
 - Backend foundation exists
-- Multi-tenant concept exists via `X-Tenant-ID`
+- Multi-tenant with per-tenant API key auth (`X-API-Key`); `X-Tenant-ID` fallback in dev mode only
 - Workflow/job model exists
 - Approval persistence and action persistence exist
 - Gmail integration has been live-tested
@@ -111,15 +111,38 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - Warning banner shown when no key is set; auto-load deferred until key is present
 - 88/88 tests pass; no backend changes
 
-## Current state
-All core MVP slices are complete. Auth is enforced end-to-end: API key required on protected endpoints, UI sends the key consistently.
+## Completed slice (2026-04-11 — UI rendering and approval visibility fixes)
+- Layout height fixed: `body` uses `flex-direction:column; height:100vh`; `.layout` uses `flex:1; overflow:hidden` — auth banner no longer causes overflow
+- HTML escaping added: `escapeHtml()` helper applied to `JSON.stringify` output in `<pre>` blocks — prevents DOM corruption from AI processor output containing `<`, `>`, `&`
+- Approval visibility in job detail fixed: `loadJobDetail` now fetches from `GET /approvals/pending` and filters by `job_id`; fallback synthesises approval card from `job.result.payload.approval_request` when job is `awaiting_approval` and pending list returns no match
+- 88/88 tests pass; no backend changes
 
-## Remaining work (priority order)
-1. DB-driven tenant config — remove hardcoded `TENANT_CONFIGS` from code
-3. Integration event persistence — persist direct integration endpoint results
-4. Gmail OAuth refresh — tokens expire; no refresh flow built
+## Completed slice (2026-04-12 — DB-driven tenant config)
+- `tenant_configs` table added; `TenantConfigRecord` model + `TenantConfigRepository` created
+- `get_tenant_config(tenant_id, db=None)` reads from DB first, falls back to static `TENANT_CONFIGS`
+- `/tenant` endpoint passes DB session — live DB rows returned when present
+- Workflow/integration policy callers unchanged (no `db` arg → static fallback, backward compatible)
+- 17 new tests; 105/105 pass
+
+## Current state
+All core MVP slices are complete. Auth is enforced end-to-end: API key required on protected endpoints, UI sends `X-API-Key` consistently. UI rendering is stable (HTML escaping + layout height patched). Approval visibility in job detail is fixed (fetches from `/approvals/pending`, filtered by `job_id`).
+
+## Completed slice (2026-04-12 — integration event persistence)
+- `IntegrationEvent` model base fixed to `database.Base` — table now in `create_all`
+- `POST /integrations/{type}/execute` saves real DB row; returns response from persisted record
+- 11 new tests; 122/122 pass
+
+## Completed slice (2026-04-12 — Gmail OAuth token refresh)
+- `refresh_access_token()` added to `mail_client.py`
+- `GoogleMailClient` accepts `refresh_token`, `client_id`, `client_secret`; retries once after 401
+- Credentials flow: settings → `service.py` connection config → `adapter.py` → `GoogleMailClient`
+- `env.example` updated with three new OAuth vars
+- 19 new tests; 141/141 pass
+
+## Remaining work
+All original MVP backlog items are complete. The platform is in a stable, demonstrable state.
 
 ## Expected output from next implementation chat
 - Pick one remaining work item above
 - Continue from this repo state; README, all docs, and 88 tests are current
-- Suggested next: UI auth (small, closes the gap between API and UI auth)
+- Suggested next: DB-driven tenant config (removes last hardcoded config from code)

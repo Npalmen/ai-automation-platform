@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     GOOGLE_MAIL_API_URL: str = "https://gmail.googleapis.com/gmail/v1"
     GOOGLE_MAIL_ACCESS_TOKEN: str = ""
     GOOGLE_MAIL_USER_ID: str = "me"
+    GOOGLE_OAUTH_REFRESH_TOKEN: str = ""
+    GOOGLE_OAUTH_CLIENT_ID: str = ""
+    GOOGLE_OAUTH_CLIENT_SECRET: str = ""
 
     GOOGLE_CALENDAR_API_URL: str = "https://www.googleapis.com/calendar/v3"
     GOOGLE_CALENDAR_ACCESS_TOKEN: str = ""

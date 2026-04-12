@@ -1,6 +1,6 @@
-from sqlalchemy import Column, String, Integer, JSON, DateTime, Boolean
+from sqlalchemy import Column, String, Integer, JSON, DateTime
 from sqlalchemy.sql import func
-from app.repositories.postgres.base import Base
+from app.repositories.postgres.database import Base
 
 
 class IntegrationEvent(Base):

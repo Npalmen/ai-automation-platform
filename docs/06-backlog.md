@@ -56,13 +56,35 @@
 - [x] Warning banner when no key set; auto-load skipped on fresh open without key
 - [x] 88/88 tests pass; no backend changes
 
+## Done (DB-driven tenant config — 2026-04-12)
+- [x] `app/repositories/postgres/tenant_config_models.py` — `TenantConfigRecord` SQLAlchemy model (`tenant_configs` table)
+- [x] `app/repositories/postgres/tenant_config_repository.py` — `TenantConfigRepository.get`, `upsert`, `to_dict`
+- [x] `app/core/config.py` — `get_tenant_config(tenant_id, db=None)` reads from DB when `db` provided; falls back to `TENANT_CONFIGS` when no row or DB unavailable
+- [x] `app/main.py` `/tenant` endpoint — passes `db` session to `get_tenant_config`; now returns DB row when present
+- [x] `app/repositories/postgres/__init__.py` — `TenantConfigRecord` imported so `create_all` creates the table
+- [x] `scripts/create_tables.py` — `tenant_config_models` import added
+- [x] `tests/test_tenant_config.py` — 17 new tests; 105/105 pass
+- [x] No change to policy logic, API contract, or existing test flows
+
+## Done (integration event persistence — 2026-04-12)
+- [x] `app/domain/integrations/models.py` — `IntegrationEvent` base changed from `base.Base` (orphaned) to `database.Base`; table now included in `create_all`
+- [x] `app/repositories/postgres/__init__.py` — side-effect import of `app.domain.integrations.models` registers table with shared metadata
+- [x] `scripts/create_tables.py` — `integration_models` import added
+- [x] `app/main.py` `POST /integrations/{type}/execute` — synthetic dict replaced with real `IntegrationEvent` record persisted via `IntegrationRepository.create`; response built from saved record via `model_validate`
+- [x] `tests/test_integration_event_persistence.py` — 11 new tests; 122/122 pass
+
+## Done (Gmail OAuth token refresh — 2026-04-12)
+- [x] `app/core/settings.py` — `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` settings added
+- [x] `app/integrations/service.py` — refresh credentials included in `GOOGLE_MAIL` connection config
+- [x] `app/integrations/google/mail_client.py` — `refresh_access_token()` function; `GoogleMailClient` accepts refresh credentials; on 401, refreshes token and retries once; 403 is not retried
+- [x] `app/integrations/google/adapter.py` — refresh credentials threaded from `connection_config` to `GoogleMailClient`
+- [x] `env.example` — `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` documented
+- [x] `tests/test_gmail_oauth_refresh.py` — 19 new tests; 141/141 pass
+
 ## Next (priority order)
-- [ ] **DB-driven tenant config** — move hardcoded tenant config from code to `tenant_config` DB table
-- [ ] **Integration event persistence** — persist results from `/integrations/{type}/execute` to `integration_events` table
-- [ ] **Gmail OAuth refresh** — build token refresh flow so Gmail integration stays live
+- [ ] No remaining MVP backlog items — all core slices complete
 
 ## Future UI improvements (out of current scope)
-- [ ] Authentication — API key or session-based, gating the `/ui` route
 - [ ] Filtering and search — filter jobs by status, type, date range
 - [ ] Pagination controls — currently UI fetches first 100; add next/prev
 - [ ] Audit log view — surface `GET /audit-events` in the UI

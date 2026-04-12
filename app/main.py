@@ -1,7 +1,7 @@
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
@@ -12,7 +12,7 @@ from app.core.auth import get_verified_tenant
 from app.core.config import get_tenant_config
 from app.core.logging import setup_logging
 from app.core.settings import get_settings
-from app.core.tenancy import get_current_tenant, set_current_tenant
+from app.core.tenancy import set_current_tenant
 from app.domain.integrations.response_schemas import (
     IntegrationEventListResponse,
     IntegrationEventResponse,
@@ -87,10 +87,11 @@ def operator_ui():
 
 
 @app.get("/tenant")
-def tenant_info(x_tenant_id: str = Header(default="TENANT_1001")):
-    set_current_tenant(x_tenant_id)
-    tenant_id = get_current_tenant()
-    config = get_tenant_config(tenant_id)
+def tenant_info(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    config = get_tenant_config(tenant_id, db=db)
     return {
         "current_tenant": tenant_id,
         "name": config.get("name"),
@@ -98,17 +99,6 @@ def tenant_info(x_tenant_id: str = Header(default="TENANT_1001")):
         "allowed_integrations": config.get("allowed_integrations"),
     }
 
-
-@app.get("/tenant/test")
-def tenant_test(tenant_id: str = "TENANT_1001"):
-    set_current_tenant(tenant_id)
-    config = get_tenant_config(tenant_id)
-    return {
-        "current_tenant": tenant_id,
-        "name": config.get("name"),
-        "auto_actions": config.get("auto_actions"),
-        "allowed_integrations": config.get("allowed_integrations"),
-    }
 
 
 @app.post("/jobs", response_model=Job)
@@ -124,7 +114,7 @@ def create_job(
             detail=f"Tenant mismatch. Header tenant '{tenant_id}' does not match payload tenant '{request.tenant_id}'.",
         )
 
-    if not is_job_type_enabled_for_tenant(request.job_type, tenant_id):
+    if not is_job_type_enabled_for_tenant(request.job_type, tenant_id, db=db):
         raise HTTPException(
             status_code=403,
             detail=f"Job type '{request.job_type}' is not enabled for tenant '{tenant_id}'.",
@@ -333,11 +323,13 @@ def list_processors():
 
 
 @app.get("/integrations")
-def list_integrations(tenant_id: str = Depends(get_verified_tenant)):
-
+def list_integrations(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
     items = []
     for integration_type in IMPLEMENTED_INTEGRATIONS:
-        if is_integration_enabled_for_tenant(tenant_id, integration_type):
+        if is_integration_enabled_for_tenant(tenant_id, integration_type, db=db):
             items.append(INTEGRATION_METADATA[integration_type.value])
 
     return {
@@ -354,7 +346,7 @@ def execute_integration_action(
     tenant_id: str = Depends(get_verified_tenant),
 ):
 
-    if not is_integration_enabled_for_tenant(tenant_id, integration_type):
+    if not is_integration_enabled_for_tenant(tenant_id, integration_type, db=db):
         raise HTTPException(
             status_code=403,
             detail=f"Integration '{integration_type.value}' is not enabled for tenant '{tenant_id}'.",
@@ -374,20 +366,21 @@ def execute_integration_action(
         payload=request.payload,
     )
 
-    event = {
-        "id": 0,
-        "tenant_id": tenant_id,
-        "job_id": "direct_integration_test",
-        "integration_type": integration_type.value,
-        "action": request.action,
-        "status": result.get("status", "success"),
-        "attempts": 1,
-        "idempotency_key": str(uuid4()),
-        "payload": request.payload,
-        "result": result,
-    }
+    from app.domain.integrations.models import IntegrationEvent
+    status = result.get("status", "success")
+    record = IntegrationEvent(
+        tenant_id=tenant_id,
+        job_id="direct",
+        integration_type=integration_type.value,
+        payload={"action": request.action, "request": request.payload, "result": result},
+        status=status,
+        attempts=1,
+        idempotency_key=str(uuid4()),
+    )
+    repo = IntegrationRepository(db)
+    saved = repo.create(record)
 
-    return IntegrationEventResponse(**event)
+    return IntegrationEventResponse.model_validate(saved)
 
 
 @app.get("/integration-events", response_model=IntegrationEventListResponse)

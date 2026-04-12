@@ -1,5 +1,12 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from app.domain.workflows.enums import JobType
 from app.integrations.enums import IntegrationType
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 
 TENANT_CONFIGS = {
@@ -85,8 +92,23 @@ TENANT_CONFIGS = {
 }
 
 
-def get_tenant_config(tenant_id: str) -> dict:
-    return TENANT_CONFIGS.get(
-        tenant_id,
-        TENANT_CONFIGS["TENANT_1001"],
-    )
+def _tenant_config_from_static(tenant_id: str) -> dict:
+    return TENANT_CONFIGS.get(tenant_id, TENANT_CONFIGS["TENANT_1001"])
+
+
+def get_tenant_config(tenant_id: str, db: "Session | None" = None) -> dict:
+    """Return tenant config dict.
+
+    Primary source: tenant_configs DB table (when db is provided and a row exists).
+    Fallback: TENANT_CONFIGS static dict (backward compatibility).
+    """
+    if db is not None:
+        try:
+            from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+            record = TenantConfigRepository.get(db, tenant_id)
+            if record is not None:
+                return TenantConfigRepository.to_dict(record)
+        except Exception:
+            # DB unavailable or table missing — fall through to static config.
+            pass
+    return _tenant_config_from_static(tenant_id)

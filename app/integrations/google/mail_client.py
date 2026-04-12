@@ -11,6 +11,41 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+_GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+
+
+def refresh_access_token(
+    refresh_token: str,
+    client_id: str,
+    client_secret: str,
+    token_url: str = _GOOGLE_TOKEN_URL,
+) -> str:
+    """Exchange a refresh token for a new access token.
+
+    Returns the new access token string.
+    Raises RuntimeError if the refresh request fails.
+    """
+    response = requests.post(
+        token_url,
+        data={
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": client_id,
+            "client_secret": client_secret,
+        },
+        timeout=10,
+    )
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Gmail token refresh failed ({response.status_code}): {response.text.strip()}"
+        )
+    data = response.json()
+    new_token = data.get("access_token")
+    if not new_token:
+        raise RuntimeError("Gmail token refresh succeeded but response contained no access_token.")
+    logger.info("Gmail access token refreshed successfully.")
+    return new_token
+
 
 class GoogleMailClient:
     def __init__(
@@ -19,11 +54,17 @@ class GoogleMailClient:
         access_token: str,
         user_id: str = "me",
         timeout_seconds: int = 30,
+        refresh_token: str = "",
+        client_id: str = "",
+        client_secret: str = "",
     ):
         self.api_url = api_url.rstrip("/")
         self.access_token = access_token
         self.user_id = user_id
         self.timeout_seconds = timeout_seconds
+        self.refresh_token = refresh_token
+        self.client_id = client_id
+        self.client_secret = client_secret
 
     @staticmethod
     def _normalize_recipients(value: str | list[str] | None) -> list[str]:
@@ -83,6 +124,51 @@ class GoogleMailClient:
         raw_bytes = base64.urlsafe_b64encode(message.as_bytes())
         return raw_bytes.decode("utf-8")
 
+    def _can_refresh(self) -> bool:
+        return bool(self.refresh_token and self.client_id and self.client_secret)
+
+    def _post_message(self, raw_message: str) -> requests.Response:
+        url = f"{self.api_url}/users/{self.user_id}/messages/send"
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json",
+        }
+        return requests.post(
+            url,
+            headers=headers,
+            json={"raw": raw_message},
+            timeout=self.timeout_seconds,
+        )
+
+    @staticmethod
+    def _raise_for_response(response: requests.Response) -> None:
+        if response.status_code < 400:
+            return
+        response_text = response.text.strip()
+        logger.error(
+            "Gmail send failed",
+            extra={
+                "provider": "google_mail",
+                "status_code": response.status_code,
+                "response_text": response_text,
+            },
+        )
+        if response.status_code == 401:
+            raise RuntimeError(
+                "Google Mail unauthorized. The access token is invalid, expired, "
+                "or missing the gmail.send scope. Response: "
+                f"{response_text}"
+            )
+        if response.status_code == 403:
+            raise RuntimeError(
+                "Google Mail forbidden. The token likely lacks permission to send mail. "
+                "Expected scope includes https://www.googleapis.com/auth/gmail.send. "
+                f"Response: {response_text}"
+            )
+        raise RuntimeError(
+            f"Google Mail send failed with status {response.status_code}: {response_text}"
+        )
+
     def send_message(
         self,
         *,
@@ -109,58 +195,28 @@ class GoogleMailClient:
             from_name=from_name,
         )
 
-        url = f"{self.api_url}/users/{self.user_id}/messages/send"
-        headers = {
-            "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json",
-        }
-        payload = {"raw": raw_message}
-
         logger.info(
             "Sending Gmail message",
             extra={
                 "provider": "google_mail",
                 "user_id": self.user_id,
-                "url": url,
                 "to_count": len(self._normalize_recipients(to)),
             },
         )
 
-        response = requests.post(
-            url,
-            headers=headers,
-            json=payload,
-            timeout=self.timeout_seconds,
-        )
+        response = self._post_message(raw_message)
 
-        if response.status_code >= 400:
-            response_text = response.text.strip()
-            logger.error(
-                "Gmail send failed",
-                extra={
-                    "provider": "google_mail",
-                    "status_code": response.status_code,
-                    "response_text": response_text,
-                },
+        # On 401, attempt token refresh and retry once.
+        if response.status_code == 401 and self._can_refresh():
+            logger.info("Gmail 401 received — attempting token refresh.")
+            self.access_token = refresh_access_token(
+                refresh_token=self.refresh_token,
+                client_id=self.client_id,
+                client_secret=self.client_secret,
             )
+            response = self._post_message(raw_message)
 
-            if response.status_code == 401:
-                raise RuntimeError(
-                    "Google Mail unauthorized. The access token is invalid, expired, "
-                    "or missing the gmail.send scope. Response: "
-                    f"{response_text}"
-                )
-
-            if response.status_code == 403:
-                raise RuntimeError(
-                    "Google Mail forbidden. The token likely lacks permission to send mail. "
-                    "Expected scope includes https://www.googleapis.com/auth/gmail.send. "
-                    f"Response: {response_text}"
-                )
-
-            raise RuntimeError(
-                f"Google Mail send failed with status {response.status_code}: {response_text}"
-            )
+        self._raise_for_response(response)
 
         data = response.json()
 

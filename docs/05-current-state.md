@@ -7,7 +7,7 @@ Projektet har passerat konceptstadiet och har en fungerande backend-kärna med r
 - [x] FastAPI API
 - [x] PostgreSQL persistence
 - [x] SQLAlchemy repository layer
-- [x] Multi-tenant tenant-context via `X-Tenant-ID`
+- [x] Multi-tenant with per-tenant API key auth (`X-API-Key`); `X-Tenant-ID` fallback in dev mode
 - [x] Orchestrator-baserad workflow pipeline
 - [x] AI-processorer med typed outputs
 - [x] Approval flow med pause/resume
@@ -113,7 +113,7 @@ Projektet har passerat konceptstadiet och har en fungerande backend-kärna med r
 - [x] README updated: Authentication section, smoke test curl commands use `X-API-Key`, UI limitation noted
 - [x] 88/88 tests pass; no business logic changed
 
-**UI limitation:** operator UI (`/ui`) still sends `X-Tenant-ID` — works in dev mode (auth disabled). Auth-aware UI support is a future improvement.
+**UI auth:** operator UI sends `X-API-Key` on all requests. Key is entered in the header field and persisted to `localStorage`. A warning banner is shown when no key is set. Works in both authenticated mode and dev mode (auth disabled).
 
 ## Operability and docs hardening (2026-04-10)
 - [x] `requirements.txt` created — all runtime and test dependencies pinned
@@ -124,11 +124,29 @@ Projektet har passerat konceptstadiet och har en fungerande backend-kärna med r
 - [x] `force_approval_test` flag documented in README smoke test
 - [x] 74/74 tests still pass; no code logic changed
 
-## Partially implemented / needs hardening
-- [ ] DB-driven tenant config
-- [ ] Auth / API keys
-- [ ] Integration event persistence for direct integration test endpoints
-- [ ] Gmail OAuth refresh flow (tokens are short-lived)
+## DB-driven tenant config (2026-04-12)
+- [x] `tenant_configs` table created via `TenantConfigRecord` model; picked up by `create_all` on startup
+- [x] `TenantConfigRepository` — `get` / `upsert` / `to_dict`
+- [x] `get_tenant_config(tenant_id, db=None)` — reads from DB when `db` provided; falls back to `TENANT_CONFIGS` static dict when no row exists or DB is unavailable
+- [x] `/tenant` endpoint now passes DB session — returns DB-stored config when present
+- [x] All existing callers (`policies.py`, `integrations/policies.py`) unchanged — they call without `db`, get static fallback
+- [x] 105/105 tests pass
+
+## Integration event persistence (2026-04-12)
+- [x] `IntegrationEvent` model fixed to use `database.Base` — `integration_events` table now created by `create_all`
+- [x] `POST /integrations/{type}/execute` persists a real `IntegrationEvent` row; response built from the saved record
+- [x] Payload shape: `{"action": ..., "request": ..., "result": ...}` — captures full round-trip
+- [x] `GET /integration-events` lists persisted records (was already wired; now has real data)
+- [x] 122/122 tests pass
+
+## Gmail OAuth token refresh (2026-04-12)
+- [x] `refresh_access_token()` in `mail_client.py` — calls `https://oauth2.googleapis.com/token` with `refresh_token`, `client_id`, `client_secret`; returns new access token or raises `RuntimeError`
+- [x] `GoogleMailClient.send_message` — on 401, attempts refresh and retries once if credentials are present; 403 is not retried (permissions error, not expiry); falls back to raising if refresh is unavailable or retry fails
+- [x] Credentials configured via `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` env vars; all default to empty (no breaking change)
+- [x] 141/141 tests pass
+
+## All MVP slices complete
+All items from the original backlog are implemented and tested.
 
 ## Known risks / filesystem issues
 - `pyproject.toml` is a directory (not a file) in the local filesystem — not tracked in git; does not affect runtime but cannot be used as a package manifest

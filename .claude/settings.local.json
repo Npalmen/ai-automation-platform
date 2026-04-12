@@ -11,7 +11,13 @@
       "Bash(ls /c/ai_automation_platform/app/repositories/postgres/*.py)",
       "Bash(xargs -I{} basename {})",
       "Bash(python scripts/create_tables.py)",
-      "Bash(python -m scripts.create_tables)"
+      "Bash(python -m scripts.create_tables)",
+      "Bash(python -m pytest tests/test_tenant_config.py -v)",
+      "Bash(python -m pytest)",
+      "Bash(python -c \"import pydantic; print\\(pydantic.__version__\\)\")",
+      "Bash(python -m pytest tests/test_integration_event_persistence.py -v)",
+      "Bash(python -m pytest tests/test_gmail_oauth_refresh.py -v)",
+      "Bash(python -m pytest --tb=no -q)"
     ]
   }
 }

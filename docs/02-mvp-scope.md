@@ -16,7 +16,7 @@ Leverera en testbar och demonstrerbar teknisk MVP där en användare kan:
 ## In scope
 - FastAPI backend
 - PostgreSQL persistence
-- Multi-tenant via `X-Tenant-ID`
+- Multi-tenant with per-tenant API key auth (`X-API-Key`)
 - Job intake
 - Classification processor
 - Entity extraction processor
@@ -26,7 +26,7 @@ Leverera en testbar och demonstrerbar teknisk MVP där en användare kan:
 - Action dispatch
 - Audit events
 - Gmail/Google Mail som första fungerande integration
-- Tunt operator/admin UI i senare slice
+- Tunt operator/admin UI (`/ui`) — implementerat
 - Testbar lokal körning
 - Tydlig dokumentation
 

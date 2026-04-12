@@ -112,7 +112,7 @@ Or open the operator UI: **http://localhost:8000/ui**
 python -m pytest
 ```
 
-Expected: 88 passed.
+Expected: 141 passed.
 
 ---
 
@@ -224,13 +224,26 @@ curl -s http://localhost:8000/audit-events \
 
 If `GOOGLE_MAIL_ACCESS_TOKEN` is set in `.env`, the `send_email` action will make a real Gmail API call. Without it, the action falls back to a stub and is marked as a non-live execution.
 
-Gmail access tokens are short-lived (1 hour). To use a real token:
+Gmail access tokens are short-lived (~1 hour). The platform supports automatic refresh.
 
-1. Obtain an OAuth2 access token for the Gmail API
+**Option A — access token only (short-lived):**
+1. Obtain an OAuth2 access token for the Gmail API with `gmail.send` scope
 2. Set `GOOGLE_MAIL_ACCESS_TOKEN=<token>` in `.env`
 3. Set `GOOGLE_MAIL_USER_ID=me`
 
-If the token is expired, the action will fail and the job will be set to `FAILED` status. This is expected and handled — the error is persisted in `action_executions` and an audit event is emitted.
+If the token expires, the action fails (job set to `FAILED`; error persisted in `action_executions` and audit).
+
+**Option B — with token refresh (recommended):**
+
+Set all three refresh credentials in `.env` in addition to the access token:
+
+```
+GOOGLE_OAUTH_REFRESH_TOKEN=<refresh_token>
+GOOGLE_OAUTH_CLIENT_ID=<client_id>
+GOOGLE_OAUTH_CLIENT_SECRET=<client_secret>
+```
+
+When the access token expires (401), the platform automatically refreshes it using the refresh token and retries the request once. If the refresh fails, the action fails cleanly.
 
 ---
 
@@ -279,13 +292,13 @@ See [docs/08-handoff.md](docs/08-handoff.md) for full UI usage instructions.
 | `POST` | `/integrations/{type}/execute` | Execute an integration action directly |
 | `GET` | `/audit-events` | List audit events for tenant |
 
-All endpoints require the `X-Tenant-ID` header.
+All endpoints except `GET /`, `GET /ui`, and `GET /processors` require the `X-API-Key` header.
 
 ---
 
 ## Tenants
 
-Tenant configuration is currently static in `app/core/config.py`.
+Tenant configuration is DB-driven. The `tenant_configs` table is the primary source; `app/core/config.py` (`TENANT_CONFIGS`) is the fallback when no DB row exists. Default tenants (pre-seeded in static fallback):
 
 | Tenant ID | Name | Enabled job types |
 |-----------|------|-------------------|
@@ -297,11 +310,9 @@ Tenant configuration is currently static in `app/core/config.py`.
 
 ## Known Limitations
 
-- No authentication — `X-Tenant-ID` is trusted without validation
-- Tenant configuration is static in code, not database-driven
-- Gmail access tokens expire and require manual refresh
 - No pagination controls in the operator UI (backend supports it via query params)
 - `docker-compose.yml` starts PostgreSQL only; the app itself must be run with `uvicorn`
+- Gmail OAuth token refresh requires `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, and `GOOGLE_OAUTH_CLIENT_SECRET` to be set; without them a 401 from Gmail will fail the action (no silent retry)
 
 ---
 

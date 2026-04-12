@@ -1,10 +1,12 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class IntegrationEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     job_id: str
     tenant_id: str
@@ -16,9 +18,6 @@ class IntegrationEventResponse(BaseModel):
     idempotency_key: str
     created_at: datetime | None = None
     updated_at: datetime | None = None
-
-    class Config:
-        from_attributes = True
 
 
 class IntegrationEventListResponse(BaseModel):

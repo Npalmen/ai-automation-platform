@@ -8,7 +8,7 @@ Systemet består av:
 - PostgreSQL persistence
 - Integrationslager med adapter/factory-pattern
 - Audit + approval persistence
-- Senare tunt operator/admin UI ovanpå API:t
+- Tunt operator/admin UI ovanpå API:t (`GET /ui`)
 
 ## Core architecture principles
 - Processors ska vara stateless

@@ -16,6 +16,9 @@ class GoogleMailAdapter(BaseIntegrationAdapter):
             access_token=str(self.connection_config.get("access_token") or "").strip(),
             user_id=str(self.connection_config.get("user_id") or "me").strip(),
             timeout_seconds=int(self.connection_config.get("timeout_seconds") or 30),
+            refresh_token=str(self.connection_config.get("refresh_token") or "").strip(),
+            client_id=str(self.connection_config.get("client_id") or "").strip(),
+            client_secret=str(self.connection_config.get("client_secret") or "").strip(),
         )
 
     def execute_action(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:

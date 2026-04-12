@@ -94,6 +94,9 @@ def get_integration_connection_config(
             "access_token": settings.GOOGLE_MAIL_ACCESS_TOKEN,
             "api_url": settings.GOOGLE_MAIL_API_URL,
             "user_id": settings.GOOGLE_MAIL_USER_ID,
+            "refresh_token": settings.GOOGLE_OAUTH_REFRESH_TOKEN,
+            "client_id": settings.GOOGLE_OAUTH_CLIENT_ID,
+            "client_secret": settings.GOOGLE_OAUTH_CLIENT_SECRET,
         }
 
     if integration_type == IntegrationType.GOOGLE_CALENDAR:
