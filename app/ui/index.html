@@ -1,113 +1,468 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sv">
 <head>
 <meta charset="UTF-8">
-<title>AI Automation — Operator UI</title>
+<title>AI Automation — Operatörsgränssnitt</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: monospace; font-size: 14px; background: #f5f5f5; color: #222; display: flex; flex-direction: column; height: 100vh; }
-  header { background: #1a1a2e; color: #eee; padding: 12px 20px; display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
-  header h1 { font-size: 16px; font-weight: bold; flex: 1; }
-  header label { font-size: 12px; color: #aaa; }
-  header input { padding: 4px 8px; border: 1px solid #555; background: #2a2a3e; color: #eee; border-radius: 3px; width: 200px; }
-  .auth-banner { background: #7f1d1d; color: #fca5a5; padding: 6px 20px; font-size: 12px; text-align: center; display: none; flex-shrink: 0; }
-  .layout { display: flex; flex: 1; overflow: hidden; }
-  .panel { padding: 16px; overflow-y: auto; }
-  .left { width: 340px; border-right: 1px solid #ddd; background: #fff; flex-shrink: 0; }
-  .right { flex: 1; background: #fafafa; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #555; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 6px; }
-  .btn { display: inline-block; padding: 5px 12px; border: none; border-radius: 3px; cursor: pointer; font-family: monospace; font-size: 13px; }
-  .btn-sm { padding: 3px 8px; font-size: 12px; }
-  .btn-primary { background: #2563eb; color: #fff; }
-  .btn-success { background: #16a34a; color: #fff; }
-  .btn-danger  { background: #dc2626; color: #fff; }
-  .btn:hover { opacity: 0.85; }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .job-row { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
-  .job-row:hover { background: #f0f4ff; }
-  .job-row.selected { background: #dbeafe; }
-  .job-id { font-weight: bold; font-size: 12px; }
-  .job-meta { font-size: 11px; color: #666; display: flex; gap: 8px; flex-wrap: wrap; }
-  .badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 11px; font-weight: bold; }
-  .badge-completed  { background: #dcfce7; color: #166534; }
-  .badge-failed     { background: #fee2e2; color: #991b1b; }
-  .badge-awaiting_approval { background: #fef9c3; color: #854d0e; }
-  .badge-manual_review     { background: #fde8d8; color: #9a3412; }
-  .badge-processing { background: #e0f2fe; color: #075985; }
-  .badge-pending    { background: #f3f4f6; color: #374151; }
-  .badge-default    { background: #e5e7eb; color: #374151; }
-  .section { margin-bottom: 20px; }
-  .kv-table { width: 100%; border-collapse: collapse; }
-  .kv-table td { padding: 4px 6px; border-bottom: 1px solid #eee; vertical-align: top; }
-  .kv-table td:first-child { color: #777; width: 140px; white-space: nowrap; }
-  pre { background: #1e1e2e; color: #cdd6f4; padding: 10px; border-radius: 4px; font-size: 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow-y: auto; }
-  .approval-card { border: 1px solid #fbbf24; border-radius: 4px; padding: 10px; margin-bottom: 8px; background: #fffbeb; }
-  .approval-card .approval-meta { font-size: 12px; color: #555; margin-bottom: 6px; }
-  .approval-card .approval-actions { display: flex; gap: 6px; margin-top: 8px; }
-  .action-card { border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 10px; margin-bottom: 6px; background: #fff; }
-  .action-card .action-meta { font-size: 11px; color: #777; display: flex; gap: 10px; flex-wrap: wrap; }
-  .msg { padding: 8px 10px; border-radius: 4px; font-size: 12px; margin-bottom: 8px; }
-  .msg-error { background: #fee2e2; color: #991b1b; }
-  .msg-ok    { background: #dcfce7; color: #166534; }
-  .empty { color: #aaa; font-size: 12px; font-style: italic; padding: 6px 0; }
-  .tabs { display: flex; gap: 2px; margin-bottom: 12px; }
-  .tab { padding: 5px 12px; border: 1px solid #ddd; background: #f3f4f6; cursor: pointer; border-radius: 3px 3px 0 0; font-size: 12px; }
-  .tab.active { background: #fff; border-bottom-color: #fff; font-weight: bold; }
-  .refresh-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
-  .spinner { display: none; font-size: 12px; color: #888; }
+/* ── Reset ── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Base ── */
+body {
+  font-family: monospace;
+  font-size: 14px;
+  background: #f0f2f5;
+  color: #1a1a1a;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ── Header ── */
+header {
+  background: #1a1a2e;
+  color: #eee;
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  border-bottom: 2px solid #0f3460;
+}
+header h1 { font-size: 15px; font-weight: bold; flex: 1; letter-spacing: 0.02em; }
+header .header-field { display: flex; flex-direction: column; gap: 2px; }
+header label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.06em; }
+header input {
+  padding: 4px 8px;
+  border: 1px solid #444;
+  background: #252540;
+  color: #eee;
+  border-radius: 3px;
+  width: 220px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+/* ── Auth banner ── */
+.auth-banner {
+  background: #7f1d1d;
+  color: #fca5a5;
+  padding: 5px 24px;
+  font-size: 12px;
+  text-align: center;
+  display: none;
+  flex-shrink: 0;
+}
+
+/* ── Top nav ── */
+.view-nav {
+  display: flex;
+  background: #fff;
+  border-bottom: 1px solid #d1d5db;
+  flex-shrink: 0;
+}
+.view-tab {
+  padding: 9px 22px;
+  font-size: 13px;
+  cursor: pointer;
+  border-right: 1px solid #e5e7eb;
+  color: #555;
+  user-select: none;
+}
+.view-tab.active { font-weight: bold; color: #1d4ed8; border-bottom: 2px solid #1d4ed8; }
+.view-tab:hover:not(.active) { background: #f9fafb; color: #111; }
+
+/* ── Layout (Operations) ── */
+.layout { display: flex; flex: 1; overflow: hidden; }
+.panel { padding: 16px; overflow-y: auto; }
+.left  { width: 340px; border-right: 1px solid #e0e0e0; background: #fff; flex-shrink: 0; }
+.right { flex: 1; background: #fafafa; }
+
+/* ── Tabs (inner) ── */
+.tabs { display: flex; gap: 0; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; }
+.tab {
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #555;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  user-select: none;
+}
+.tab.active { color: #1d4ed8; border-bottom-color: #1d4ed8; font-weight: bold; }
+.tab:hover:not(.active) { color: #111; }
+
+/* ── Refresh bar ── */
+.refresh-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-block;
+  padding: 5px 14px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 600;
+  transition: opacity 0.1s;
+}
+.btn-sm   { padding: 3px 10px; font-size: 12px; }
+.btn-primary { background: #1d4ed8; color: #fff; }
+.btn-success { background: #15803d; color: #fff; }
+.btn-danger  { background: #b91c1c; color: #fff; }
+.btn-neutral { background: #e5e7eb; color: #374151; }
+.btn:hover   { opacity: 0.85; }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Spinner ── */
+.spinner { display: none; font-size: 12px; color: #888; margin-left: 8px; }
+
+/* ── Messages ── */
+.msg { padding: 8px 12px; border-radius: 4px; font-size: 12px; margin-bottom: 10px; }
+.msg-error { background: #fee2e2; color: #991b1b; border-left: 3px solid #dc2626; }
+.msg-ok    { background: #dcfce7; color: #14532d; border-left: 3px solid #16a34a; }
+
+/* ── Empty state ── */
+.empty { color: #9ca3af; font-size: 12px; font-style: italic; padding: 6px 0; display: block; }
+
+/* ── Job list ── */
+.job-row {
+  padding: 9px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.job-row:hover   { background: #f0f6ff; }
+.job-row.selected { background: #dbeafe; border-left: 3px solid #1d4ed8; padding-left: 9px; }
+.job-id   { font-weight: bold; font-size: 12px; color: #111; }
+.job-meta { font-size: 11px; color: #666; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* ── Badges ── */
+.badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+.badge-completed          { background: #dcfce7; color: #166534; }
+.badge-failed             { background: #fee2e2; color: #991b1b; }
+.badge-awaiting_approval  { background: #fef9c3; color: #854d0e; }
+.badge-manual_review      { background: #fde8d8; color: #9a3412; }
+.badge-processing         { background: #e0f2fe; color: #075985; }
+.badge-pending            { background: #f3f4f6; color: #374151; }
+.badge-default            { background: #e5e7eb; color: #374151; }
+
+/* ── KV table ── */
+.section { margin-bottom: 22px; }
+h2 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 5px;
+}
+.kv-table { width: 100%; border-collapse: collapse; }
+.kv-table td { padding: 5px 6px; border-bottom: 1px solid #f3f4f6; vertical-align: top; font-size: 13px; }
+.kv-table td:first-child { color: #6b7280; width: 140px; white-space: nowrap; }
+
+/* ── Code / pre ── */
+pre {
+  background: #1e1e2e;
+  color: #cdd6f4;
+  padding: 10px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+/* ── Approval / action cards ── */
+.approval-card {
+  border: 1px solid #fbbf24;
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: #fffbeb;
+}
+.approval-card .approval-meta { font-size: 12px; color: #555; margin-bottom: 6px; }
+.approval-card .approval-actions { display: flex; gap: 8px; margin-top: 10px; }
+.action-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 9px 12px;
+  margin-bottom: 6px;
+  background: #fff;
+}
+.action-card .action-meta { font-size: 11px; color: #777; display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+
+/* ── Setup panel ── */
+.setup-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  background: #f0f2f5;
+  display: none;
+}
+.setup-row { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; max-width: 760px; margin-bottom: 0; }
+.setup-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  max-width: 760px;
+}
+.setup-card h2 { margin-bottom: 14px; }
+.setup-card p.hint { font-size: 12px; color: #6b7280; margin-bottom: 12px; line-height: 1.5; }
+
+/* ── Readiness panel ── */
+.readiness-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  max-width: 760px;
+}
+.readiness-card h2 { margin-bottom: 12px; }
+.readiness-row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 5px; }
+.readiness-overall {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 13px;
+  font-weight: bold;
+}
+.r-ok   { color: #15803d; }
+.r-warn { color: #b45309; }
+.r-fail { color: #b91c1c; }
+
+/* ── Check / toggle grids ── */
+.check-grid { display: flex; flex-wrap: wrap; gap: 6px 24px; }
+.check-grid label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  min-width: 180px;
+  padding: 3px 0;
+}
+.check-grid input[type=checkbox] { cursor: pointer; accent-color: #1d4ed8; }
+.toggle-grid { display: flex; flex-direction: column; gap: 8px; }
+.toggle-row  { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.toggle-row input[type=checkbox] { cursor: pointer; accent-color: #1d4ed8; }
+
+/* ── Inline form row ── */
+.form-inline { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.form-field  { display: flex; flex-direction: column; gap: 4px; }
+.form-field label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+.form-field input[type=text] {
+  font-family: monospace;
+  font-size: 13px;
+  padding: 5px 9px;
+  border: 1px solid #d1d5db;
+  border-radius: 3px;
+  width: 210px;
+  color: #111;
+}
+.form-field input[type=text]:focus { outline: 2px solid #1d4ed8; border-color: #1d4ed8; }
+
+/* ── kv-info ── */
+.kv-info { font-size: 13px; color: #374151; }
+
+/* ── Verify result box ── */
+.verify-result-box {
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 12px 14px;
+  background: #fafafa;
+  font-size: 13px;
+  margin-top: 12px;
+}
+.verify-result-box .vr-row { margin-bottom: 6px; }
+.verify-result-box .vr-label { color: #6b7280; }
+
+/* ── Save bar ── */
+.save-bar { display: flex; align-items: center; gap: 10px; max-width: 760px; margin-bottom: 16px; }
+
+/* ── Tenant switcher ── */
+.tenant-switcher {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 14px 20px;
+  margin-bottom: 16px;
+  max-width: 760px;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.tenant-switcher .ts-label { font-size: 11px; color: #6b7280; margin-bottom: 4px; display: block; text-transform: uppercase; letter-spacing: 0.05em; }
+.tenant-switcher select {
+  font-family: monospace;
+  font-size: 13px;
+  padding: 5px 9px;
+  border: 1px solid #d1d5db;
+  border-radius: 3px;
+  min-width: 240px;
+  color: #111;
+  background: #fff;
+  cursor: pointer;
+}
+.tenant-switcher select:focus { outline: 2px solid #1d4ed8; border-color: #1d4ed8; }
+.ts-info { font-size: 12px; align-self: center; }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>AI Automation — Operator UI</h1>
-  <label>API Key&nbsp;
+  <h1>AI Automation &mdash; Operatörsgränssnitt</h1>
+  <div class="header-field">
+    <label>API-nyckel</label>
     <input id="apiKeyInput" type="password" placeholder="X-API-Key" oninput="onKeyInput()">
-  </label>
-  <button class="btn btn-primary btn-sm" onclick="loadAll()">Refresh All</button>
+  </div>
+  <button class="btn btn-neutral btn-sm" onclick="loadAll()">Uppdatera allt</button>
 </header>
+
 <div class="auth-banner" id="authBanner">
-  No API key entered. Requests will fail unless the server has auth disabled (dev mode).
+  Ingen API-nyckel angiven. Anrop misslyckas om inte servern kör utan autentisering (dev-läge).
 </div>
 
-<div class="layout">
-  <!-- LEFT: jobs list + pending approvals tab -->
+<div class="view-nav">
+  <div class="view-tab active" id="viewTabOps"   onclick="switchView('ops')">Drift</div>
+  <div class="view-tab"        id="viewTabSetup" onclick="switchView('setup')">Inställningar</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ DRIFT -->
+<div class="layout" id="viewOps">
+
+  <!-- LEFT: jobs + pending approvals -->
   <div class="left panel">
     <div class="tabs">
-      <div class="tab active" id="tabJobs" onclick="switchTab('jobs')">Jobs</div>
-      <div class="tab" id="tabApprovals" onclick="switchTab('approvals')">Pending Approvals</div>
+      <div class="tab active" id="tabJobs"      onclick="switchTab('jobs')">Jobb</div>
+      <div class="tab"        id="tabApprovals" onclick="switchTab('approvals')">Väntande godkännanden</div>
     </div>
 
     <div id="paneJobs">
       <div class="refresh-bar">
-        <button class="btn btn-primary btn-sm" onclick="loadJobs()">Load Jobs</button>
-        <span class="spinner" id="spinJobs">loading…</span>
+        <button class="btn btn-primary btn-sm" onclick="loadJobs()">Ladda jobb</button>
+        <span class="spinner" id="spinJobs">laddar…</span>
       </div>
       <div id="msgJobs"></div>
-      <div id="jobsList"><span class="empty">Press "Load Jobs".</span></div>
+      <div id="jobsList"><span class="empty">Tryck på "Ladda jobb".</span></div>
     </div>
 
     <div id="paneApprovals" style="display:none">
       <div class="refresh-bar">
-        <button class="btn btn-primary btn-sm" onclick="loadPendingApprovals()">Load Pending</button>
-        <span class="spinner" id="spinApprovals">loading…</span>
+        <button class="btn btn-primary btn-sm" onclick="loadPendingApprovals()">Ladda väntande</button>
+        <span class="spinner" id="spinApprovals">laddar…</span>
       </div>
       <div id="msgApprovals"></div>
-      <div id="approvalsList"><span class="empty">Press "Load Pending".</span></div>
+      <div id="approvalsList"><span class="empty">Tryck på "Ladda väntande".</span></div>
     </div>
   </div>
 
   <!-- RIGHT: job detail -->
   <div class="right panel">
-    <div id="jobDetail"><span class="empty">Select a job from the list.</span></div>
+    <div id="jobDetail"><span class="empty">Välj ett jobb i listan.</span></div>
   </div>
 </div>
+
+<!-- ═══════════════════════════════════════════════════════ INSTÄLLNINGAR -->
+<div class="setup-panel" id="viewSetup">
+
+  <div id="msgSetup"></div>
+
+  <!-- Tenant switcher -->
+  <div class="tenant-switcher">
+    <div>
+      <span class="ts-label">Aktiv tenant</span>
+      <select id="switchTenantSelect">
+        <option value="">— Välj tenant —</option>
+      </select>
+    </div>
+    <button class="btn btn-neutral btn-sm" onclick="switchTenant()">Ladda tenant</button>
+    <span class="ts-info" id="tsSwitchMsg"></span>
+  </div>
+
+  <!-- Konfigurationsstatus (readiness) -->
+  <div class="readiness-card" id="setupReadiness" style="display:none"></div>
+
+  <!-- Skapa tenant -->
+  <div class="setup-card">
+    <h2>Skapa tenant</h2>
+    <div class="form-inline" style="margin-bottom:10px;">
+      <div class="form-field">
+        <label>Tenant-ID</label>
+        <input id="newTenantId" type="text" placeholder="t.ex. TENANT_9001">
+      </div>
+      <div class="form-field">
+        <label>Namn</label>
+        <input id="newTenantName" type="text" placeholder="t.ex. Acme AB">
+      </div>
+      <button class="btn btn-primary" onclick="createTenant()" style="align-self:flex-end;">Skapa tenant</button>
+    </div>
+    <div id="msgCreateTenant" style="font-size:12px;"></div>
+  </div>
+
+  <!-- Aktiv tenant -->
+  <div class="setup-card">
+    <h2>Aktiv tenant</h2>
+    <div class="kv-info" id="setupTenantInfo">Laddar…</div>
+  </div>
+
+  <!-- Aktiva jobbtyper -->
+  <div class="setup-card">
+    <h2>Aktiva jobbtyper</h2>
+    <div class="check-grid" id="setupJobTypes"><span class="empty">Laddar…</span></div>
+  </div>
+
+  <!-- Tillåtna integrationer -->
+  <div class="setup-card">
+    <h2>Tillåtna integrationer</h2>
+    <div class="check-grid" id="setupIntegrations"><span class="empty">Laddar…</span></div>
+  </div>
+
+  <!-- Autoåtgärder -->
+  <div class="setup-card">
+    <h2>Autoåtgärder</h2>
+    <p class="hint">Utför åtgärder automatiskt utan manuellt godkännande, per aktiv jobbtyp.</p>
+    <div class="toggle-grid" id="setupAutoActions"><span class="empty">Laddar…</span></div>
+  </div>
+
+  <!-- Spara-knapp -->
+  <div class="save-bar">
+    <button class="btn btn-success" onclick="saveConfig()">Spara konfiguration</button>
+    <span class="spinner" id="spinSetup">sparar…</span>
+  </div>
+
+  <!-- Verifiering -->
+  <div class="setup-card">
+    <h2>Verifiering</h2>
+    <p class="hint">
+      Skickar ett minimalt testjobb för den aktiva tenanten och visar resultatet.
+      Inga externa integrationer krävs.
+    </p>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <button class="btn btn-primary" onclick="runVerification()" id="btnRunVerify">Kör verifieringstest</button>
+      <span class="spinner" id="spinVerify">kör…</span>
+    </div>
+    <div id="verifyResult"></div>
+  </div>
+
+</div><!-- /setup-panel -->
 
 <script>
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
-let selectedJobId = null;
+let selectedJobId  = null;
+let _verifyTenantId = null;
 
 const LS_KEY = 'ui_api_key';
 
@@ -124,12 +479,8 @@ function headers() {
 
 function onKeyInput() {
   const key = apiKey();
-  // Persist to localStorage so the key survives page refresh.
-  if (key) {
-    localStorage.setItem(LS_KEY, key);
-  } else {
-    localStorage.removeItem(LS_KEY);
-  }
+  if (key) localStorage.setItem(LS_KEY, key);
+  else     localStorage.removeItem(LS_KEY);
   document.getElementById('authBanner').style.display = key ? 'none' : 'block';
 }
 
@@ -140,10 +491,22 @@ function initApiKey() {
 }
 
 // ---------------------------------------------------------------------------
-// Tabs
+// View switcher (Drift / Inställningar)
+// ---------------------------------------------------------------------------
+function switchView(name) {
+  const isOps = name === 'ops';
+  document.getElementById('viewOps').style.display   = isOps ? 'flex' : 'none';
+  document.getElementById('viewSetup').style.display = isOps ? 'none' : 'block';
+  document.getElementById('viewTabOps').classList.toggle('active',   isOps);
+  document.getElementById('viewTabSetup').classList.toggle('active', !isOps);
+  if (!isOps) loadSetup();
+}
+
+// ---------------------------------------------------------------------------
+// Tabs (within Drift view)
 // ---------------------------------------------------------------------------
 function switchTab(name) {
-  document.getElementById('paneJobs').style.display     = name === 'jobs'      ? '' : 'none';
+  document.getElementById('paneJobs').style.display      = name === 'jobs'      ? '' : 'none';
   document.getElementById('paneApprovals').style.display = name === 'approvals' ? '' : 'none';
   document.getElementById('tabJobs').classList.toggle('active',      name === 'jobs');
   document.getElementById('tabApprovals').classList.toggle('active', name === 'approvals');
@@ -169,7 +532,7 @@ function statusBadge(status) {
 function setMsg(elId, text, isError) {
   const el = document.getElementById(elId);
   if (!text) { el.innerHTML = ''; return; }
-  el.innerHTML = `<div class="msg ${isError ? 'msg-error' : 'msg-ok'}">${text}</div>`;
+  el.innerHTML = `<div class="msg ${isError ? 'msg-error' : 'msg-ok'}">${escapeHtml(text)}</div>`;
 }
 
 function spin(id, on) {
@@ -186,7 +549,7 @@ async function apiFetch(path, opts) {
 }
 
 // ---------------------------------------------------------------------------
-// Jobs list
+// Jobblista
 // ---------------------------------------------------------------------------
 async function loadJobs() {
   spin('spinJobs', true);
@@ -203,13 +566,13 @@ async function loadJobs() {
 
 function renderJobsList(jobs) {
   const el = document.getElementById('jobsList');
-  if (!jobs.length) { el.innerHTML = '<span class="empty">No jobs found.</span>'; return; }
+  if (!jobs.length) { el.innerHTML = '<span class="empty">Inga jobb hittades.</span>'; return; }
   el.innerHTML = jobs.map(j => {
     const sel = j.job_id === selectedJobId ? ' selected' : '';
-    return `<div class="job-row${sel}" onclick="selectJob('${j.job_id}')">
-      <div class="job-id">${j.job_id}</div>
+    return `<div class="job-row${sel}" onclick="selectJob('${escapeHtml(j.job_id)}')">
+      <div class="job-id">${escapeHtml(j.job_id)}</div>
       <div class="job-meta">
-        <span>${j.job_type || '—'}</span>
+        <span>${escapeHtml(j.job_type || '—')}</span>
         ${statusBadge(j.status)}
         <span>${j.created_at ? j.created_at.slice(0,19).replace('T',' ') : ''}</span>
       </div>
@@ -219,7 +582,6 @@ function renderJobsList(jobs) {
 
 async function selectJob(jobId) {
   selectedJobId = jobId;
-  // update selected highlight
   document.querySelectorAll('.job-row').forEach(el => {
     el.classList.toggle('selected', el.querySelector('.job-id')?.textContent === jobId);
   });
@@ -227,11 +589,11 @@ async function selectJob(jobId) {
 }
 
 // ---------------------------------------------------------------------------
-// Job detail
+// Jobbdetalj
 // ---------------------------------------------------------------------------
 async function loadJobDetail(jobId) {
   const el = document.getElementById('jobDetail');
-  el.innerHTML = '<span class="empty">Loading…</span>';
+  el.innerHTML = '<span class="empty">Laddar…</span>';
   try {
     const [job, pendingData, actions] = await Promise.all([
       apiFetch(`/jobs/${jobId}`),
@@ -239,11 +601,8 @@ async function loadJobDetail(jobId) {
       apiFetch(`/jobs/${jobId}/actions`),
     ]);
 
-    // Primary source: filter pending approvals by job_id.
     let approvals = (pendingData.items || []).filter(a => a.job_id === jobId);
 
-    // Fallback: if job is awaiting_approval and no approval found, synthesise
-    // a minimal approval object from the result payload so the operator can act.
     if (approvals.length === 0 && job.status === 'awaiting_approval') {
       const ar = ((job.result || {}).payload || {}).approval_request;
       if (ar && ar.approval_id) {
@@ -253,89 +612,90 @@ async function loadJobDetail(jobId) {
 
     renderJobDetail(job, approvals, actions.items || []);
   } catch (e) {
-    el.innerHTML = `<div class="msg msg-error">${e.message}</div>`;
+    el.innerHTML = `<div class="msg msg-error">${escapeHtml(e.message)}</div>`;
   }
 }
 
 function renderJobDetail(job, approvals, actions) {
-  const result = job.result || {};
-  const summary = result.summary || result.status || '';
+  const result     = job.result || {};
+  const summary    = result.summary || result.status || '';
   const failedCount = (result.payload || {}).failed_count;
-  const el = document.getElementById('jobDetail');
+  const el         = document.getElementById('jobDetail');
 
   el.innerHTML = `
     <div class="section">
-      <h2>Job — ${job.job_id}</h2>
+      <h2>Jobb — ${escapeHtml(job.job_id)}</h2>
       <table class="kv-table">
         <tr><td>Status</td><td>${statusBadge(job.status)}</td></tr>
-        <tr><td>Job type</td><td>${job.job_type || '—'}</td></tr>
-        <tr><td>Tenant</td><td>${job.tenant_id || '—'}</td></tr>
-        <tr><td>Created</td><td>${job.created_at ? job.created_at.replace('T',' ').slice(0,19) : '—'}</td></tr>
-        <tr><td>Updated</td><td>${job.updated_at ? job.updated_at.replace('T',' ').slice(0,19) : '—'}</td></tr>
-        ${summary ? `<tr><td>Summary</td><td>${summary}</td></tr>` : ''}
-        ${failedCount !== undefined ? `<tr><td>Failed actions</td><td>${failedCount}</td></tr>` : ''}
+        <tr><td>Jobbtyp</td><td>${escapeHtml(job.job_type || '—')}</td></tr>
+        <tr><td>Tenant</td><td>${escapeHtml(job.tenant_id || '—')}</td></tr>
+        <tr><td>Skapad</td><td>${job.created_at ? job.created_at.replace('T',' ').slice(0,19) : '—'}</td></tr>
+        <tr><td>Uppdaterad</td><td>${job.updated_at ? job.updated_at.replace('T',' ').slice(0,19) : '—'}</td></tr>
+        ${summary     ? `<tr><td>Sammanfattning</td><td>${escapeHtml(summary)}</td></tr>` : ''}
+        ${failedCount !== undefined ? `<tr><td>Misslyckade åtgärder</td><td>${failedCount}</td></tr>` : ''}
       </table>
     </div>
 
     <div class="section">
-      <h2>Result payload</h2>
+      <h2>Resultatnyttolast</h2>
       <pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>
     </div>
 
     <div class="section">
-      <h2>Approvals for this job (${approvals.length})</h2>
+      <h2>Godkännanden för detta jobb (${approvals.length})</h2>
       <div id="jobApprovals">${renderApprovalCards(approvals, true)}</div>
     </div>
 
     <div class="section">
-      <h2>Actions for this job (${actions.length})</h2>
+      <h2>Åtgärder för detta jobb (${actions.length})</h2>
       ${renderActionCards(actions)}
     </div>
   `;
 }
 
 // ---------------------------------------------------------------------------
-// Approval cards (used in job detail and pending list)
+// Godkännandekortar
 // ---------------------------------------------------------------------------
 function renderApprovalCards(approvals, fromJobDetail) {
-  if (!approvals.length) return '<span class="empty">No approvals.</span>';
+  if (!approvals.length) return '<span class="empty">Inga godkännanden.</span>';
   return approvals.map(a => {
     const isPending = a.state === 'pending';
     const btns = isPending ? `
       <div class="approval-actions">
-        <button class="btn btn-success btn-sm" onclick="doApprove('${a.approval_id}', ${fromJobDetail})">Approve</button>
-        <button class="btn btn-danger btn-sm"  onclick="doReject('${a.approval_id}',  ${fromJobDetail})">Reject</button>
+        <button class="btn btn-success btn-sm" onclick="doApprove('${a.approval_id}', ${fromJobDetail})">Godkänn</button>
+        <button class="btn btn-danger  btn-sm" onclick="doReject('${a.approval_id}',  ${fromJobDetail})">Avslå</button>
       </div>` : '';
     return `<div class="approval-card">
       <div class="approval-meta">
-        <strong>${a.approval_id}</strong> &nbsp;|&nbsp; state: <strong>${a.state || '—'}</strong>
-        &nbsp;|&nbsp; job: ${a.job_id || '—'}
+        <strong>${escapeHtml(a.approval_id)}</strong>
+        &nbsp;|&nbsp; status: <strong>${escapeHtml(a.state || '—')}</strong>
+        &nbsp;|&nbsp; jobb: ${escapeHtml(a.job_id || '—')}
         ${a.created_at ? '&nbsp;|&nbsp; ' + a.created_at.slice(0,19).replace('T',' ') : ''}
       </div>
-      ${a.summary ? `<div style="font-size:12px;color:#555;">${a.summary}</div>` : ''}
-      ${a.resolution_note ? `<div style="font-size:12px;color:#555;">Note: ${a.resolution_note}</div>` : ''}
+      ${a.summary         ? `<div style="font-size:12px;color:#555;">${escapeHtml(a.summary)}</div>` : ''}
+      ${a.resolution_note ? `<div style="font-size:12px;color:#555;">Notering: ${escapeHtml(a.resolution_note)}</div>` : ''}
       ${btns}
     </div>`;
   }).join('');
 }
 
 function renderActionCards(actions) {
-  if (!actions.length) return '<span class="empty">No actions.</span>';
+  if (!actions.length) return '<span class="empty">Inga åtgärder.</span>';
   return actions.map(a => `<div class="action-card">
     <div class="job-meta" style="margin-bottom:4px;">
-      <strong>${a.action_type || '—'}</strong>
+      <strong>${escapeHtml(a.action_type || '—')}</strong>
       ${statusBadge(a.status)}
     </div>
     <div class="action-meta">
-      ${a.attempt_no !== undefined ? `<span>attempt #${a.attempt_no}</span>` : ''}
-      ${a.created_at ? `<span>${a.created_at.slice(0,19).replace('T',' ')}</span>` : ''}
-      ${a.error_message ? `<span style="color:#dc2626;">error: ${a.error_message}</span>` : ''}
+      ${a.attempt_no !== undefined ? `<span>försök #${a.attempt_no}</span>` : ''}
+      ${a.created_at  ? `<span>${a.created_at.slice(0,19).replace('T',' ')}</span>` : ''}
+      ${a.error_message ? `<span style="color:#b91c1c;">fel: ${escapeHtml(a.error_message)}</span>` : ''}
     </div>
   </div>`).join('');
 }
 
 // ---------------------------------------------------------------------------
-// Pending approvals list (left panel)
+// Väntande godkännanden (vänsterpanel)
 // ---------------------------------------------------------------------------
 async function loadPendingApprovals() {
   spin('spinApprovals', true);
@@ -352,20 +712,15 @@ async function loadPendingApprovals() {
 
 function renderPendingList(approvals) {
   const el = document.getElementById('approvalsList');
-  if (!approvals.length) { el.innerHTML = '<span class="empty">No pending approvals.</span>'; return; }
+  if (!approvals.length) { el.innerHTML = '<span class="empty">Inga väntande godkännanden.</span>'; return; }
   el.innerHTML = renderApprovalCards(approvals, false);
 }
 
 // ---------------------------------------------------------------------------
-// Approve / Reject
+// Godkänn / Avslå
 // ---------------------------------------------------------------------------
-async function doApprove(approvalId, fromJobDetail) {
-  await doDecision(approvalId, 'approve', fromJobDetail);
-}
-
-async function doReject(approvalId, fromJobDetail) {
-  await doDecision(approvalId, 'reject', fromJobDetail);
-}
+async function doApprove(approvalId, fromJobDetail) { await doDecision(approvalId, 'approve', fromJobDetail); }
+async function doReject(approvalId, fromJobDetail)  { await doDecision(approvalId, 'reject',  fromJobDetail); }
 
 async function doDecision(approvalId, decision, fromJobDetail) {
   const body = { actor: 'operator', channel: 'ui', note: null };
@@ -374,15 +729,12 @@ async function doDecision(approvalId, decision, fromJobDetail) {
       method: 'POST',
       body: JSON.stringify(body),
     });
-    if (fromJobDetail && selectedJobId) {
-      await loadJobDetail(selectedJobId);
-    } else {
-      await loadPendingApprovals();
-    }
+    if (fromJobDetail && selectedJobId) await loadJobDetail(selectedJobId);
+    else                                await loadPendingApprovals();
   } catch (e) {
     if (fromJobDetail) {
       document.getElementById('jobApprovals').innerHTML =
-        `<div class="msg msg-error">${e.message}</div>`;
+        `<div class="msg msg-error">${escapeHtml(e.message)}</div>`;
     } else {
       setMsg('msgApprovals', e.message, true);
     }
@@ -390,17 +742,338 @@ async function doDecision(approvalId, decision, fromJobDetail) {
 }
 
 // ---------------------------------------------------------------------------
-// Load all
+// Ladda allt (Drift)
 // ---------------------------------------------------------------------------
 async function loadAll() {
   await Promise.all([loadJobs(), loadPendingApprovals()]);
 }
 
 // ---------------------------------------------------------------------------
+// Inställningar — kända konstanter (speglar backend-enum)
+// ---------------------------------------------------------------------------
+const ALL_JOB_TYPES = [
+  'lead', 'invoice', 'customer_inquiry',
+  'lead_qualification', 'quote', 'sales_followup', 'crm_update', 'opportunity_summary',
+  'support_triage', 'response_draft', 'escalation', 'case_summary', 'sla_monitoring',
+  'payment_followup', 'finance_summary', 'receipt', 'anomaly',
+  'kpi', 'exec_summary', 'risk', 'decision_support', 'report',
+];
+
+const ALL_INTEGRATIONS = [
+  'google_mail', 'google_calendar',
+  'microsoft_mail', 'microsoft_calendar',
+  'crm', 'accounting', 'support',
+  'slack', 'monday', 'fortnox', 'visma',
+];
+
+// ---------------------------------------------------------------------------
+// Inställningar — ladda (GET /tenant)
+// ---------------------------------------------------------------------------
+async function loadSetup() {
+  setMsg('msgSetup', '');
+  await loadTenants();
+  try {
+    const cfg = await apiFetch('/tenant');
+    renderSetup(cfg);
+  } catch (e) {
+    setMsg('msgSetup', e.message, true);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Inställningar — ladda tenantlista
+// ---------------------------------------------------------------------------
+async function loadTenants() {
+  try {
+    const data   = await apiFetch('/tenants');
+    const items  = data.items || [];
+    const select = document.getElementById('switchTenantSelect');
+    const prev   = select.value;
+    select.innerHTML = '<option value="">— Välj tenant —</option>' +
+      items.map(t =>
+        `<option value="${escapeHtml(t.tenant_id)}">${escapeHtml(t.tenant_id)}${t.name ? ' — ' + escapeHtml(t.name) : ''}</option>`
+      ).join('');
+    // Restore previous selection if still present.
+    if (prev && items.some(t => t.tenant_id === prev)) select.value = prev;
+  } catch (_) {
+    // Non-fatal: switcher remains with placeholder only.
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Inställningar — byt tenant
+// ---------------------------------------------------------------------------
+async function switchTenant() {
+  const select  = document.getElementById('switchTenantSelect');
+  const tenantId = select.value;
+  const msgEl   = document.getElementById('tsSwitchMsg');
+  msgEl.textContent = '';
+  msgEl.style.color = '#6b7280';
+
+  if (!tenantId) {
+    msgEl.style.color = '#b91c1c';
+    msgEl.textContent = 'Ingen tenant vald.';
+    return;
+  }
+
+  setMsg('msgSetup', '');
+  try {
+    const cfg = await apiFetch(`/tenant/config/${encodeURIComponent(tenantId)}`);
+    renderSetup(cfg);
+    msgEl.style.color = '#15803d';
+    msgEl.textContent = `Tenant '${escapeHtml(tenantId)}' laddad.`;
+    setTimeout(() => { msgEl.textContent = ''; }, 3000);
+  } catch (e) {
+    msgEl.style.color = '#b91c1c';
+    msgEl.textContent = 'Kunde inte ladda tenant.';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Konfigurationsstatus (readiness)
+// ---------------------------------------------------------------------------
+function renderReadiness(cfg) {
+  const enabledJobTypes     = cfg.enabled_job_types || [];
+  const allowedIntegrations = cfg.allowed_integrations || [];
+  const autoActions         = cfg.auto_actions || {};
+
+  const tenantLoaded    = !!(cfg.current_tenant);
+  const hasJobTypes     = enabledJobTypes.length > 0;
+  const hasIntegrations = allowedIntegrations.length > 0;
+  const hasAutoActions  = Object.values(autoActions).some(v => v === true);
+
+  const checks = [
+    { ok: tenantLoaded,    label: 'Tenant inläst' },
+    { ok: hasJobTypes,     label: 'Minst en jobbtyp aktiverad' },
+    { ok: hasIntegrations, label: 'Minst en integration tillåten' },
+    { ok: hasAutoActions,  label: 'Autoåtgärder konfigurerade', warn: true },
+  ];
+
+  const ready = tenantLoaded && hasJobTypes && hasIntegrations;
+
+  const rows = checks.map(c => {
+    let cls, icon;
+    if (c.ok)       { cls = 'r-ok';   icon = '✅'; }
+    else if (c.warn){ cls = 'r-warn'; icon = '⚠'; }
+    else            { cls = 'r-fail'; icon = '❌'; }
+    return `<div class="readiness-row"><span>${icon}</span><span class="${cls}">${escapeHtml(c.label)}</span></div>`;
+  }).join('');
+
+  const overallCls  = ready ? 'r-ok'  : 'r-fail';
+  const overallText = ready ? '✅ Redo' : '❌ Inte redo';
+
+  const el = document.getElementById('setupReadiness');
+  el.style.display = '';
+  el.innerHTML = `<h2>Konfigurationsstatus</h2>${rows}<div class="readiness-overall ${overallCls}">${overallText}</div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Rendera inställningar
+// ---------------------------------------------------------------------------
+function renderSetup(cfg) {
+  _verifyTenantId = cfg.current_tenant || null;
+
+  const enabledJobTypes     = new Set(cfg.enabled_job_types || []);
+  const allowedIntegrations = new Set(cfg.allowed_integrations || []);
+  const autoActions         = cfg.auto_actions || {};
+
+  renderReadiness(cfg);
+
+  // Aktiv tenant
+  document.getElementById('setupTenantInfo').innerHTML =
+    `<strong>${escapeHtml(cfg.current_tenant || '—')}</strong>` +
+    (cfg.name ? ` &nbsp;&mdash;&nbsp; ${escapeHtml(cfg.name)}` : '');
+
+  // Jobbtyper
+  document.getElementById('setupJobTypes').innerHTML = ALL_JOB_TYPES.map(jt =>
+    `<label>
+      <input type="checkbox" id="jt_${jt}" value="${jt}"
+        ${enabledJobTypes.has(jt) ? 'checked' : ''} onchange="refreshAutoActions()">
+      ${escapeHtml(jt)}
+    </label>`
+  ).join('');
+
+  // Integrationer
+  document.getElementById('setupIntegrations').innerHTML = ALL_INTEGRATIONS.map(it =>
+    `<label>
+      <input type="checkbox" id="int_${it}" value="${it}" ${allowedIntegrations.has(it) ? 'checked' : ''}>
+      ${escapeHtml(it)}
+    </label>`
+  ).join('');
+
+  // Autoåtgärder
+  renderAutoActions(enabledJobTypes, autoActions);
+}
+
+function renderAutoActions(enabledJobTypes, autoActions) {
+  const el    = document.getElementById('setupAutoActions');
+  const types = [...enabledJobTypes];
+  if (!types.length) {
+    el.innerHTML = '<span class="empty">Aktivera jobbtyper ovan för att konfigurera autoåtgärder.</span>';
+    return;
+  }
+  el.innerHTML = types.map(jt =>
+    `<div class="toggle-row">
+      <input type="checkbox" id="aa_${jt}" ${autoActions[jt] ? 'checked' : ''}>
+      <label for="aa_${jt}">${escapeHtml(jt)}</label>
+    </div>`
+  ).join('');
+}
+
+function refreshAutoActions() {
+  const enabled = new Set(
+    ALL_JOB_TYPES.filter(jt => {
+      const el = document.getElementById(`jt_${jt}`);
+      return el && el.checked;
+    })
+  );
+  const current = {};
+  ALL_JOB_TYPES.forEach(jt => {
+    const el = document.getElementById(`aa_${jt}`);
+    if (el) current[jt] = el.checked;
+  });
+  renderAutoActions(enabled, current);
+}
+
+// ---------------------------------------------------------------------------
+// Skapa tenant
+// ---------------------------------------------------------------------------
+async function createTenant() {
+  const tenant_id = document.getElementById('newTenantId').value.trim();
+  const name      = document.getElementById('newTenantName').value.trim();
+  const msgEl     = document.getElementById('msgCreateTenant');
+  msgEl.style.color = '#555';
+  msgEl.textContent = '';
+
+  if (!tenant_id || !name) {
+    msgEl.style.color = '#b91c1c';
+    msgEl.textContent = 'Tenant-ID och namn krävs.';
+    return;
+  }
+
+  try {
+    await apiFetch('/tenant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenant_id, name }),
+    });
+    document.getElementById('newTenantId').value   = '';
+    document.getElementById('newTenantName').value = '';
+    msgEl.style.color = '#15803d';
+    msgEl.textContent = `Tenant '${tenant_id}' skapad.`;
+    await loadTenants();
+    // Pre-select the newly created tenant in the dropdown.
+    document.getElementById('switchTenantSelect').value = tenant_id;
+    await loadSetup();
+  } catch (e) {
+    msgEl.style.color = '#b91c1c';
+    msgEl.textContent = e.message;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Spara konfiguration
+// ---------------------------------------------------------------------------
+async function saveConfig() {
+  setMsg('msgSetup', '');
+  spin('spinSetup', true);
+
+  const enabled_job_types = ALL_JOB_TYPES.filter(jt => {
+    const el = document.getElementById(`jt_${jt}`);
+    return el && el.checked;
+  });
+
+  const allowed_integrations = ALL_INTEGRATIONS.filter(it => {
+    const el = document.getElementById(`int_${it}`);
+    return el && el.checked;
+  });
+
+  const auto_actions = {};
+  ALL_JOB_TYPES.forEach(jt => {
+    const el = document.getElementById(`aa_${jt}`);
+    if (el) auto_actions[jt] = el.checked;
+  });
+
+  try {
+    await apiFetch('/tenant/config', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled_job_types, allowed_integrations, auto_actions }),
+    });
+    setMsg('msgSetup', 'Konfigurationen sparad.', false);
+    await loadSetup();
+  } catch (e) {
+    setMsg('msgSetup', e.message, true);
+  } finally {
+    spin('spinSetup', false);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Verifiering
+// ---------------------------------------------------------------------------
+async function runVerification() {
+  const resultEl = document.getElementById('verifyResult');
+  resultEl.innerHTML = '';
+  spin('spinVerify', true);
+  document.getElementById('btnRunVerify').disabled = true;
+
+  const tenant_id = _verifyTenantId;
+  if (!tenant_id) {
+    resultEl.innerHTML = '<div class="msg msg-error">Ingen aktiv tenant. Öppna Inställningar-fliken först.</div>';
+    spin('spinVerify', false);
+    document.getElementById('btnRunVerify').disabled = false;
+    return;
+  }
+
+  const payload = {
+    tenant_id,
+    job_type: 'customer_inquiry',
+    input_data: {
+      subject: 'Verifieringstest',
+      message_text: 'Detta är ett automatiskt verifieringsjobb skickat från operatörsgränssnittet.',
+      sender: { name: 'Verifiering', email: 'verify@test.internal', phone: null },
+    },
+  };
+
+  try {
+    const job = await apiFetch('/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const statusColor = job.status === 'completed' ? '#15803d'
+                      : job.status === 'failed'    ? '#b91c1c'
+                      : '#b45309';
+
+    const resultPayload = job.result && job.result.payload
+      ? `<pre style="margin-top:8px;">${escapeHtml(JSON.stringify(job.result.payload, null, 2))}</pre>`
+      : '';
+
+    const summary = job.result && job.result.summary
+      ? `<div class="vr-row"><span class="vr-label">Sammanfattning: </span>${escapeHtml(job.result.summary)}</div>`
+      : '';
+
+    resultEl.innerHTML = `
+      <div class="verify-result-box">
+        <div class="vr-row"><span class="vr-label">Jobb-ID: </span><span style="font-family:monospace;">${escapeHtml(job.job_id)}</span></div>
+        <div class="vr-row"><span class="vr-label">Status: </span><strong style="color:${statusColor};">${escapeHtml(job.status)}</strong></div>
+        <div class="vr-row"><span class="vr-label">Jobbtyp: </span>${escapeHtml(job.job_type || '—')}</div>
+        ${summary}
+        ${resultPayload}
+      </div>`;
+  } catch (e) {
+    resultEl.innerHTML = `<div class="msg msg-error">Fel: ${escapeHtml(e.message)}</div>`;
+  } finally {
+    spin('spinVerify', false);
+    document.getElementById('btnRunVerify').disabled = false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
 initApiKey();
-// Auto-load only if a key is already saved (avoids immediate 401 on fresh open).
 if (apiKey()) loadAll();
 </script>
 </body>

@@ -145,6 +145,46 @@ Projektet har passerat konceptstadiet och har en fungerande backend-kärna med r
 - [x] Credentials configured via `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` env vars; all default to empty (no breaking change)
 - [x] 141/141 tests pass
 
+## Setup UI slice (2026-04-12)
+- [x] `GET /tenant` extended — now returns `enabled_job_types`, `auto_actions`, and normalises `allowed_integrations` to plain strings
+- [x] `PUT /tenant/config` added — accepts `{enabled_job_types, allowed_integrations, auto_actions}`, calls `TenantConfigRepository.upsert`, returns `{status, tenant_id}`
+- [x] `app/ui/index.html` — "Setup" tab added alongside existing "Operations" tab; loads current config from `GET /tenant`; renders checkbox lists for job types and integrations; renders auto-action toggles per enabled job type; single "Save Configuration" button POSTs to `PUT /tenant/config` and reloads
+- [x] `tests/test_setup_ui_endpoints.py` — 15 new tests; 156/156 pass
+
+## Setup Status / Readiness panel (2026-04-12)
+- [x] `app/ui/index.html` — readiness summary panel added inside the Setup tab; rendered before config checkboxes
+- [x] Four checks computed from already-loaded config: Tenant loaded, ≥1 job type enabled, ≥1 integration enabled, auto-actions configured (warn-only — does not block overall readiness)
+- [x] Overall status: "Ready" (green) when tenant + job types + integrations all present; "Not Ready" (red) otherwise
+- [x] Frontend-only change; no backend or test changes; 156/156 pass
+
+## Tenant creation (2026-04-12)
+- [x] `POST /tenant` added — accepts `{tenant_id, name}`; rejects duplicates with 400; creates DB row via `TenantConfigRepository.upsert` with empty job types, integrations, auto actions; no auth required (bootstrap endpoint)
+- [x] `TenantCreateRequest` Pydantic schema added to `app/main.py`
+- [x] `app/ui/index.html` — "Create Tenant" section added at top of Setup tab; two inputs (Tenant ID, Name) + "Create Tenant" button; POSTs to `POST /tenant`, shows inline success/error, reloads config on success
+- [x] `tests/test_tenant_creation.py` — 10 tests: success shape, duplicate 400, upsert args, schema validation; 166/166 pass
+
+## Verification / Test Run UI (2026-04-12)
+- [x] `app/ui/index.html` — "Verification" section added at bottom of Setup tab; frontend-only, no backend changes
+- [x] "Run Verification Test" button submits a minimal `customer_inquiry` job for the active tenant via `POST /jobs`
+- [x] Result panel shows: job ID, status (colour-coded), job type, summary, and condensed payload JSON
+- [x] Tenant ID captured from loaded config (`_verifyTenantId`); shows clear error if Setup not loaded first
+- [x] Uses existing AI fallback path — completes without external credentials
+- [x] 166/166 tests pass; no backend changes
+
+## UI polish, Swedish localisation, and tenant switcher (2026-04-12)
+- [x] `app/ui/index.html` fully rewritten with Swedish UI text throughout (headings, buttons, messages, empty states, labels)
+- [x] Tenant switcher added to Inställningar tab — input + "Ladda tenant" button loads config for any tenant via `GET /tenant/config/{tenant_id}`; clears input and confirms success inline
+- [x] Full CSS/layout polish: consistent card system (`.setup-card`, `.readiness-card`), form field helpers (`.form-field`, `.form-inline`), improved tab styling, better header layout, cleaner spacing throughout
+- [x] `GET /tenant/config/{tenant_id}` added to `app/main.py` — unauthenticated, returns same shape as `GET /tenant` for any tenant ID; used by the tenant switcher in the UI
+- [x] `tests/test_tenant_config_by_id.py` — 8 tests; 174/174 pass
+
+## Tenant listing and dropdown switcher (2026-04-12)
+- [x] `TenantConfigRepository.list_all(db)` added — queries `tenant_configs` table ordered by `tenant_id`; returns only real DB rows, no static fallback
+- [x] `GET /tenants` added to `app/main.py` — unauthenticated; returns `{items: [{tenant_id, name}], total}`; no static/fallback tenants included
+- [x] `app/ui/index.html` — tenant switcher upgraded from free-text input to `<select>` dropdown populated from `GET /tenants`; only existing DB tenants can be selected; error shown if no tenant selected
+- [x] `loadTenants()` called on `loadSetup()` (tab open) and after `createTenant()` (new tenant pre-selected in dropdown immediately)
+- [x] `tests/test_tenant_listing.py` — 14 tests: shape, field content, no-fallback guarantee, repository method; 188/188 pass
+
 ## All MVP slices complete
 All items from the original backlog are implemented and tested.
 

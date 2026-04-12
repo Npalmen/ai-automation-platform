@@ -92,12 +92,103 @@ def tenant_info(
     tenant_id: str = Depends(get_verified_tenant),
 ):
     config = get_tenant_config(tenant_id, db=db)
+    # Normalise allowed_integrations to strings (static config stores enum objects).
+    allowed = [
+        i.value if hasattr(i, "value") else str(i)
+        for i in (config.get("allowed_integrations") or [])
+    ]
     return {
         "current_tenant": tenant_id,
         "name": config.get("name"),
-        "auto_actions": config.get("auto_actions"),
-        "allowed_integrations": config.get("allowed_integrations"),
+        "enabled_job_types": config.get("enabled_job_types") or [],
+        "auto_actions": config.get("auto_actions") or {},
+        "allowed_integrations": allowed,
     }
+
+
+from pydantic import BaseModel as _BaseModel
+
+
+class TenantCreateRequest(_BaseModel):
+    tenant_id: str
+    name: str
+
+
+class TenantConfigUpdateRequest(_BaseModel):
+    enabled_job_types: list[str]
+    allowed_integrations: list[str]
+    auto_actions: dict[str, bool]
+
+
+@app.get("/tenant/config/{tenant_id}")
+def get_tenant_config_by_id(
+    tenant_id: str,
+    db: Session = Depends(get_db),
+):
+    """Return config for any tenant by ID. No auth required — operator bootstrap helper."""
+    config = get_tenant_config(tenant_id, db=db)
+    allowed = [
+        i.value if hasattr(i, "value") else str(i)
+        for i in (config.get("allowed_integrations") or [])
+    ]
+    return {
+        "current_tenant": tenant_id,
+        "name": config.get("name"),
+        "enabled_job_types": config.get("enabled_job_types") or [],
+        "auto_actions": config.get("auto_actions") or {},
+        "allowed_integrations": allowed,
+    }
+
+
+@app.get("/tenants")
+def list_tenants(
+    db: Session = Depends(get_db),
+):
+    """Return all tenants that exist in the DB. No fallback/static tenants included."""
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    records = TenantConfigRepository.list_all(db)
+    items = [{"tenant_id": r.tenant_id, "name": r.name} for r in records]
+    return {"items": items, "total": len(items)}
+
+
+@app.post("/tenant", status_code=201)
+def create_tenant(
+    request: TenantCreateRequest,
+    db: Session = Depends(get_db),
+):
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    existing = TenantConfigRepository.get(db, request.tenant_id)
+    if existing is not None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tenant '{request.tenant_id}' already exists.",
+        )
+    TenantConfigRepository.upsert(
+        db=db,
+        tenant_id=request.tenant_id,
+        name=request.name,
+        enabled_job_types=[],
+        allowed_integrations=[],
+        auto_actions={},
+    )
+    return {"status": "created", "tenant_id": request.tenant_id, "name": request.name}
+
+
+@app.put("/tenant/config")
+def update_tenant_config(
+    request: TenantConfigUpdateRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    TenantConfigRepository.upsert(
+        db=db,
+        tenant_id=tenant_id,
+        enabled_job_types=request.enabled_job_types,
+        allowed_integrations=request.allowed_integrations,
+        auto_actions=request.auto_actions,
+    )
+    return {"status": "ok", "tenant_id": tenant_id}
 
 
 

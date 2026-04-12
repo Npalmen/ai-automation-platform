@@ -46,6 +46,10 @@ class TenantConfigRepository:
         return record
 
     @staticmethod
+    def list_all(db: Session) -> list[TenantConfigRecord]:
+        return db.query(TenantConfigRecord).order_by(TenantConfigRecord.tenant_id).all()
+
+    @staticmethod
     def to_dict(record: TenantConfigRecord) -> dict:
         return {
             "name": record.name,

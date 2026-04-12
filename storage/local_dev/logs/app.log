@@ -3046,3 +3046,589 @@ WHERE jobs.tenant_id = %(tenant_id_1)s) AS anon_1
 2026-04-11 13:31:42,802 | INFO | sqlalchemy.engine.Engine | [generated in 0.00056s] {'tenant_id_1': 'TENANT_1001'}
 2026-04-11 13:31:42,804 | INFO | sqlalchemy.engine.Engine | ROLLBACK
 2026-04-11 13:31:42,815 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:15:36,137 | INFO | app.core.auth | API key auth enabled for 2 tenant(s).
+2026-04-12 21:15:36,216 | INFO | sqlalchemy.engine.Engine | select pg_catalog.version()
+2026-04-12 21:15:36,217 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-12 21:15:36,218 | INFO | sqlalchemy.engine.Engine | select current_schema()
+2026-04-12 21:15:36,218 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-12 21:15:36,219 | INFO | sqlalchemy.engine.Engine | show standard_conforming_strings
+2026-04-12 21:15:36,219 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-12 21:15:36,220 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:15:36,220 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:15:36,223 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s ORDER BY jobs.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-12 21:15:36,226 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s ORDER BY approval_requests.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-12 21:15:36,226 | INFO | sqlalchemy.engine.Engine | [generated in 0.00324s] {'tenant_id_1': 'TENANT_1001', 'param_1': 100, 'param_2': 0}
+2026-04-12 21:15:36,226 | INFO | sqlalchemy.engine.Engine | [generated in 0.00067s] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending', 'param_1': 100, 'param_2': 0}
+2026-04-12 21:15:36,241 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s) AS anon_1
+2026-04-12 21:15:36,259 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s) AS anon_1
+2026-04-12 21:15:36,260 | INFO | sqlalchemy.engine.Engine | [generated in 0.01875s] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending'}
+2026-04-12 21:15:36,260 | INFO | sqlalchemy.engine.Engine | [generated in 0.00065s] {'tenant_id_1': 'TENANT_1001'}
+2026-04-12 21:15:36,265 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:15:36,281 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:15:38,390 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:15:38,391 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:15:38,392 | INFO | sqlalchemy.engine.Engine | [generated in 0.00037s] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:15:38,395 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:16:18,926 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:16:18,926 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:16:18,927 | INFO | sqlalchemy.engine.Engine | [cached since 40.54s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:16:18,929 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:16:49,999 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:16:49,999 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:16:50,000 | INFO | sqlalchemy.engine.Engine | [cached since 71.61s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:16:50,002 | INFO | sqlalchemy.engine.Engine | INSERT INTO tenant_configs (tenant_id, name, enabled_job_types, allowed_integrations, auto_actions) VALUES (%(tenant_id)s, %(name)s, %(enabled_job_types)s::JSON, %(allowed_integrations)s::JSON, %(auto_actions)s::JSON)
+2026-04-12 21:16:50,002 | INFO | sqlalchemy.engine.Engine | [generated in 0.00023s] {'tenant_id': 'TENANT_1001', 'name': None, 'enabled_job_types': '["lead", "invoice", "customer_inquiry"]', 'allowed_integrations': '["google_mail", "google_calendar", "microsoft_mail", "microsoft_calendar", "crm", "accounting", "support", "monday", "fortnox", "visma"]', 'auto_actions': '{"lead": true, "invoice": true, "customer_inquiry": true}'}
+2026-04-12 21:16:50,014 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-12 21:16:50,016 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:16:50,016 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id, tenant_configs.name, tenant_configs.enabled_job_types, tenant_configs.allowed_integrations, tenant_configs.auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(pk_1)s
+2026-04-12 21:16:50,017 | INFO | sqlalchemy.engine.Engine | [generated in 0.00026s] {'pk_1': 'TENANT_1001'}
+2026-04-12 21:16:50,018 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:16:50,022 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:16:50,022 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:16:50,022 | INFO | sqlalchemy.engine.Engine | [cached since 71.63s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:16:50,024 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:17:44,026 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:17:44,026 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:17:44,026 | INFO | sqlalchemy.engine.Engine | [cached since 125.6s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:17:44,028 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:27:19,342 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:27:19,343 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s ORDER BY jobs.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-12 21:27:19,344 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:27:19,344 | INFO | sqlalchemy.engine.Engine | [cached since 703.1s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 100, 'param_2': 0}
+2026-04-12 21:27:19,344 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s ORDER BY approval_requests.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-12 21:27:19,345 | INFO | sqlalchemy.engine.Engine | [cached since 703.1s ago] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending', 'param_1': 100, 'param_2': 0}
+2026-04-12 21:27:19,354 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s) AS anon_1
+2026-04-12 21:27:19,355 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s) AS anon_1
+2026-04-12 21:27:19,355 | INFO | sqlalchemy.engine.Engine | [cached since 703.1s ago] {'tenant_id_1': 'TENANT_1001'}
+2026-04-12 21:27:19,356 | INFO | sqlalchemy.engine.Engine | [cached since 703.1s ago] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending'}
+2026-04-12 21:27:19,363 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:27:19,363 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:27:21,010 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:27:21,011 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:27:21,011 | INFO | sqlalchemy.engine.Engine | [cached since 702.6s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:27:21,013 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:27:33,739 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:27:33,739 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:27:33,740 | INFO | sqlalchemy.engine.Engine | [cached since 715.3s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:27:33,743 | INFO | sqlalchemy.engine.Engine | UPDATE tenant_configs SET enabled_job_types=%(enabled_job_types)s::JSON, auto_actions=%(auto_actions)s::JSON WHERE tenant_configs.tenant_id = %(tenant_configs_tenant_id)s
+2026-04-12 21:27:33,743 | INFO | sqlalchemy.engine.Engine | [generated in 0.00035s] {'enabled_job_types': '[]', 'auto_actions': '{}', 'tenant_configs_tenant_id': 'TENANT_1001'}
+2026-04-12 21:27:33,745 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-12 21:27:33,746 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:27:33,747 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id, tenant_configs.name, tenant_configs.enabled_job_types, tenant_configs.allowed_integrations, tenant_configs.auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(pk_1)s
+2026-04-12 21:27:33,747 | INFO | sqlalchemy.engine.Engine | [cached since 643.7s ago] {'pk_1': 'TENANT_1001'}
+2026-04-12 21:27:33,750 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:27:33,754 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:27:33,754 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:27:33,755 | INFO | sqlalchemy.engine.Engine | [cached since 715.4s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:27:33,757 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:27:37,463 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:27:37,464 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:27:37,464 | INFO | sqlalchemy.engine.Engine | [cached since 719.1s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:27:37,465 | INFO | sqlalchemy.engine.Engine | UPDATE tenant_configs SET enabled_job_types=%(enabled_job_types)s::JSON, auto_actions=%(auto_actions)s::JSON WHERE tenant_configs.tenant_id = %(tenant_configs_tenant_id)s
+2026-04-12 21:27:37,465 | INFO | sqlalchemy.engine.Engine | [cached since 3.723s ago] {'enabled_job_types': '["lead"]', 'auto_actions': '{"lead": false}', 'tenant_configs_tenant_id': 'TENANT_1001'}
+2026-04-12 21:27:37,474 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-12 21:27:37,476 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:27:37,476 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id, tenant_configs.name, tenant_configs.enabled_job_types, tenant_configs.allowed_integrations, tenant_configs.auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(pk_1)s
+2026-04-12 21:27:37,476 | INFO | sqlalchemy.engine.Engine | [cached since 647.5s ago] {'pk_1': 'TENANT_1001'}
+2026-04-12 21:27:37,479 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:27:37,482 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:27:37,482 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:27:37,482 | INFO | sqlalchemy.engine.Engine | [cached since 719.1s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:27:37,484 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:27:50,514 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:27:50,515 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:27:50,515 | INFO | sqlalchemy.engine.Engine | [cached since 732.1s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:27:50,517 | INFO | sqlalchemy.engine.Engine | UPDATE tenant_configs SET allowed_integrations=%(allowed_integrations)s::JSON, auto_actions=%(auto_actions)s::JSON WHERE tenant_configs.tenant_id = %(tenant_configs_tenant_id)s
+2026-04-12 21:27:50,517 | INFO | sqlalchemy.engine.Engine | [generated in 0.00025s] {'allowed_integrations': '[]', 'auto_actions': '{"lead": true}', 'tenant_configs_tenant_id': 'TENANT_1001'}
+2026-04-12 21:27:50,517 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-12 21:27:50,526 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:27:50,526 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id, tenant_configs.name, tenant_configs.enabled_job_types, tenant_configs.allowed_integrations, tenant_configs.auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(pk_1)s
+2026-04-12 21:27:50,527 | INFO | sqlalchemy.engine.Engine | [cached since 660.5s ago] {'pk_1': 'TENANT_1001'}
+2026-04-12 21:27:50,528 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:27:50,532 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:27:50,533 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:27:50,533 | INFO | sqlalchemy.engine.Engine | [cached since 732.1s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:27:50,534 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:27:53,205 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:27:53,205 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:27:53,206 | INFO | sqlalchemy.engine.Engine | [cached since 734.8s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:27:53,207 | INFO | sqlalchemy.engine.Engine | UPDATE tenant_configs SET allowed_integrations=%(allowed_integrations)s::JSON WHERE tenant_configs.tenant_id = %(tenant_configs_tenant_id)s
+2026-04-12 21:27:53,207 | INFO | sqlalchemy.engine.Engine | [generated in 0.00021s] {'allowed_integrations': '["google_mail"]', 'tenant_configs_tenant_id': 'TENANT_1001'}
+2026-04-12 21:27:53,208 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-12 21:27:53,216 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:27:53,216 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id, tenant_configs.name, tenant_configs.enabled_job_types, tenant_configs.allowed_integrations, tenant_configs.auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(pk_1)s
+2026-04-12 21:27:53,216 | INFO | sqlalchemy.engine.Engine | [cached since 663.2s ago] {'pk_1': 'TENANT_1001'}
+2026-04-12 21:27:53,218 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:27:53,222 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:27:53,222 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:27:53,222 | INFO | sqlalchemy.engine.Engine | [cached since 734.8s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:27:53,224 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:29:27,138 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:29:27,138 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:29:27,138 | INFO | sqlalchemy.engine.Engine | [cached since 828.7s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:29:27,140 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:34:33,749 | INFO | app.core.auth | API key auth enabled for 2 tenant(s).
+2026-04-12 21:34:33,816 | INFO | sqlalchemy.engine.Engine | select pg_catalog.version()
+2026-04-12 21:34:33,817 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-12 21:34:33,818 | INFO | sqlalchemy.engine.Engine | select current_schema()
+2026-04-12 21:34:33,818 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-12 21:34:33,819 | INFO | sqlalchemy.engine.Engine | show standard_conforming_strings
+2026-04-12 21:34:33,819 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-12 21:34:33,820 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:34:33,822 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s ORDER BY jobs.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-12 21:34:33,823 | INFO | sqlalchemy.engine.Engine | [generated in 0.00043s] {'tenant_id_1': 'TENANT_1001', 'param_1': 100, 'param_2': 0}
+2026-04-12 21:34:33,828 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:34:33,836 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s) AS anon_1
+2026-04-12 21:34:33,840 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s ORDER BY approval_requests.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-12 21:34:33,841 | INFO | sqlalchemy.engine.Engine | [generated in 0.00441s] {'tenant_id_1': 'TENANT_1001'}
+2026-04-12 21:34:33,841 | INFO | sqlalchemy.engine.Engine | [generated in 0.00091s] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending', 'param_1': 100, 'param_2': 0}
+2026-04-12 21:34:33,846 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:34:33,851 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s) AS anon_1
+2026-04-12 21:34:33,852 | INFO | sqlalchemy.engine.Engine | [generated in 0.00063s] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending'}
+2026-04-12 21:34:33,855 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:34:35,872 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:34:35,874 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:34:35,874 | INFO | sqlalchemy.engine.Engine | [generated in 0.00030s] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:34:35,877 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:48:12,503 | INFO | app.core.auth | API key auth enabled for 2 tenant(s).
+2026-04-12 21:48:12,574 | INFO | sqlalchemy.engine.Engine | select pg_catalog.version()
+2026-04-12 21:48:12,574 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-12 21:48:12,575 | INFO | sqlalchemy.engine.Engine | select current_schema()
+2026-04-12 21:48:12,576 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-12 21:48:12,576 | INFO | sqlalchemy.engine.Engine | show standard_conforming_strings
+2026-04-12 21:48:12,577 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-12 21:48:12,577 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:48:12,577 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:48:12,581 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s ORDER BY approval_requests.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-12 21:48:12,582 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s ORDER BY jobs.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-12 21:48:12,582 | INFO | sqlalchemy.engine.Engine | [generated in 0.00192s] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending', 'param_1': 100, 'param_2': 0}
+2026-04-12 21:48:12,583 | INFO | sqlalchemy.engine.Engine | [generated in 0.00051s] {'tenant_id_1': 'TENANT_1001', 'param_1': 100, 'param_2': 0}
+2026-04-12 21:48:12,595 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s) AS anon_1
+2026-04-12 21:48:12,611 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s) AS anon_1
+2026-04-12 21:48:12,612 | INFO | sqlalchemy.engine.Engine | [generated in 0.01704s] {'tenant_id_1': 'TENANT_1001'}
+2026-04-12 21:48:12,612 | INFO | sqlalchemy.engine.Engine | [generated in 0.00073s] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending'}
+2026-04-12 21:48:12,618 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:48:12,619 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:48:16,258 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:48:16,260 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:48:16,260 | INFO | sqlalchemy.engine.Engine | [generated in 0.00044s] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:48:16,264 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:48:18,009 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:48:18,010 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:48:18,010 | INFO | sqlalchemy.engine.Engine | [cached since 1.75s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:48:18,013 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:48:20,848 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:48:20,849 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s ORDER BY jobs.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-12 21:48:20,849 | INFO | sqlalchemy.engine.Engine | [cached since 8.267s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 100, 'param_2': 0}
+2026-04-12 21:48:20,856 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s) AS anon_1
+2026-04-12 21:48:20,856 | INFO | sqlalchemy.engine.Engine | [cached since 8.262s ago] {'tenant_id_1': 'TENANT_1001'}
+2026-04-12 21:48:20,861 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:48:20,871 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:48:20,872 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s ORDER BY approval_requests.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-12 21:48:20,872 | INFO | sqlalchemy.engine.Engine | [cached since 8.292s ago] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending', 'param_1': 100, 'param_2': 0}
+2026-04-12 21:48:20,875 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s) AS anon_1
+2026-04-12 21:48:20,875 | INFO | sqlalchemy.engine.Engine | [cached since 8.264s ago] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending'}
+2026-04-12 21:48:20,878 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:48:22,054 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:48:22,054 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:48:22,055 | INFO | sqlalchemy.engine.Engine | [cached since 5.795s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:48:22,057 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:48:43,556 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:48:43,556 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:48:43,557 | INFO | sqlalchemy.engine.Engine | [cached since 27.3s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:48:43,559 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:48:46,365 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:48:46,365 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:48:46,365 | INFO | sqlalchemy.engine.Engine | [cached since 30.11s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:48:46,367 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:49:19,494 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:49:19,495 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:49:19,495 | INFO | sqlalchemy.engine.Engine | [cached since 63.24s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:49:19,497 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:50:49,856 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:50:49,856 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:50:49,857 | INFO | sqlalchemy.engine.Engine | [cached since 153.6s ago] {'tenant_id_1': 'TENANT_3001', 'param_1': 1}
+2026-04-12 21:50:49,858 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:50:49,858 | INFO | sqlalchemy.engine.Engine | [cached since 153.6s ago] {'tenant_id_1': 'TENANT_3001', 'param_1': 1}
+2026-04-12 21:50:49,861 | INFO | sqlalchemy.engine.Engine | INSERT INTO tenant_configs (tenant_id, name, enabled_job_types, allowed_integrations, auto_actions) VALUES (%(tenant_id)s, %(name)s, %(enabled_job_types)s::JSON, %(allowed_integrations)s::JSON, %(auto_actions)s::JSON)
+2026-04-12 21:50:49,862 | INFO | sqlalchemy.engine.Engine | [generated in 0.00042s] {'tenant_id': 'TENANT_3001', 'name': 'Test', 'enabled_job_types': '[]', 'allowed_integrations': '[]', 'auto_actions': '{}'}
+2026-04-12 21:50:49,863 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-12 21:50:49,873 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:50:49,874 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id, tenant_configs.name, tenant_configs.enabled_job_types, tenant_configs.allowed_integrations, tenant_configs.auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(pk_1)s
+2026-04-12 21:50:49,874 | INFO | sqlalchemy.engine.Engine | [generated in 0.00040s] {'pk_1': 'TENANT_3001'}
+2026-04-12 21:50:49,877 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:50:49,881 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:50:49,882 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:50:49,882 | INFO | sqlalchemy.engine.Engine | [cached since 153.6s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:50:49,884 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:51:10,308 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:51:10,308 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:51:10,308 | INFO | sqlalchemy.engine.Engine | [cached since 174s ago] {'tenant_id_1': 'TENANT_3001', 'param_1': 1}
+2026-04-12 21:51:10,317 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:51:22,457 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:51:22,458 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:51:22,458 | INFO | sqlalchemy.engine.Engine | [cached since 186.2s ago] {'tenant_id_1': 'TENANT_4001', 'param_1': 1}
+2026-04-12 21:51:22,459 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:51:22,460 | INFO | sqlalchemy.engine.Engine | [cached since 186.2s ago] {'tenant_id_1': 'TENANT_4001', 'param_1': 1}
+2026-04-12 21:51:22,461 | INFO | sqlalchemy.engine.Engine | INSERT INTO tenant_configs (tenant_id, name, enabled_job_types, allowed_integrations, auto_actions) VALUES (%(tenant_id)s, %(name)s, %(enabled_job_types)s::JSON, %(allowed_integrations)s::JSON, %(auto_actions)s::JSON)
+2026-04-12 21:51:22,461 | INFO | sqlalchemy.engine.Engine | [cached since 32.6s ago] {'tenant_id': 'TENANT_4001', 'name': 'Test 4', 'enabled_job_types': '[]', 'allowed_integrations': '[]', 'auto_actions': '{}'}
+2026-04-12 21:51:22,462 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-12 21:51:22,463 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:51:22,464 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id, tenant_configs.name, tenant_configs.enabled_job_types, tenant_configs.allowed_integrations, tenant_configs.auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(pk_1)s
+2026-04-12 21:51:22,464 | INFO | sqlalchemy.engine.Engine | [cached since 32.59s ago] {'pk_1': 'TENANT_4001'}
+2026-04-12 21:51:22,467 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:51:22,472 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:51:22,472 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:51:22,472 | INFO | sqlalchemy.engine.Engine | [cached since 186.2s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:51:22,475 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:52:01,739 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:52:01,740 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:52:01,740 | INFO | sqlalchemy.engine.Engine | [cached since 225.5s ago] {'tenant_id_1': 'Tenant_3001', 'param_1': 1}
+2026-04-12 21:52:01,742 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:52:19,471 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:52:19,471 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:52:19,471 | INFO | sqlalchemy.engine.Engine | [cached since 243.2s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:52:19,473 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:52:29,341 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:52:29,341 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:52:29,341 | INFO | sqlalchemy.engine.Engine | [cached since 253.1s ago] {'tenant_id_1': 'TENANT_5001', 'param_1': 1}
+2026-04-12 21:52:29,343 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:53:01,765 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:53:01,766 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:53:01,766 | INFO | sqlalchemy.engine.Engine | [cached since 285.5s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:53:01,768 | INFO | sqlalchemy.engine.Engine | UPDATE tenant_configs SET enabled_job_types=%(enabled_job_types)s::JSON, allowed_integrations=%(allowed_integrations)s::JSON, auto_actions=%(auto_actions)s::JSON WHERE tenant_configs.tenant_id = %(tenant_configs_tenant_id)s
+2026-04-12 21:53:01,769 | INFO | sqlalchemy.engine.Engine | [generated in 0.00029s] {'enabled_job_types': '["lead", "invoice", "customer_inquiry"]', 'allowed_integrations': '["google_mail", "google_calendar", "microsoft_mail", "microsoft_calendar", "crm", "accounting", "support", "slack", "monday", "fortnox", "visma"]', 'auto_actions': '{"lead": true, "invoice": false, "customer_inquiry": true}', 'tenant_configs_tenant_id': 'TENANT_1001'}
+2026-04-12 21:53:01,770 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-12 21:53:01,778 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:53:01,778 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id, tenant_configs.name, tenant_configs.enabled_job_types, tenant_configs.allowed_integrations, tenant_configs.auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(pk_1)s
+2026-04-12 21:53:01,779 | INFO | sqlalchemy.engine.Engine | [cached since 131.9s ago] {'pk_1': 'TENANT_1001'}
+2026-04-12 21:53:01,781 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:53:01,785 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:53:01,785 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:53:01,785 | INFO | sqlalchemy.engine.Engine | [cached since 285.5s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:53:01,787 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:53:26,986 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:53:26,987 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:53:26,988 | INFO | sqlalchemy.engine.Engine | [generated in 0.00029s] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'f70d3da9-14a1-4c80-ab80-739ad13b5e4c', 'param_1': 1}
+2026-04-12 21:53:26,992 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:53:26,993 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:53:26,994 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s ORDER BY approval_requests.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-12 21:53:26,994 | INFO | sqlalchemy.engine.Engine | [cached since 314.4s ago] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending', 'param_1': 100, 'param_2': 0}
+2026-04-12 21:53:26,999 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s) AS anon_1
+2026-04-12 21:53:26,999 | INFO | sqlalchemy.engine.Engine | [cached since 314.4s ago] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending'}
+2026-04-12 21:53:27,001 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:53:27,004 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:53:27,004 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s AND jobs.job_id = %(job_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:53:27,004 | INFO | sqlalchemy.engine.Engine | [cached since 0.01681s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'f70d3da9-14a1-4c80-ab80-739ad13b5e4c', 'param_1': 1}
+2026-04-12 21:53:27,006 | INFO | sqlalchemy.engine.Engine | SELECT action_executions.execution_id AS action_executions_execution_id, action_executions.tenant_id AS action_executions_tenant_id, action_executions.job_id AS action_executions_job_id, action_executions.action_type AS action_executions_action_type, action_executions.status AS action_executions_status, action_executions.target AS action_executions_target, action_executions.provider AS action_executions_provider, action_executions.external_id AS action_executions_external_id, action_executions.attempt_no AS action_executions_attempt_no, action_executions.request_payload AS action_executions_request_payload, action_executions.result_payload AS action_executions_result_payload, action_executions.error_message AS action_executions_error_message, action_executions.executed_at AS action_executions_executed_at, action_executions.created_at AS action_executions_created_at, action_executions.updated_at AS action_executions_updated_at 
+FROM action_executions 
+WHERE action_executions.tenant_id = %(tenant_id_1)s AND action_executions.job_id = %(job_id_1)s ORDER BY action_executions.executed_at ASC, action_executions.created_at ASC
+2026-04-12 21:53:27,007 | INFO | sqlalchemy.engine.Engine | [generated in 0.00029s] {'tenant_id_1': 'TENANT_1001', 'job_id_1': 'f70d3da9-14a1-4c80-ab80-739ad13b5e4c'}
+2026-04-12 21:53:27,020 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:53:32,209 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:53:32,210 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:53:32,210 | INFO | sqlalchemy.engine.Engine | [cached since 316s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:53:32,212 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:53:44,972 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:53:44,972 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:53:44,972 | INFO | sqlalchemy.engine.Engine | [cached since 328.7s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:53:44,974 | INFO | sqlalchemy.engine.Engine | UPDATE tenant_configs SET enabled_job_types=%(enabled_job_types)s::JSON, auto_actions=%(auto_actions)s::JSON WHERE tenant_configs.tenant_id = %(tenant_configs_tenant_id)s
+2026-04-12 21:53:44,974 | INFO | sqlalchemy.engine.Engine | [generated in 0.00024s] {'enabled_job_types': '["lead", "invoice", "customer_inquiry", "anomaly"]', 'auto_actions': '{"lead": true, "invoice": false, "customer_inquiry": false, "anomaly": false}', 'tenant_configs_tenant_id': 'TENANT_1001'}
+2026-04-12 21:53:44,982 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-12 21:53:44,984 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:53:44,984 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id, tenant_configs.name, tenant_configs.enabled_job_types, tenant_configs.allowed_integrations, tenant_configs.auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(pk_1)s
+2026-04-12 21:53:44,984 | INFO | sqlalchemy.engine.Engine | [cached since 175.1s ago] {'pk_1': 'TENANT_1001'}
+2026-04-12 21:53:44,986 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:53:44,988 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:53:44,989 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:53:44,989 | INFO | sqlalchemy.engine.Engine | [cached since 328.7s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:53:44,990 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 21:54:15,665 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 21:54:15,665 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 21:54:15,666 | INFO | sqlalchemy.engine.Engine | [cached since 359.4s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 21:54:15,667 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 22:03:47,902 | INFO | app.core.auth | API key auth enabled for 2 tenant(s).
+2026-04-12 22:03:47,974 | INFO | sqlalchemy.engine.Engine | select pg_catalog.version()
+2026-04-12 22:03:47,975 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-12 22:03:47,976 | INFO | sqlalchemy.engine.Engine | select current_schema()
+2026-04-12 22:03:47,976 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-12 22:03:47,977 | INFO | sqlalchemy.engine.Engine | show standard_conforming_strings
+2026-04-12 22:03:47,977 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-12 22:03:47,978 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 22:03:47,982 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s ORDER BY jobs.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-12 22:03:47,982 | INFO | sqlalchemy.engine.Engine | [generated in 0.00054s] {'tenant_id_1': 'TENANT_1001', 'param_1': 100, 'param_2': 0}
+2026-04-12 22:03:47,995 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s) AS anon_1
+2026-04-12 22:03:47,995 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 22:03:47,995 | INFO | sqlalchemy.engine.Engine | [generated in 0.00061s] {'tenant_id_1': 'TENANT_1001'}
+2026-04-12 22:03:47,998 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s ORDER BY approval_requests.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-12 22:03:47,998 | INFO | sqlalchemy.engine.Engine | [generated in 0.00053s] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending', 'param_1': 100, 'param_2': 0}
+2026-04-12 22:03:48,005 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 22:03:48,010 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s) AS anon_1
+2026-04-12 22:03:48,011 | INFO | sqlalchemy.engine.Engine | [generated in 0.00094s] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending'}
+2026-04-12 22:03:48,014 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 22:03:49,151 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 22:03:49,152 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 22:03:49,152 | INFO | sqlalchemy.engine.Engine | [generated in 0.00024s] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 22:03:49,154 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 22:08:41,847 | INFO | app.core.auth | API key auth enabled for 2 tenant(s).
+2026-04-12 22:08:41,914 | INFO | sqlalchemy.engine.Engine | select pg_catalog.version()
+2026-04-12 22:08:41,915 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-12 22:08:41,916 | INFO | sqlalchemy.engine.Engine | select current_schema()
+2026-04-12 22:08:41,916 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-12 22:08:41,917 | INFO | sqlalchemy.engine.Engine | show standard_conforming_strings
+2026-04-12 22:08:41,917 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-12 22:08:41,917 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 22:08:41,918 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 22:08:41,921 | INFO | sqlalchemy.engine.Engine | SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s ORDER BY approval_requests.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-12 22:08:41,922 | INFO | sqlalchemy.engine.Engine | SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s ORDER BY jobs.created_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-04-12 22:08:41,923 | INFO | sqlalchemy.engine.Engine | [generated in 0.00195s] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending', 'param_1': 100, 'param_2': 0}
+2026-04-12 22:08:41,923 | INFO | sqlalchemy.engine.Engine | [generated in 0.00060s] {'tenant_id_1': 'TENANT_1001', 'param_1': 100, 'param_2': 0}
+2026-04-12 22:08:41,947 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT jobs.job_id AS jobs_job_id, jobs.tenant_id AS jobs_tenant_id, jobs.job_type AS jobs_job_type, jobs.status AS jobs_status, jobs.input_data AS jobs_input_data, jobs.result AS jobs_result, jobs.created_at AS jobs_created_at, jobs.updated_at AS jobs_updated_at, jobs.created_by AS jobs_created_by 
+FROM jobs 
+WHERE jobs.tenant_id = %(tenant_id_1)s) AS anon_1
+2026-04-12 22:08:41,949 | INFO | sqlalchemy.engine.Engine | SELECT count(*) AS count_1 
+FROM (SELECT approval_requests.approval_id AS approval_requests_approval_id, approval_requests.tenant_id AS approval_requests_tenant_id, approval_requests.job_id AS approval_requests_job_id, approval_requests.job_type AS approval_requests_job_type, approval_requests.state AS approval_requests_state, approval_requests.channel AS approval_requests_channel, approval_requests.title AS approval_requests_title, approval_requests.summary AS approval_requests_summary, approval_requests.requested_by AS approval_requests_requested_by, approval_requests.requested_at AS approval_requests_requested_at, approval_requests.resolved_at AS approval_requests_resolved_at, approval_requests.resolved_by AS approval_requests_resolved_by, approval_requests.resolved_via AS approval_requests_resolved_via, approval_requests.resolution_note AS approval_requests_resolution_note, approval_requests.next_on_approve AS approval_requests_next_on_approve, approval_requests.next_on_reject AS approval_requests_next_on_reject, approval_requests.request_payload AS approval_requests_request_payload, approval_requests.delivery_payload AS approval_requests_delivery_payload, approval_requests.created_at AS approval_requests_created_at, approval_requests.updated_at AS approval_requests_updated_at 
+FROM approval_requests 
+WHERE approval_requests.tenant_id = %(tenant_id_1)s AND approval_requests.state = %(state_1)s) AS anon_1
+2026-04-12 22:08:41,950 | INFO | sqlalchemy.engine.Engine | [generated in 0.00280s] {'tenant_id_1': 'TENANT_1001'}
+2026-04-12 22:08:41,950 | INFO | sqlalchemy.engine.Engine | [generated in 0.00045s] {'tenant_id_1': 'TENANT_1001', 'state_1': 'pending'}
+2026-04-12 22:08:41,954 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 22:08:41,955 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 22:08:43,569 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 22:08:43,571 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs ORDER BY tenant_configs.tenant_id
+2026-04-12 22:08:43,571 | INFO | sqlalchemy.engine.Engine | [generated in 0.00029s] {}
+2026-04-12 22:08:43,574 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-12 22:08:43,578 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-12 22:08:43,579 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-12 22:08:43,579 | INFO | sqlalchemy.engine.Engine | [generated in 0.00034s] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-12 22:08:43,582 | INFO | sqlalchemy.engine.Engine | ROLLBACK
