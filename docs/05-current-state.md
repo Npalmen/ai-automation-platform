@@ -185,6 +185,52 @@ Projektet har passerat konceptstadiet och har en fungerande backend-kärna med r
 - [x] `loadTenants()` called on `loadSetup()` (tab open) and after `createTenant()` (new tenant pre-selected in dropdown immediately)
 - [x] `tests/test_tenant_listing.py` — 14 tests: shape, field content, no-fallback guarantee, repository method; 188/188 pass
 
+## Tenant state fix, label maps, automation levels, live readiness (2026-04-13)
+
+**Root cause fixed:** `saveConfig()` previously called `PUT /tenant/config` (API-key-derived tenant) then `loadSetup()` → `GET /tenant` (also API-key tenant), silently reverting to `TENANT_1001`. Fix: added `PUT /tenant/config/{tenant_id}` (unauthenticated bootstrap endpoint); UI now reads/writes config exclusively via `GET /tenant/config/{id}` and `PUT /tenant/config/{id}` using a single `_activeTenantId` variable.
+
+- [x] `PUT /tenant/config/{tenant_id}` added to `app/main.py` — unauthenticated, 404 if tenant not in DB, upserts to exact tenant; saves `dict[str, bool | str]` auto_actions (accepts both legacy bool and new string levels)
+- [x] `TenantConfigUpdateRequest.auto_actions` widened to `dict[str, bool | str]` to support automation level strings
+- [x] `app/ui/index.html`:
+  - Single `_activeTenantId` state variable — set by `switchTenant()`, `createTenant()`, and initial `loadSetup()`; never overwritten by `saveConfig()` or `loadTenants()`
+  - `saveConfig()` calls `PUT /tenant/config/{_activeTenantId}` then reloads from `GET /tenant/config/{_activeTenantId}` — tenant never reverts
+  - `JOB_TYPE_LABELS` and `INTEGRATION_LABELS` maps — job types and integrations shown with Swedish customer-friendly labels
+  - Auto actions replaced with 3-level radio selector per active job type: Manuellt godkännande / Semi-automatiskt / Fullt automatiskt
+  - Readiness panel updated live on every checkbox/radio change via `refreshReadiness()` / `computeReadiness()`
+  - Readiness now checks: tenant inläst, ≥1 arbetsflöde, ≥1 system, automationsnivå konfigurerad för alla aktiva jobbtyper
+  - Final status text changed from "Redo" → "Redo att köra jobb"
+- [x] `tests/test_tenant_config_save_by_id.py` — 14 tests: save endpoint shape, 404 path, upsert args, automation level schema; 202/202 pass
+
+## Verification fix — tenant-aware routing (2026-04-13)
+
+Two live testing failures in the verification flow fixed:
+
+**Root causes:**
+1. `POST /jobs` uses `get_verified_tenant` (API-key → `TENANT_1001`) but payload had `tenant_id: "TENANT_2002"` → HTTP 400 tenant mismatch.
+2. Hard-coded `customer_inquiry` job type was not in the target tenant's `enabled_job_types` DB row → HTTP 403 job type not enabled.
+
+**Fix:**
+- [x] `POST /verify/{tenant_id}` added — unauthenticated; picks first enabled supported type; calls `run_pipeline` with tenant-specific payload
+- [x] `app/ui/index.html` — `runVerification()` calls `POST /verify/{_activeTenantId}` with no body
+- [x] `tests/test_verify_tenant.py` — 16 tests; 216/216 pass
+
+## Verification fix — deterministic pipeline (2026-04-13)
+
+**Root cause:** `run_pipeline` triggers the classification processor which calls the LLM (`LLM_API_KEY` not set in dev) → falls back to `detected_job_type: "unknown"` → orchestrator routes to `UNKNOWN` pipeline → policy appends `"unknown_job_type"` reason → `manual_review`. All three supported job types (lead, customer_inquiry, invoice) also have LLM-dependent processors that fall back to `low_confidence / manual_review` without credentials.
+
+**Fix:** `_run_verification_pipeline(job, job_type_value, db)` — deterministic pipeline helper that bypasses all LLM calls:
+- [x] Runs `intake_processor` (deterministic)
+- [x] Injects synthetic `processor_history` entries for all AI steps: `classification_processor` (confidence=0.95, correct `detected_job_type`), `entity_extraction_processor`, type-specific processor (`lead_processor` / `customer_inquiry_processor` / `invoice_processor`), and `decisioning_processor` (for lead/inquiry: `auto_execute`)
+- [x] Runs `policy_processor` (deterministic — reads from injected history; routes correctly for lead/inquiry/invoice without LLM)
+- [x] Runs `human_handoff_processor` (deterministic — reads from policy)
+- [x] Finalises `JobStatus` (`COMPLETED`, `AWAITING_APPROVAL`, or `MANUAL_REVIEW`)
+- [x] Supported types: `lead`, `customer_inquiry`, `invoice` — each has a realistic Swedish input payload in `_VERIFICATION_PAYLOADS`
+- [x] If no supported type is enabled: 400 with clear message listing supported types
+- [x] Response includes `verification_type` field indicating which type was exercised
+- [x] `tests/test_verify_tenant.py` — 16 tests: 404, 400 (no types, unsupported-only), success shape, tenant match, supported-type preference; updated for new interface
+- [x] `tests/test_verification_pipeline.py` — 19 new tests: end-to-end pipeline for all three types (no mocking), verifies status not failed, no `unknown_job_type` reason, correct `detected_job_type` in history; payload config sanity checks
+- [x] 237/237 pass
+
 ## All MVP slices complete
 All items from the original backlog are implemented and tested.
 

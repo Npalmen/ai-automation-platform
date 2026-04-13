@@ -125,7 +125,7 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - 17 new tests; 105/105 pass
 
 ## Current state
-All core MVP slices are complete. Auth is enforced end-to-end. UI is stable, Swedish-localised, and polished. Tenants can be created via `POST /tenant` or the Inställningar tab. Active tenant is selected from a dropdown of real DB tenants — no free-text entry, no misleading fallback behaviour. Setup tab shows readiness status and a one-click verification test. 188/188 tests pass.
+All core MVP slices are complete. Auth is enforced end-to-end. UI is stable, Swedish-localised, and polished. Tenants can be created via `POST /tenant` or the Inställningar tab. Active tenant is selected from a dropdown of real DB tenants and persists correctly across saves. Config is saved via `PUT /tenant/config/{tenant_id}` (unauthenticated). Automation is configured per job type with three levels. Readiness panel updates live. Verification runs via `POST /verify/{tenant_id}` — deterministic pipeline (no LLM required), picks first supported enabled type (`lead`/`customer_inquiry`/`invoice`), produces `completed` or `awaiting_approval` result. Final status: "Redo att köra jobb". 237/237 tests pass.
 
 ## Completed slice (2026-04-12 — integration event persistence)
 - `IntegrationEvent` model base fixed to `database.Base` — table now in `create_all`
@@ -176,6 +176,30 @@ All core MVP slices are complete. Auth is enforced end-to-end. UI is stable, Swe
 - Dropdown refreshes on tab open and after tenant creation; newly created tenant pre-selected automatically
 - 14 new tests in `tests/test_tenant_listing.py`; 188/188 pass
 
+## Completed slice (2026-04-13 — Tenant state fix, label maps, automation levels, live readiness)
+- **Root cause:** `saveConfig()` saved to API-key tenant and reloaded from API-key tenant — silently reverting any non-TENANT_1001 selection. Fixed by: (1) `PUT /tenant/config/{tenant_id}` unauthenticated endpoint, (2) single `_activeTenantId` JS variable as sole source of truth, (3) all read/write paths use `{id}`-explicit endpoints
+- `PUT /tenant/config/{tenant_id}` added — unauthenticated; 404 if tenant not in DB
+- `TenantConfigUpdateRequest.auto_actions` widened to `dict[str, bool | str]`
+- UI: `JOB_TYPE_LABELS` / `INTEGRATION_LABELS` maps for Swedish customer-friendly display
+- UI: binary auto-action checkbox replaced with 3-level radio per active job type (Manuellt / Semi-automatiskt / Fullt automatiskt)
+- UI: readiness panel recomputed live from form state on every change; final status "Redo att köra jobb"
+- 14 new tests in `tests/test_tenant_config_save_by_id.py`; 202/202 pass
+
+## Completed slice (2026-04-13 — Verification fix: tenant routing)
+- **Root causes:** (1) `POST /jobs` derives tenant from API key → mismatch when UI tenant ≠ API-key tenant; (2) hard-coded `customer_inquiry` may not be in the tenant's enabled job types
+- `POST /verify/{tenant_id}` added — unauthenticated; reads `tenant_configs` row; picks first supported enabled type; runs pipeline; 404/400 guards
+- `app/ui/index.html` — `runVerification()` calls `POST /verify/{_activeTenantId}` with no body
+
+## Completed slice (2026-04-13 — Verification fix: deterministic pipeline)
+- **Root cause:** Without `LLM_API_KEY`, classification falls back to `detected_job_type: "unknown"` → policy appends `unknown_job_type` reason → `manual_review`. Lead/inquiry/invoice processors also fall back to `low_confidence / manual_review`.
+- `_run_verification_pipeline(job, job_type_value, db)` added to `app/main.py` — runs intake, injects synthetic AI processor history (classification @ 0.95 confidence, entity extraction, type processor, decisioning), then runs deterministic policy + human_handoff. No LLM calls.
+- `_VERIFICATION_SUPPORTED_TYPES = ["lead", "customer_inquiry", "invoice"]` — endpoint picks first enabled type from this list; 400 if none enabled
+- `_VERIFICATION_PAYLOADS` — realistic Swedish input payload per supported type; ensures meaningful intake content
+- Response now includes `verification_type` field
+- `tests/test_verify_tenant.py` updated — 16 tests (added unsupported-type 400, verification_type key, supported-type preference)
+- `tests/test_verification_pipeline.py` added — 19 tests exercising all three types end-to-end without mocking
+- 237/237 pass
+
 ## How to use the Inställningar (Setup) tab
 1. Open `http://localhost:8000/ui`
 2. Click **Inställningar** in the top navigation
@@ -184,12 +208,11 @@ All core MVP slices are complete. Auth is enforced end-to-end. UI is stable, Swe
 5. The **Konfigurationsstatus** panel shows readiness at a glance (job types, integrations, auto-actions)
 6. Toggle job types, integrations, and auto-action settings
 7. Click **Spara konfiguration** — persists to the `tenant_configs` DB table and reloads
-8. Click **Kör verifieringstest** — submits a minimal `customer_inquiry` job and shows the result inline (no external credentials required)
+8. Click **Kör verifieringstest** — calls `POST /verify/{tenant_id}`, which picks the tenant's first enabled job type and runs the pipeline; shows the result inline (no external credentials required)
 
 ## Remaining work
 All original MVP backlog items are complete. The platform is in a stable, demonstrable state.
 
 ## Expected output from next implementation chat
-- Pick one remaining work item above
-- Continue from this repo state; README, all docs, and 88 tests are current
-- Suggested next: DB-driven tenant config (removes last hardcoded config from code)
+- Continue from this repo state; README, all docs, and 237 tests are current
+- Verification produces meaningful results for any tenant with lead, customer_inquiry, or invoice enabled

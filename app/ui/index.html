@@ -206,7 +206,6 @@ pre {
   background: #f0f2f5;
   display: none;
 }
-.setup-row { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; max-width: 760px; margin-bottom: 0; }
 .setup-card {
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -248,13 +247,36 @@ pre {
   gap: 6px;
   font-size: 13px;
   cursor: pointer;
-  min-width: 180px;
+  min-width: 200px;
   padding: 3px 0;
 }
 .check-grid input[type=checkbox] { cursor: pointer; accent-color: #1d4ed8; }
-.toggle-grid { display: flex; flex-direction: column; gap: 8px; }
-.toggle-row  { display: flex; align-items: center; gap: 10px; font-size: 13px; }
-.toggle-row input[type=checkbox] { cursor: pointer; accent-color: #1d4ed8; }
+
+/* ── Automation level grid ── */
+.auto-grid { display: flex; flex-direction: column; gap: 10px; }
+.auto-row  { display: flex; align-items: center; gap: 0; border: 1px solid #e5e7eb; border-radius: 4px; overflow: hidden; }
+.auto-row-label { font-size: 13px; min-width: 200px; padding: 6px 10px; background: #f9fafb; border-right: 1px solid #e5e7eb; color: #374151; }
+.auto-options { display: flex; flex: 1; }
+.auto-option { flex: 1; }
+.auto-option input[type=radio] { display: none; }
+.auto-option label {
+  display: block;
+  text-align: center;
+  padding: 6px 4px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #6b7280;
+  border-right: 1px solid #e5e7eb;
+  transition: background 0.1s, color 0.1s;
+}
+.auto-option:last-child label { border-right: none; }
+.auto-option input[type=radio]:checked + label {
+  background: #1d4ed8;
+  color: #fff;
+  font-weight: bold;
+}
+.auto-option label:hover { background: #f0f6ff; color: #1d4ed8; }
+.auto-option input[type=radio]:checked + label:hover { background: #1d4ed8; color: #fff; }
 
 /* ── Inline form row ── */
 .form-inline { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
@@ -309,7 +331,7 @@ pre {
   padding: 5px 9px;
   border: 1px solid #d1d5db;
   border-radius: 3px;
-  min-width: 240px;
+  min-width: 260px;
   color: #111;
   background: #fff;
   cursor: pointer;
@@ -418,21 +440,22 @@ pre {
 
   <!-- Aktiva jobbtyper -->
   <div class="setup-card">
-    <h2>Aktiva jobbtyper</h2>
+    <h2>Aktiva arbetsflöden</h2>
     <div class="check-grid" id="setupJobTypes"><span class="empty">Laddar…</span></div>
   </div>
 
   <!-- Tillåtna integrationer -->
   <div class="setup-card">
-    <h2>Tillåtna integrationer</h2>
+    <h2>Anslutna system</h2>
+    <p class="hint">Välj vilka system denna kundmiljö får använda när integrationen är ansluten.</p>
     <div class="check-grid" id="setupIntegrations"><span class="empty">Laddar…</span></div>
   </div>
 
-  <!-- Autoåtgärder -->
+  <!-- Automationsnivå -->
   <div class="setup-card">
-    <h2>Autoåtgärder</h2>
-    <p class="hint">Utför åtgärder automatiskt utan manuellt godkännande, per aktiv jobbtyp.</p>
-    <div class="toggle-grid" id="setupAutoActions"><span class="empty">Laddar…</span></div>
+    <h2>Automationsnivå</h2>
+    <p class="hint">Välj hur långt systemet får gå för varje arbetsflöde.</p>
+    <div class="auto-grid" id="setupAutoActions"><span class="empty">Laddar…</span></div>
   </div>
 
   <!-- Spara-knapp -->
@@ -459,10 +482,61 @@ pre {
 
 <script>
 // ---------------------------------------------------------------------------
-// State
+// Label maps — presentationslager (ändrar inte backend-nycklar)
 // ---------------------------------------------------------------------------
-let selectedJobId  = null;
-let _verifyTenantId = null;
+const JOB_TYPE_LABELS = {
+  lead:                 'Nya leads',
+  invoice:              'Fakturor',
+  customer_inquiry:     'Kundförfrågningar',
+  lead_qualification:   'Kvalificering av leads',
+  quote:                'Offerter',
+  sales_followup:       'Säljuppföljning',
+  crm_update:           'Uppdatera kundsystem',
+  opportunity_summary:  'Affärsmöjligheter',
+  support_triage:       'Sortering av supportärenden',
+  response_draft:       'Svarsutkast',
+  escalation:           'Eskaleringar',
+  case_summary:         'Ärendesammanfattning',
+  sla_monitoring:       'Bevakning av svarstid',
+  payment_followup:     'Betalningsuppföljning',
+  finance_summary:      'Ekonomisk sammanfattning',
+  receipt:              'Kvitton',
+  anomaly:              'Avvikelser',
+  kpi:                  'Nyckeltal',
+  exec_summary:         'Ledningssammanfattning',
+  risk:                 'Riskbedömning',
+  decision_support:     'Beslutsunderlag',
+  report:               'Rapportering',
+};
+
+const INTEGRATION_LABELS = {
+  google_mail:          'Gmail',
+  google_calendar:      'Google Kalender',
+  microsoft_mail:       'Outlook e-post',
+  microsoft_calendar:   'Outlook Kalender',
+  crm:                  'CRM-system',
+  accounting:           'Ekonomisystem',
+  support:              'Supportsystem',
+  slack:                'Slack',
+  monday:               'Monday.com',
+  fortnox:              'Fortnox',
+  visma:                'Visma',
+};
+
+const AUTO_LEVELS = [
+  { value: 'manual', label: 'Manuellt godkännande' },
+  { value: 'semi',   label: 'Semi-automatiskt' },
+  { value: 'auto',   label: 'Fullt automatiskt' },
+];
+
+function jobLabel(key)   { return JOB_TYPE_LABELS[key]   || key; }
+function intLabel(key)   { return INTEGRATION_LABELS[key] || key; }
+
+// ---------------------------------------------------------------------------
+// State — single source of truth for active tenant
+// ---------------------------------------------------------------------------
+let selectedJobId   = null;
+let _activeTenantId = null;   // the tenant whose config is currently loaded
 
 const LS_KEY = 'ui_api_key';
 
@@ -767,20 +841,6 @@ const ALL_INTEGRATIONS = [
 ];
 
 // ---------------------------------------------------------------------------
-// Inställningar — ladda (GET /tenant)
-// ---------------------------------------------------------------------------
-async function loadSetup() {
-  setMsg('msgSetup', '');
-  await loadTenants();
-  try {
-    const cfg = await apiFetch('/tenant');
-    renderSetup(cfg);
-  } catch (e) {
-    setMsg('msgSetup', e.message, true);
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Inställningar — ladda tenantlista
 // ---------------------------------------------------------------------------
 async function loadTenants() {
@@ -788,12 +848,12 @@ async function loadTenants() {
     const data   = await apiFetch('/tenants');
     const items  = data.items || [];
     const select = document.getElementById('switchTenantSelect');
-    const prev   = select.value;
+    const prev   = _activeTenantId || select.value;
     select.innerHTML = '<option value="">— Välj tenant —</option>' +
       items.map(t =>
         `<option value="${escapeHtml(t.tenant_id)}">${escapeHtml(t.tenant_id)}${t.name ? ' — ' + escapeHtml(t.name) : ''}</option>`
       ).join('');
-    // Restore previous selection if still present.
+    // Restore active tenant selection if still in list.
     if (prev && items.some(t => t.tenant_id === prev)) select.value = prev;
   } catch (_) {
     // Non-fatal: switcher remains with placeholder only.
@@ -801,12 +861,39 @@ async function loadTenants() {
 }
 
 // ---------------------------------------------------------------------------
+// Inställningar — ladda config för _activeTenantId (eller API-key tenant)
+// ---------------------------------------------------------------------------
+async function loadSetup() {
+  setMsg('msgSetup', '');
+  await loadTenants();
+  try {
+    let cfg;
+    if (_activeTenantId) {
+      cfg = await apiFetch(`/tenant/config/${encodeURIComponent(_activeTenantId)}`);
+    } else {
+      // Initial load: use API-key tenant, then lock _activeTenantId to it.
+      cfg = await apiFetch('/tenant');
+      _activeTenantId = cfg.current_tenant || null;
+      // Sync dropdown to API-key tenant if it exists there.
+      const select = document.getElementById('switchTenantSelect');
+      if (_activeTenantId && select) {
+        const opt = select.querySelector(`option[value="${CSS.escape(_activeTenantId)}"]`);
+        if (opt) select.value = _activeTenantId;
+      }
+    }
+    renderSetup(cfg);
+  } catch (e) {
+    setMsg('msgSetup', e.message, true);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Inställningar — byt tenant
 // ---------------------------------------------------------------------------
 async function switchTenant() {
-  const select  = document.getElementById('switchTenantSelect');
+  const select   = document.getElementById('switchTenantSelect');
   const tenantId = select.value;
-  const msgEl   = document.getElementById('tsSwitchMsg');
+  const msgEl    = document.getElementById('tsSwitchMsg');
   msgEl.textContent = '';
   msgEl.style.color = '#6b7280';
 
@@ -819,6 +906,7 @@ async function switchTenant() {
   setMsg('msgSetup', '');
   try {
     const cfg = await apiFetch(`/tenant/config/${encodeURIComponent(tenantId)}`);
+    _activeTenantId = tenantId;
     renderSetup(cfg);
     msgEl.style.color = '#15803d';
     msgEl.textContent = `Tenant '${escapeHtml(tenantId)}' laddad.`;
@@ -830,26 +918,48 @@ async function switchTenant() {
 }
 
 // ---------------------------------------------------------------------------
-// Konfigurationsstatus (readiness)
+// Konfigurationsstatus (readiness) — läser aktuell formulärstate
 // ---------------------------------------------------------------------------
-function renderReadiness(cfg) {
-  const enabledJobTypes     = cfg.enabled_job_types || [];
-  const allowedIntegrations = cfg.allowed_integrations || [];
-  const autoActions         = cfg.auto_actions || {};
+function computeReadiness() {
+  const enabledJobTypes = ALL_JOB_TYPES.filter(jt => {
+    const el = document.getElementById(`jt_${jt}`);
+    return el && el.checked;
+  });
+  const allowedIntegrations = ALL_INTEGRATIONS.filter(it => {
+    const el = document.getElementById(`int_${it}`);
+    return el && el.checked;
+  });
+  // Automation configured = every enabled job type has a non-manual selection,
+  // or at least one has any selection set.
+  const autoConfigured = enabledJobTypes.length > 0 && enabledJobTypes.every(jt => {
+    const sel = getAutoLevel(jt);
+    return sel !== null; // any level counts as configured
+  });
 
-  const tenantLoaded    = !!(cfg.current_tenant);
-  const hasJobTypes     = enabledJobTypes.length > 0;
-  const hasIntegrations = allowedIntegrations.length > 0;
-  const hasAutoActions  = Object.values(autoActions).some(v => v === true);
+  return {
+    tenantLoaded:    !!_activeTenantId,
+    hasJobTypes:     enabledJobTypes.length > 0,
+    hasIntegrations: allowedIntegrations.length > 0,
+    autoConfigured,
+  };
+}
+
+function renderReadiness(cfg) {
+  // If a cfg object is passed (from server), seed the readiness from it
+  // but always re-read the form for live updates.
+  const r = computeReadiness();
+
+  // Override tenantLoaded from cfg if provided (before form exists).
+  const tenantLoaded = cfg ? !!(cfg.current_tenant) : r.tenantLoaded;
 
   const checks = [
-    { ok: tenantLoaded,    label: 'Tenant inläst' },
-    { ok: hasJobTypes,     label: 'Minst en jobbtyp aktiverad' },
-    { ok: hasIntegrations, label: 'Minst en integration tillåten' },
-    { ok: hasAutoActions,  label: 'Autoåtgärder konfigurerade', warn: true },
+    { ok: tenantLoaded,      label: 'Tenant inläst' },
+    { ok: r.hasJobTypes,     label: 'Minst ett arbetsflöde aktiverat' },
+    { ok: r.hasIntegrations, label: 'Minst ett system anslutet' },
+    { ok: r.autoConfigured,  label: 'Automationsnivå konfigurerad', warn: !r.hasJobTypes },
   ];
 
-  const ready = tenantLoaded && hasJobTypes && hasIntegrations;
+  const ready = tenantLoaded && r.hasJobTypes && r.hasIntegrations && r.autoConfigured;
 
   const rows = checks.map(c => {
     let cls, icon;
@@ -860,64 +970,100 @@ function renderReadiness(cfg) {
   }).join('');
 
   const overallCls  = ready ? 'r-ok'  : 'r-fail';
-  const overallText = ready ? '✅ Redo' : '❌ Inte redo';
+  const overallText = ready ? '✅ Redo att köra jobb' : '❌ Inte redo';
 
   const el = document.getElementById('setupReadiness');
   el.style.display = '';
   el.innerHTML = `<h2>Konfigurationsstatus</h2>${rows}<div class="readiness-overall ${overallCls}">${overallText}</div>`;
 }
 
+// Live update — called by all form onchange handlers.
+function refreshReadiness() {
+  renderReadiness(null);
+}
+
+// ---------------------------------------------------------------------------
+// Automationsnivå helpers
+// ---------------------------------------------------------------------------
+function getAutoLevel(jt) {
+  for (const lvl of AUTO_LEVELS) {
+    const el = document.getElementById(`al_${jt}_${lvl.value}`);
+    if (el && el.checked) return lvl.value;
+  }
+  return null;
+}
+
+function autoLevelFromConfig(autoActions, jt) {
+  const v = autoActions[jt];
+  if (v === true  || v === 'auto')   return 'auto';
+  if (v === 'semi')                  return 'semi';
+  return 'manual'; // false, 'manual', undefined → manual
+}
+
 // ---------------------------------------------------------------------------
 // Rendera inställningar
 // ---------------------------------------------------------------------------
 function renderSetup(cfg) {
-  _verifyTenantId = cfg.current_tenant || null;
-
+  // cfg.current_tenant is the source of truth here; _activeTenantId already set by caller.
   const enabledJobTypes     = new Set(cfg.enabled_job_types || []);
   const allowedIntegrations = new Set(cfg.allowed_integrations || []);
   const autoActions         = cfg.auto_actions || {};
 
-  renderReadiness(cfg);
-
-  // Aktiv tenant
+  // Aktiv tenant info
   document.getElementById('setupTenantInfo').innerHTML =
     `<strong>${escapeHtml(cfg.current_tenant || '—')}</strong>` +
     (cfg.name ? ` &nbsp;&mdash;&nbsp; ${escapeHtml(cfg.name)}` : '');
 
-  // Jobbtyper
+  // Jobbtyper med svenska etiketter
   document.getElementById('setupJobTypes').innerHTML = ALL_JOB_TYPES.map(jt =>
     `<label>
       <input type="checkbox" id="jt_${jt}" value="${jt}"
-        ${enabledJobTypes.has(jt) ? 'checked' : ''} onchange="refreshAutoActions()">
-      ${escapeHtml(jt)}
+        ${enabledJobTypes.has(jt) ? 'checked' : ''}
+        onchange="refreshAutoActions(); refreshReadiness();">
+      ${escapeHtml(jobLabel(jt))}
     </label>`
   ).join('');
 
-  // Integrationer
+  // Integrationer med svenska etiketter
   document.getElementById('setupIntegrations').innerHTML = ALL_INTEGRATIONS.map(it =>
     `<label>
-      <input type="checkbox" id="int_${it}" value="${it}" ${allowedIntegrations.has(it) ? 'checked' : ''}>
-      ${escapeHtml(it)}
+      <input type="checkbox" id="int_${it}" value="${it}"
+        ${allowedIntegrations.has(it) ? 'checked' : ''}
+        onchange="refreshReadiness();">
+      ${escapeHtml(intLabel(it))}
     </label>`
   ).join('');
 
-  // Autoåtgärder
+  // Automationsnivå — renderAutoActions läser enabledJobTypes + autoActions
   renderAutoActions(enabledJobTypes, autoActions);
+
+  // Readiness från backend-state (initialt)
+  renderReadiness(cfg);
 }
 
 function renderAutoActions(enabledJobTypes, autoActions) {
   const el    = document.getElementById('setupAutoActions');
   const types = [...enabledJobTypes];
   if (!types.length) {
-    el.innerHTML = '<span class="empty">Aktivera jobbtyper ovan för att konfigurera autoåtgärder.</span>';
+    el.innerHTML = '<span class="empty">Aktivera arbetsflöden ovan för att konfigurera automationsnivå.</span>';
     return;
   }
-  el.innerHTML = types.map(jt =>
-    `<div class="toggle-row">
-      <input type="checkbox" id="aa_${jt}" ${autoActions[jt] ? 'checked' : ''}>
-      <label for="aa_${jt}">${escapeHtml(jt)}</label>
-    </div>`
-  ).join('');
+
+  el.innerHTML = types.map(jt => {
+    const current = autoLevelFromConfig(autoActions, jt);
+    const options = AUTO_LEVELS.map(lvl =>
+      `<div class="auto-option">
+        <input type="radio" id="al_${jt}_${lvl.value}" name="al_${jt}" value="${lvl.value}"
+          ${current === lvl.value ? 'checked' : ''}
+          onchange="refreshReadiness();">
+        <label for="al_${jt}_${lvl.value}">${escapeHtml(lvl.label)}</label>
+      </div>`
+    ).join('');
+    return `<div class="auto-row">
+      <span class="auto-row-label">${escapeHtml(jobLabel(jt))}</span>
+      <div class="auto-options">${options}</div>
+    </div>`;
+  }).join('');
 }
 
 function refreshAutoActions() {
@@ -927,10 +1073,11 @@ function refreshAutoActions() {
       return el && el.checked;
     })
   );
+  // Preserve existing automation level selections where possible.
   const current = {};
   ALL_JOB_TYPES.forEach(jt => {
-    const el = document.getElementById(`aa_${jt}`);
-    if (el) current[jt] = el.checked;
+    const lvl = getAutoLevel(jt);
+    if (lvl !== null) current[jt] = lvl;
   });
   renderAutoActions(enabled, current);
 }
@@ -954,17 +1101,20 @@ async function createTenant() {
   try {
     await apiFetch('/tenant', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tenant_id, name }),
     });
     document.getElementById('newTenantId').value   = '';
     document.getElementById('newTenantName').value = '';
     msgEl.style.color = '#15803d';
     msgEl.textContent = `Tenant '${tenant_id}' skapad.`;
+    // Set active tenant to the newly created one, then refresh list and config.
+    _activeTenantId = tenant_id;
     await loadTenants();
-    // Pre-select the newly created tenant in the dropdown.
+    // Select the new tenant in dropdown.
     document.getElementById('switchTenantSelect').value = tenant_id;
-    await loadSetup();
+    // Load its config (empty initially).
+    const cfg = await apiFetch(`/tenant/config/${encodeURIComponent(tenant_id)}`);
+    renderSetup(cfg);
   } catch (e) {
     msgEl.style.color = '#b91c1c';
     msgEl.textContent = e.message;
@@ -975,6 +1125,11 @@ async function createTenant() {
 // Spara konfiguration
 // ---------------------------------------------------------------------------
 async function saveConfig() {
+  if (!_activeTenantId) {
+    setMsg('msgSetup', 'Ingen aktiv tenant. Välj en tenant i rullgardinsmenyn.', true);
+    return;
+  }
+
   setMsg('msgSetup', '');
   spin('spinSetup', true);
 
@@ -988,19 +1143,25 @@ async function saveConfig() {
     return el && el.checked;
   });
 
+  // Collect automation levels — stored as string values ('manual'/'semi'/'auto').
   const auto_actions = {};
   ALL_JOB_TYPES.forEach(jt => {
-    const el = document.getElementById(`aa_${jt}`);
-    if (el) auto_actions[jt] = el.checked;
+    const lvl = getAutoLevel(jt);
+    if (lvl !== null) auto_actions[jt] = lvl;
   });
 
   try {
-    await apiFetch('/tenant/config', {
+    // Always save to the explicit tenant ID — never relies on API-key tenant derivation.
+    await apiFetch(`/tenant/config/${encodeURIComponent(_activeTenantId)}`, {
       method: 'PUT',
       body: JSON.stringify({ enabled_job_types, allowed_integrations, auto_actions }),
     });
     setMsg('msgSetup', 'Konfigurationen sparad.', false);
-    await loadSetup();
+    // Reload config for the same tenant — _activeTenantId must not change.
+    const cfg = await apiFetch(`/tenant/config/${encodeURIComponent(_activeTenantId)}`);
+    renderSetup(cfg);
+    // Ensure dropdown stays on the correct tenant after reload.
+    document.getElementById('switchTenantSelect').value = _activeTenantId;
   } catch (e) {
     setMsg('msgSetup', e.message, true);
   } finally {
@@ -1017,29 +1178,17 @@ async function runVerification() {
   spin('spinVerify', true);
   document.getElementById('btnRunVerify').disabled = true;
 
-  const tenant_id = _verifyTenantId;
+  const tenant_id = _activeTenantId;
   if (!tenant_id) {
-    resultEl.innerHTML = '<div class="msg msg-error">Ingen aktiv tenant. Öppna Inställningar-fliken först.</div>';
+    resultEl.innerHTML = '<div class="msg msg-error">Ingen aktiv tenant. Öppna Inställningar-fliken och välj en tenant.</div>';
     spin('spinVerify', false);
     document.getElementById('btnRunVerify').disabled = false;
     return;
   }
 
-  const payload = {
-    tenant_id,
-    job_type: 'customer_inquiry',
-    input_data: {
-      subject: 'Verifieringstest',
-      message_text: 'Detta är ett automatiskt verifieringsjobb skickat från operatörsgränssnittet.',
-      sender: { name: 'Verifiering', email: 'verify@test.internal', phone: null },
-    },
-  };
-
   try {
-    const job = await apiFetch('/jobs', {
+    const job = await apiFetch(`/verify/${encodeURIComponent(tenant_id)}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
     });
 
     const statusColor = job.status === 'completed' ? '#15803d'

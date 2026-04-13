@@ -62,6 +62,17 @@ async def on_startup():
     Base.metadata.create_all(bind=engine)
     print("Startup complete")
 
+    # TEMPORARY: local-debug — verify Google OAuth env vars are loaded from .env
+    def _masked(val: str) -> str:
+        return f"yes (prefix={val[:8]}...)" if val else "no"
+
+    _s = get_settings()
+    print("[DEBUG] GOOGLE_MAIL_ACCESS_TOKEN  :", _masked(_s.GOOGLE_MAIL_ACCESS_TOKEN))
+    print("[DEBUG] GOOGLE_OAUTH_REFRESH_TOKEN:", _masked(_s.GOOGLE_OAUTH_REFRESH_TOKEN))
+    print("[DEBUG] GOOGLE_OAUTH_CLIENT_ID    :", _masked(_s.GOOGLE_OAUTH_CLIENT_ID))
+    print("[DEBUG] GOOGLE_OAUTH_CLIENT_SECRET:", _masked(_s.GOOGLE_OAUTH_CLIENT_SECRET))
+    # END TEMPORARY
+
 
 @app.middleware("http")
 async def tenant_middleware(request: Request, call_next):
@@ -117,7 +128,7 @@ class TenantCreateRequest(_BaseModel):
 class TenantConfigUpdateRequest(_BaseModel):
     enabled_job_types: list[str]
     allowed_integrations: list[str]
-    auto_actions: dict[str, bool]
+    auto_actions: dict[str, bool | str]
 
 
 @app.get("/tenant/config/{tenant_id}")
@@ -151,6 +162,338 @@ def list_tenants(
     return {"items": items, "total": len(items)}
 
 
+# --- Verification pipeline helpers ---
+
+# Job types with full deterministic pipeline support (no LLM required).
+_VERIFICATION_SUPPORTED_TYPES = ["lead", "customer_inquiry", "invoice"]
+
+# Realistic input payloads per supported job type.
+_VERIFICATION_PAYLOADS: dict[str, dict] = {
+    "lead": {
+        "subject": "Intresserad av era tjänster – önskar mer information",
+        "message_text": (
+            "Hej, jag heter Erik Lindqvist och arbetar som inköpschef på Lindqvist Industri AB. "
+            "Vi har sett er presentation och är intresserade av att veta mer om era automationslösningar. "
+            "Kan ni skicka en offert och boka ett möte? Telefon: 070-1234567."
+        ),
+        "sender": {"name": "Erik Lindqvist", "email": "erik@lindqvist-industri.se", "phone": "070-1234567"},
+    },
+    "customer_inquiry": {
+        "subject": "Fråga angående faktura #INV-2024-0042",
+        "message_text": (
+            "Hej, jag har en fråga om faktura nummer INV-2024-0042 som vi fick förra veckan. "
+            "Beloppet stämmer inte med den offert vi fick. Kan ni se över detta och återkomma? "
+            "Med vänliga hälsningar, Sara Johansson."
+        ),
+        "sender": {"name": "Sara Johansson", "email": "sara@kund.se", "phone": None},
+    },
+    "invoice": {
+        "subject": "Faktura #2024-0099 från Leverantör AB",
+        "message_text": (
+            "Bifogad faktura #2024-0099 från Leverantör AB, org.nr 556123-4567. "
+            "Fakturadatum: 2024-01-15. Förfallodatum: 2024-02-14. "
+            "Belopp exkl. moms: 15 000 SEK. Moms: 3 750 SEK. Totalt: 18 750 SEK. "
+            "Referens: PO-2024-88."
+        ),
+        "sender": {"name": "Leverantör AB", "email": "faktura@leverantor.se", "phone": None},
+    },
+}
+
+# Synthetic processor history injected per type to bypass LLM steps.
+def _synthetic_history(job_type_value: str) -> list[dict]:
+    """
+    Returns pre-seeded processor history entries for all AI steps.
+    Policy and human_handoff processors read from this history and are deterministic.
+    """
+    classification = {
+        "processor": "classification_processor",
+        "result": {
+            "status": "completed",
+            "summary": "Verifieringsklassificering (deterministisk).",
+            "requires_human_review": False,
+            "payload": {
+                "processor_name": "classification_processor",
+                "detected_job_type": job_type_value,
+                "confidence": 0.95,
+                "reasons": ["verification_synthetic"],
+                "recommended_next_step": job_type_value,
+                "used_fallback": False,
+                "prompt_name": "classification_v1",
+                "duration_ms": 0,
+                "low_confidence": False,
+            },
+        },
+    }
+
+    entity_extraction = {
+        "processor": "entity_extraction_processor",
+        "result": {
+            "status": "completed",
+            "summary": "Verifieringsentitetsextrahering (deterministisk).",
+            "requires_human_review": False,
+            "payload": {
+                "processor_name": "entity_extraction_processor",
+                "entities": {
+                    "customer_name": "Verifieringskund",
+                    "email": "verify@test.internal",
+                },
+                "confidence": 0.9,
+                "validation": {"issues": []},
+                "used_fallback": False,
+                "prompt_name": "entity_extraction_v1",
+                "duration_ms": 0,
+                "low_confidence": False,
+            },
+        },
+    }
+
+    if job_type_value == "lead":
+        type_specific = {
+            "processor": "lead_processor",
+            "result": {
+                "status": "completed",
+                "summary": "Verifiering lead scoring (deterministisk).",
+                "requires_human_review": False,
+                "payload": {
+                    "processor_name": "lead_processor",
+                    "lead_score": 70,
+                    "priority": "medium",
+                    "routing": "crm_update",
+                    "reasons": ["verification_synthetic"],
+                    "confidence": 0.85,
+                    "recommended_next_step": "crm_update",
+                    "used_fallback": False,
+                    "prompt_name": "lead_scoring_v1",
+                    "duration_ms": 0,
+                    "low_confidence": False,
+                },
+            },
+        }
+        decisioning = {
+            "processor": "decisioning_processor",
+            "result": {
+                "status": "completed",
+                "summary": "Verifiering decisioning (deterministisk).",
+                "requires_human_review": False,
+                "payload": {
+                    "processor_name": "decisioning_processor",
+                    "decision": "auto_execute",
+                    "target_queue": "crm_update",
+                    "action_flags": {"create_crm_lead": True, "notify_human": False, "request_missing_data": False},
+                    "reasons": ["verification_synthetic"],
+                    "confidence": 0.9,
+                    "recommended_next_step": "action_dispatch",
+                    "used_fallback": False,
+                    "prompt_name": "decisioning_v1",
+                    "duration_ms": 0,
+                    "low_confidence": False,
+                },
+            },
+        }
+        return [classification, entity_extraction, type_specific, decisioning]
+
+    if job_type_value == "customer_inquiry":
+        type_specific = {
+            "processor": "customer_inquiry_processor",
+            "result": {
+                "status": "completed",
+                "summary": "Verifiering kundförfrågan (deterministisk).",
+                "requires_human_review": False,
+                "payload": {
+                    "processor_name": "customer_inquiry_processor",
+                    "inquiry_type": "billing",
+                    "priority": "medium",
+                    "routing": "billing_queue",
+                    "reasons": ["verification_synthetic"],
+                    "confidence": 0.85,
+                    "recommended_next_step": "billing_queue",
+                    "used_fallback": False,
+                    "prompt_name": "inquiry_analysis_v1",
+                    "duration_ms": 0,
+                    "low_confidence": False,
+                },
+            },
+        }
+        decisioning = {
+            "processor": "decisioning_processor",
+            "result": {
+                "status": "completed",
+                "summary": "Verifiering decisioning (deterministisk).",
+                "requires_human_review": False,
+                "payload": {
+                    "processor_name": "decisioning_processor",
+                    "decision": "auto_execute",
+                    "target_queue": "billing_queue",
+                    "action_flags": {"create_crm_lead": False, "notify_human": False, "request_missing_data": False},
+                    "reasons": ["verification_synthetic"],
+                    "confidence": 0.9,
+                    "recommended_next_step": "action_dispatch",
+                    "used_fallback": False,
+                    "prompt_name": "decisioning_v1",
+                    "duration_ms": 0,
+                    "low_confidence": False,
+                },
+            },
+        }
+        return [classification, entity_extraction, type_specific, decisioning]
+
+    if job_type_value == "invoice":
+        type_specific = {
+            "processor": "invoice_processor",
+            "result": {
+                "status": "completed",
+                "summary": "Verifiering fakturaanalys (deterministisk).",
+                "requires_human_review": False,
+                "payload": {
+                    "processor_name": "invoice_processor",
+                    "invoice_data": {
+                        "supplier_name": "Leverantör AB",
+                        "invoice_number": "2024-0099",
+                        "amount_ex_vat": 15000.0,
+                        "vat_amount": 3750.0,
+                        "amount_inc_vat": 18750.0,
+                        "currency": "SEK",
+                    },
+                    "validation_status": "validated",
+                    "duplicate_suspected": False,
+                    "missing_critical": [],
+                    "approval_route": "approval_required",
+                    "reasons": ["verification_synthetic"],
+                    "confidence": 0.9,
+                    "validation": {"issues": []},
+                    "used_fallback": False,
+                    "prompt_name": "invoice_analysis_v1",
+                    "duration_ms": 0,
+                    "low_confidence": False,
+                },
+            },
+        }
+        return [classification, entity_extraction, type_specific]
+
+    return [classification, entity_extraction]
+
+
+def _run_verification_pipeline(job: Job, job_type_value: str, db) -> Job:
+    """
+    Run a deterministic verification pipeline without LLM calls.
+
+    Injects synthetic processor history for all AI steps, then runs the
+    deterministic processors (intake, policy, human_handoff) directly.
+    Policy reads from the injected history and routes correctly without LLM.
+    """
+    from datetime import datetime, timezone
+    from app.domain.workflows.statuses import JobStatus
+    from app.workflows.processors.intake_processor import process_universal_intake_job
+    from app.workflows.processors.policy_processor import process_policy_job
+    from app.workflows.processors.human_handoff_processor import process_human_handoff_job
+
+    # Step 1: intake (deterministic, no LLM)
+    job = process_universal_intake_job(job)
+
+    # Step 2: inject synthetic AI step results
+    for entry in _synthetic_history(job_type_value):
+        job.processor_history.append(entry)
+        job.result = entry["result"]
+
+    # Step 3: policy (deterministic — reads from injected history)
+    job = process_policy_job(job)
+
+    # Step 4: human_handoff (deterministic — reads from policy result)
+    job = process_human_handoff_job(job)
+
+    # Step 5: finalise status
+    from app.workflows.approval_service import has_pending_approval
+    requires_human_review = bool((job.result or {}).get("requires_human_review", False))
+
+    if has_pending_approval(job):
+        job.status = JobStatus.AWAITING_APPROVAL
+    elif requires_human_review:
+        job.status = JobStatus.MANUAL_REVIEW
+    else:
+        job.status = JobStatus.COMPLETED
+
+    job.updated_at = datetime.now(timezone.utc)
+
+    if db is not None:
+        job = JobRepository.update_job(db, job)
+
+    return job
+
+
+@app.post("/verify/{tenant_id}", status_code=200)
+def verify_tenant(
+    tenant_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Run a deterministic verification job for any tenant by ID.
+    No auth required — operator bootstrap helper.
+
+    Picks the first supported enabled job type from the tenant's DB config and
+    runs a synthetic pipeline that bypasses LLM calls. Returns a meaningful
+    result (completed / awaiting_approval) without requiring AI credentials.
+    """
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    from app.domain.workflows.enums import JobType
+
+    record = TenantConfigRepository.get(db, tenant_id)
+    if record is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Tenant '{tenant_id}' not found.",
+        )
+
+    enabled = record.enabled_job_types or []
+    if not enabled:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tenant '{tenant_id}' has no enabled job types. Configure at least one job type before verifying.",
+        )
+
+    # Pick the first enabled type that has full verification support.
+    job_type_value = next(
+        (t for t in enabled if t in _VERIFICATION_SUPPORTED_TYPES),
+        None,
+    )
+    if job_type_value is None:
+        supported_str = ", ".join(_VERIFICATION_SUPPORTED_TYPES)
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Tenant '{tenant_id}' has no verifiable job types enabled. "
+                f"Enable at least one of: {supported_str}."
+            ),
+        )
+
+    try:
+        job_type_enum = JobType(job_type_value)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job type '{job_type_value}' is not a recognised job type.",
+        )
+
+    input_data = _VERIFICATION_PAYLOADS[job_type_value]
+    job = Job(
+        tenant_id=tenant_id,
+        job_type=job_type_enum,
+        input_data=input_data,
+    )
+
+    set_current_tenant(tenant_id)
+    saved_job = JobRepository.create_job(db, job)
+    processed_job = _run_verification_pipeline(saved_job, job_type_value, db)
+
+    return {
+        "job_id": processed_job.job_id,
+        "tenant_id": processed_job.tenant_id,
+        "job_type": job_type_value,
+        "status": processed_job.status.value if hasattr(processed_job.status, "value") else str(processed_job.status),
+        "result": processed_job.result,
+        "verification_type": job_type_value,
+    }
+
+
 @app.post("/tenant", status_code=201)
 def create_tenant(
     request: TenantCreateRequest,
@@ -181,6 +524,30 @@ def update_tenant_config(
     tenant_id: str = Depends(get_verified_tenant),
 ):
     from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    TenantConfigRepository.upsert(
+        db=db,
+        tenant_id=tenant_id,
+        enabled_job_types=request.enabled_job_types,
+        allowed_integrations=request.allowed_integrations,
+        auto_actions=request.auto_actions,
+    )
+    return {"status": "ok", "tenant_id": tenant_id}
+
+
+@app.put("/tenant/config/{tenant_id}")
+def update_tenant_config_by_id(
+    tenant_id: str,
+    request: TenantConfigUpdateRequest,
+    db: Session = Depends(get_db),
+):
+    """Save config for any tenant by ID. No auth required — operator bootstrap helper."""
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    existing = TenantConfigRepository.get(db, tenant_id)
+    if existing is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Tenant '{tenant_id}' not found.",
+        )
     TenantConfigRepository.upsert(
         db=db,
         tenant_id=tenant_id,

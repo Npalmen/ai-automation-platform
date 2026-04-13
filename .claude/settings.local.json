@@ -22,7 +22,10 @@
       "Bash(python -m pytest tests/test_tenant_creation.py -v --tb=short)",
       "Bash(python -m pytest tests/test_tenant_config_by_id.py -v --tb=short)",
       "Bash(python -m pytest tests/test_tenant_config_by_id.py::TestGetTenantConfigById::test_empty_config_returns_empty_collections -v --tb=long)",
-      "Bash(python -m pytest tests/test_tenant_listing.py -v --tb=short)"
+      "Bash(python -m pytest tests/test_tenant_listing.py -v --tb=short)",
+      "Bash(python -m pytest tests/test_tenant_config_save_by_id.py -v --tb=short)",
+      "Bash(python -m pytest tests/ -x -q)",
+      "Bash(python -m pytest tests/test_verify_tenant.py -v)"
     ]
   }
 }
