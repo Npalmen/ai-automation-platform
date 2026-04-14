@@ -4,9 +4,8 @@
 AI Automation Platform — multi-tenant backend-first plattform för AI-driven workflow automation.
 
 ## Current objective
-Konsolidera dokumentationen och lås officiell MVP-riktning.
-Nästa tekniska slice är att verifiera ett officiellt end-to-end backend-flöde:
-lead intake → classification → entity extraction → decisioning → policy → approval/resume → Gmail action → audit visibility.
+MVP is complete and stabilized. The platform is in a demonstrable state.
+Pipeline runs end-to-end, verification is deterministic, intake normalization is correct, and docs reflect actual behavior.
 
 ## Read these first
 1. docs/02-mvp-scope.md
@@ -125,7 +124,7 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - 17 new tests; 105/105 pass
 
 ## Current state
-All core MVP slices are complete. Auth is enforced end-to-end. UI is stable, Swedish-localised, and polished. Tenants can be created via `POST /tenant` or the Inställningar tab. Active tenant is selected from a dropdown of real DB tenants and persists correctly across saves. Config is saved via `PUT /tenant/config/{tenant_id}` (unauthenticated). Automation is configured per job type with three levels. Readiness panel updates live. Verification runs via `POST /verify/{tenant_id}` — deterministic pipeline (no LLM required), picks first supported enabled type (`lead`/`customer_inquiry`/`invoice`), produces `completed` or `awaiting_approval` result. Final status: "Redo att köra jobb". 237/237 tests pass.
+MVP is complete and stabilized. Pipeline runs end-to-end with correct intake normalization and entity fallback. Auth is enforced. UI is stable, Swedish-localised, and tenant-aware. Verification is deterministic (no LLM required). `/jobs` input contract is clarified and tested. 263/263 tests pass.
 
 ## Completed slice (2026-04-12 — integration event persistence)
 - `IntegrationEvent` model base fixed to `database.Base` — table now in `create_all`
@@ -210,9 +209,28 @@ All core MVP slices are complete. Auth is enforced end-to-end. UI is stable, Swe
 7. Click **Spara konfiguration** — persists to the `tenant_configs` DB table and reloads
 8. Click **Kör verifieringstest** — calls `POST /verify/{tenant_id}`, which picks the tenant's first enabled job type and runs the pipeline; shows the result inline (no external credentials required)
 
+## Completed slice (2026-04-14 — MVP stabilization & API readiness)
+
+Six fixes applied after live testing revealed integration issues:
+
+1. **Tenant state fix** — `saveConfig()` silently reverted to API-key tenant. Fixed by `PUT /tenant/config/{tenant_id}` (unauthenticated, explicit path) and `_activeTenantId` as single JS source of truth.
+
+2. **Verification redesign** — Old flow used `run_pipeline` → LLM failure → `unknown` / `manual_review`. New `POST /verify/{tenant_id}` runs `_run_verification_pipeline`: deterministic, no LLM, injects synthetic processor history. Returns `completed` or `awaiting_approval` for valid tenants.
+
+3. **Auth header bug** — `apiFetch` calls in `runVerification()` / `createTenant()` passed `headers: { 'Content-Type': ... }` which overwrote `X-API-Key`. Fixed by removing redundant `headers:` key.
+
+4. **`/jobs` input contract clarified** — `input_data` is required as a nested object. Fields at top-level of the request body (outside `input_data`) are not passed to processors. README now includes a WARNING block.
+
+5. **Intake mapping fix** — `intake_processor` now supports flat `sender_name` / `sender_email` / `sender_phone` keys at `input_data` root, in addition to the nested `sender` dict. Normalized into `origin`.
+
+6. **Entity extraction fallback** — When LLM extraction leaves `customer_name` / `email` / `phone` null, they are now filled from normalized intake `origin` (`sender_name` / `sender_email` / `sender_phone`). Prevents false `missing_identity` validation errors.
+
+- 263/263 tests pass
+- README, docs/05-current-state.md, and docs/08-handoff.md updated to reflect real behavior
+
 ## Remaining work
-All original MVP backlog items are complete. The platform is in a stable, demonstrable state.
+All original MVP backlog items are complete.
 
 ## Expected output from next implementation chat
-- Continue from this repo state; README, all docs, and 237 tests are current
-- Verification produces meaningful results for any tenant with lead, customer_inquiry, or invoice enabled
+- Continue from this repo state; all docs and 263 tests are current
+- Platform is stable and ready for first customer onboarding or integration testing

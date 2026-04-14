@@ -2,21 +2,21 @@
 
 Backend-first, multi-tenant platform for AI-driven workflow automation.
 
-Jobs are received, classified, processed through a pipeline, paused for human approval when required, and resumed to execute real integration actions. Everything is auditable.
+Jobs are received, classified, processed through a pipeline, paused for human approval when required, and resumed to execute integration actions. Everything is auditable.
 
 ---
 
 ## Current Status
 
-All core MVP slices are complete and verified:
+MVP is complete and stabilized:
 
 - FastAPI backend with PostgreSQL persistence
 - Multi-tenant with per-tenant API key auth (`X-API-Key`)
-- Workflow orchestrator with AI processors
+- Workflow orchestrator with AI processors and deterministic fallbacks
 - Approval flow (pause / resume)
-- Action dispatch with controlled failure handling
-- Audit logging
-- Thin operator UI at `/ui`
+- Action dispatch with error handling and audit
+- Operator UI at `/ui` (Swedish, tenant-aware)
+- 263 tests passing
 
 See [docs/05-current-state.md](docs/05-current-state.md) for the full status.
 
@@ -27,7 +27,7 @@ See [docs/05-current-state.md](docs/05-current-state.md) for the full status.
 ```
 app/          Core backend (API, workflows, integrations, UI)
 docs/         Source of truth (scope, architecture, decisions, state)
-tests/        Automated test suite (88 tests)
+tests/        Automated test suite
 scripts/      Utility scripts (DB setup, connection check)
 ```
 
@@ -58,13 +58,12 @@ Edit `.env` and set at minimum:
 
 ```
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_platform
-LLM_API_KEY=<your OpenAI key>
 TENANT_API_KEYS={"TENANT_1001": "key-abc123"}
 ```
 
-The LLM key is required for the AI classification and extraction processors.
-`TENANT_API_KEYS` configures per-tenant API key auth (see [Authentication](#authentication) below).
-All other keys (Gmail, Slack, etc.) are optional unless you are testing a specific integration.
+`LLM_API_KEY` is only required if you want live AI classification and extraction. Without it, processors fall back to deterministic defaults — the pipeline still runs.
+
+All other keys (Gmail, Slack, etc.) are optional unless testing a specific integration.
 
 ### 3. Start PostgreSQL
 
@@ -74,11 +73,11 @@ All other keys (Gmail, Slack, etc.) are optional unless you are testing a specif
 docker-compose up -d
 ```
 
-This starts a Postgres 15 instance on port 5432 with user `postgres`, password `postgres`, database `ai_platform`.
+Starts Postgres 15 on port 5432 with user `postgres`, password `postgres`, database `ai_platform`.
 
 **Option B — local Postgres:**
 
-Create a database named `ai_platform` and set the matching `DATABASE_URL` in `.env`.
+Create a database named `ai_platform` and set `DATABASE_URL` in `.env`.
 
 ### 4. Verify the database connection
 
@@ -102,7 +101,7 @@ curl http://localhost:8000/
 # Expected: {"status":"ok","app_name":"AI Automation Platform","env":"dev"}
 ```
 
-Or open the operator UI: **http://localhost:8000/ui**
+Open the operator UI: **http://localhost:8000/ui**
 
 ---
 
@@ -112,13 +111,13 @@ Or open the operator UI: **http://localhost:8000/ui**
 python -m pytest
 ```
 
-Expected: 141 passed.
+Expected: 263 passed.
 
 ---
 
 ## Authentication
 
-Protected endpoints require the `X-API-Key` header. Tenant identity is resolved from the key — the `X-Tenant-ID` header is **ignored** when auth is enabled.
+Protected endpoints require the `X-API-Key` header. Tenant identity is resolved from the key — `X-Tenant-ID` is **ignored** when auth is enabled.
 
 Configure keys in `.env`:
 
@@ -126,24 +125,117 @@ Configure keys in `.env`:
 TENANT_API_KEYS={"TENANT_1001": "key-abc123", "TENANT_2001": "key-def456"}
 ```
 
-**Missing key** → `401 Unauthorized`
-**Invalid key** → `403 Forbidden`
+| Condition | Response |
+|-----------|----------|
+| Missing key | `401 Unauthorized` |
+| Invalid key | `403 Forbidden` |
 
-If `TENANT_API_KEYS` is empty or not set, auth is **disabled** and the `X-Tenant-ID` header is trusted directly. This is acceptable for local development only.
+If `TENANT_API_KEYS` is empty or unset, auth is **disabled** and `X-Tenant-ID` is trusted directly. Acceptable for local development only.
 
-Unprotected endpoints (no key required): `GET /`, `GET /ui`, `GET /processors`
+Unprotected endpoints (no key required): `GET /`, `GET /ui`, `GET /tenants`, `GET /tenant/config/{id}`, `PUT /tenant/config/{id}`, `POST /tenant`, `POST /verify/{id}`
 
 ---
 
-## Official Smoke Test — MVP Flow
+## Calling `/jobs` — Correct Format
 
-This is the golden path for the lead flow with forced approval.
-Run it after a clean local start with `TENANT_API_KEYS` configured.
+> **WARNING:** `input_data` must be a nested object. Fields like `subject` and `message_text` at the top level of the request are ignored — they must be inside `input_data`.
 
-All curl commands assume the server is running at `http://localhost:8000`
-and `TENANT_API_KEYS={"TENANT_1001": "key-abc123"}` is set in `.env`.
+### Required request shape
 
-### Step 1 — Create a job (lead, forced approval)
+```json
+{
+  "tenant_id": "TENANT_2001",
+  "job_type": "customer_inquiry",
+  "input_data": {
+    "subject": "Fråga om offert",
+    "message_text": "Hej, jag vill installera solceller. Kan ni skicka offert?",
+    "sender_name": "Testkund",
+    "sender_email": "test@example.com",
+    "sender_phone": "0701234567"
+  }
+}
+```
+
+### Field notes
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `tenant_id` | Yes | Must match the tenant derived from `X-API-Key` |
+| `job_type` | Yes | Must be enabled for the tenant |
+| `input_data` | Yes | Dict passed through the pipeline |
+| `input_data.subject` | Recommended | Used by classification and entity extraction |
+| `input_data.message_text` | Recommended | Main content for AI processors |
+| `input_data.sender_name` | Recommended | Flat format supported |
+| `input_data.sender_email` | Recommended | Flat format supported |
+| `input_data.sender_phone` | Optional | Flat format supported |
+
+**Sender field formats — both are supported:**
+
+```json
+// Flat (recommended for API callers)
+"input_data": {
+  "sender_name": "Erik Lindqvist",
+  "sender_email": "erik@example.com",
+  "sender_phone": "070-1234567"
+}
+
+// Nested dict (also accepted)
+"input_data": {
+  "sender": {
+    "name": "Erik Lindqvist",
+    "email": "erik@example.com",
+    "phone": "070-1234567"
+  }
+}
+```
+
+Nested dict takes precedence when both are present.
+
+### Supported `job_type` values
+
+| Value | Pipeline |
+|-------|---------|
+| `lead` | intake → classification → entity_extraction → lead → decisioning → policy → action_dispatch → human_handoff |
+| `customer_inquiry` | intake → classification → entity_extraction → customer_inquiry → decisioning → policy → action_dispatch → human_handoff |
+| `invoice` | intake → classification → entity_extraction → invoice → policy → human_handoff |
+
+Only types enabled for the tenant are accepted. A request with a non-enabled type returns `403`.
+
+### Typical responses
+
+| `status` | Meaning |
+|----------|---------|
+| `completed` | Pipeline ran fully; actions executed (or stubbed) |
+| `awaiting_approval` | Policy required human approval; pipeline paused |
+| `manual_review` | Policy routed to manual review (low confidence or validation issue) |
+| `failed` | An action dispatch step failed; error persisted to audit and `action_executions` |
+
+### Example: create a lead job
+
+```bash
+curl -s -X POST http://localhost:8000/jobs \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: key-abc123" \
+  -d '{
+    "tenant_id": "TENANT_1001",
+    "job_type": "lead",
+    "input_data": {
+      "subject": "Intresserad av era tjänster",
+      "message_text": "Hej, vi söker en lösning för att automatisera vår kundhantering. Kan ni kontakta oss?",
+      "sender_name": "Erik Lindqvist",
+      "sender_email": "erik@lindqvist.se",
+      "sender_phone": "070-1234567"
+    }
+  }'
+```
+
+---
+
+## Official Smoke Test — Approval Flow
+
+This is the end-to-end golden path. Run after a clean local start with `TENANT_API_KEYS` configured.
+
+### Step 1 — Create a job with forced approval
 
 ```bash
 curl -s -X POST http://localhost:8000/jobs \
@@ -155,7 +247,8 @@ curl -s -X POST http://localhost:8000/jobs \
     "input_data": {
       "subject": "New lead from website",
       "message_text": "Hi, I am interested in your services.",
-      "owner_email": "owner@example.com",
+      "sender_name": "Test Lead",
+      "sender_email": "lead@example.com",
       "force_approval_test": true
     }
   }'
@@ -163,20 +256,16 @@ curl -s -X POST http://localhost:8000/jobs \
 
 `force_approval_test: true` forces the policy processor to require approval regardless of AI confidence.
 
-**Expected response:** a job object with `"status": "awaiting_approval"`.
+**Expected:** job object with `"status": "awaiting_approval"`. Note the `job_id`.
 
-Note the `job_id` from the response — you will need it in later steps.
-
-### Step 2 — Confirm the approval request was created
+### Step 2 — Check the pending approval
 
 ```bash
 curl -s http://localhost:8000/approvals/pending \
   -H "X-API-Key: key-abc123"
 ```
 
-**Expected:** `{"items": [{...}], "total": 1}` containing one pending approval.
-
-Note the `approval_id` from the response.
+**Expected:** `{"items": [{...}], "total": 1}`. Note the `approval_id`.
 
 ### Step 3 — Approve the job
 
@@ -187,132 +276,119 @@ curl -s -X POST http://localhost:8000/approvals/<approval_id>/approve \
   -d '{"actor": "operator", "channel": "api"}'
 ```
 
-Replace `<approval_id>` with the value from step 2.
+**Expected:** job object with `"status": "completed"` (or `"failed"` if no Gmail credentials are configured).
 
-**Expected response:** a job object with `"status": "completed"` (or `"failed"` if no Gmail credentials are configured — see Gmail note below).
-
-### Step 4 — Inspect the job result
+### Step 4 — Inspect the job
 
 ```bash
-curl -s http://localhost:8000/jobs/<job_id> \
-  -H "X-API-Key: key-abc123"
+curl -s http://localhost:8000/jobs/<job_id> -H "X-API-Key: key-abc123"
+curl -s http://localhost:8000/jobs/<job_id>/actions -H "X-API-Key: key-abc123"
+curl -s http://localhost:8000/audit-events -H "X-API-Key: key-abc123"
 ```
-
-**Expected:** `"status": "completed"` or `"failed"`, with a populated `result` payload.
-
-### Step 5 — Inspect executed actions
-
-```bash
-curl -s http://localhost:8000/jobs/<job_id>/actions \
-  -H "X-API-Key: key-abc123"
-```
-
-**Expected:** `{"items": [{...}], "total": N}` — action records showing what was attempted.
-
-### Step 6 — Verify the audit trail
-
-```bash
-curl -s http://localhost:8000/audit-events \
-  -H "X-API-Key: key-abc123"
-```
-
-**Expected:** a list of audit events including `job_created`, `step_started`, `step_completed`, `workflow_completed` (or `workflow_failed`).
 
 ---
 
 ## Gmail Integration
 
-If `GOOGLE_MAIL_ACCESS_TOKEN` is set in `.env`, the `send_email` action will make a real Gmail API call. Without it, the action falls back to a stub and is marked as a non-live execution.
-
-Gmail access tokens are short-lived (~1 hour). The platform supports automatic refresh.
+If `GOOGLE_MAIL_ACCESS_TOKEN` is set, `send_email` actions make a real Gmail API call. Without it the action falls back to a stub.
 
 **Option A — access token only (short-lived):**
-1. Obtain an OAuth2 access token for the Gmail API with `gmail.send` scope
-2. Set `GOOGLE_MAIL_ACCESS_TOKEN=<token>` in `.env`
-3. Set `GOOGLE_MAIL_USER_ID=me`
-
-If the token expires, the action fails (job set to `FAILED`; error persisted in `action_executions` and audit).
-
-**Option B — with token refresh (recommended):**
-
-Set all three refresh credentials in `.env` in addition to the access token:
 
 ```
+GOOGLE_MAIL_ACCESS_TOKEN=<token>
+GOOGLE_MAIL_USER_ID=me
+```
+
+Token expires in ~1 hour. Expired tokens cause the action to fail (job → `FAILED`).
+
+**Option B — with automatic token refresh (recommended):**
+
+```
+GOOGLE_MAIL_ACCESS_TOKEN=<token>
 GOOGLE_OAUTH_REFRESH_TOKEN=<refresh_token>
 GOOGLE_OAUTH_CLIENT_ID=<client_id>
 GOOGLE_OAUTH_CLIENT_SECRET=<client_secret>
 ```
 
-When the access token expires (401), the platform automatically refreshes it using the refresh token and retries the request once. If the refresh fails, the action fails cleanly.
+On a 401, the platform refreshes the token and retries once. If refresh fails, the action fails cleanly.
 
 ---
 
 ## Operator UI
 
-Open `http://localhost:8000/ui` after starting the server.
+Open `http://localhost:8000/ui`.
 
-- Enter your **API key** in the header field. The key is saved to `localStorage` so it persists across refreshes.
-- If no key is entered, a warning banner is shown. The UI still works against a server with auth disabled (dev mode).
-- All API requests send `X-API-Key` with the entered key.
-- **Jobs tab** — lists all jobs; click a row to open job detail
-- **Job detail** — shows status, result, approvals, and actions for that job
-- **Pending Approvals tab** — lists pending approvals with Approve/Reject buttons; approve/reject send `X-API-Key`
+- **API key** — enter in the header field; persisted to `localStorage`
+- **Inställningar tab** — create/switch tenants, configure job types and integrations, set automation levels, run verification test
+- **Operationer tab** — view jobs, job detail (result, approvals, actions), approve/reject pending approvals
 
-See [docs/08-handoff.md](docs/08-handoff.md) for full UI usage instructions.
+The verification test (`POST /verify/{tenant_id}`) runs a deterministic pipeline — no LLM or external credentials required.
 
 ---
 
 ## API Reference
 
-### Core
+### Jobs
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/` | Health check |
-| `GET` | `/ui` | Operator UI |
-| `POST` | `/jobs` | Create and process a job |
-| `GET` | `/jobs` | List jobs for tenant |
-| `GET` | `/jobs/{job_id}` | Get job detail |
-| `GET` | `/jobs/{job_id}/actions` | Get actions for a job |
-| `GET` | `/jobs/{job_id}/approvals` | Get approvals for a job |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/jobs` | Required | Create and process a job |
+| `GET` | `/jobs` | Required | List jobs for tenant |
+| `GET` | `/jobs/{job_id}` | Required | Get job detail |
+| `GET` | `/jobs/{job_id}/actions` | Required | Actions for a job |
+| `GET` | `/jobs/{job_id}/approvals` | Required | Approvals for a job |
 
 ### Approvals
 
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/approvals/pending` | Required | List pending approvals |
+| `POST` | `/approvals/{id}/approve` | Required | Approve and resume |
+| `POST` | `/approvals/{id}/reject` | Required | Reject |
+
+### Tenants (unauthenticated — operator bootstrap)
+
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/approvals/pending` | List pending approvals |
-| `POST` | `/approvals/{id}/approve` | Approve and resume job |
-| `POST` | `/approvals/{id}/reject` | Reject job |
+| `GET` | `/tenants` | List all tenants |
+| `POST` | `/tenant` | Create a tenant |
+| `GET` | `/tenant/config/{id}` | Get tenant config |
+| `PUT` | `/tenant/config/{id}` | Save tenant config |
+| `POST` | `/verify/{id}` | Run deterministic verification job |
 
 ### Integrations & Audit
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/integrations` | List enabled integrations for tenant |
-| `POST` | `/integrations/{type}/execute` | Execute an integration action directly |
-| `GET` | `/audit-events` | List audit events for tenant |
-
-All endpoints except `GET /`, `GET /ui`, and `GET /processors` require the `X-API-Key` header.
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/integrations` | Required | List enabled integrations |
+| `POST` | `/integrations/{type}/execute` | Required | Execute integration action |
+| `GET` | `/audit-events` | Required | Audit events for tenant |
 
 ---
 
 ## Tenants
 
-Tenant configuration is DB-driven. The `tenant_configs` table is the primary source; `app/core/config.py` (`TENANT_CONFIGS`) is the fallback when no DB row exists. Default tenants (pre-seeded in static fallback):
+Tenant configuration is DB-driven. The `tenant_configs` table is the source of truth; `app/core/config.py` (`TENANT_CONFIGS`) is a fallback when no DB row exists.
 
-| Tenant ID | Name | Enabled job types |
-|-----------|------|-------------------|
-| `TENANT_1001` | Default Tenant | lead, invoice, customer_inquiry |
-| `TENANT_2001` | Sales Tenant | lead, customer_inquiry |
-| `TENANT_3001` | Finance Tenant | invoice |
+Default static fallback tenants (used when no DB row exists for a tenant):
+
+| Tenant ID | Enabled job types |
+|-----------|-------------------|
+| `TENANT_1001` | lead, invoice, customer_inquiry |
+| `TENANT_2001` | lead, customer_inquiry |
+| `TENANT_3001` | invoice |
+
+To use a tenant with the API, it must be configured in `TENANT_API_KEYS` and have a DB row (or static fallback).
 
 ---
 
 ## Known Limitations
 
 - No pagination controls in the operator UI (backend supports it via query params)
-- `docker-compose.yml` starts PostgreSQL only; the app itself must be run with `uvicorn`
-- Gmail OAuth token refresh requires `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, and `GOOGLE_OAUTH_CLIENT_SECRET` to be set; without them a 401 from Gmail will fail the action (no silent retry)
+- `docker-compose.yml` starts PostgreSQL only — the app runs separately via `uvicorn`
+- No DB migration tooling — schema changes require manual `create_all` or ALTER TABLE
+- `app/api/routes/jobs.py` is dead code (not mounted) — does not affect runtime
+- Action dispatch is stubbed for most integrations; only Gmail has a live implementation
 
 ---
 
@@ -325,6 +401,6 @@ Tenant configuration is DB-driven. The `tenant_configs` table is the primary sou
 | [docs/05-current-state.md](docs/05-current-state.md) | Current implementation status |
 | [docs/06-backlog.md](docs/06-backlog.md) | Completed and upcoming work |
 | [docs/07-decisions.md](docs/07-decisions.md) | Architectural decisions log |
-| [docs/08-handoff.md](docs/08-handoff.md) | Handoff notes and UI usage guide |
+| [docs/08-handoff.md](docs/08-handoff.md) | Handoff notes and session history |
 | [docs/10-test-strategy.md](docs/10-test-strategy.md) | Test strategy |
 | [docs/11-release-checklist.md](docs/11-release-checklist.md) | Release checklist |

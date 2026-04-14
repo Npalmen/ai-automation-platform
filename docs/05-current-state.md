@@ -1,7 +1,61 @@
 # Current State
 
-## Status summary
-Projektet har passerat konceptstadiet och har en fungerande backend-kärna med riktig exekveringsförmåga.
+## What works (as of 2026-04-14)
+
+### Core pipeline
+- `/jobs` endpoint accepts jobs and runs the full pipeline synchronously
+- Pipeline: intake → classification → entity extraction → type-specific processor → decisioning → policy → action_dispatch → human_handoff
+- Supported job types with full pipelines: `lead`, `customer_inquiry`, `invoice`
+- Classification and extraction use the LLM when `LLM_API_KEY` is set; fall back to deterministic defaults without it — pipeline always completes
+- Policy decides: `auto_execute` → action_dispatch → `completed`; `send_for_approval` → paused `awaiting_approval`; `hold_for_review` → `manual_review`
+- Failed action dispatch → job status `failed` with error persisted to audit and `action_executions`
+
+### Input handling
+- `input_data` is required inside the job request body
+- Sender fields support two formats: flat (`sender_name`, `sender_email`, `sender_phone`) or nested (`sender.name`, `sender.email`, `sender.phone`) — both normalized by intake
+- Entity extraction uses normalized intake `origin` as fallback for `customer_name`, `email`, `phone` when LLM leaves them null — prevents false `missing_identity` validation errors
+
+### Multi-tenant
+- Per-tenant API key auth via `X-API-Key` header; tenant derived from key
+- Tenant config stored in `tenant_configs` DB table; static fallback in `TENANT_CONFIGS` when no DB row
+- Enabled job types and integrations are per-tenant
+- All protected endpoints derive tenant from the key — `X-Tenant-ID` ignored when auth enabled
+
+### Operator UI
+- Single-file HTML/CSS/JS at `/ui` — no build toolchain
+- Inställningar (Setup) tab: create tenants, configure job types/integrations/automation levels, run verification
+- Operationer tab: view jobs, approve/reject
+- All reads/writes use explicit `{tenant_id}` endpoints — no silent reversion to API-key tenant
+
+### Verification
+- `POST /verify/{tenant_id}` — unauthenticated; runs a deterministic pipeline (no LLM, no external credentials)
+- Picks first enabled supported type from tenant DB config (lead > customer_inquiry > invoice)
+- Returns `completed` or `awaiting_approval` for valid configured tenants
+
+### Approvals
+- Policy can trigger approval pause; human decision via UI or API resumes the pipeline
+- Approvals persisted in DB with actor/channel/timestamp
+
+### Integrations
+- Gmail (`send_email`) has a live implementation with OAuth token refresh
+- All other integrations (CRM, Slack, Fortnox, Visma, etc.) are stubbed or webhook-based
+
+### Audit
+- All pipeline steps emit audit events: `step_started`, `step_completed`, `step_failed`, `workflow_completed`, `workflow_failed`
+
+## What is limited
+
+- No LLM in dev without `LLM_API_KEY` — processors fall back; results are deterministic but not AI-driven
+- Action dispatch is real only for Gmail; all other actions are stubbed
+- No DB migration tooling — schema changes require manual intervention
+- No pagination in the UI — API supports it via query params
+- No auto-refresh in the UI — all loads are manual
+- `app/api/routes/jobs.py` is dead code (not mounted)
+
+---
+
+## Status summary (historical)
+The project has passed the concept stage and has a working backend core with real execution capability.
 
 ## Confirmed implemented
 - [x] FastAPI API
@@ -231,13 +285,21 @@ Two live testing failures in the verification flow fixed:
 - [x] `tests/test_verification_pipeline.py` — 19 new tests: end-to-end pipeline for all three types (no mocking), verifies status not failed, no `unknown_job_type` reason, correct `detected_job_type` in history; payload config sanity checks
 - [x] 237/237 pass
 
+## MVP stabilization (2026-04-14)
+
+See handoff doc for the full list. Key items:
+- Intake normalization supports flat `sender_*` fields
+- Entity extraction uses normalized origin as identity fallback
+- `/jobs` input contract clarified: `input_data` is required; flat sender keys work
+- Verification redesigned: deterministic pipeline, no LLM dependency
+- Auth header bug fixed: `X-API-Key` always preserved in `apiFetch`
+- 263/263 tests pass
+
 ## All MVP slices complete
 All items from the original backlog are implemented and tested.
 
-## Known risks / filesystem issues
-- `pyproject.toml` is a directory (not a file) in the local filesystem — not tracked in git; does not affect runtime but cannot be used as a package manifest
-- `.env.example` is an empty directory in the local filesystem — workaround: use `env.example` (no dot prefix) as the template file
-- `docker-compose.yml` was previously an empty tracked file — now contains a working Postgres definition
-- `app/api/routes/jobs.py` is dead code (not mounted in `main.py`) — not a blocker, noted for future cleanup
-- No DB migration tooling — tables are created via `create_all` on startup; schema changes require manual intervention
-- Gmail access tokens expire (~1 hour); no OAuth refresh flow is built
+## Known issues / filesystem
+- `pyproject.toml` is a directory (not a file) in the local filesystem — not tracked in git; does not affect runtime
+- `.env.example` is an empty directory in the local filesystem — use `env.example` (no dot prefix)
+- `app/api/routes/jobs.py` is dead code (not mounted in `main.py`) — not a blocker
+- No DB migration tooling — tables created via `create_all` on startup; schema changes require manual intervention
