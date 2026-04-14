@@ -63,14 +63,29 @@ async def on_startup():
     print("Startup complete")
 
     # TEMPORARY: local-debug — verify Google OAuth env vars are loaded from .env
+    import logging as _logging
+    _startup_log = _logging.getLogger("startup")
+
     def _masked(val: str) -> str:
         return f"yes (prefix={val[:8]}...)" if val else "no"
 
     _s = get_settings()
-    print("[DEBUG] GOOGLE_MAIL_ACCESS_TOKEN  :", _masked(_s.GOOGLE_MAIL_ACCESS_TOKEN))
-    print("[DEBUG] GOOGLE_OAUTH_REFRESH_TOKEN:", _masked(_s.GOOGLE_OAUTH_REFRESH_TOKEN))
-    print("[DEBUG] GOOGLE_OAUTH_CLIENT_ID    :", _masked(_s.GOOGLE_OAUTH_CLIENT_ID))
-    print("[DEBUG] GOOGLE_OAUTH_CLIENT_SECRET:", _masked(_s.GOOGLE_OAUTH_CLIENT_SECRET))
+    _startup_log.info("[DEBUG] GOOGLE_MAIL_ACCESS_TOKEN  : %s", _masked(_s.GOOGLE_MAIL_ACCESS_TOKEN))
+    _startup_log.info("[DEBUG] GOOGLE_OAUTH_REFRESH_TOKEN: %s", _masked(_s.GOOGLE_OAUTH_REFRESH_TOKEN))
+    _startup_log.info("[DEBUG] GOOGLE_OAUTH_CLIENT_ID    : %s", _masked(_s.GOOGLE_OAUTH_CLIENT_ID))
+    _startup_log.info("[DEBUG] GOOGLE_OAUTH_CLIENT_SECRET: %s", _masked(_s.GOOGLE_OAUTH_CLIENT_SECRET))
+
+    # Warn if OAuth refresh credential set is incomplete — prevents silent invalid_grant failures.
+    _refresh_fields = [_s.GOOGLE_OAUTH_REFRESH_TOKEN, _s.GOOGLE_OAUTH_CLIENT_ID, _s.GOOGLE_OAUTH_CLIENT_SECRET]
+    _refresh_set = sum(bool(f) for f in _refresh_fields)
+    if 0 < _refresh_set < 3:
+        _startup_log.warning(
+            "[GoogleMail] WARNING: %d of 3 OAuth refresh fields are set. "
+            "Token refresh will fail with invalid_grant. "
+            "Set all three (GOOGLE_OAUTH_REFRESH_TOKEN, GOOGLE_OAUTH_CLIENT_ID, "
+            "GOOGLE_OAUTH_CLIENT_SECRET) or none.",
+            _refresh_set,
+        )
     # END TEMPORARY
 
 
@@ -819,10 +834,15 @@ def execute_integration_action(
         connection_config=connection_config,
     )
 
-    result = adapter.execute_action(
-        action=request.action,
-        payload=request.payload,
-    )
+    try:
+        result = adapter.execute_action(
+            action=request.action,
+            payload=request.payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     from app.domain.integrations.models import IntegrationEvent
     status = result.get("status", "success")

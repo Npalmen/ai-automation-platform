@@ -1,5 +1,32 @@
 # Current State
 
+## Live-tested and working (2026-04-14)
+
+The following has been confirmed through real API calls against a running instance:
+
+- ✅ **Gmail integration** — `POST /integrations/google_mail/execute` sends real email via Gmail API; access token + OAuth refresh token flow validated end-to-end
+- ✅ **Full pipeline** — intake → classification → entity extraction → decisioning → policy → approval pause → resume → action dispatch; all stages verified with real data
+- ✅ **Approval flow** — `POST /approvals/{id}/approve` with body `{}` correctly resumes a paused job; action is executed and persisted after approval
+- ✅ **Action persistence** — executed actions are stored and queryable via `GET /jobs/{job_id}/actions`
+- ✅ **300 tests passing**
+
+---
+
+## Known API Contract Gaps
+
+These are sharp edges discovered during live testing. They are not bugs — they are correct behavior that is easy to get wrong.
+
+| Endpoint | Sharp edge |
+|----------|-----------|
+| `POST /jobs` | Requires `X-API-Key` header **and** `tenant_id` in the request body. Missing either returns an error. |
+| `POST /jobs` | `job_type` is a hint — AI classification may override it. The final job type is in the response. |
+| `POST /approvals/{id}/approve` | Requires a JSON body. Minimal working body: `{}`. Empty body causes a parse error. |
+| `POST /integrations/{type}/execute` | Body field is `"payload"`, not `"input"`. Sending `"input"` silently produces empty payload → `400`. |
+| Google Mail | All four env vars required for refresh: `GOOGLE_MAIL_ACCESS_TOKEN`, `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`. Partial config → `invalid_grant` on first token expiry. |
+| UTF-8 output | API response is correct UTF-8. Windows terminals (GBK/CP936) misrender Swedish chars as `?` in curl output. The data is correct. Run `chcp 65001` to fix terminal display. |
+
+---
+
 ## What works (as of 2026-04-14)
 
 ### Core pipeline
@@ -37,7 +64,7 @@
 - Approvals persisted in DB with actor/channel/timestamp
 
 ### Integrations
-- Gmail (`send_email`) has a live implementation with OAuth token refresh
+- Gmail (`send_email`) — ✅ live-tested and working; OAuth token refresh validated; `RuntimeError` from `invalid_grant` surfaces as `503` with descriptive detail
 - All other integrations (CRM, Slack, Fortnox, Visma, etc.) are stubbed or webhook-based
 
 ### Audit
@@ -294,6 +321,20 @@ See handoff doc for the full list. Key items:
 - Verification redesigned: deterministic pipeline, no LLM dependency
 - Auth header bug fixed: `X-API-Key` always preserved in `apiFetch`
 - 263/263 tests pass
+
+## Live testing and regression hardening (2026-04-14)
+
+Performed real API testing of the full platform. Findings and fixes:
+
+- ✅ Gmail integration confirmed working end-to-end (live send + OAuth refresh)
+- ✅ Full approval flow confirmed: `POST /jobs` → `awaiting_approval` → `POST /approvals/{id}/approve` → `completed` → action persisted
+- Identified and documented API contract gaps (see "Known API Contract Gaps" section above)
+- `POST /integrations/{type}/execute` — `RuntimeError` from Gmail now maps to `503` (not `500`); `ValueError` maps to `400`
+- `_mask()` helper and `_log_config_diagnostics()` added to `GoogleMailAdapter` — logs masked OAuth credential presence on every `execute_action` call
+- `tests/test_google_mail_runtime_errors.py` — 15 tests covering `_mask`, diagnostics logging, and route error mapping
+- `tests/test_integration_execute_contract.py` — 10 tests covering schema field name (`payload` not `input`), valid execute, and all `400` paths
+- `tests/test_swedish_char_encoding.py` — 12 tests confirming UTF-8 is preserved through all layers (request schema, adapter call, event payload, response serialization, Starlette bytes)
+- 300/300 tests pass
 
 ## All MVP slices complete
 All items from the original backlog are implemented and tested.

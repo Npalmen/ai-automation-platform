@@ -1,10 +1,20 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from app.integrations.base import BaseIntegrationAdapter
 from app.integrations.google.calendar_client import GoogleCalendarClient
 from app.integrations.google.mail_client import GoogleMailClient
+
+logger = logging.getLogger(__name__)
+
+
+def _mask(value: str, prefix_len: int = 8) -> str:
+    """Return a masked representation for logging — never logs the full value."""
+    if not value:
+        return "<not set>"
+    return f"{value[:prefix_len]}..." if len(value) > prefix_len else "<set, short>"
 
 
 class GoogleMailAdapter(BaseIntegrationAdapter):
@@ -21,7 +31,39 @@ class GoogleMailAdapter(BaseIntegrationAdapter):
             client_secret=str(self.connection_config.get("client_secret") or "").strip(),
         )
 
+    def _log_config_diagnostics(self) -> None:
+        """Log masked presence of OAuth credentials to assist debugging without leaking secrets."""
+        cfg = self.connection_config
+        access_token = str(cfg.get("access_token") or "")
+        refresh_token = str(cfg.get("refresh_token") or "")
+        client_id = str(cfg.get("client_id") or "")
+        client_secret = str(cfg.get("client_secret") or "")
+
+        logger.info(
+            "[GoogleMail] OAuth config diagnostics: "
+            "access_token=%s refresh_token=%s client_id=%s client_secret=%s",
+            _mask(access_token),
+            _mask(refresh_token),
+            _mask(client_id),
+            _mask(client_secret),
+        )
+
+        # Warn about incomplete refresh credential set — a common misconfiguration.
+        refresh_fields = [refresh_token, client_id, client_secret]
+        refresh_set = sum(bool(f) for f in refresh_fields)
+        if 0 < refresh_set < 3:
+            logger.warning(
+                "[GoogleMail] Incomplete OAuth refresh credentials: "
+                "%d of 3 fields set (GOOGLE_OAUTH_REFRESH_TOKEN, "
+                "GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET). "
+                "Token refresh will fail with invalid_grant. "
+                "Set all three or none.",
+                refresh_set,
+            )
+
     def execute_action(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
+        self._log_config_diagnostics()
+
         if action != "send_email":
             raise ValueError(f"Unsupported Google Mail action '{action}'.")
 

@@ -124,7 +124,7 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - 17 new tests; 105/105 pass
 
 ## Current state
-MVP is complete and stabilized. Pipeline runs end-to-end with correct intake normalization and entity fallback. Auth is enforced. UI is stable, Swedish-localised, and tenant-aware. Verification is deterministic (no LLM required). `/jobs` input contract is clarified and tested. 263/263 tests pass.
+MVP is complete and stabilized. Pipeline runs end-to-end with correct intake normalization and entity fallback. Auth is enforced. UI is stable, Swedish-localised, and tenant-aware. Verification is deterministic (no LLM required). Live API testing has confirmed Gmail, approval flow, and action persistence all work. 300/300 tests pass.
 
 ## Completed slice (2026-04-12 — integration event persistence)
 - `IntegrationEvent` model base fixed to `database.Base` — table now in `create_all`
@@ -228,9 +228,98 @@ Six fixes applied after live testing revealed integration issues:
 - 263/263 tests pass
 - README, docs/05-current-state.md, and docs/08-handoff.md updated to reflect real behavior
 
+## What is actually working (live-verified 2026-04-14)
+
+Confirmed through real API calls — not theoretical:
+
+- **Gmail send** — `POST /integrations/google_mail/execute` reaches the Gmail API and delivers email
+- **OAuth refresh** — token refresh on `401` works; `invalid_grant` surfaces as `503` with detail
+- **Full pipeline** — intake → classification → extraction → decisioning → policy → action_dispatch; all stages execute
+- **Approval pause/resume** — job enters `awaiting_approval`; `POST /approvals/{id}/approve` with `{}` resumes it; actions execute after approval
+- **Action persistence** — `GET /jobs/{job_id}/actions` returns the executed action record
+- **300 tests passing**
+
+---
+
+## How to test the system via API
+
+**Direct Gmail send:**
+```bash
+curl -s -X POST http://localhost:8000/integrations/google_mail/execute \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: key-abc123" \
+  -d '{"action": "send_email", "payload": {"to": "you@example.com", "subject": "Test", "body": "Hello"}}'
+```
+
+**Create a job (approval flow):**
+```bash
+curl -s -X POST http://localhost:8000/jobs \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: key-abc123" \
+  -d '{
+    "tenant_id": "TENANT_1001",
+    "job_type": "lead",
+    "input_data": {
+      "subject": "Test lead",
+      "message_text": "Interested in your services.",
+      "sender_name": "Test User",
+      "sender_email": "test@example.com",
+      "force_approval_test": true
+    }
+  }'
+```
+
+**Approve:**
+```bash
+curl -s -X POST http://localhost:8000/approvals/<approval_id>/approve \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: key-abc123" \
+  -d '{}'
+```
+
+**Inspect:**
+```bash
+curl -s http://localhost:8000/jobs/<job_id>/actions -H "X-API-Key: key-abc123"
+```
+
+---
+
+## Known sharp edges (do not assume)
+
+These are real behaviors observed during live testing. Each one has caused a failure at least once.
+
+1. **`POST /jobs` requires `tenant_id` in the body** — not just the `X-API-Key` header. Both are required. The key determines auth; the body field routes the job.
+
+2. **`job_type` in `/jobs` is overrideable** — the AI classifier may change it. The actual type used is in the response. Do not assume the input type matches the executed pipeline.
+
+3. **`POST /approvals/{id}/approve` requires `{}`** — not an empty body. Sending no body at all causes a JSON parse error. Always include `{}` at minimum.
+
+4. **`POST /integrations/{type}/execute` uses `"payload"`, not `"input"`** — sending `"input"` silently results in an empty payload and the adapter returns `400`. There is no warning in the response that the wrong key was used.
+
+5. **Gmail needs all four OAuth vars** — `GOOGLE_MAIL_ACCESS_TOKEN`, `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`. Setting only some of them will work until the access token expires, then fail with `invalid_grant` (503).
+
+6. **Windows terminal (GBK) misrenders UTF-8** — Swedish characters in the API response are correct UTF-8. The Windows GBK code page can't display them and shows `?`. The data is not corrupted. Run `chcp 65001` to fix the terminal.
+
+---
+
+## Completed slice (2026-04-14 — live testing and regression hardening)
+
+- Full end-to-end live testing performed: Gmail send, pipeline, approval flow, action persistence
+- API contract gaps identified and documented (see "Known sharp edges" above and README "API Contracts")
+- `RuntimeError` from Gmail routes maps to `503`; `ValueError` maps to `400`
+- `_mask()` helper and `_log_config_diagnostics()` added to `GoogleMailAdapter`
+- `tests/test_google_mail_runtime_errors.py` — 15 tests
+- `tests/test_integration_execute_contract.py` — 10 tests
+- `tests/test_swedish_char_encoding.py` — 12 tests (UTF-8 round-trip proof)
+- README updated: "Verified Capabilities", "Quick Start (Tested)", "API Contracts (Important)", "Gmail Integration (Working Setup)"
+- docs/05-current-state.md updated: live-tested section, Known API Contract Gaps table
+- 300/300 tests pass
+
+---
+
 ## Remaining work
 All original MVP backlog items are complete.
 
 ## Expected output from next implementation chat
-- Continue from this repo state; all docs and 263 tests are current
+- Continue from this repo state; all docs and 300 tests are current
 - Platform is stable and ready for first customer onboarding or integration testing
