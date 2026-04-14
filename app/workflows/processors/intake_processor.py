@@ -11,6 +11,10 @@ def process_universal_intake_job(job: Job) -> Job:
     sender = input_data.get("sender") or {}
     attachments = input_data.get("attachments") or []
 
+    # Support both nested sender dict and flat sender_* keys at input_data root.
+    def _sender_field(nested_key: str, flat_key: str) -> str:
+        return sender.get(nested_key) or input_data.get(flat_key) or ""
+
     result = {
         "status": "completed",
         "summary": "Intake normaliserad.",
@@ -24,9 +28,9 @@ def process_universal_intake_job(job: Job) -> Job:
                 "channel": input_data.get("source_channel", "") or "",
             },
             "origin": {
-                "sender_name": sender.get("name", "") or "",
-                "sender_email": sender.get("email", "") or "",
-                "sender_phone": sender.get("phone", "") or "",
+                "sender_name": _sender_field("name", "sender_name"),
+                "sender_email": _sender_field("email", "sender_email"),
+                "sender_phone": _sender_field("phone", "sender_phone"),
             },
             "content": {
                 "subject": input_data.get("subject", "") or "",

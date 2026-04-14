@@ -11,10 +11,20 @@ PROCESSOR_NAME = "entity_extraction_processor"
 PROMPT_NAME = "entity_extraction"
 
 
+def _get_intake_origin(job: Job) -> dict:
+    """Return origin dict from normalized intake payload, or empty dict."""
+    intake_payload = get_latest_processor_payload(job, "universal_intake_processor")
+    return intake_payload.get("origin") or {}
+
+
 def _build_source_context(job: Job) -> dict:
     input_data = job.input_data or {}
     sender = input_data.get("sender") or {}
     attachments = input_data.get("attachments") or []
+
+    # Include flat sender_* keys so the LLM prompt receives them when nested dict is absent.
+    def _sender_field(nested_key: str, flat_key: str) -> str | None:
+        return sender.get(nested_key) or input_data.get(flat_key) or None
 
     classification_payload = get_latest_processor_payload(job, "classification_processor")
 
@@ -26,9 +36,9 @@ def _build_source_context(job: Job) -> dict:
             "subject": input_data.get("subject"),
             "message_text": input_data.get("message_text"),
             "sender": {
-                "name": sender.get("name"),
-                "email": sender.get("email"),
-                "phone": sender.get("phone"),
+                "name": _sender_field("name", "sender_name"),
+                "email": _sender_field("email", "sender_email"),
+                "phone": _sender_field("phone", "sender_phone"),
             },
             "attachments": attachments,
         },
@@ -38,11 +48,27 @@ def _build_source_context(job: Job) -> dict:
     }
 
 
+def _apply_intake_fallback(entities: dict, origin: dict) -> dict:
+    """
+    Fill null entity fields from normalized intake origin when LLM left them empty.
+    Only fills customer_name, email, and phone — the identity/contact fields.
+    """
+    result = dict(entities)
+    if not result.get("customer_name"):
+        result["customer_name"] = origin.get("sender_name") or None
+    if not result.get("email"):
+        result["email"] = origin.get("sender_email") or None
+    if not result.get("phone"):
+        result["phone"] = origin.get("sender_phone") or None
+    return result
+
+
 def process_entity_extraction_job(job: Job) -> Job:
     context = _build_source_context(job)
+    origin = _get_intake_origin(job)
 
     def success_payload_builder(parsed):
-        entities = parsed.entities.model_dump()
+        entities = _apply_intake_fallback(parsed.entities.model_dump(), origin)
         validation = validate_entities(entities)
 
         return {
@@ -59,9 +85,9 @@ def process_entity_extraction_job(job: Job) -> Job:
         }
 
     def fallback_payload_builder(error_message: str):
-        return {
-            "processor_name": PROCESSOR_NAME,
-            "entities": {
+        # Apply intake origin fallback so known sender data is not lost on LLM failure.
+        entities = _apply_intake_fallback(
+            {
                 "customer_name": None,
                 "company_name": None,
                 "email": None,
@@ -76,10 +102,16 @@ def process_entity_extraction_job(job: Job) -> Job:
                 "city": None,
                 "notes": None,
             },
+            origin,
+        )
+        validation = validate_entities(entities)
+        return {
+            "processor_name": PROCESSOR_NAME,
+            "entities": entities,
             "confidence": 0.0,
             "validation": {
-                "is_valid": False,
-                "issues": ["entity_extraction_failed"],
+                "is_valid": validation["is_valid"],
+                "issues": validation["issues"],
             },
             "error": error_message,
             "recommended_next_step": "manual_review",
