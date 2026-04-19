@@ -302,3 +302,67 @@ class TestRuntimePolicyWithDb:
             result = is_integration_enabled_for_tenant("TENANT_1001", IntegrationType.GOOGLE_MAIL, db=db)
 
         assert result is True
+
+
+# ---------------------------------------------------------------------------
+# is_integration_enabled_for_tenant — string / enum / mixed normalization
+# ---------------------------------------------------------------------------
+
+class TestIntegrationEnabledNormalization:
+    """
+    is_integration_enabled_for_tenant must work regardless of whether
+    allowed_integrations contains strings, enum objects, or a mix of both.
+    """
+
+    def _config_with(self, allowed: list) -> dict:
+        return {"allowed_integrations": allowed}
+
+    def test_string_values_allowed(self):
+        """Plain strings (the canonical format) work."""
+        with patch("app.integrations.policies.get_tenant_config", return_value=self._config_with(["monday", "google_mail"])):
+            assert is_integration_enabled_for_tenant("TENANT_1001", IntegrationType.MONDAY) is True
+
+    def test_string_values_blocked(self):
+        """Integration absent from string list is correctly blocked."""
+        with patch("app.integrations.policies.get_tenant_config", return_value=self._config_with(["google_mail"])):
+            assert is_integration_enabled_for_tenant("TENANT_1001", IntegrationType.MONDAY) is False
+
+    def test_enum_objects_allowed(self):
+        """Enum objects in the list are normalized and match correctly."""
+        with patch("app.integrations.policies.get_tenant_config", return_value=self._config_with([IntegrationType.MONDAY, IntegrationType.GOOGLE_MAIL])):
+            assert is_integration_enabled_for_tenant("TENANT_1001", IntegrationType.MONDAY) is True
+
+    def test_enum_objects_blocked(self):
+        """Integration absent from enum list is correctly blocked."""
+        with patch("app.integrations.policies.get_tenant_config", return_value=self._config_with([IntegrationType.GOOGLE_MAIL])):
+            assert is_integration_enabled_for_tenant("TENANT_1001", IntegrationType.MONDAY) is False
+
+    def test_mixed_list_string_and_enum(self):
+        """Mixed list (string + enum) works for both present and absent integrations."""
+        mixed = [IntegrationType.GOOGLE_MAIL, "monday", IntegrationType.SLACK]
+        with patch("app.integrations.policies.get_tenant_config", return_value=self._config_with(mixed)):
+            assert is_integration_enabled_for_tenant("TENANT_1001", IntegrationType.MONDAY) is True
+            assert is_integration_enabled_for_tenant("TENANT_1001", IntegrationType.GOOGLE_MAIL) is True
+            assert is_integration_enabled_for_tenant("TENANT_1001", IntegrationType.SLACK) is True
+            assert is_integration_enabled_for_tenant("TENANT_1001", IntegrationType.FORTNOX) is False
+
+    def test_empty_list_always_blocked(self):
+        """Empty allowed list blocks everything."""
+        with patch("app.integrations.policies.get_tenant_config", return_value=self._config_with([])):
+            assert is_integration_enabled_for_tenant("TENANT_1001", IntegrationType.MONDAY) is False
+
+    def test_monday_enabled_in_static_tenant_1001(self):
+        """After the config fix, MONDAY is enabled in TENANT_1001 static config."""
+        assert is_integration_enabled_for_tenant("TENANT_1001", IntegrationType.MONDAY) is True
+
+    def test_monday_enabled_in_static_tenant_2001(self):
+        """After the config fix, MONDAY is enabled in TENANT_2001 static config."""
+        assert is_integration_enabled_for_tenant("TENANT_2001", IntegrationType.MONDAY) is True
+
+    def test_fortnox_not_enabled_in_static_tenant_2001(self):
+        """FORTNOX is not in TENANT_2001 static config — should return False."""
+        assert is_integration_enabled_for_tenant("TENANT_2001", IntegrationType.FORTNOX) is False
+
+    def test_accounting_not_enabled_in_static_tenant_2001(self):
+        """Existing regression test still passes after normalization fix."""
+        assert is_integration_enabled_for_tenant("TENANT_2001", IntegrationType.ACCOUNTING) is False

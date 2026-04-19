@@ -1,27 +1,36 @@
 # Current State
 
-## Live-tested and working (2026-04-14)
+## Real-world validation results
 
-The following has been confirmed through real API calls against a running instance:
+The following has been confirmed through real API calls against a running instance — not theoretical.
 
-- ✅ **Gmail integration** — `POST /integrations/google_mail/execute` sends real email via Gmail API; access token + OAuth refresh token flow validated end-to-end
-- ✅ **Full pipeline** — intake → classification → entity extraction → decisioning → policy → approval pause → resume → action dispatch; all stages verified with real data
-- ✅ **Approval flow** — `POST /approvals/{id}/approve` with body `{}` correctly resumes a paused job; action is executed and persisted after approval
-- ✅ **Action persistence** — executed actions are stored and queryable via `GET /jobs/{job_id}/actions`
-- ✅ **300 tests passing**
+| What | Status | Notes |
+|------|--------|-------|
+| Gmail send_email | ✅ LIVE VERIFIED | `POST /integrations/google_mail/execute` → real Gmail delivery |
+| Gmail OAuth refresh | ✅ LIVE VERIFIED | token refresh on 401, invalid_grant → 503 |
+| Monday create_item | ✅ LIVE VERIFIED | `POST /integrations/monday/execute` → item appears in real board |
+| Full pipeline | ✅ END-TO-END VERIFIED | intake → classification → extraction → decisioning → policy → approval → action_dispatch |
+| Approval pause/resume | ✅ LIVE VERIFIED | `POST /approvals/{id}/approve` with `{}` resumes job; action executes after |
+| Action persistence | ✅ LIVE VERIFIED | `GET /jobs/{job_id}/actions` returns real executed records |
+| Multi-tenant auth | ✅ LIVE VERIFIED | `X-API-Key` + body `tenant_id` both required |
+| 326 tests passing | ✅ | `python -m pytest` |
 
 ---
 
 ## Known API Contract Gaps
 
-These are sharp edges discovered during live testing. They are not bugs — they are correct behavior that is easy to get wrong.
+These are sharp edges discovered during live testing. Each one has caused a real failure.
 
-| Endpoint | Sharp edge |
-|----------|-----------|
+| Endpoint / Area | Sharp edge |
+|-----------------|-----------|
 | `POST /jobs` | Requires `X-API-Key` header **and** `tenant_id` in the request body. Missing either returns an error. |
 | `POST /jobs` | `job_type` is a hint — AI classification may override it. The final job type is in the response. |
 | `POST /approvals/{id}/approve` | Requires a JSON body. Minimal working body: `{}`. Empty body causes a parse error. |
 | `POST /integrations/{type}/execute` | Body field is `"payload"`, not `"input"`. Sending `"input"` silently produces empty payload → `400`. |
+| Monday — `board_id` | Not a per-request payload field. Fixed from `MONDAY_BOARD_ID` env var at connection time. |
+| Monday — `column_values` | Pass a plain dict; the platform serializes it to a JSON string internally. monday's GraphQL API requires a JSON string — sending a dict directly caused `Invalid type, expected a JSON string`. |
+| Tenant config — DB vs static | The DB `tenant_configs` row overrides `TENANT_CONFIGS` in `app/core/config.py` when a row exists. If an integration appears enabled in code but returns `403`, check the DB row. |
+| Tenant config — enum vs string | `allowed_integrations` in static config previously stored `IntegrationType.MONDAY` (enum objects). DB stores `"monday"` (strings). Code normalizes both; the DB row is authoritative when present. |
 | Google Mail | All four env vars required for refresh: `GOOGLE_MAIL_ACCESS_TOKEN`, `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`. Partial config → `invalid_grant` on first token expiry. |
 | UTF-8 output | API response is correct UTF-8. Windows terminals (GBK/CP936) misrender Swedish chars as `?` in curl output. The data is correct. Run `chcp 65001` to fix terminal display. |
 
@@ -64,7 +73,8 @@ These are sharp edges discovered during live testing. They are not bugs — they
 - Approvals persisted in DB with actor/channel/timestamp
 
 ### Integrations
-- Gmail (`send_email`) — ✅ live-tested and working; OAuth token refresh validated; `RuntimeError` from `invalid_grant` surfaces as `503` with descriptive detail
+- Gmail (`send_email`) — ✅ LIVE VERIFIED; OAuth token refresh validated; `RuntimeError` from `invalid_grant` surfaces as `503` with descriptive detail
+- Monday (`create_item`, `create_update`) — ✅ LIVE VERIFIED; item created in real board; `column_values` serialized to JSON string internally; `board_id` fixed from env
 - All other integrations (CRM, Slack, Fortnox, Visma, etc.) are stubbed or webhook-based
 
 ### Audit
@@ -335,6 +345,21 @@ Performed real API testing of the full platform. Findings and fixes:
 - `tests/test_integration_execute_contract.py` — 10 tests covering schema field name (`payload` not `input`), valid execute, and all `400` paths
 - `tests/test_swedish_char_encoding.py` — 12 tests confirming UTF-8 is preserved through all layers (request schema, adapter call, event payload, response serialization, Starlette bytes)
 - 300/300 tests pass
+
+## Monday integration + tenant config normalization (2026-04-14)
+
+Live testing of Monday.com integration and tenant config resolution:
+
+- ✅ Monday `create_item` confirmed working end-to-end — item appears in real monday board
+- **Bug fixed:** `allowed_integrations` in static `TENANT_CONFIGS` stored `IntegrationType.MONDAY` (enum objects); route check expected string `"monday"` → `403` even though integration was configured
+- **Fix 1 (config.py):** all `IntegrationType.X` in `allowed_integrations` replaced with `IntegrationType.X.value` (plain strings) across all four static tenant configs
+- **Fix 2 (policies.py):** defensive normalization added — `allowed = [i.value if hasattr(i, "value") else i for i in raw]` — handles strings, enums, and mixed lists; checks `integration_type.value in allowed`
+- **Bug fixed:** `column_values` sent as a Python dict to monday's GraphQL API — monday requires a JSON string → `Invalid type, expected a JSON string` error
+- **Fix (client.py):** `column_values` serialized via `json.dumps()` before assignment to variables; `None` maps to `"{}"`, strings pass through unchanged
+- **Improvement:** monday API `errors` array now raises `RuntimeError("monday API error: <message>")` instead of `Exception(str(list))` — readable error, correct type for route's `except RuntimeError → 503` handler
+- `tests/test_tenant_config.py` — 10 new normalization tests (string list, enum list, mixed, empty, monday in TENANT_1001 / TENANT_2001)
+- `tests/test_monday_client.py` — 16 new tests (column_values serialization for all input types, board_id as string, group_id, error handling, adapter routing)
+- 326/326 tests pass
 
 ## All MVP slices complete
 All items from the original backlog are implemented and tested.

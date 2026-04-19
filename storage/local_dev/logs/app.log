@@ -9508,3 +9508,144 @@ FROM action_executions
 WHERE action_executions.tenant_id = %(tenant_id_1)s AND action_executions.job_id = %(job_id_1)s ORDER BY action_executions.executed_at ASC, action_executions.created_at ASC
 2026-04-14 22:00:38,326 | INFO | sqlalchemy.engine.Engine | [cached since 141.6s ago] {'tenant_id_1': 'TENANT_1001', 'job_id_1': '6200ef7c-697e-48ff-90b6-aeba13488d4e'}
 2026-04-14 22:00:38,328 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-19 21:46:03,804 | INFO | startup | [DEBUG] GOOGLE_MAIL_ACCESS_TOKEN  : yes (prefix=ya29.a0A...)
+2026-04-19 21:46:03,804 | INFO | startup | [DEBUG] GOOGLE_OAUTH_REFRESH_TOKEN: yes (prefix=1//04t1X...)
+2026-04-19 21:46:03,804 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_ID    : yes (prefix=50201299...)
+2026-04-19 21:46:03,804 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_SECRET: yes (prefix=GOCSPX--...)
+2026-04-19 21:49:19,266 | INFO | app.core.auth | API key auth enabled for 2 tenant(s).
+2026-04-19 21:49:19,313 | INFO | sqlalchemy.engine.Engine | select pg_catalog.version()
+2026-04-19 21:49:19,313 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-19 21:49:19,314 | INFO | sqlalchemy.engine.Engine | select current_schema()
+2026-04-19 21:49:19,315 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-19 21:49:19,315 | INFO | sqlalchemy.engine.Engine | show standard_conforming_strings
+2026-04-19 21:49:19,315 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-19 21:49:19,316 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-19 21:49:19,317 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-19 21:49:19,317 | INFO | sqlalchemy.engine.Engine | [generated in 0.00025s] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-19 21:49:19,326 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-19 21:51:19,858 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-19 21:51:19,858 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-19 21:51:19,859 | INFO | sqlalchemy.engine.Engine | [cached since 120.5s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-19 21:51:19,860 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-19 21:54:09,209 | INFO | startup | [DEBUG] GOOGLE_MAIL_ACCESS_TOKEN  : yes (prefix=ya29.a0A...)
+2026-04-19 21:54:09,209 | INFO | startup | [DEBUG] GOOGLE_OAUTH_REFRESH_TOKEN: yes (prefix=1//04t1X...)
+2026-04-19 21:54:09,209 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_ID    : yes (prefix=50201299...)
+2026-04-19 21:54:09,209 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_SECRET: yes (prefix=GOCSPX--...)
+2026-04-19 21:54:38,049 | INFO | startup | [DEBUG] GOOGLE_MAIL_ACCESS_TOKEN  : yes (prefix=ya29.a0A...)
+2026-04-19 21:54:38,049 | INFO | startup | [DEBUG] GOOGLE_OAUTH_REFRESH_TOKEN: yes (prefix=1//04t1X...)
+2026-04-19 21:54:38,049 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_ID    : yes (prefix=50201299...)
+2026-04-19 21:54:38,049 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_SECRET: yes (prefix=GOCSPX--...)
+2026-04-19 21:55:00,057 | INFO | startup | [DEBUG] GOOGLE_MAIL_ACCESS_TOKEN  : yes (prefix=ya29.a0A...)
+2026-04-19 21:55:00,058 | INFO | startup | [DEBUG] GOOGLE_OAUTH_REFRESH_TOKEN: yes (prefix=1//04t1X...)
+2026-04-19 21:55:00,058 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_ID    : yes (prefix=50201299...)
+2026-04-19 21:55:00,058 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_SECRET: yes (prefix=GOCSPX--...)
+2026-04-19 21:57:20,502 | INFO | startup | [DEBUG] GOOGLE_MAIL_ACCESS_TOKEN  : yes (prefix=ya29.a0A...)
+2026-04-19 21:57:20,503 | INFO | startup | [DEBUG] GOOGLE_OAUTH_REFRESH_TOKEN: yes (prefix=1//04t1X...)
+2026-04-19 21:57:20,503 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_ID    : yes (prefix=50201299...)
+2026-04-19 21:57:20,503 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_SECRET: yes (prefix=GOCSPX--...)
+2026-04-19 21:57:26,799 | INFO | app.core.auth | API key auth enabled for 2 tenant(s).
+2026-04-19 21:57:26,947 | INFO | sqlalchemy.engine.Engine | select pg_catalog.version()
+2026-04-19 21:57:26,947 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-19 21:57:26,948 | INFO | sqlalchemy.engine.Engine | select current_schema()
+2026-04-19 21:57:26,948 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-19 21:57:26,949 | INFO | sqlalchemy.engine.Engine | show standard_conforming_strings
+2026-04-19 21:57:26,949 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-19 21:57:26,950 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-19 21:57:26,951 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-19 21:57:26,951 | INFO | sqlalchemy.engine.Engine | [generated in 0.00028s] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-19 21:57:26,953 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-19 21:58:37,900 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-19 21:58:37,901 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-19 21:58:37,901 | INFO | sqlalchemy.engine.Engine | [cached since 70.95s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-19 21:58:37,902 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-19 21:58:48,024 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-19 21:58:48,024 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-19 21:58:48,025 | INFO | sqlalchemy.engine.Engine | [cached since 81.07s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-19 21:58:48,026 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-19 21:59:33,163 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-19 21:59:33,163 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-19 21:59:33,163 | INFO | sqlalchemy.engine.Engine | [cached since 126.2s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-19 21:59:33,164 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-19 21:59:33,164 | INFO | sqlalchemy.engine.Engine | [cached since 126.2s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-19 21:59:33,166 | INFO | sqlalchemy.engine.Engine | UPDATE tenant_configs SET allowed_integrations=%(allowed_integrations)s::JSON WHERE tenant_configs.tenant_id = %(tenant_configs_tenant_id)s
+2026-04-19 21:59:33,166 | INFO | sqlalchemy.engine.Engine | [generated in 0.00030s] {'allowed_integrations': '["google_mail", "crm", "monday"]', 'tenant_configs_tenant_id': 'TENANT_1001'}
+2026-04-19 21:59:33,184 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-19 21:59:33,186 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-19 21:59:33,187 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id, tenant_configs.name, tenant_configs.enabled_job_types, tenant_configs.allowed_integrations, tenant_configs.auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(pk_1)s
+2026-04-19 21:59:33,187 | INFO | sqlalchemy.engine.Engine | [generated in 0.00020s] {'pk_1': 'TENANT_1001'}
+2026-04-19 21:59:33,188 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-19 21:59:39,402 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-19 21:59:39,403 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-19 21:59:39,403 | INFO | sqlalchemy.engine.Engine | [cached since 132.5s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-19 21:59:39,405 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-19 21:59:47,193 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-19 21:59:47,193 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-19 21:59:47,194 | INFO | sqlalchemy.engine.Engine | [cached since 140.2s ago] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-19 21:59:47,953 | INFO | sqlalchemy.engine.Engine | ROLLBACK
+2026-04-19 22:01:32,566 | INFO | startup | [DEBUG] GOOGLE_MAIL_ACCESS_TOKEN  : yes (prefix=ya29.a0A...)
+2026-04-19 22:01:32,566 | INFO | startup | [DEBUG] GOOGLE_OAUTH_REFRESH_TOKEN: yes (prefix=1//04t1X...)
+2026-04-19 22:01:32,566 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_ID    : yes (prefix=50201299...)
+2026-04-19 22:01:32,566 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_SECRET: yes (prefix=GOCSPX--...)
+2026-04-19 22:01:39,998 | INFO | startup | [DEBUG] GOOGLE_MAIL_ACCESS_TOKEN  : yes (prefix=ya29.a0A...)
+2026-04-19 22:01:39,998 | INFO | startup | [DEBUG] GOOGLE_OAUTH_REFRESH_TOKEN: yes (prefix=1//04t1X...)
+2026-04-19 22:01:39,998 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_ID    : yes (prefix=50201299...)
+2026-04-19 22:01:39,998 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_SECRET: yes (prefix=GOCSPX--...)
+2026-04-19 22:01:45,106 | INFO | startup | [DEBUG] GOOGLE_MAIL_ACCESS_TOKEN  : yes (prefix=ya29.a0A...)
+2026-04-19 22:01:45,107 | INFO | startup | [DEBUG] GOOGLE_OAUTH_REFRESH_TOKEN: yes (prefix=1//04t1X...)
+2026-04-19 22:01:45,107 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_ID    : yes (prefix=50201299...)
+2026-04-19 22:01:45,107 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_SECRET: yes (prefix=GOCSPX--...)
+2026-04-19 22:03:16,850 | INFO | startup | [DEBUG] GOOGLE_MAIL_ACCESS_TOKEN  : yes (prefix=ya29.a0A...)
+2026-04-19 22:03:16,851 | INFO | startup | [DEBUG] GOOGLE_OAUTH_REFRESH_TOKEN: yes (prefix=1//04t1X...)
+2026-04-19 22:03:16,851 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_ID    : yes (prefix=50201299...)
+2026-04-19 22:03:16,851 | INFO | startup | [DEBUG] GOOGLE_OAUTH_CLIENT_SECRET: yes (prefix=GOCSPX--...)
+2026-04-19 22:03:22,022 | INFO | app.core.auth | API key auth enabled for 2 tenant(s).
+2026-04-19 22:03:22,064 | INFO | sqlalchemy.engine.Engine | select pg_catalog.version()
+2026-04-19 22:03:22,065 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-19 22:03:22,065 | INFO | sqlalchemy.engine.Engine | select current_schema()
+2026-04-19 22:03:22,065 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-19 22:03:22,066 | INFO | sqlalchemy.engine.Engine | show standard_conforming_strings
+2026-04-19 22:03:22,066 | INFO | sqlalchemy.engine.Engine | [raw sql] {}
+2026-04-19 22:03:22,066 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-19 22:03:22,068 | INFO | sqlalchemy.engine.Engine | SELECT tenant_configs.tenant_id AS tenant_configs_tenant_id, tenant_configs.name AS tenant_configs_name, tenant_configs.enabled_job_types AS tenant_configs_enabled_job_types, tenant_configs.allowed_integrations AS tenant_configs_allowed_integrations, tenant_configs.auto_actions AS tenant_configs_auto_actions 
+FROM tenant_configs 
+WHERE tenant_configs.tenant_id = %(tenant_id_1)s 
+ LIMIT %(param_1)s
+2026-04-19 22:03:22,068 | INFO | sqlalchemy.engine.Engine | [generated in 0.00031s] {'tenant_id_1': 'TENANT_1001', 'param_1': 1}
+2026-04-19 22:03:23,239 | INFO | sqlalchemy.engine.Engine | INSERT INTO integration_events (job_id, tenant_id, integration_type, payload, status, attempts, last_error, idempotency_key, updated_at) VALUES (%(job_id)s, %(tenant_id)s, %(integration_type)s, %(payload)s::JSON, %(status)s, %(attempts)s, %(last_error)s, %(idempotency_key)s, %(updated_at)s) RETURNING integration_events.id, integration_events.created_at
+2026-04-19 22:03:23,240 | INFO | sqlalchemy.engine.Engine | [generated in 0.00046s] {'job_id': 'direct', 'tenant_id': 'TENANT_1001', 'integration_type': 'monday', 'payload': '{"action": "create_item", "request": {"item_name": "AI Platform Monday via integration"}, "result": {"status": "success", "integration": "monday", "a ... (143 characters truncated) ... ration", "state": "active", "board": {"id": "18409323747", "name": "Test"}}}, "extensions": {"request_id": "1edd9e00-d0f3-9140-8d38-35bc871eb2eb"}}}}', 'status': 'success', 'attempts': 1, 'last_error': None, 'idempotency_key': '2e4f7887-a11b-46f4-821b-13917efd6727', 'updated_at': None}
+2026-04-19 22:03:23,265 | INFO | sqlalchemy.engine.Engine | COMMIT
+2026-04-19 22:03:23,267 | INFO | sqlalchemy.engine.Engine | BEGIN (implicit)
+2026-04-19 22:03:23,268 | INFO | sqlalchemy.engine.Engine | SELECT integration_events.id, integration_events.job_id, integration_events.tenant_id, integration_events.integration_type, integration_events.payload, integration_events.status, integration_events.attempts, integration_events.last_error, integration_events.idempotency_key, integration_events.created_at, integration_events.updated_at 
+FROM integration_events 
+WHERE integration_events.id = %(pk_1)s
+2026-04-19 22:03:23,269 | INFO | sqlalchemy.engine.Engine | [generated in 0.00023s] {'pk_1': 5}
+2026-04-19 22:03:23,271 | INFO | sqlalchemy.engine.Engine | ROLLBACK

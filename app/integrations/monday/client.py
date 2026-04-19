@@ -1,5 +1,6 @@
 # app/integrations/monday/client.py
 
+import json
 import requests
 
 
@@ -26,7 +27,8 @@ class MondayClient:
         data = response.json()
 
         if "errors" in data and data["errors"]:
-            raise Exception(str(data["errors"]))
+            messages = "; ".join(e.get("message", str(e)) for e in data["errors"])
+            raise RuntimeError(f"monday API error: {messages}")
 
         return data
 
@@ -68,11 +70,19 @@ class MondayClient:
         }
         """
 
+        # monday GraphQL expects column_values as a JSON string, not a dict.
+        if column_values is None:
+            cv_str = "{}"
+        elif isinstance(column_values, str):
+            cv_str = column_values
+        else:
+            cv_str = json.dumps(column_values)
+
         variables = {
             "board_id": str(board_id),
             "item_name": item_name,
             "group_id": group_id,
-            "column_values": column_values,
+            "column_values": cv_str,
         }
 
         return self._post(query=query, variables=variables)

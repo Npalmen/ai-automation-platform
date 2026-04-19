@@ -124,7 +124,7 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - 17 new tests; 105/105 pass
 
 ## Current state
-MVP is complete and stabilized. Pipeline runs end-to-end with correct intake normalization and entity fallback. Auth is enforced. UI is stable, Swedish-localised, and tenant-aware. Verification is deterministic (no LLM required). Live API testing has confirmed Gmail, approval flow, and action persistence all work. 300/300 tests pass.
+MVP is complete and live-validated. Gmail send and Monday item creation are confirmed working through real API calls. Full pipeline, approval flow, and action persistence verified end-to-end. Auth is enforced. UI is stable, Swedish-localised, and tenant-aware. Verification is deterministic (no LLM required). 326/326 tests pass.
 
 ## Completed slice (2026-04-12 — integration event persistence)
 - `IntegrationEvent` model base fixed to `database.Base` — table now in `create_all`
@@ -228,22 +228,22 @@ Six fixes applied after live testing revealed integration issues:
 - 263/263 tests pass
 - README, docs/05-current-state.md, and docs/08-handoff.md updated to reflect real behavior
 
-## What is actually working (live-verified 2026-04-14)
+## What is actually working now (live-verified)
 
 Confirmed through real API calls — not theoretical:
 
-- **Gmail send** — `POST /integrations/google_mail/execute` reaches the Gmail API and delivers email
-- **OAuth refresh** — token refresh on `401` works; `invalid_grant` surfaces as `503` with detail
-- **Full pipeline** — intake → classification → extraction → decisioning → policy → action_dispatch; all stages execute
-- **Approval pause/resume** — job enters `awaiting_approval`; `POST /approvals/{id}/approve` with `{}` resumes it; actions execute after approval
+- **Gmail send** — `POST /integrations/google_mail/execute` reaches the Gmail API and delivers email; OAuth refresh validated
+- **Monday item creation** — `POST /integrations/monday/execute` creates a real item in a monday.com board
+- **Full pipeline** — intake → classification → extraction → decisioning → policy → action_dispatch; all stages execute with real data
+- **Approval pause/resume** — job enters `awaiting_approval`; `POST /approvals/{id}/approve` with `{}` resumes it; action executes after approval; result persisted
 - **Action persistence** — `GET /jobs/{job_id}/actions` returns the executed action record
-- **300 tests passing**
+- **326 tests passing**
 
 ---
 
-## How to test the system via API
+## How to test the system via API (step-by-step)
 
-**Direct Gmail send:**
+**1. Direct Gmail send (requires OAuth env vars):**
 ```bash
 curl -s -X POST http://localhost:8000/integrations/google_mail/execute \
   -H "Content-Type: application/json" \
@@ -251,7 +251,15 @@ curl -s -X POST http://localhost:8000/integrations/google_mail/execute \
   -d '{"action": "send_email", "payload": {"to": "you@example.com", "subject": "Test", "body": "Hello"}}'
 ```
 
-**Create a job (approval flow):**
+**2. Direct Monday item creation (requires MONDAY_API_KEY + MONDAY_BOARD_ID env vars):**
+```bash
+curl -s -X POST http://localhost:8000/integrations/monday/execute \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: key-abc123" \
+  -d '{"action": "create_item", "payload": {"item_name": "Test item from AI Platform"}}'
+```
+
+**3. Create a job (triggers full pipeline; add force_approval_test to pause for approval):**
 ```bash
 curl -s -X POST http://localhost:8000/jobs \
   -H "Content-Type: application/json" \
@@ -269,22 +277,25 @@ curl -s -X POST http://localhost:8000/jobs \
   }'
 ```
 
-**Approve:**
+**4. List pending approvals and approve (body {} is required — empty body causes parse error):**
 ```bash
+curl -s http://localhost:8000/approvals/pending -H "X-API-Key: key-abc123"
+
 curl -s -X POST http://localhost:8000/approvals/<approval_id>/approve \
   -H "Content-Type: application/json" \
   -H "X-API-Key: key-abc123" \
   -d '{}'
 ```
 
-**Inspect:**
+**5. Inspect job result and executed actions:**
 ```bash
+curl -s http://localhost:8000/jobs/<job_id> -H "X-API-Key: key-abc123"
 curl -s http://localhost:8000/jobs/<job_id>/actions -H "X-API-Key: key-abc123"
 ```
 
 ---
 
-## Known sharp edges (do not assume)
+## Known limitations / sharp edges (do not assume)
 
 These are real behaviors observed during live testing. Each one has caused a failure at least once.
 
@@ -298,22 +309,40 @@ These are real behaviors observed during live testing. Each one has caused a fai
 
 5. **Gmail needs all four OAuth vars** — `GOOGLE_MAIL_ACCESS_TOKEN`, `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`. Setting only some of them will work until the access token expires, then fail with `invalid_grant` (503).
 
-6. **Windows terminal (GBK) misrenders UTF-8** — Swedish characters in the API response are correct UTF-8. The Windows GBK code page can't display them and shows `?`. The data is not corrupted. Run `chcp 65001` to fix the terminal.
+6. **Monday `board_id` is env-only** — `MONDAY_BOARD_ID` in `.env` is the only way to set the target board. There is no per-request override. All `create_item` calls go to this board.
+
+7. **Monday `column_values` must be a dict in the request** — the platform serializes it to a JSON string before sending to monday's GraphQL API. Do not pre-serialize. Sending a dict directly to monday's API without this serialization causes `Invalid type, expected a JSON string`.
+
+8. **DB tenant config overrides static config** — if `monday` appears in `TENANT_CONFIGS` but the route returns `403 Integration not enabled`, check the DB row for that tenant. The DB row is authoritative when present. Update via `PUT /tenant/config/{tenant_id}`.
+
+9. **Windows terminal (GBK) misrenders UTF-8** — Swedish characters in the API response are correct UTF-8. The Windows GBK code page can't display them and shows `?`. The data is not corrupted. Run `chcp 65001` to fix the terminal.
 
 ---
 
 ## Completed slice (2026-04-14 — live testing and regression hardening)
 
 - Full end-to-end live testing performed: Gmail send, pipeline, approval flow, action persistence
-- API contract gaps identified and documented (see "Known sharp edges" above and README "API Contracts")
+- API contract gaps identified and documented
 - `RuntimeError` from Gmail routes maps to `503`; `ValueError` maps to `400`
 - `_mask()` helper and `_log_config_diagnostics()` added to `GoogleMailAdapter`
 - `tests/test_google_mail_runtime_errors.py` — 15 tests
 - `tests/test_integration_execute_contract.py` — 10 tests
 - `tests/test_swedish_char_encoding.py` — 12 tests (UTF-8 round-trip proof)
-- README updated: "Verified Capabilities", "Quick Start (Tested)", "API Contracts (Important)", "Gmail Integration (Working Setup)"
-- docs/05-current-state.md updated: live-tested section, Known API Contract Gaps table
 - 300/300 tests pass
+
+## Completed slice (2026-04-14 — Monday integration live testing and config fixes)
+
+- Monday `create_item` live-tested — item confirmed created in real monday.com board
+- **Bug fixed:** `allowed_integrations` in static `TENANT_CONFIGS` stored enum objects (`IntegrationType.MONDAY`); route check expected strings → `403` even though integration was configured
+  - `app/core/config.py` — all `IntegrationType.X` → `IntegrationType.X.value` across all four tenant configs
+  - `app/integrations/policies.py` — defensive normalization: `allowed = [i.value if hasattr(i, "value") else i for i in raw]`
+- **Bug fixed:** `column_values` sent as Python dict to monday GraphQL API; monday requires a JSON string → `Invalid type, expected a JSON string`
+  - `app/integrations/monday/client.py` — `json.dumps(column_values)` before variable assignment; `None` → `"{}"`, string pass-through
+- **Improvement:** monday API errors now raise `RuntimeError("monday API error: <message>")` instead of raw `Exception(str(list))` — readable message, correctly caught by route as 503
+- `tests/test_tenant_config.py` — 10 new normalization tests
+- `tests/test_monday_client.py` — 16 new tests (serialization, error handling, adapter routing)
+- README, docs/05-current-state.md, docs/08-handoff.md updated with Monday live status and all sharp edges
+- 326/326 tests pass
 
 ---
 
@@ -321,5 +350,6 @@ These are real behaviors observed during live testing. Each one has caused a fai
 All original MVP backlog items are complete.
 
 ## Expected output from next implementation chat
-- Continue from this repo state; all docs and 300 tests are current
-- Platform is stable and ready for first customer onboarding or integration testing
+- Continue from this repo state; all docs and 326 tests are current
+- Gmail and Monday integrations are live-verified
+- Platform is stable and ready for first customer onboarding or additional integration testing

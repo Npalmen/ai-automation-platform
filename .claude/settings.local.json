@@ -26,7 +26,8 @@
       "Bash(python -m pytest tests/test_tenant_config_save_by_id.py -v --tb=short)",
       "Bash(python -m pytest tests/ -x -q)",
       "Bash(python -m pytest tests/test_verify_tenant.py -v)",
-      "Bash(python -m pytest tests/test_swedish_char_encoding.py -v)"
+      "Bash(python -m pytest tests/test_swedish_char_encoding.py -v)",
+      "Bash(python -m pytest tests/test_monday_client.py -v)"
     ]
   }
 }

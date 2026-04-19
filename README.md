@@ -6,29 +6,35 @@ Jobs are received, classified, processed through a pipeline, paused for human ap
 
 ---
 
-## Verified Capabilities
+## Verified Capabilities (Live Tested)
 
-The following has been validated through live API testing (2026-04-14):
+The following has been confirmed through real API calls against a running instance — not assumptions.
 
-- **Live Gmail sending works** — `POST /integrations/google_mail/execute` reaches the Gmail API and sends real email using access + refresh token flow
-- **Full pipeline verified end-to-end** — intake → classification → entity extraction → decisioning → policy → approval pause → resume → action dispatch
-- **Approval flow works** — job enters `awaiting_approval`, `POST /approvals/{id}/approve` with `{}` resumes execution, actions execute after approval
-- **Action execution is persisted** — queryable via `GET /jobs/{job_id}/actions`
-- **300 tests passing**
+| Capability | Status | Verified via |
+|-----------|--------|-------------|
+| Gmail send (`send_email`) | ✅ LIVE | `POST /integrations/google_mail/execute` |
+| Gmail OAuth token refresh | ✅ LIVE | access + refresh token flow end-to-end |
+| Monday item creation (`create_item`) | ✅ LIVE | `POST /integrations/monday/execute` → real board |
+| Full pipeline (intake → action_dispatch) | ✅ LIVE | `/jobs` end-to-end with real data |
+| Approval pause and resume | ✅ LIVE | job enters `awaiting_approval`; approve resumes; action executes |
+| Action persistence | ✅ LIVE | `GET /jobs/{job_id}/actions` returns real records |
+| Multi-tenant auth | ✅ LIVE | `X-API-Key` + `tenant_id` in body, both required |
+| 326 tests passing | ✅ | `python -m pytest` |
 
 ---
 
 ## Current Status
 
-MVP is complete and stabilized:
+MVP is complete and live-validated:
 
 - FastAPI backend with PostgreSQL persistence
 - Multi-tenant with per-tenant API key auth (`X-API-Key`)
 - Workflow orchestrator with AI processors and deterministic fallbacks
 - Approval flow (pause / resume)
 - Action dispatch with error handling and audit
+- Gmail and Monday.com integrations live-tested
 - Operator UI at `/ui` (Swedish, tenant-aware)
-- 300 tests passing
+- 326 tests passing
 
 See [docs/05-current-state.md](docs/05-current-state.md) for the full status.
 
@@ -45,25 +51,37 @@ scripts/      Utility scripts (DB setup, connection check)
 
 ---
 
-## API Contracts (Important)
+## Important API Contracts
 
-These are observed behaviors from live testing — not assumptions.
+All of the following are real behaviors observed during live testing — each one has caused a failure at least once.
 
 ### POST /jobs
 
-- Requires `X-API-Key` header **and** `tenant_id` in the request body
-- `job_type` in the request is a hint, not authoritative — the system may override it via AI classification
-- `input_data` must be a nested object; top-level fields outside `input_data` are ignored by processors
+- Requires **both** `X-API-Key` header and `tenant_id` in the request body — missing either returns an error
+- `job_type` is a hint only; AI classification may override it — the actual type used is in the response
+- `input_data` must be a nested object; top-level fields outside `input_data` are silently ignored by all processors
 
 ### POST /approvals/{id}/approve
 
 - Requires a JSON body — minimal working body is `{}`
-- Without a body the request fails with a parse error
+- Sending no body at all causes a parse error
 
 ### POST /integrations/{type}/execute
 
-- Request body uses `"payload"`, not `"input"`
-- Sending `"input"` instead silently produces an empty payload and returns `400`
+- Request body uses `"payload"`, not `"input"` — sending `"input"` silently produces an empty payload, and the adapter returns `400` with no indication that the wrong key was used
+- For Monday: `board_id` is **not** a payload field — it is fixed at connection time from `MONDAY_BOARD_ID` in `.env`
+- For Monday: `column_values` must be passed as a plain dict — the platform JSON-serializes it internally (monday's GraphQL API requires it as a JSON string; sending a pre-serialized string also works)
+
+### Tenant configuration
+
+- The DB `tenant_configs` table overrides the static config in `app/core/config.py` whenever a row exists for the tenant — if an integration appears enabled in the code but rejected at runtime, check the DB row
+- `allowed_integrations` in the DB is stored as plain strings (e.g. `"monday"`); enum objects in static config are normalized on read — both formats work, but the DB is authoritative
+- An integration must be in the tenant's `allowed_integrations` or the route returns `403` regardless of env var configuration
+
+### Gmail OAuth
+
+- All four env vars are required for automatic refresh: `GOOGLE_MAIL_ACCESS_TOKEN`, `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`
+- Setting only some of them works until the access token expires (≈1 hour), then fails with `invalid_grant` (503)
 
 ### Authentication
 
@@ -152,11 +170,13 @@ Open the operator UI: **http://localhost:8000/ui**
 
 ---
 
-## Quick Start (Tested)
+## Quick Start (Actual Working Commands)
 
-These are the exact commands verified against a running instance.
+These exact commands have been verified against a live running instance.
 
-### Direct Gmail send
+### Gmail — send an email directly
+
+Requires `GOOGLE_MAIL_ACCESS_TOKEN` (and optionally refresh credentials) in `.env`.
 
 ```bash
 curl -s -X POST http://localhost:8000/integrations/google_mail/execute \
@@ -172,9 +192,46 @@ curl -s -X POST http://localhost:8000/integrations/google_mail/execute \
   }'
 ```
 
-> Note: the field is `"payload"`, not `"input"`.
+### Monday — create an item directly
 
-### Create a job
+Requires `MONDAY_API_KEY` and `MONDAY_BOARD_ID` in `.env`. The board is fixed from env — `board_id` is not a payload field.
+
+```bash
+curl -s -X POST http://localhost:8000/integrations/monday/execute \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: key-abc123" \
+  -d '{
+    "action": "create_item",
+    "payload": {
+      "item_name": "New lead from AI Platform"
+    }
+  }'
+```
+
+With column values (pass as a dict — the platform serializes to JSON string internally):
+
+```bash
+curl -s -X POST http://localhost:8000/integrations/monday/execute \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: key-abc123" \
+  -d '{
+    "action": "create_item",
+    "payload": {
+      "item_name": "Erik Lindqvist",
+      "group_id": "topics",
+      "column_values": {
+        "text": "Erik Lindqvist",
+        "email": {"email": "erik@example.com", "text": "erik@example.com"},
+        "phone": {"phone": "0701234567", "countryShortName": "SE"},
+        "status": {"label": "New"}
+      }
+    }
+  }'
+```
+
+### Full pipeline — create a job
+
+`tenant_id` in the body must match the tenant derived from `X-API-Key`. `job_type` is a hint — the classifier may override it.
 
 ```bash
 curl -s -X POST http://localhost:8000/jobs \
@@ -193,31 +250,33 @@ curl -s -X POST http://localhost:8000/jobs \
   }'
 ```
 
-> `tenant_id` in the body must match the tenant derived from `X-API-Key`. `job_type` may be overridden by the classifier.
-
-### Approve a pending job
+### Approval flow — step by step
 
 ```bash
-# 1. Find the approval ID
+# Step 1 — list pending approvals, note the approval_id
 curl -s http://localhost:8000/approvals/pending \
   -H "X-API-Key: key-abc123"
 
-# 2. Approve it — body {} is required
+# Step 2 — approve; {} body is required (empty body causes a parse error)
 curl -s -X POST http://localhost:8000/approvals/<approval_id>/approve \
   -H "Content-Type: application/json" \
   -H "X-API-Key: key-abc123" \
   -d '{}'
 ```
 
-> `{}` is required. An empty body causes a parse error.
-
-### Inspect a job and its actions
+### Inspect job status and actions
 
 ```bash
+# Job detail
 curl -s http://localhost:8000/jobs/<job_id> \
   -H "X-API-Key: key-abc123"
 
+# Actions executed for this job
 curl -s http://localhost:8000/jobs/<job_id>/actions \
+  -H "X-API-Key: key-abc123"
+
+# Audit events
+curl -s http://localhost:8000/audit-events \
   -H "X-API-Key: key-abc123"
 ```
 
@@ -229,7 +288,7 @@ curl -s http://localhost:8000/jobs/<job_id>/actions \
 python -m pytest
 ```
 
-Expected: 300 passed.
+Expected: 326 passed.
 
 ---
 
@@ -269,6 +328,70 @@ Fix: re-authorize the OAuth application and obtain a new refresh token. All thre
 **Note on terminal encoding:**
 
 The API response is UTF-8 encoded. On Windows terminals using GBK/CP936 code page, Swedish characters (ä, å, ö) may render as `?` in curl output. The data is correct — the display is wrong. Run `chcp 65001` in your terminal to switch to UTF-8 before running curl.
+
+---
+
+## Monday.com Integration Setup
+
+```
+MONDAY_API_KEY=<your_monday_api_token>
+MONDAY_API_URL=https://api.monday.com/v2
+MONDAY_BOARD_ID=<your_board_id_as_integer>
+```
+
+**Where to find these values:**
+- API token: monday.com → Avatar → Developers → My Access Tokens → copy a personal token
+- Board ID: visible in the board URL — `https://your-org.monday.com/boards/<board_id>`
+
+**Supported actions:**
+
+| Action | Required payload fields | Optional payload fields |
+|--------|------------------------|------------------------|
+| `create_item` | `item_name` | `group_id`, `column_values` |
+| `create_update` | `item_id`, `body` | — |
+
+**`board_id` is not a per-request field.** The board is fixed at connection time from `MONDAY_BOARD_ID`. To write to a different board, change the env var.
+
+**`column_values`** is sent as a plain JSON dict in the request payload — the platform serializes it to a JSON string internally before sending to monday's GraphQL API (which requires `column_values` to be a JSON string, not an object). Pass a dict; do not pre-serialize it.
+
+Common column value shapes by type:
+
+```json
+{
+  "text":    "plain string value",
+  "email":   {"email": "x@example.com", "text": "x@example.com"},
+  "phone":   {"phone": "0701234567", "countryShortName": "SE"},
+  "status":  {"label": "New"},
+  "numbers": 42
+}
+```
+
+Column IDs match the board's column configuration — inspect your board settings in monday.com to find the exact IDs.
+
+**`group_id`** is the monday internal group identifier (not the display name). Find it via monday.com's board API or by inspecting the board URL when a group is selected.
+
+**Common failures:**
+
+| Error | Cause |
+|-------|-------|
+| `400 Missing monday api_key` | `MONDAY_API_KEY` not set |
+| `400 Missing monday board_id` | `MONDAY_BOARD_ID=0` or unset |
+| `400 Missing 'item_name'` | `item_name` absent from payload |
+| `400 Unsupported monday action` | Wrong action string |
+| `403 Forbidden` | `monday` not in tenant's `allowed_integrations` |
+| `503` | monday GraphQL returned errors (invalid token, board not found, wrong column ID) |
+
+**Add monday to a tenant's allowed integrations:**
+
+```bash
+curl -s -X PUT http://localhost:8000/tenant/config/TENANT_1001 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "enabled_job_types": ["lead", "customer_inquiry"],
+    "allowed_integrations": ["google_mail", "monday"],
+    "auto_actions": {}
+  }'
+```
 
 ---
 
@@ -501,13 +624,31 @@ To use a tenant with the API, it must be configured in `TENANT_API_KEYS` and hav
 
 ---
 
+## Known Sharp Edges
+
+These are real behaviors that have caused failures during live testing.
+
+1. **DB tenant config overrides static config** — if an integration appears enabled in `app/core/config.py` but the route returns `403`, the DB row for that tenant is overriding it. Check and update via `PUT /tenant/config/{tenant_id}`.
+
+2. **Integration must be in `allowed_integrations` for the tenant** — both env vars and DB config must align. Setting `MONDAY_API_KEY` alone is not enough if `monday` is not in the tenant's allowed list.
+
+3. **Enum vs string mismatch in tenant config** — the static config previously stored `IntegrationType.MONDAY` (enum objects); the DB stores plain strings (`"monday"`). The code normalizes both now, but if you see an integration silently blocked, inspect whether the DB row contains strings or enum reprs.
+
+4. **Monday `column_values` must come from the platform serializer** — pass a plain dict in the request payload; do not pre-serialize to a JSON string. The platform calls `json.dumps()` before sending to monday's GraphQL API. Sending a raw Python dict directly to the monday API causes `Invalid type, expected a JSON string`.
+
+5. **`board_id` is env-only for Monday** — there is no per-request board ID override. All `create_item` calls go to `MONDAY_BOARD_ID`. To target a different board, change the env var and restart.
+
+6. **Windows terminal (GBK) misrenders UTF-8** — Swedish characters in the API response are correct UTF-8. The Windows GBK code page shows them as `?`. Run `chcp 65001` to switch the terminal to UTF-8 before running curl.
+
+---
+
 ## Known Limitations
 
 - No pagination controls in the operator UI (backend supports it via query params)
 - `docker-compose.yml` starts PostgreSQL only — the app runs separately via `uvicorn`
 - No DB migration tooling — schema changes require manual `create_all` or ALTER TABLE
 - `app/api/routes/jobs.py` is dead code (not mounted) — does not affect runtime
-- Action dispatch is stubbed for most integrations; only Gmail has a live implementation
+- Action dispatch is live for Gmail and Monday; all other integrations (CRM, Slack, Fortnox, Visma) are stubbed or webhook-based
 - Windows terminals using GBK code page (default) will misrender UTF-8 characters in curl output — run `chcp 65001` to switch to UTF-8
 
 ---

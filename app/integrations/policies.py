@@ -15,9 +15,9 @@ def is_integration_enabled_for_tenant(
     db: "Session | None" = None,
 ) -> bool:
     config = get_tenant_config(tenant_id, db=db)
-    allowed_integrations = config.get("allowed_integrations", [])
+    raw = config.get("allowed_integrations", [])
 
-    return any(
-        allowed == integration_type or allowed == integration_type.value
-        for allowed in allowed_integrations
-    )
+    # Normalize to strings — config may contain enum objects or string values.
+    allowed = [i.value if hasattr(i, "value") else i for i in raw]
+
+    return integration_type.value in allowed
