@@ -7,13 +7,18 @@ The following has been confirmed through real API calls against a running instan
 | What | Status | Notes |
 |------|--------|-------|
 | Gmail send_email | ✅ LIVE VERIFIED | `POST /integrations/google_mail/execute` → real Gmail delivery |
-| Gmail OAuth refresh | ✅ LIVE VERIFIED | token refresh on 401, invalid_grant → 503 |
-| Monday create_item | ✅ LIVE VERIFIED | `POST /integrations/monday/execute` → item appears in real board |
-| Full pipeline | ✅ END-TO-END VERIFIED | intake → classification → extraction → decisioning → policy → approval → action_dispatch |
+| Gmail list_messages | ✅ LIVE VERIFIED | returns real inbox messages with message_id, thread_id, from, subject, snippet, received_at, label_ids |
+| Gmail get_message | ✅ LIVE VERIFIED | returns full message including body_text (text/plain extracted from MIME tree) |
+| Gmail OAuth refresh | ✅ LIVE VERIFIED | token refresh on 401; invalid_grant → 503 |
+| Monday create_item (direct) | ✅ LIVE VERIFIED | `POST /integrations/monday/execute` → item appears in real board |
+| Monday create_monday_item (workflow) | ✅ LIVE VERIFIED | `/jobs` → action_dispatch → Monday adapter → real board item |
+| Full pipeline | ✅ END-TO-END VERIFIED | intake → classification → extraction → decisioning → policy → action_dispatch → human_handoff |
+| Multi-action dispatch | ✅ LIVE VERIFIED | multiple actions in `input_data.actions` execute in sequence; partial failure recorded |
 | Approval pause/resume | ✅ LIVE VERIFIED | `POST /approvals/{id}/approve` with `{}` resumes job; action executes after |
 | Action persistence | ✅ LIVE VERIFIED | `GET /jobs/{job_id}/actions` returns real executed records |
 | Multi-tenant auth | ✅ LIVE VERIFIED | `X-API-Key` + body `tenant_id` both required |
-| 326 tests passing | ✅ | `python -m pytest` |
+| Gmail → lead → Monday flow | ✅ LIVE VERIFIED | list_messages → get_message → map to /jobs → Monday item created |
+| 335 tests passing | ✅ | `python -m pytest` |
 
 ---
 
@@ -73,17 +78,57 @@ These are sharp edges discovered during live testing. Each one has caused a real
 - Approvals persisted in DB with actor/channel/timestamp
 
 ### Integrations
-- Gmail (`send_email`) — ✅ LIVE VERIFIED; OAuth token refresh validated; `RuntimeError` from `invalid_grant` surfaces as `503` with descriptive detail
-- Monday (`create_item`, `create_update`) — ✅ LIVE VERIFIED; item created in real board; `column_values` serialized to JSON string internally; `board_id` fixed from env
-- All other integrations (CRM, Slack, Fortnox, Visma, etc.) are stubbed or webhook-based
+
+**Google Mail** — ✅ LIVE VERIFIED (read + write)
+- `send_email` — delivers to real Gmail inbox; OAuth token refresh on 401; `invalid_grant` surfaces as 503
+- `list_messages` — lists inbox messages; returns message_id, thread_id, from, subject, received_at, snippet, label_ids; supports `max_results` and `query` params
+- `get_message` — fetches single message by `message_id`; returns all header fields plus `body_text` (text/plain extracted from MIME tree; empty string for HTML-only messages)
+- All three actions share the same 401→refresh→retry path
+
+**Monday** — ✅ LIVE VERIFIED
+- `create_item` (direct via `/integrations/monday/execute`) — creates real item in the configured board
+- `create_monday_item` (workflow via `input_data.actions`) — routes through action_dispatch → MondayAdapter → real board item
+- `column_values` serialized to JSON string internally; `board_id` is env-only (`MONDAY_BOARD_ID`)
+
+**All other integrations** (CRM, Slack, Fortnox, Visma, etc.) are stubbed or webhook-based and have not been live-tested.
+
+### Deterministic execution path
+
+`input_data.actions` is the primary control path for action dispatch. When actions are provided explicitly, the workflow engine executes them directly without requiring LLM output. The LLM is used for classification, extraction, and decisioning — but if those processors fall back (no `LLM_API_KEY`), the policy processor still routes to `auto_execute` for `lead` and `customer_inquiry` job types, and action_dispatch runs.
+
+**The workflow does NOT auto-generate actions** — actions must be provided in `input_data.actions` or derived from a future decisioning rule. Without them, action_dispatch runs but executes nothing.
 
 ### Audit
 - All pipeline steps emit audit events: `step_started`, `step_completed`, `step_failed`, `workflow_completed`, `workflow_failed`
 
+## Verified end-to-end flows
+
+### Flow 1: Gmail read → lead intake → Monday item
+1. `POST /integrations/google_mail/execute` with `action: list_messages` → inbox message list
+2. `POST /integrations/google_mail/execute` with `action: get_message, message_id: <id>` → full message with body_text
+3. Map sender, subject, body_text into `POST /jobs` with `job_type: lead` and `input_data.actions: [{type: create_monday_item, ...}]`
+4. Pipeline runs deterministically (no LLM required): intake → classification → extraction → decisioning → policy (auto_execute) → action_dispatch
+5. Monday item created in real board; job status: `completed`
+
+This is a complete manual-trigger ingestion → decision → action flow, confirmed live.
+
+### Flow 2: Multi-action dispatch
+- Both `create_monday_item` and `send_email` can be listed in `input_data.actions`
+- Actions execute in sequence within a single action_dispatch step
+- If one fails: job status is `failed`; the successful action's side effect is not rolled back
+- Partial success is visible in `GET /jobs/{id}` → `pipeline_state.action_dispatch.actions_taken` vs `actions_failed`
+
+### Flow 3: Approval pause → resume → action
+- Include `force_approval_test: true` in `input_data` to force approval pause
+- Job enters `awaiting_approval`; `POST /approvals/{id}/approve` with `{}` resumes it
+- Post-approval path runs ACTION_DISPATCH only (no re-classification)
+
 ## What is limited
 
-- No LLM in dev without `LLM_API_KEY` — processors fall back; results are deterministic but not AI-driven
-- Action dispatch is real only for Gmail; all other actions are stubbed
+- No LLM in dev without `LLM_API_KEY` — processors fall back deterministically; pipeline still completes
+- Action dispatch is real for Gmail and Monday only; all other action types (notify_slack, notify_teams, create_internal_task) are stubbed
+- Gmail `body_text` is empty for HTML-only emails — no HTML-to-text conversion
+- Monday `board_id` is env-only — no per-request override
 - No DB migration tooling — schema changes require manual intervention
 - No pagination in the UI — API supports it via query params
 - No auto-refresh in the UI — all loads are manual
@@ -107,7 +152,9 @@ The project has passed the concept stage and has a working backend core with rea
 - [x] Approval persistence i DB
 - [x] Action execution persistence i DB
 - [x] Read-endpoints för approvals och actions
-- [x] Live-testad Gmail / Google Mail integration för `send_email`
+- [x] Live-testad Gmail / Google Mail integration: `send_email`, `list_messages`, `get_message`
+- [x] Live-testad Monday integration: `create_item` (direct) + `create_monday_item` (workflow)
+- [x] Multi-action dispatch verified (lead → Monday + Gmail in single job)
 
 ## Confirmed API surface
 ### Core
@@ -360,6 +407,30 @@ Live testing of Monday.com integration and tenant config resolution:
 - `tests/test_tenant_config.py` — 10 new normalization tests (string list, enum list, mixed, empty, monday in TENANT_1001 / TENANT_2001)
 - `tests/test_monday_client.py` — 16 new tests (column_values serialization for all input types, board_id as string, group_id, error handling, adapter routing)
 - 326/326 tests pass
+
+## Monday workflow wiring (2026-04-20)
+
+- `create_monday_item` added to `SUPPORTED_ACTIONS` in `app/workflows/action_executor.py`
+- `_build_monday_item_result()` handler added — mirrors `_build_email_result` pattern; routes to `MondayAdapter`
+- `is_integration_configured()` in `app/integrations/service.py` extended: `api_key + board_id` → configured (previously only checked token-based or webhook-based configs)
+- `tests/test_action_executor_monday.py` — 9 new tests
+- Monday is now fully wired into both the direct integration path and the workflow pipeline
+
+## Gmail read actions (2026-04-20)
+
+- `list_messages` action added to `GoogleMailClient` and `GoogleMailAdapter`
+  - Fetches inbox stubs then enriches each with metadata headers in one pass
+  - Returns: `message_id`, `thread_id`, `from`, `subject`, `received_at`, `snippet`, `label_ids`
+  - Supports `max_results` (default 10) and `query` (Gmail search string)
+  - 401→refresh→retry path shared with send
+- `get_message` action added to `GoogleMailClient` and `GoogleMailAdapter`
+  - Fetches single message with `format=full`
+  - Extracts `body_text` by walking MIME part tree depth-first; returns first `text/plain` part, base64-decoded
+  - Returns: `message_id`, `thread_id`, `from`, `to`, `subject`, `received_at`, `snippet`, `label_ids`, `body_text`
+  - `body_text` is empty string for HTML-only messages
+- `tests/test_google_mail_list_messages.py` — 11 new tests
+- `tests/test_google_mail_get_message.py` — 11 new tests
+- 335/335 tests pass
 
 ## All MVP slices complete
 All items from the original backlog are implemented and tested.

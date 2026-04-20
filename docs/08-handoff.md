@@ -232,23 +232,70 @@ Six fixes applied after live testing revealed integration issues:
 
 Confirmed through real API calls — not theoretical:
 
-- **Gmail send** — `POST /integrations/google_mail/execute` reaches the Gmail API and delivers email; OAuth refresh validated
-- **Monday item creation** — `POST /integrations/monday/execute` creates a real item in a monday.com board
-- **Full pipeline** — intake → classification → extraction → decisioning → policy → action_dispatch; all stages execute with real data
+- **Gmail send** (`send_email`) — `POST /integrations/google_mail/execute` reaches the Gmail API and delivers email; OAuth refresh validated
+- **Gmail read** (`list_messages`) — returns real inbox messages with message_id, thread_id, from, subject, received_at, snippet, label_ids; supports max_results and query filter
+- **Gmail read** (`get_message`) — returns full message by message_id including body_text (text/plain extracted from MIME tree)
+- **Monday item creation** (direct) — `POST /integrations/monday/execute` with `action: create_item` creates a real item in the configured board
+- **Monday item creation** (workflow) — `/jobs` → action_dispatch → `create_monday_item` action type → real board item
+- **Full pipeline** — intake → classification → extraction → decisioning → policy → action_dispatch → human_handoff; all stages execute with real data; verified without LLM
+- **Multi-action dispatch** — `input_data.actions` with multiple entries executes them in sequence; partial failure recorded; no rollback
 - **Approval pause/resume** — job enters `awaiting_approval`; `POST /approvals/{id}/approve` with `{}` resumes it; action executes after approval; result persisted
 - **Action persistence** — `GET /jobs/{job_id}/actions` returns the executed action record
-- **326 tests passing**
+- **Gmail → lead → Monday flow** — list_messages → get_message → map to /jobs → Monday item created (full manual ingestion flow confirmed)
+- **335 tests passing**
+
+## Verified production behavior
+
+### Gmail
+- `send_email`, `list_messages`, `get_message` all confirmed against live Gmail account
+- OAuth 401→refresh→retry works for all three actions
+- `invalid_grant` (expired/revoked refresh token) surfaces as 503 with descriptive message
+- `body_text` extracted from text/plain MIME part; empty for HTML-only messages
+
+### Monday
+- `create_item` confirmed live — item appears in real board
+- `create_monday_item` in workflow confirmed — action_dispatch routes to MondayAdapter correctly
+- `column_values` serialized to JSON string internally; board_id is env-only
+
+### Multi-action dispatch behavior
+- Actions in `input_data.actions` execute in order within action_dispatch
+- If one action fails, job status is `failed` — even if earlier actions succeeded
+- No rollback — successful side effects (Monday item, sent email) persist regardless of later failures
+- Results visible in `GET /jobs/{id}` → pipeline_state.action_dispatch
+
+### Partial failure example (confirmed live)
+Job with `[create_monday_item, send_email]`:
+- Monday item created ✅
+- Gmail failed (invalid_grant) ❌
+- Job status: `failed`
+- Monday item not rolled back
 
 ---
 
 ## How to test the system via API (step-by-step)
 
-**1. Direct Gmail send (requires OAuth env vars):**
+**1a. Direct Gmail send (requires OAuth env vars):**
 ```bash
 curl -s -X POST http://localhost:8000/integrations/google_mail/execute \
   -H "Content-Type: application/json" \
   -H "X-API-Key: key-abc123" \
   -d '{"action": "send_email", "payload": {"to": "you@example.com", "subject": "Test", "body": "Hello"}}'
+```
+
+**1b. Gmail list messages:**
+```bash
+curl -s -X POST http://localhost:8000/integrations/google_mail/execute \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: key-abc123" \
+  -d '{"action": "list_messages", "payload": {"max_results": 5}}'
+```
+
+**1c. Gmail get full message (use message_id from list_messages):**
+```bash
+curl -s -X POST http://localhost:8000/integrations/google_mail/execute \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: key-abc123" \
+  -d '{"action": "get_message", "payload": {"message_id": "<id>"}}'
 ```
 
 **2. Direct Monday item creation (requires MONDAY_API_KEY + MONDAY_BOARD_ID env vars):**
@@ -346,10 +393,35 @@ These are real behaviors observed during live testing. Each one has caused a fai
 
 ---
 
+## Next step (clear)
+
+### Immediate: Gmail inbox ingestion endpoint
+
+Implement `POST /ingest/gmail` — a manual-trigger endpoint that:
+1. Calls `list_messages` (optionally filtered by query)
+2. For each message, calls `get_message`
+3. Maps the message into a lead/inquiry job payload
+4. Posts to the pipeline via `run_pipeline`
+5. Returns a list of created job IDs
+
+This removes the current manual curl sequence and makes inbox ingestion a single API call.
+
+### After that: scheduled ingestion
+
+Add a periodic trigger (cron or background task) that calls the ingestion endpoint on an interval. The endpoint already does the work; the scheduler just calls it.
+
+### Not yet started
+- Inbox ingestion endpoint (`POST /ingest/gmail`)
+- Scheduler / periodic trigger
+- HTML-to-text for Gmail HTML-only messages
+- Gmail `body_text` truncation for long messages
+- Monday per-request board_id override
+
 ## Remaining work
-All original MVP backlog items are complete.
+All original MVP backlog items are complete. Platform is live-verified and stable.
 
 ## Expected output from next implementation chat
-- Continue from this repo state; all docs and 326 tests are current
-- Gmail and Monday integrations are live-verified
-- Platform is stable and ready for first customer onboarding or additional integration testing
+- Continue from this repo state; all docs and 335 tests are current
+- Gmail read + write and Monday integrations are live-verified
+- The clear next slice is the Gmail ingestion endpoint (`POST /ingest/gmail`)
+- Platform is ready for the ingestion automation layer

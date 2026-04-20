@@ -20,6 +20,7 @@ SUPPORTED_ACTIONS = {
     "notify_slack",
     "notify_teams",
     "create_internal_task",
+    "create_monday_item",
 }
 
 
@@ -220,6 +221,47 @@ def _build_internal_task_result(action: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def _build_monday_item_result(action: dict[str, Any]) -> dict[str, Any]:
+    tenant_id = _get_tenant_id(action)
+    item_name = _ensure_str(action.get("item_name"), "item_name")
+
+    payload: dict[str, Any] = {
+        "item_name": item_name,
+        "column_values": action.get("column_values", {}),
+        "group_id": action.get("group_id"),
+    }
+
+    connection_config = get_integration_connection_config(
+        tenant_id=tenant_id,
+        integration_type=IntegrationType.MONDAY,
+    )
+
+    if not is_integration_configured(connection_config):
+        return _build_stub_result(
+            action_type="create_monday_item",
+            target=item_name,
+            payload=payload,
+            integration="monday",
+            message="Monday integration is not configured for this tenant. Falling back to internal stub.",
+        )
+
+    adapter = get_integration_adapter(
+        integration_type=IntegrationType.MONDAY,
+        connection_config=connection_config,
+    )
+    result = adapter.execute_action(action="create_item", payload=payload)
+
+    return {
+        "type": "create_monday_item",
+        "status": "executed",
+        "executed_at": _utcnow_iso(),
+        "target": item_name,
+        "provider": "monday",
+        "payload": payload,
+        "integration_result": result,
+    }
+
+
 def execute_action(action: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(action, dict):
         raise ValueError("Each action must be an object.")
@@ -251,5 +293,8 @@ def execute_action(action: dict[str, Any]) -> dict[str, Any]:
 
     if action_type == "create_internal_task":
         return _build_internal_task_result(action)
+
+    if action_type == "create_monday_item":
+        return _build_monday_item_result(action)
 
     raise ValueError(f"Unhandled action type '{action_type}'.")

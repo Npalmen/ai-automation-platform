@@ -169,6 +169,111 @@ class GoogleMailClient:
             f"Google Mail send failed with status {response.status_code}: {response_text}"
         )
 
+    def _get(self, path: str, params: dict | None = None) -> requests.Response:
+        url = f"{self.api_url}{path}"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        return requests.get(url, headers=headers, params=params, timeout=self.timeout_seconds)
+
+    def _get_with_refresh(self, path: str, params: dict | None = None) -> dict[str, Any]:
+        response = self._get(path, params)
+        if response.status_code == 401 and self._can_refresh():
+            logger.info("Gmail 401 on read — attempting token refresh.")
+            self.access_token = refresh_access_token(
+                refresh_token=self.refresh_token,
+                client_id=self.client_id,
+                client_secret=self.client_secret,
+            )
+            response = self._get(path, params)
+        if response.status_code >= 400:
+            raise RuntimeError(
+                f"Gmail API error ({response.status_code}): {response.text.strip()}"
+            )
+        return response.json()
+
+    @staticmethod
+    def _extract_header(headers: list[dict], name: str) -> str:
+        for h in headers:
+            if h.get("name", "").lower() == name.lower():
+                return h.get("value", "")
+        return ""
+
+    @staticmethod
+    def _extract_body_text(payload: dict) -> str:
+        # Walk the MIME part tree depth-first; return the first text/plain body found.
+        mime_type = payload.get("mimeType", "")
+        parts = payload.get("parts") or []
+
+        if mime_type == "text/plain":
+            data = (payload.get("body") or {}).get("data", "")
+            if data:
+                try:
+                    return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="replace")
+                except Exception:
+                    return ""
+
+        for part in parts:
+            result = GoogleMailClient._extract_body_text(part)
+            if result:
+                return result
+
+        return ""
+
+    def get_message(self, message_id: str) -> dict[str, Any]:
+        if not message_id or not message_id.strip():
+            raise ValueError("message_id is required.")
+
+        data = self._get_with_refresh(
+            f"/users/{self.user_id}/messages/{message_id.strip()}",
+            params={"format": "full"},
+        )
+
+        payload = data.get("payload") or {}
+        hdrs = payload.get("headers") or []
+
+        return {
+            "message_id": data.get("id", ""),
+            "thread_id": data.get("threadId", ""),
+            "from": self._extract_header(hdrs, "From"),
+            "to": self._extract_header(hdrs, "To"),
+            "subject": self._extract_header(hdrs, "Subject"),
+            "received_at": self._extract_header(hdrs, "Date"),
+            "snippet": data.get("snippet", ""),
+            "label_ids": data.get("labelIds", []),
+            "body_text": self._extract_body_text(payload),
+        }
+
+    def list_messages(self, max_results: int = 10, query: str = "") -> list[dict[str, Any]]:
+        params: dict[str, Any] = {"maxResults": max_results, "format": "metadata"}
+        if query:
+            params["q"] = query
+
+        data = self._get_with_refresh(
+            f"/users/{self.user_id}/messages",
+            params=params,
+        )
+
+        stubs = data.get("messages") or []
+        messages = []
+
+        for stub in stubs:
+            msg_id = stub.get("id", "")
+            detail = self._get_with_refresh(
+                f"/users/{self.user_id}/messages/{msg_id}",
+                params={"format": "metadata", "metadataHeaders": ["From", "Subject", "Date"]},
+            )
+            hdrs = detail.get("payload", {}).get("headers", [])
+            messages.append({
+                "message_id": msg_id,
+                "thread_id": detail.get("threadId", ""),
+                "from": self._extract_header(hdrs, "From"),
+                "subject": self._extract_header(hdrs, "Subject"),
+                "received_at": self._extract_header(hdrs, "Date"),
+                "snippet": detail.get("snippet", ""),
+                "label_ids": detail.get("labelIds", []),
+            })
+
+        return messages
+
     def send_message(
         self,
         *,

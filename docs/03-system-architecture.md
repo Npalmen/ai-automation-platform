@@ -27,6 +27,49 @@ Systemet består av:
 - `app/api/`
 - `app/ai/` (om fortfarande aktiv i aktuell kodstruktur)
 
+## Integration layer
+
+Integrations are action-based. All integrations use the pattern:
+
+```
+adapter.execute_action(action: str, payload: dict) → dict
+```
+
+The integration route (`POST /integrations/{type}/execute`) accepts:
+```json
+{ "action": "<action_name>", "payload": { ... } }
+```
+
+### Google Mail — verified read + write
+
+| Action | Direction | Status |
+|---|---|---|
+| `send_email` | Write | ✅ LIVE VERIFIED |
+| `list_messages` | Read | ✅ LIVE VERIFIED |
+| `get_message` | Read | ✅ LIVE VERIFIED |
+
+All three actions share a 401→token refresh→retry path.
+
+### Monday — verified
+
+| Action (direct) | Action (workflow) | Status |
+|---|---|---|
+| `create_item` | `create_monday_item` | ✅ LIVE VERIFIED |
+
+The workflow action type `create_monday_item` maps to the adapter's `create_item` action.
+
+### Action dispatch — workflow integration
+
+The workflow engine dispatches actions through `app/workflows/action_executor.py`. Supported action types in the workflow:
+
+- `send_email` → `GoogleMailAdapter`
+- `create_monday_item` → `MondayAdapter`
+- `notify_slack` → stub
+- `notify_teams` → stub
+- `create_internal_task` → stub
+
+**The workflow does NOT auto-generate actions.** Actions must be provided explicitly in `input_data.actions` or derived by a future rule engine. Without explicit actions, action_dispatch runs but executes nothing.
+
 ## Current workflow principle
 Bas:
 1. intake

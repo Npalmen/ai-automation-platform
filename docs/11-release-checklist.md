@@ -7,9 +7,15 @@
 - [x] DB setup verified (`docker-compose.yml` + `scripts/create_tables.py`)
 
 ## Test
-- [x] Automated tests pass — 141/141 (`python -m pytest`) — zero warnings
+- [x] Automated tests pass — 335/335 (`python -m pytest`)
 - [x] Official MVP smoke test documented in README (curl commands, step by step)
-- [ ] Gmail integration path verified with live token (requires valid `GOOGLE_MAIL_ACCESS_TOKEN`)
+- [x] Gmail send_email verified live (real Gmail delivery confirmed)
+- [x] Gmail list_messages verified live (real inbox messages returned)
+- [x] Gmail get_message verified live (full message including body_text returned)
+- [x] Monday create_item verified live (real board item confirmed)
+- [x] Monday create_monday_item via workflow verified live (action_dispatch → real board item)
+- [x] Multi-action dispatch tested live (Monday + Gmail in single job)
+- [x] Real lead ingestion flow verified (manual): list_messages → get_message → /jobs → Monday item
 
 ## Docs
 - [x] current-state updated
@@ -31,3 +37,6 @@
 - [x] Gmail OAuth token refresh — refresh on 401, retry once, fail cleanly
 - [x] Integration event persistence — real DB row on every `POST /integrations/{type}/execute`
 - [x] MVP hardening — removed unauthenticated `/tenant/test` debug route; fixed Pydantic v2 deprecation warnings
+- [x] Gmail list_messages + get_message — read actions implemented, tested, and verified live
+- [x] Monday workflow wiring — `create_monday_item` action type wired into action_executor; `is_integration_configured` extended for api_key+board_id configs
+- [x] Full Gmail → lead → Monday flow verified end-to-end (manual trigger)

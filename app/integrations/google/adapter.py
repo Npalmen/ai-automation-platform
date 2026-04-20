@@ -64,6 +64,32 @@ class GoogleMailAdapter(BaseIntegrationAdapter):
     def execute_action(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
         self._log_config_diagnostics()
 
+        if action == "list_messages":
+            max_results = int(payload.get("max_results") or 10)
+            query = str(payload.get("query") or "")
+            messages = self.client.list_messages(max_results=max_results, query=query)
+            return {
+                "status": "success",
+                "integration": "google_mail",
+                "provider": "google_mail",
+                "action": action,
+                "count": len(messages),
+                "messages": messages,
+            }
+
+        if action == "get_message":
+            message_id = payload.get("message_id")
+            if not message_id:
+                raise ValueError("get_message requires 'message_id' in payload.")
+            message = self.client.get_message(message_id=str(message_id))
+            return {
+                "status": "success",
+                "integration": "google_mail",
+                "provider": "google_mail",
+                "action": action,
+                "message": message,
+            }
+
         if action != "send_email":
             raise ValueError(f"Unsupported Google Mail action '{action}'.")
 

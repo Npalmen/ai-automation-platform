@@ -160,4 +160,8 @@ def is_integration_configured(connection_config: dict) -> bool:
     if connection_config.get("access_token") and connection_config.get("api_url"):
         return True
 
+    # API-key-based integrations (Monday, etc.) are configured when api_key and board_id present.
+    if connection_config.get("api_key") and connection_config.get("board_id"):
+        return True
+
     return False

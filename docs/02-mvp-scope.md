@@ -47,3 +47,23 @@ Leverera en testbar och demonstrerbar teknisk MVP där en användare kan:
 - Gmail action kan demonstreras
 - Audit events kan visas
 - En ny chatt kan återuppta arbetet enbart från docs
+
+## MVP status (as of 2026-04-20) — ALL CRITERIA MET
+
+All success criteria above are confirmed met through live API testing.
+
+### What the MVP is
+
+An automation platform with three verified layers:
+
+1. **Ingestion** (manual trigger today) — Gmail inbox can be read via `list_messages` + `get_message`; messages are mapped manually into `/jobs`; scheduled/automatic ingestion is the next step
+2. **Decision engine** — full pipeline: intake → classification → entity extraction → decisioning → policy → action_dispatch. Runs deterministically without LLM when `input_data.actions` is provided explicitly
+3. **Action dispatch** — real integrations: Gmail `send_email`, Monday `create_item`. Multi-action dispatch (both in one job) verified
+
+### Key architectural fact
+
+`input_data.actions` is the primary deterministic execution path. Providing explicit actions bypasses reliance on LLM output for routing. The workflow engine executes whatever is in that list.
+
+### Email ingestion state
+
+Manual trigger is proven: list_messages → get_message → map to /jobs → Monday item created. This is a complete ingestion → decision → action flow. Automation (scheduler/webhook trigger) is not yet implemented and is the clear next step.
