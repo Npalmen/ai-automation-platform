@@ -909,7 +909,7 @@ def gmail_process_inbox(
     Read recent unread Gmail messages and create a lead job for each one.
 
     Skips messages that already have a job (deduplication via source.message_id).
-    Does NOT mark messages as read.
+    Marks successfully processed messages as read via Gmail modify API.
     """
     from app.domain.workflows.enums import JobType
 
@@ -998,13 +998,27 @@ def gmail_process_inbox(
         try:
             saved_job = JobRepository.create_job(db, job)
             processed_job = run_pipeline(saved_job, db)
-            created_jobs.append({
-                "message_id": message_id,
-                "job_id": processed_job.job_id,
-                "status": processed_job.status.value if hasattr(processed_job.status, "value") else str(processed_job.status),
-            })
         except Exception as exc:
             failed_messages.append({"message_id": message_id, "reason": str(exc)})
+            continue
+
+        marked_handled = False
+        mark_warning: str | None = None
+        try:
+            adapter.execute_action(action="mark_as_read", payload={"message_id": message_id})
+            marked_handled = True
+        except Exception as exc:
+            mark_warning = str(exc)
+
+        entry: dict = {
+            "message_id": message_id,
+            "job_id": processed_job.job_id,
+            "status": processed_job.status.value if hasattr(processed_job.status, "value") else str(processed_job.status),
+            "marked_handled": marked_handled,
+        }
+        if mark_warning:
+            entry["mark_warning"] = mark_warning
+        created_jobs.append(entry)
 
     return {
         "processed": len(created_jobs),

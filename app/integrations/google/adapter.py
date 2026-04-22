@@ -90,6 +90,19 @@ class GoogleMailAdapter(BaseIntegrationAdapter):
                 "message": message,
             }
 
+        if action == "mark_as_read":
+            message_id = payload.get("message_id")
+            if not message_id:
+                raise ValueError("mark_as_read requires 'message_id' in payload.")
+            self.client.mark_as_read(message_id=str(message_id))
+            return {
+                "status": "success",
+                "integration": "google_mail",
+                "provider": "google_mail",
+                "action": action,
+                "message_id": message_id,
+            }
+
         if action != "send_email":
             raise ValueError(f"Unsupported Google Mail action '{action}'.")
 

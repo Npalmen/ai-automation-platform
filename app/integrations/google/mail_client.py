@@ -242,6 +242,36 @@ class GoogleMailClient:
             "body_text": self._extract_body_text(payload),
         }
 
+    def _post_with_refresh(self, path: str, body: dict) -> dict[str, Any]:
+        url = f"{self.api_url}{path}"
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json",
+        }
+        response = requests.post(url, headers=headers, json=body, timeout=self.timeout_seconds)
+        if response.status_code == 401 and self._can_refresh():
+            logger.info("Gmail 401 on modify — attempting token refresh.")
+            self.access_token = refresh_access_token(
+                refresh_token=self.refresh_token,
+                client_id=self.client_id,
+                client_secret=self.client_secret,
+            )
+            headers["Authorization"] = f"Bearer {self.access_token}"
+            response = requests.post(url, headers=headers, json=body, timeout=self.timeout_seconds)
+        if response.status_code >= 400:
+            raise RuntimeError(
+                f"Gmail API error ({response.status_code}): {response.text.strip()}"
+            )
+        return response.json()
+
+    def mark_as_read(self, message_id: str) -> None:
+        if not message_id or not message_id.strip():
+            raise ValueError("message_id is required.")
+        self._post_with_refresh(
+            f"/users/{self.user_id}/messages/{message_id.strip()}/modify",
+            body={"removeLabelIds": ["UNREAD"]},
+        )
+
     def list_messages(self, max_results: int = 10, query: str = "") -> list[dict[str, Any]]:
         params: dict[str, Any] = {"maxResults": max_results, "format": "metadata"}
         if query:
