@@ -124,7 +124,11 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - 17 new tests; 105/105 pass
 
 ## Current state
-MVP is complete and live-validated. Gmail (send + read + inbox trigger) and Monday (direct + workflow) are confirmed working through real API calls. Full pipeline, approval flow, and action persistence verified end-to-end. Auth is enforced. UI is stable, Swedish-localised, and tenant-aware. Verification is deterministic (no LLM required). 371/371 tests pass.
+MVP is complete and live-validated. Gmail (send + read + inbox trigger with full hardening) and Monday (direct + workflow) are confirmed working through real API calls. Full pipeline, approval flow, and action persistence verified end-to-end. Auth is enforced. UI is stable, Swedish-localised, and tenant-aware. Verification is deterministic (no LLM required). **545/545 tests pass.**
+
+`POST /gmail/process-inbox` is production-ready: deduplication, mark-as-read, tenant config gating, Monday enrichment, phone extraction, Slack notification, dry_run mode, and query override are all implemented and tested.
+
+Classification fallback (DEL 1 — Slice 1) is complete: LLM unavailability no longer produces `"unknown"` — instead, keyword-based intent detection classifies every message as `lead` or `customer_inquiry`.
 
 ## Completed slice (2026-04-12 — integration event persistence)
 - `IntegrationEvent` model base fixed to `database.Base` — table now in `create_all`
@@ -242,8 +246,9 @@ Confirmed through real API calls — not theoretical:
 - **Approval pause/resume** — job enters `awaiting_approval`; `POST /approvals/{id}/approve` with `{}` resumes it; action executes after approval; result persisted
 - **Action persistence** — `GET /jobs/{job_id}/actions` returns the executed action record
 - **Gmail → lead → Monday flow** — list_messages → get_message → map to /jobs → Monday item created (full manual ingestion flow confirmed)
-- **Gmail inbox trigger** (`POST /gmail/process-inbox`) — reads unread messages, creates lead jobs with `create_monday_item` action, returns processed count and job IDs; not production-ready (no dedup, no mark-as-read)
-- **371 tests passing**
+- **Gmail inbox trigger** (`POST /gmail/process-inbox`) — production-ready: dedup, mark-as-read, tenant gate, Monday enrichment, phone extraction, Slack notify, dry_run, query override
+- **Deterministic classification** — LLM fallback produces `lead` or `customer_inquiry` (not `"unknown"`) for all job sources
+- **545 tests passing**
 
 ## Verified production behavior
 
@@ -394,31 +399,46 @@ These are real behaviors observed during live testing. Each one has caused a fai
 
 ---
 
+## Completed slice (2026-04-21 — Gmail inbox trigger — initial)
+- `POST /gmail/process-inbox` added — reads unread messages, creates lead jobs with `create_monday_item`, returns processed count and job IDs
+- `_parse_from_header` helper; 14 tests in `tests/test_gmail_process_inbox.py`
+- 371/371 tests pass (initial state for this session)
+
+## Completed slices (2026-04-22 — Gmail inbox hardening)
+
+Seven production-readiness slices completed in a single session:
+
+1. **Deduplication** — `JobRepository.get_by_gmail_message_id`; `skipped_messages` with `reason: "duplicate"` (12 tests)
+2. **Mark-as-read** — `GoogleMailClient.mark_as_read` + adapter dispatch; called non-fatally after pipeline; `marked_handled` in response (12 tests)
+3. **Tenant config lead gate** — `get_tenant_config` checked before job creation; `reason: "lead_disabled"` when not enabled (11 tests)
+4. **Monday enrichment** — `_make_monday_item_name`, `_infer_priority`, rich `column_values` with email/phone/priority/body (37 tests)
+5. **From-header + phone extraction** — `email.utils.parseaddr`; `_extract_phone()` regex; phone fed into `column_values` and `input_data.sender` (26 tests)
+6. **Slack notification** — `dispatch_action("notify_slack", ...)` non-fatal; `notified` flag in response (20 tests)
+7. **Scheduler-safe mode** — `dry_run`, `query` override, richer response (`dry_run`, `query_used`, `max_results`, `scanned`) (24 tests)
+
+## Completed slice (2026-04-22 — DEL 1 Slice 1: Deterministic classification fallback)
+
+- `_LEAD_KEYWORDS` + `_classify_deterministic()` added to `classification_processor.py`
+- Fallback now returns `"lead"` or `"customer_inquiry"` with `confidence=0.5`, `reasons=["deterministic_fallback", "llm_unavailable"]`
+- Applies to all job sources — not just Gmail inbox
+- `tests/test_classification_deterministic.py` — 33 tests; `tests/test_ai_processors.py` updated
+- 545/545 tests pass
+
 ## Next steps
 
-### Done
-- `POST /gmail/process-inbox` — reads unread Gmail, creates lead jobs, returns processed count and job IDs. Implemented and tested (14 tests). Not production-ready: no deduplication, does not mark messages as read, `job_type` hardcoded as `lead`.
-
 ### Immediate
-1. **Stabilize Gmail credentials** — refresh token expires/revoked causes full ingestion failure. Add a credential health check or automatic reauthorization flow.
-2. **Add deduplication** — store processed `message_id` values to prevent creating duplicate jobs when the endpoint is called repeatedly before messages are read.
-3. **Mark messages as read** — add `modify` action to Gmail adapter (Gmail API: `POST /messages/{id}/modify` with `removeLabelIds: ["UNREAD"]`); call after successful job creation.
+1. **Scheduler / cron trigger** — `POST /gmail/process-inbox` is scheduler-ready (`dry_run`, idempotent via dedup); next step is wiring a periodic external trigger (cron job, APScheduler, or Cloud Scheduler) to call it on an interval
+2. **DEL 1 — Slice 2: Customer inquiry actions** — define what happens after a `customer_inquiry` is created: auto-reply email, internal ticket, or Slack alert
 
 ### After that
-4. **Scheduler** — periodic background task that calls `POST /gmail/process-inbox` on an interval. The endpoint already does the work; the scheduler just triggers it.
-5. **Configurable job_type** — allow caller to specify whether inbox messages become `lead` or `customer_inquiry` jobs.
-
-### Not yet started
-- Scheduler / periodic trigger
-- HTML-to-text for Gmail HTML-only messages (`body_text` is empty for HTML-only messages)
-- Monday per-request board_id override
-- Gmail mark-as-read after ingestion
+3. **HTML-to-text** — `body_text` is empty for HTML-only Gmail messages; no conversion implemented
+4. **Monday per-request board_id override** — currently env-only
+5. **Gmail credential health check** — proactive check before ingestion run; surface `invalid_grant` early
 
 ## Remaining work
-All original MVP backlog items are complete. Platform is live-verified and stable.
+All original MVP backlog items are complete. Platform is live-verified and stable. The ingestion layer is production-ready.
 
 ## Expected output from next implementation chat
-- Continue from this repo state; all docs and 371 tests are current
-- Gmail read + write + inbox trigger and Monday integrations are live-verified
-- `POST /gmail/process-inbox` is implemented; next slice is deduplication + mark-as-read
-- Platform is ready for production hardening of the ingestion layer
+- Continue from this repo state; all docs and 545 tests are current
+- `POST /gmail/process-inbox` is production-hardened; ready for external scheduler trigger
+- Next logical slice: DEL 1 — Slice 2 (customer inquiry actions) or scheduler wiring

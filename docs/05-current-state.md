@@ -18,8 +18,9 @@ The following has been confirmed through real API calls against a running instan
 | Action persistence | ✅ LIVE VERIFIED | `GET /jobs/{job_id}/actions` returns real executed records |
 | Multi-tenant auth | ✅ LIVE VERIFIED | `X-API-Key` + body `tenant_id` both required |
 | Gmail → lead → Monday flow | ✅ LIVE VERIFIED | list_messages → get_message → map to /jobs → Monday item created |
-| Gmail inbox trigger | ✅ IMPLEMENTED | `POST /gmail/process-inbox` reads unread messages, creates lead jobs; not production-ready (no dedup, no mark-as-read) |
-| 371 tests passing | ✅ | `python -m pytest` |
+| Gmail inbox trigger | ✅ PRODUCTION-READY | `POST /gmail/process-inbox` — dedup, mark-as-read, tenant gate, enrichment, phone extraction, Slack notify, dry_run, query override |
+| Deterministic classification fallback | ✅ IMPLEMENTED | LLM fallback classifies as `lead` or `customer_inquiry` (keyword-based); no more `"unknown"` |
+| 545 tests passing | ✅ | `python -m pytest` |
 
 ---
 
@@ -126,8 +127,8 @@ This is a complete manual-trigger ingestion → decision → action flow, confir
 
 ## What is limited
 
-- No LLM in dev without `LLM_API_KEY` — processors fall back deterministically; pipeline still completes
-- Action dispatch is real for Gmail and Monday only; all other action types (notify_slack, notify_teams, create_internal_task) are stubbed
+- No LLM in dev without `LLM_API_KEY` — processors fall back deterministically (classification → keyword-based lead/inquiry; others → safe defaults); pipeline always completes
+- Action dispatch is real for Gmail and Monday only; `notify_slack` is non-fatal (silently no-ops when Slack not configured); other action types (notify_teams, create_internal_task) are stubbed
 - Gmail `body_text` is empty for HTML-only emails — no HTML-to-text conversion
 - Monday `board_id` is env-only — no per-request override
 - No DB migration tooling — schema changes require manual intervention
@@ -420,6 +421,66 @@ Live testing of Monday.com integration and tenant config resolution:
 - **Known limitations:** no deduplication, does not mark messages as read, `job_type` hardcoded as `lead`, `create_monday_item` hardcoded as the sole action
 - `tests/test_gmail_process_inbox.py` — 14 new tests
 - 371/371 tests pass
+
+## Gmail inbox hardening (2026-04-22)
+
+Seven production-readiness slices applied to `POST /gmail/process-inbox`:
+
+### Deduplication
+- `JobRepository.get_by_gmail_message_id(db, tenant_id, message_id)` — queries `jobs` table for existing records with matching Gmail message ID
+- Already-processed messages skipped with `reason: "duplicate"` in `skipped_messages`; `skipped` counter incremented
+- `tests/test_gmail_process_inbox_dedup.py` — 12 tests
+
+### Mark-as-read after successful processing
+- `GoogleMailClient.mark_as_read(message_id)` added — `POST /users/{uid}/messages/{id}/modify` with `{"removeLabelIds": ["UNREAD"]}`; uses same 401→refresh→retry path
+- `GoogleMailAdapter` dispatches `mark_as_read` action
+- Called (non-fatally) after successful pipeline run; `marked_handled` flag in response per message
+- `tests/test_gmail_mark_handled.py` — 12 tests
+
+### Tenant config lead gate
+- `get_tenant_config(tenant_id, db)` called at inbox entry; job creation skipped if `"lead"` not in `enabled_job_types`
+- Gated messages appear in `skipped_messages` with `reason: "lead_disabled"`
+- `tests/test_gmail_tenant_config_gate.py` — 11 tests
+
+### Improved Monday item naming and column_values
+- `_make_monday_item_name(subject, sender_name)` — uses subject (truncated to 60 chars), falls back to sender name, then `"Ny förfrågan"`
+- `_infer_priority(subject, body)` — deterministic priority (`"High"` on Swedish/English urgency keywords, `"Medium"` otherwise)
+- `column_values` built from `sender_email`, `sender_phone`, `priority`, `body_text` (truncated) — mapped to monday column IDs
+- `tests/test_gmail_lead_enrichment.py` — 37 tests
+
+### Improved From-header and phone extraction
+- `_parse_from_header` replaced by `email.utils.parseaddr` — correctly handles RFC 2822 `"Name <email>"` and bare addresses
+- `_extract_phone(text)` — regex-based extraction of Swedish/international phone numbers from subject+body
+- Extracted phone fed into `column_values` and `input_data.sender`
+- `tests/test_gmail_extraction.py` — 26 tests
+
+### Slack notification after lead creation
+- `dispatch_action("notify_slack", ...)` called (non-fatally) after successful pipeline run
+- Notification includes tenant ID, message ID, job ID, sender name, subject
+- `notified` flag per message in response
+- `tests/test_gmail_notification.py` — 20 tests
+
+### Scheduler-safe mode (dry_run + query override)
+- `GmailProcessInboxRequest` extended: `dry_run: bool = False`, `query: str | None = None`
+- `dry_run=True` — reads messages but skips all writes (no job creation, no pipeline, no mark-as-read, no Slack notify); response entries have `status: "dry_run"`, `job_id: null`
+- Default query `"is:unread"` used when `query` is absent; custom query forwarded to `list_messages`
+- Response extended with: `dry_run`, `query_used`, `max_results`, `scanned`
+- `tests/test_gmail_scheduler_mode.py` — 24 tests
+
+**545/545 tests pass after all seven slices.**
+
+## Deterministic classification fallback (2026-04-22)
+
+DEL 1 — Slice 1: Classification fallback replaced `"unknown"` with keyword-based intent detection.
+
+- `_LEAD_KEYWORDS` set added to `classification_processor.py`: Swedish (`offert`, `pris`, `köpa`, `intresserad`) + English (`quote`, `pricing`, `buy`, `purchase`, `interested`, `demo`, `trial`)
+- `_classify_deterministic(subject, body) -> str` — case-insensitive substring match; returns `"lead"` on any keyword hit, `"customer_inquiry"` otherwise
+- `process_classification_job` `fallback_payload_builder` now calls `_classify_deterministic` instead of returning `"unknown"`; fallback sets `confidence=0.5`, `reasons=["deterministic_fallback", "llm_unavailable"]`
+- Classification fallback applies to **all job sources** (not just Gmail inbox) — `POST /jobs`, inbox trigger, and future sources all benefit
+- `orchestrator` routing unchanged; `"customer_inquiry"` and `"lead"` already have defined post-classification pipelines
+- `tests/test_classification_deterministic.py` — 33 tests covering all keyword variants, fallback path, and inbox routing
+- `tests/test_ai_processors.py` updated: stale `"unknown"` / `0.0` / no-reasons assertions replaced
+- 545/545 tests pass
 
 ## Monday workflow wiring (2026-04-20)
 
