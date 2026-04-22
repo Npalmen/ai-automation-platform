@@ -6,6 +6,24 @@ from app.workflows.processors.ai_processor_utils import run_ai_step
 PROCESSOR_NAME = "classification_processor"
 PROMPT_NAME = "classification"
 
+_LEAD_KEYWORDS = {
+    "offert", "pris", "köpa", "intresserad",
+    "quote", "pricing", "buy", "purchase", "interested",
+    "demo", "trial",
+}
+
+
+def _classify_deterministic(subject: str, body: str) -> str:
+    """Return 'lead' or 'customer_inquiry' based on keyword match.
+
+    Checks combined subject+body text case-insensitively.
+    Returns 'lead' on any lead-intent keyword match, 'customer_inquiry' otherwise.
+    """
+    combined = f"{subject} {body}".lower()
+    if any(kw in combined for kw in _LEAD_KEYWORDS):
+        return "lead"
+    return "customer_inquiry"
+
 
 def _build_source_context(job: Job) -> dict:
     input_data = job.input_data or {}
@@ -31,10 +49,25 @@ def _build_source_context(job: Job) -> dict:
 def process_classification_job(job: Job) -> Job:
     context = _build_source_context(job)
 
+    input_data = job.input_data or {}
+
+    def _deterministic_fallback(error_message: str) -> dict:
+        detected = _classify_deterministic(
+            subject=input_data.get("subject") or "",
+            body=input_data.get("message_text") or "",
+        )
+        return {
+            "detected_job_type": detected,
+            "confidence": 0.5,
+            "reasons": ["deterministic_fallback", "llm_unavailable"],
+            "error": error_message,
+            "recommended_next_step": detected,
+        }
+
     return run_ai_step(
         job=job,
         processor_name=PROCESSOR_NAME,
-        prompt_name = "classification_v1",
+        prompt_name="classification_v1",
         context=context,
         response_model=ClassificationResponse,
         success_summary="Ärendet klassificerat med AI.",
@@ -44,11 +77,5 @@ def process_classification_job(job: Job) -> Job:
             "reasons": parsed.reasons,
             "recommended_next_step": parsed.detected_job_type,
         },
-        fallback_payload_builder=lambda error_message: {
-            "detected_job_type": "unknown",
-            "confidence": 0.0,
-            "reasons": ["classification_failed"],
-            "error": error_message,
-            "recommended_next_step": "manual_review",
-        },
+        fallback_payload_builder=_deterministic_fallback,
     )

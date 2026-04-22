@@ -112,10 +112,13 @@ def test_classification_processor_fallback(monkeypatch):
     result = process_classification_job(job)
 
     payload = result.result["payload"]
-    assert payload["detected_job_type"] == "unknown"
-    assert payload["confidence"] == 0.0
+    # Fallback now uses deterministic classifier instead of emitting "unknown".
+    # _build_lead_job() has "offert" in subject -> classified as "lead".
+    assert payload["detected_job_type"] == "lead"
+    assert payload["confidence"] == 0.5
     assert result.result["requires_human_review"] is True
     assert "error" in payload
+    assert "deterministic_fallback" in payload["reasons"]
 
 
 def test_classification_processor_marks_manual_review_on_low_confidence(monkeypatch):
