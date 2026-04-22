@@ -124,7 +124,7 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - 17 new tests; 105/105 pass
 
 ## Current state
-MVP is complete and live-validated. Gmail send and Monday item creation are confirmed working through real API calls. Full pipeline, approval flow, and action persistence verified end-to-end. Auth is enforced. UI is stable, Swedish-localised, and tenant-aware. Verification is deterministic (no LLM required). 326/326 tests pass.
+MVP is complete and live-validated. Gmail (send + read + inbox trigger) and Monday (direct + workflow) are confirmed working through real API calls. Full pipeline, approval flow, and action persistence verified end-to-end. Auth is enforced. UI is stable, Swedish-localised, and tenant-aware. Verification is deterministic (no LLM required). 371/371 tests pass.
 
 ## Completed slice (2026-04-12 — integration event persistence)
 - `IntegrationEvent` model base fixed to `database.Base` — table now in `create_all`
@@ -242,7 +242,8 @@ Confirmed through real API calls — not theoretical:
 - **Approval pause/resume** — job enters `awaiting_approval`; `POST /approvals/{id}/approve` with `{}` resumes it; action executes after approval; result persisted
 - **Action persistence** — `GET /jobs/{job_id}/actions` returns the executed action record
 - **Gmail → lead → Monday flow** — list_messages → get_message → map to /jobs → Monday item created (full manual ingestion flow confirmed)
-- **335 tests passing**
+- **Gmail inbox trigger** (`POST /gmail/process-inbox`) — reads unread messages, creates lead jobs with `create_monday_item` action, returns processed count and job IDs; not production-ready (no dedup, no mark-as-read)
+- **371 tests passing**
 
 ## Verified production behavior
 
@@ -393,35 +394,31 @@ These are real behaviors observed during live testing. Each one has caused a fai
 
 ---
 
-## Next step (clear)
+## Next steps
 
-### Immediate: Gmail inbox ingestion endpoint
+### Done
+- `POST /gmail/process-inbox` — reads unread Gmail, creates lead jobs, returns processed count and job IDs. Implemented and tested (14 tests). Not production-ready: no deduplication, does not mark messages as read, `job_type` hardcoded as `lead`.
 
-Implement `POST /ingest/gmail` — a manual-trigger endpoint that:
-1. Calls `list_messages` (optionally filtered by query)
-2. For each message, calls `get_message`
-3. Maps the message into a lead/inquiry job payload
-4. Posts to the pipeline via `run_pipeline`
-5. Returns a list of created job IDs
+### Immediate
+1. **Stabilize Gmail credentials** — refresh token expires/revoked causes full ingestion failure. Add a credential health check or automatic reauthorization flow.
+2. **Add deduplication** — store processed `message_id` values to prevent creating duplicate jobs when the endpoint is called repeatedly before messages are read.
+3. **Mark messages as read** — add `modify` action to Gmail adapter (Gmail API: `POST /messages/{id}/modify` with `removeLabelIds: ["UNREAD"]`); call after successful job creation.
 
-This removes the current manual curl sequence and makes inbox ingestion a single API call.
-
-### After that: scheduled ingestion
-
-Add a periodic trigger (cron or background task) that calls the ingestion endpoint on an interval. The endpoint already does the work; the scheduler just calls it.
+### After that
+4. **Scheduler** — periodic background task that calls `POST /gmail/process-inbox` on an interval. The endpoint already does the work; the scheduler just triggers it.
+5. **Configurable job_type** — allow caller to specify whether inbox messages become `lead` or `customer_inquiry` jobs.
 
 ### Not yet started
-- Inbox ingestion endpoint (`POST /ingest/gmail`)
 - Scheduler / periodic trigger
-- HTML-to-text for Gmail HTML-only messages
-- Gmail `body_text` truncation for long messages
+- HTML-to-text for Gmail HTML-only messages (`body_text` is empty for HTML-only messages)
 - Monday per-request board_id override
+- Gmail mark-as-read after ingestion
 
 ## Remaining work
 All original MVP backlog items are complete. Platform is live-verified and stable.
 
 ## Expected output from next implementation chat
-- Continue from this repo state; all docs and 335 tests are current
-- Gmail read + write and Monday integrations are live-verified
-- The clear next slice is the Gmail ingestion endpoint (`POST /ingest/gmail`)
-- Platform is ready for the ingestion automation layer
+- Continue from this repo state; all docs and 371 tests are current
+- Gmail read + write + inbox trigger and Monday integrations are live-verified
+- `POST /gmail/process-inbox` is implemented; next slice is deduplication + mark-as-read
+- Platform is ready for production hardening of the ingestion layer

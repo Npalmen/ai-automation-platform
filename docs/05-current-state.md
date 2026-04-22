@@ -18,7 +18,8 @@ The following has been confirmed through real API calls against a running instan
 | Action persistence | ✅ LIVE VERIFIED | `GET /jobs/{job_id}/actions` returns real executed records |
 | Multi-tenant auth | ✅ LIVE VERIFIED | `X-API-Key` + body `tenant_id` both required |
 | Gmail → lead → Monday flow | ✅ LIVE VERIFIED | list_messages → get_message → map to /jobs → Monday item created |
-| 335 tests passing | ✅ | `python -m pytest` |
+| Gmail inbox trigger | ✅ IMPLEMENTED | `POST /gmail/process-inbox` reads unread messages, creates lead jobs; not production-ready (no dedup, no mark-as-read) |
+| 371 tests passing | ✅ | `python -m pytest` |
 
 ---
 
@@ -408,6 +409,18 @@ Live testing of Monday.com integration and tenant config resolution:
 - `tests/test_monday_client.py` — 16 new tests (column_values serialization for all input types, board_id as string, group_id, error handling, adapter routing)
 - 326/326 tests pass
 
+## Gmail inbox trigger endpoint (2026-04-21)
+
+- `POST /gmail/process-inbox` added to `app/main.py`
+- Reads unread Gmail messages (`is:unread`, configurable `max_results`, default 5)
+- For each message: calls `get_message`, maps to lead job payload with `create_monday_item` action, calls `run_pipeline`
+- Per-message errors are silently skipped; only `list_messages` failure raises 503
+- `_parse_from_header(from_header)` helper added: parses `"Name <email>"` or bare `"email"` into `(name, email)`
+- Response: `{"processed": int, "created_jobs": [{"message_id": ..., "job_id": ..., "status": ...}]}`
+- **Known limitations:** no deduplication, does not mark messages as read, `job_type` hardcoded as `lead`, `create_monday_item` hardcoded as the sole action
+- `tests/test_gmail_process_inbox.py` — 14 new tests
+- 371/371 tests pass
+
 ## Monday workflow wiring (2026-04-20)
 
 - `create_monday_item` added to `SUPPORTED_ACTIONS` in `app/workflows/action_executor.py`
@@ -430,7 +443,7 @@ Live testing of Monday.com integration and tenant config resolution:
   - `body_text` is empty string for HTML-only messages
 - `tests/test_google_mail_list_messages.py` — 11 new tests
 - `tests/test_google_mail_get_message.py` — 11 new tests
-- 335/335 tests pass
+- 371/371 tests pass
 
 ## All MVP slices complete
 All items from the original backlog are implemented and tested.

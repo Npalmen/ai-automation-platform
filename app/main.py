@@ -886,6 +886,117 @@ def list_integration_events(
     )
 
 
+class GmailProcessInboxRequest(_BaseModel):
+    max_results: int = 5
+
+
+def _parse_from_header(from_header: str) -> tuple[str, str]:
+    """Parse 'Name <email>' or bare 'email' into (name, email)."""
+    from_header = (from_header or "").strip()
+    if "<" in from_header and from_header.endswith(">"):
+        name_part, email_part = from_header.rsplit("<", 1)
+        return name_part.strip().strip('"'), email_part.rstrip(">").strip()
+    return "", from_header
+
+
+@app.post("/gmail/process-inbox")
+def gmail_process_inbox(
+    request: GmailProcessInboxRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Read recent unread Gmail messages and create a lead job for each one.
+
+    Does NOT mark messages as read or deduplicate — caller is responsible.
+    """
+    from app.domain.workflows.enums import JobType
+
+    connection_config = get_integration_connection_config(
+        tenant_id=tenant_id,
+        integration_type=IntegrationType.GOOGLE_MAIL,
+    )
+    adapter = get_integration_adapter(
+        integration_type=IntegrationType.GOOGLE_MAIL,
+        connection_config=connection_config,
+    )
+
+    try:
+        list_result = adapter.execute_action(
+            action="list_messages",
+            payload={"max_results": request.max_results, "query": "is:unread"},
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=503, detail=f"Gmail list_messages failed: {exc}") from exc
+
+    messages = list_result.get("messages") or []
+    created_jobs = []
+
+    for stub in messages:
+        message_id = stub.get("message_id", "")
+        if not message_id:
+            continue
+
+        try:
+            detail_result = adapter.execute_action(
+                action="get_message",
+                payload={"message_id": message_id},
+            )
+        except (ValueError, RuntimeError):
+            continue
+
+        msg = detail_result.get("message") or {}
+        sender_name, sender_email = _parse_from_header(msg.get("from", ""))
+
+        subject = msg.get("subject") or "(no subject)"
+        body_text = msg.get("body_text") or ""
+        thread_id = msg.get("thread_id") or ""
+        item_name = f"Lead: {sender_name or sender_email} - {subject}"
+
+        input_data = {
+            "subject": subject,
+            "message_text": body_text,
+            "sender": {
+                "name": sender_name,
+                "email": sender_email,
+            },
+            "source": {
+                "system": "gmail",
+                "message_id": message_id,
+                "thread_id": thread_id,
+            },
+            "actions": [
+                {
+                    "type": "create_monday_item",
+                    "item_name": item_name,
+                    "tenant_id": tenant_id,
+                }
+            ],
+        }
+
+        job = Job(
+            tenant_id=tenant_id,
+            job_type=JobType.LEAD,
+            input_data=input_data,
+        )
+
+        try:
+            saved_job = JobRepository.create_job(db, job)
+            processed_job = run_pipeline(saved_job, db)
+            created_jobs.append({
+                "message_id": message_id,
+                "job_id": processed_job.job_id,
+                "status": processed_job.status.value if hasattr(processed_job.status, "value") else str(processed_job.status),
+            })
+        except Exception:
+            continue
+
+    return {
+        "processed": len(created_jobs),
+        "created_jobs": created_jobs,
+    }
+
+
 @app.get("/audit-events", response_model=AuditEventListResponse)
 def list_audit_events(
     db: Session = Depends(get_db),
