@@ -890,6 +890,8 @@ def list_integration_events(
 
 class GmailProcessInboxRequest(_BaseModel):
     max_results: int = 5
+    dry_run: bool = False
+    query: str | None = None
 
 
 def _parse_from_header(from_header: str) -> tuple[str, str]:
@@ -973,8 +975,11 @@ def gmail_process_inbox(
 
     Skips messages that already have a job (deduplication via source.message_id).
     Marks successfully processed messages as read via Gmail modify API.
+    Set dry_run=true to preview what would happen without creating jobs or side effects.
     """
     from app.domain.workflows.enums import JobType
+
+    query_used = request.query if request.query is not None else "is:unread"
 
     connection_config = get_integration_connection_config(
         tenant_id=tenant_id,
@@ -988,7 +993,7 @@ def gmail_process_inbox(
     try:
         list_result = adapter.execute_action(
             action="list_messages",
-            payload={"max_results": request.max_results, "query": "is:unread"},
+            payload={"max_results": request.max_results, "query": query_used},
         )
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=503, detail=f"Gmail list_messages failed: {exc}") from exc
@@ -1074,6 +1079,16 @@ def gmail_process_inbox(
             ],
         }
 
+        if request.dry_run:
+            created_jobs.append({
+                "message_id": message_id,
+                "job_id": None,
+                "status": "dry_run",
+                "marked_handled": False,
+                "notified": False,
+            })
+            continue
+
         job = Job(
             tenant_id=tenant_id,
             job_type=JobType.LEAD,
@@ -1135,6 +1150,10 @@ def gmail_process_inbox(
         "processed": len(created_jobs),
         "skipped": len(skipped_messages),
         "failed": len(failed_messages),
+        "dry_run": request.dry_run,
+        "query_used": query_used,
+        "max_results": request.max_results,
+        "scanned": len(messages),
         "created_jobs": created_jobs,
         "skipped_messages": skipped_messages,
         "failed_messages": failed_messages,
