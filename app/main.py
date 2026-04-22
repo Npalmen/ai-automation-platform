@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from uuid import uuid4
 
@@ -891,12 +892,21 @@ class GmailProcessInboxRequest(_BaseModel):
 
 
 def _parse_from_header(from_header: str) -> tuple[str, str]:
-    """Parse 'Name <email>' or bare 'email' into (name, email)."""
-    from_header = (from_header or "").strip()
-    if "<" in from_header and from_header.endswith(">"):
-        name_part, email_part = from_header.rsplit("<", 1)
-        return name_part.strip().strip('"'), email_part.rstrip(">").strip()
-    return "", from_header
+    """Parse RFC 2822 From header into (name, email).
+
+    Handles: 'Name <email>', '"Name" <email>', bare 'email', empty/malformed.
+    Returns ("", "") when nothing useful is found.
+    If the parsed display name equals the email address, the name is suppressed
+    to avoid storing a redundant fake-person name.
+    """
+    from email.utils import parseaddr as _parseaddr
+    name, email = _parseaddr((from_header or "").strip())
+    name = name.strip().strip('"').strip()
+    email = email.strip().lower()
+    # Suppress name when it's just a copy of the email address.
+    if name and name.lower() == email:
+        name = ""
+    return name, email
 
 
 _SUBJECT_MAX_LEN = 60
@@ -924,6 +934,31 @@ def _make_monday_item_name(sender_name: str, sender_email: str, subject: str) ->
     if label:
         return f"Lead: {label} - {short_subject}"
     return f"Lead: {short_subject}"
+
+
+# Matches: +46 70 123 45 67 / +46701234567 / 070-123 45 67 / 0701234567 / 018-123456
+# Requires at least 7 digits after optional country prefix.
+_PHONE_RE = re.compile(
+    r"(?<!\d)"                    # not preceded by digit
+    r"(\+46|0046)?"               # optional Swedish country prefix
+    r"[\s\-]?"
+    r"(0\d{1,3}|\d{2,3})"        # area code or first digit group
+    r"[\s\-]?"
+    r"\d{2,4}"                    # second group
+    r"(?:[\s\-]?\d{2,4}){1,3}"   # remaining groups
+    r"(?!\d)",                    # not followed by digit
+)
+
+
+def _extract_phone(subject: str, body_text: str) -> str | None:
+    """Return the first plausible phone number found in subject or body, or None."""
+    for text in (subject, body_text):
+        m = _PHONE_RE.search(text or "")
+        if m:
+            # Collapse internal whitespace/hyphens into a single clean string.
+            raw = m.group(0).strip()
+            return re.sub(r"[\s\-]+", "-", raw)
+    return None
 
 
 @app.post("/gmail/process-inbox")
@@ -1002,23 +1037,27 @@ def gmail_process_inbox(
         body_text = msg.get("body_text") or ""
         thread_id = msg.get("thread_id") or ""
 
+        phone = _extract_phone(subject, body_text)
         item_name = _make_monday_item_name(sender_name, sender_email, subject)
         priority = _infer_priority(subject, body_text)
 
         column_values: dict = {"source": "gmail", "priority": priority}
         if sender_email:
             column_values["email"] = sender_email
+        if phone:
+            column_values["phone"] = phone
         if subject and subject != "(no subject)":
             column_values["subject"] = subject[:_SUBJECT_MAX_LEN].rstrip()
+
+        sender_dict: dict = {"name": sender_name, "email": sender_email}
+        if phone:
+            sender_dict["phone"] = phone
 
         input_data = {
             "subject": subject,
             "message_text": body_text,
             "priority": priority,
-            "sender": {
-                "name": sender_name,
-                "email": sender_email,
-            },
+            "sender": sender_dict,
             "source": {
                 "system": "gmail",
                 "message_id": message_id,
