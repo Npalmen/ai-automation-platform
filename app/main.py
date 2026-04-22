@@ -45,6 +45,7 @@ from app.repositories.postgres.database import Base
 from app.repositories.postgres.integration_repository import IntegrationRepository
 from app.repositories.postgres.job_repository import JobRepository
 from app.repositories.postgres.session import engine
+from app.workflows.action_executor import execute_action as dispatch_action
 from app.workflows.approval_service import resolve_approval
 from app.workflows.pipeline_runner import run_pipeline
 from app.workflows.policies import is_job_type_enabled_for_tenant
@@ -1094,14 +1095,40 @@ def gmail_process_inbox(
         except Exception as exc:
             mark_warning = str(exc)
 
+        notified = False
+        notify_warning: str | None = None
+        try:
+            sender_label = sender_name or sender_email or "unknown"
+            notify_body = (
+                f"New lead created from Gmail.\n\n"
+                f"From:     {sender_label}\n"
+                f"Subject:  {subject}\n"
+                f"Priority: {priority}\n"
+                f"Job ID:   {processed_job.job_id}\n"
+                f"Tenant:   {tenant_id}\n"
+                f"Source:   gmail"
+            )
+            dispatch_action({
+                "type": "notify_slack",
+                "tenant_id": tenant_id,
+                "channel": "#leads",
+                "message": notify_body,
+            })
+            notified = True
+        except Exception as exc:
+            notify_warning = str(exc)
+
         entry: dict = {
             "message_id": message_id,
             "job_id": processed_job.job_id,
             "status": processed_job.status.value if hasattr(processed_job.status, "value") else str(processed_job.status),
             "marked_handled": marked_handled,
+            "notified": notified,
         }
         if mark_warning:
             entry["mark_warning"] = mark_warning
+        if notify_warning:
+            entry["notify_warning"] = notify_warning
         created_jobs.append(entry)
 
     return {
