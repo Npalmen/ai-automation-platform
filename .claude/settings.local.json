@@ -27,7 +27,12 @@
       "Bash(python -m pytest tests/ -x -q)",
       "Bash(python -m pytest tests/test_verify_tenant.py -v)",
       "Bash(python -m pytest tests/test_swedish_char_encoding.py -v)",
-      "Bash(python -m pytest tests/test_monday_client.py -v)"
+      "Bash(python -m pytest tests/test_monday_client.py -v)",
+      "Bash(python -m pytest tests/test_action_executor_monday.py -v)",
+      "Bash(python -m pytest tests/test_google_mail_list_messages.py -v)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
