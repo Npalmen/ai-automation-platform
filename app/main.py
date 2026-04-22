@@ -899,6 +899,33 @@ def _parse_from_header(from_header: str) -> tuple[str, str]:
     return "", from_header
 
 
+_SUBJECT_MAX_LEN = 60
+
+_HIGH_PRIORITY_KEYWORDS = {
+    "urgent", "asap", "immediately", "akut", "omgående",
+    "critical", "emergency", "prioritet",
+}
+
+
+def _infer_priority(subject: str, body_text: str) -> str:
+    """Return 'high', 'medium', or 'low' based on keyword presence."""
+    combined = f"{subject} {body_text}".lower()
+    if any(kw in combined for kw in _HIGH_PRIORITY_KEYWORDS):
+        return "high"
+    if subject.strip() and subject.strip() != "(no subject)":
+        return "medium"
+    return "low"
+
+
+def _make_monday_item_name(sender_name: str, sender_email: str, subject: str) -> str:
+    """Build a clean, truncated Monday item name for a Gmail lead."""
+    short_subject = subject.strip()[:_SUBJECT_MAX_LEN].rstrip()
+    label = sender_name.strip() or sender_email.strip()
+    if label:
+        return f"Lead: {label} - {short_subject}"
+    return f"Lead: {short_subject}"
+
+
 @app.post("/gmail/process-inbox")
 def gmail_process_inbox(
     request: GmailProcessInboxRequest,
@@ -974,11 +1001,20 @@ def gmail_process_inbox(
         subject = msg.get("subject") or "(no subject)"
         body_text = msg.get("body_text") or ""
         thread_id = msg.get("thread_id") or ""
-        item_name = f"Lead: {sender_name or sender_email} - {subject}"
+
+        item_name = _make_monday_item_name(sender_name, sender_email, subject)
+        priority = _infer_priority(subject, body_text)
+
+        column_values: dict = {"source": "gmail", "priority": priority}
+        if sender_email:
+            column_values["email"] = sender_email
+        if subject and subject != "(no subject)":
+            column_values["subject"] = subject[:_SUBJECT_MAX_LEN].rstrip()
 
         input_data = {
             "subject": subject,
             "message_text": body_text,
+            "priority": priority,
             "sender": {
                 "name": sender_name,
                 "email": sender_email,
@@ -993,6 +1029,7 @@ def gmail_process_inbox(
                     "type": "create_monday_item",
                     "item_name": item_name,
                     "tenant_id": tenant_id,
+                    "column_values": column_values,
                 }
             ],
         }
