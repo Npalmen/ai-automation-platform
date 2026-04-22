@@ -908,7 +908,8 @@ def gmail_process_inbox(
     """
     Read recent unread Gmail messages and create a lead job for each one.
 
-    Does NOT mark messages as read or deduplicate — caller is responsible.
+    Skips messages that already have a job (deduplication via source.message_id).
+    Does NOT mark messages as read.
     """
     from app.domain.workflows.enums import JobType
 
@@ -931,10 +932,23 @@ def gmail_process_inbox(
 
     messages = list_result.get("messages") or []
     created_jobs = []
+    skipped_messages = []
+    failed_messages = []
 
     for stub in messages:
         message_id = stub.get("message_id", "")
         if not message_id:
+            failed_messages.append({"message_id": "", "reason": "missing message_id"})
+            continue
+
+        # Deduplication: skip if a job already exists for this Gmail message.
+        existing = JobRepository.get_by_gmail_message_id(db, tenant_id, message_id)
+        if existing is not None:
+            skipped_messages.append({
+                "message_id": message_id,
+                "reason": "duplicate",
+                "job_id": existing.job_id,
+            })
             continue
 
         try:
@@ -942,7 +956,8 @@ def gmail_process_inbox(
                 action="get_message",
                 payload={"message_id": message_id},
             )
-        except (ValueError, RuntimeError):
+        except (ValueError, RuntimeError) as exc:
+            failed_messages.append({"message_id": message_id, "reason": str(exc)})
             continue
 
         msg = detail_result.get("message") or {}
@@ -988,12 +1003,16 @@ def gmail_process_inbox(
                 "job_id": processed_job.job_id,
                 "status": processed_job.status.value if hasattr(processed_job.status, "value") else str(processed_job.status),
             })
-        except Exception:
-            continue
+        except Exception as exc:
+            failed_messages.append({"message_id": message_id, "reason": str(exc)})
 
     return {
         "processed": len(created_jobs),
+        "skipped": len(skipped_messages),
+        "failed": len(failed_messages),
         "created_jobs": created_jobs,
+        "skipped_messages": skipped_messages,
+        "failed_messages": failed_messages,
     }
 
 

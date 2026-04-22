@@ -126,6 +126,22 @@ class JobRepository:
             return None
         return JobRepository._to_domain(record)
 
+    @staticmethod
+    def get_by_gmail_message_id(db: Session, tenant_id: str, message_id: str) -> Job | None:
+        record = (
+            db.query(JobRecord)
+            .filter(
+                JobRecord.tenant_id == tenant_id,
+                JobRecord.input_data["source"]["system"].as_string() == "gmail",
+                JobRecord.input_data["source"]["message_id"].as_string() == message_id,
+            )
+            .order_by(JobRecord.created_at.desc())
+            .first()
+        )
+        if record is None:
+            return None
+        return JobRepository._to_domain(record)
+
     # Aliases used by main.py
     @staticmethod
     def list_jobs(
