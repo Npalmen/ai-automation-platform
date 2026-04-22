@@ -935,6 +935,9 @@ def gmail_process_inbox(
     skipped_messages = []
     failed_messages = []
 
+    tenant_config = get_tenant_config(tenant_id, db=db)
+    lead_enabled = "lead" in (tenant_config.get("enabled_job_types") or [])
+
     for stub in messages:
         message_id = stub.get("message_id", "")
         if not message_id:
@@ -949,6 +952,11 @@ def gmail_process_inbox(
                 "reason": "duplicate",
                 "job_id": existing.job_id,
             })
+            continue
+
+        # Tenant config gate: only create lead jobs when lead is enabled.
+        if not lead_enabled:
+            skipped_messages.append({"message_id": message_id, "reason": "lead_disabled"})
             continue
 
         try:

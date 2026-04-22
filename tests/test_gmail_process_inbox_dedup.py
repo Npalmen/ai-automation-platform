@@ -94,6 +94,7 @@ def _call(
 
     with patch("app.main.get_integration_connection_config", return_value={}), \
          patch("app.main.get_integration_adapter", return_value=mock_adapter), \
+         patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead"]}), \
          patch(
              "app.main.JobRepository.get_by_gmail_message_id",
              side_effect=fake_get_by_gmail_message_id,
@@ -135,6 +136,7 @@ class TestDeduplication:
 
         with patch("app.main.get_integration_connection_config", return_value={}), \
              patch("app.main.get_integration_adapter") as mock_get_adapter, \
+             patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead"]}), \
              patch("app.main.JobRepository.get_by_gmail_message_id", return_value=existing), \
              patch("app.main.JobRepository.create_job") as mock_create:
 
