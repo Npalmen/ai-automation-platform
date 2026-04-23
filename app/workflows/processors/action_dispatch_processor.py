@@ -124,11 +124,55 @@ def _build_inquiry_default_actions(job: Job) -> list[dict[str, Any]]:
     ]
 
 
+def _build_invoice_default_actions(job: Job) -> list[dict[str, Any]]:
+    input_data = job.input_data or {}
+    sender = normalize_sender(input_data)
+
+    sender_name = sender.get("name", "")
+    sender_email = sender.get("email", "")
+    subject = input_data.get("subject") or ""
+
+    sender_label = sender_name or sender_email or "Okänd avsändare"
+    item_name = f"Faktura: {sender_label}"
+
+    column_values: dict[str, Any] = {"source": "invoice"}
+    if subject:
+        column_values["subject"] = subject[:60].rstrip()
+    if sender_email:
+        column_values["email"] = sender_email
+
+    return [
+        {
+            "type": "create_monday_item",
+            "item_name": item_name,
+            "tenant_id": job.tenant_id,
+            "column_values": column_values,
+        },
+        {
+            "type": "create_internal_task",
+            "title": f"Granska faktura: {sender_label}",
+            "description": (
+                f"Inkommande faktura från {sender_label}."
+                + (f" Ämne: {subject}" if subject else "")
+            ),
+            "assignee": None,
+            "metadata": {
+                "job_id": job.job_id,
+                "tenant_id": job.tenant_id,
+                "detected_job_type": "invoice",
+            },
+        },
+    ]
+
+
 def _build_fallback_actions(job: Job) -> list[dict[str, Any]]:
     input_data = job.input_data or {}
     classification_payload = get_latest_processor_payload(job, "classification_processor")
 
     detected_job_type = classification_payload.get("detected_job_type", job.job_type.value)
+
+    if detected_job_type == "invoice":
+        return _build_invoice_default_actions(job)
 
     if detected_job_type == "customer_inquiry":
         return _build_inquiry_default_actions(job)
