@@ -18,9 +18,9 @@ Covers:
     - first match wins (subject before body)
 
   gmail_process_inbox integration:
-    - phone stored in input_data.sender.phone
-    - phone included in Monday column_values
-    - no phone -> phone key absent from sender and column_values
+    - phone stored in input_data.sender.phone when present
+    - no phone -> phone key absent from sender
+    - sender name/email parsed correctly from From header
 """
 from __future__ import annotations
 
@@ -186,10 +186,11 @@ def _run_inbox(detail: dict, tenant_id: str = "TENANT_1001"):
 
     with patch("app.main.get_integration_connection_config", return_value={}), \
          patch("app.main.get_integration_adapter", return_value=mock_adapter), \
-         patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead"]}), \
+         patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead", "invoice", "customer_inquiry"]}), \
          patch("app.main.JobRepository.get_by_gmail_message_id", return_value=None), \
          patch("app.main.JobRepository.create_job", side_effect=fake_create_job), \
-         patch("app.main.run_pipeline", return_value=_make_processed_job()):
+         patch("app.main.run_pipeline", return_value=_make_processed_job()), \
+         patch("app.main.dispatch_action", return_value={"status": "success"}):
         gmail_process_inbox(
             request=GmailProcessInboxRequest(max_results=5),
             db=MagicMock(),
@@ -206,20 +207,9 @@ class TestPhoneInPayload:
         assert "phone" in job.input_data["sender"]
         assert "070" in job.input_data["sender"]["phone"]
 
-    def test_phone_in_monday_column_values_when_present(self):
-        job = _run_inbox(_detail_result(body_text="Ring mig på 070-123 45 67"))
-        cv = job.input_data["actions"][0]["column_values"]
-        assert "phone" in cv
-        assert "070" in cv["phone"]
-
     def test_no_phone_omitted_from_sender(self):
         job = _run_inbox(_detail_result(body_text="No number here."))
         assert "phone" not in job.input_data["sender"]
-
-    def test_no_phone_omitted_from_column_values(self):
-        job = _run_inbox(_detail_result(body_text="No number here."))
-        cv = job.input_data["actions"][0]["column_values"]
-        assert "phone" not in cv
 
     def test_phone_from_subject_stored(self):
         job = _run_inbox(_detail_result(subject="Call 0701234567 please", body_text=""))

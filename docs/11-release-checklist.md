@@ -7,7 +7,7 @@
 - [x] DB setup verified (`docker-compose.yml` + `scripts/create_tables.py`)
 
 ## Test
-- [x] Automated tests pass — 371/371 (`python -m pytest`)
+- [x] Automated tests pass — 702/702 (`python -m pytest`)
 - [x] Official MVP smoke test documented in README (curl commands, step by step)
 - [x] Gmail send_email verified live (real Gmail delivery confirmed)
 - [x] Gmail list_messages verified live (real inbox messages returned)
@@ -42,4 +42,9 @@
 - [x] Gmail list_messages + get_message — read actions implemented, tested, and verified live
 - [x] Monday workflow wiring — `create_monday_item` action type wired into action_executor; `is_integration_configured` extended for api_key+board_id configs
 - [x] Full Gmail → lead → Monday flow verified end-to-end (manual trigger)
-- [x] Gmail inbox trigger — `POST /gmail/process-inbox` implemented; reads unread messages, creates lead jobs automatically
+- [x] Gmail inbox trigger — `POST /gmail/process-inbox` implemented with full hardening (dedup, mark-as-read, type-gating, phone extraction, Slack notify, dry_run, query override)
+- [x] Deterministic classification — invoice > lead > customer_inquiry keyword fallback; no `"unknown"` result
+- [x] Customer inquiry flow — `create_monday_item` + `send_email` to support; HIGH/NORMAL priority
+- [x] Invoice flow — `create_monday_item` + `create_internal_task`; deterministic extraction of amount, invoice_number, due_date, supplier_name
+- [x] Inbox type inference — `/gmail/process-inbox` infers correct `job_type` before job creation
+- [x] 702/702 tests pass

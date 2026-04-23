@@ -50,6 +50,7 @@ from app.workflows.approval_service import resolve_approval
 from app.workflows.pipeline_runner import run_pipeline
 from app.workflows.policies import is_job_type_enabled_for_tenant
 from app.workflows.processor_metadata import PROCESSOR_METADATA
+from app.workflows.processors.classification_processor import classify_email_type
 
 settings = get_settings()
 setup_logging()
@@ -971,8 +972,10 @@ def gmail_process_inbox(
     tenant_id: str = Depends(get_verified_tenant),
 ):
     """
-    Read recent unread Gmail messages and create a lead job for each one.
+    Read recent unread Gmail messages and create a job for each one.
 
+    The job type (lead, customer_inquiry, invoice) is inferred from subject+body.
+    Messages whose inferred type is not in tenant enabled_job_types are skipped.
     Skips messages that already have a job (deduplication via source.message_id).
     Marks successfully processed messages as read via Gmail modify API.
     Set dry_run=true to preview what would happen without creating jobs or side effects.
@@ -1004,7 +1007,13 @@ def gmail_process_inbox(
     failed_messages = []
 
     tenant_config = get_tenant_config(tenant_id, db=db)
-    lead_enabled = "lead" in (tenant_config.get("enabled_job_types") or [])
+    enabled_job_types = set(tenant_config.get("enabled_job_types") or [])
+
+    _INFERRED_TYPE_TO_JOB_TYPE = {
+        "lead": JobType.LEAD,
+        "customer_inquiry": JobType.CUSTOMER_INQUIRY,
+        "invoice": JobType.INVOICE,
+    }
 
     for stub in messages:
         message_id = stub.get("message_id", "")
@@ -1020,11 +1029,6 @@ def gmail_process_inbox(
                 "reason": "duplicate",
                 "job_id": existing.job_id,
             })
-            continue
-
-        # Tenant config gate: only create lead jobs when lead is enabled.
-        if not lead_enabled:
-            skipped_messages.append({"message_id": message_id, "reason": "lead_disabled"})
             continue
 
         try:
@@ -1043,18 +1047,15 @@ def gmail_process_inbox(
         body_text = msg.get("body_text") or ""
         thread_id = msg.get("thread_id") or ""
 
+        # Infer job type from message content, then gate against tenant config.
+        inferred_type = classify_email_type(subject, body_text)
+        if inferred_type not in enabled_job_types:
+            skipped_messages.append({"message_id": message_id, "reason": f"{inferred_type}_disabled"})
+            continue
+
+        job_type = _INFERRED_TYPE_TO_JOB_TYPE[inferred_type]
+
         phone = _extract_phone(subject, body_text)
-        item_name = _make_monday_item_name(sender_name, sender_email, subject)
-        priority = _infer_priority(subject, body_text)
-
-        column_values: dict = {"source": "gmail", "priority": priority}
-        if sender_email:
-            column_values["email"] = sender_email
-        if phone:
-            column_values["phone"] = phone
-        if subject and subject != "(no subject)":
-            column_values["subject"] = subject[:_SUBJECT_MAX_LEN].rstrip()
-
         sender_dict: dict = {"name": sender_name, "email": sender_email}
         if phone:
             sender_dict["phone"] = phone
@@ -1062,21 +1063,12 @@ def gmail_process_inbox(
         input_data = {
             "subject": subject,
             "message_text": body_text,
-            "priority": priority,
             "sender": sender_dict,
             "source": {
                 "system": "gmail",
                 "message_id": message_id,
                 "thread_id": thread_id,
             },
-            "actions": [
-                {
-                    "type": "create_monday_item",
-                    "item_name": item_name,
-                    "tenant_id": tenant_id,
-                    "column_values": column_values,
-                }
-            ],
         }
 
         if request.dry_run:
@@ -1084,6 +1076,7 @@ def gmail_process_inbox(
                 "message_id": message_id,
                 "job_id": None,
                 "status": "dry_run",
+                "inferred_type": inferred_type,
                 "marked_handled": False,
                 "notified": False,
             })
@@ -1091,7 +1084,7 @@ def gmail_process_inbox(
 
         job = Job(
             tenant_id=tenant_id,
-            job_type=JobType.LEAD,
+            job_type=job_type,
             input_data=input_data,
         )
 
@@ -1115,18 +1108,18 @@ def gmail_process_inbox(
         try:
             sender_label = sender_name or sender_email or "unknown"
             notify_body = (
-                f"New lead created from Gmail.\n\n"
-                f"From:     {sender_label}\n"
-                f"Subject:  {subject}\n"
-                f"Priority: {priority}\n"
-                f"Job ID:   {processed_job.job_id}\n"
-                f"Tenant:   {tenant_id}\n"
-                f"Source:   gmail"
+                f"New {inferred_type} job created from Gmail.\n\n"
+                f"From:    {sender_label}\n"
+                f"Subject: {subject}\n"
+                f"Type:    {inferred_type}\n"
+                f"Job ID:  {processed_job.job_id}\n"
+                f"Tenant:  {tenant_id}\n"
+                f"Source:  gmail"
             )
             dispatch_action({
                 "type": "notify_slack",
                 "tenant_id": tenant_id,
-                "channel": "#leads",
+                "channel": "#inbox",
                 "message": notify_body,
             })
             notified = True
@@ -1136,6 +1129,7 @@ def gmail_process_inbox(
         entry: dict = {
             "message_id": message_id,
             "job_id": processed_job.job_id,
+            "inferred_type": inferred_type,
             "status": processed_job.status.value if hasattr(processed_job.status, "value") else str(processed_job.status),
             "marked_handled": marked_handled,
             "notified": notified,

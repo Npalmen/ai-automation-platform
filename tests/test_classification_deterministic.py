@@ -315,11 +315,17 @@ class TestGmailInboxClassificationRouting:
         assert result["skipped_messages"][0]["reason"] == "duplicate"
 
     def test_lead_disabled_not_broken(self):
+        # A lead-keyword email must be skipped with "lead_disabled" when lead is not in enabled_job_types.
         mock_adapter = MagicMock()
-        mock_adapter.execute_action.return_value = {
-            "status": "success",
-            "messages": [{"message_id": "msg1", "thread_id": "t1"}],
-        }
+
+        def fake_execute(action, payload):
+            if action == "list_messages":
+                return {"status": "success", "messages": [{"message_id": "msg1", "thread_id": "t1"}]}
+            if action == "get_message":
+                return _detail_result(subject="Offert önskas")
+            return {"status": "success"}
+
+        mock_adapter.execute_action.side_effect = fake_execute
 
         with patch("app.main.get_integration_connection_config", return_value={}), \
              patch("app.main.get_integration_adapter", return_value=mock_adapter), \

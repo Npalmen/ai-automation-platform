@@ -106,10 +106,11 @@ def _call(
 
     with patch("app.main.get_integration_connection_config", return_value={}), \
          patch("app.main.get_integration_adapter", return_value=mock_adapter), \
-         patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead"]}), \
+         patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead", "invoice", "customer_inquiry"]}), \
          patch("app.main.JobRepository.get_by_gmail_message_id", side_effect=fake_get_by_gmail), \
          patch("app.main.JobRepository.create_job", side_effect=lambda db, job: job), \
-         patch("app.main.run_pipeline", side_effect=fake_run_pipeline):
+         patch("app.main.run_pipeline", side_effect=fake_run_pipeline), \
+         patch("app.main.dispatch_action", return_value={"status": "success"}):
         result = gmail_process_inbox(
             request=GmailProcessInboxRequest(max_results=5),
             db=MagicMock(),

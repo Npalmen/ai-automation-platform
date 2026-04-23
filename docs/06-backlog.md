@@ -81,8 +81,33 @@
 - [x] `env.example` — `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` documented
 - [x] `tests/test_gmail_oauth_refresh.py` — 19 new tests; 141/141 pass
 
+## Done (sellable MVP intake flows — 2026-04-23)
+
+### DEL 1: Customer inquiry flow
+- [x] `_build_inquiry_default_actions(job)` — `create_monday_item` + `send_email` to support
+- [x] `normalize_sender()`, `extract_phone()`, `classify_inquiry_priority()` shared helpers
+- [x] HIGH/NORMAL priority surfaced in item name, email subject, column_values, body
+- [x] `tests/test_inquiry_default_actions.py` — 76 tests
+
+### DEL 2: Invoice flow
+- [x] `_INVOICE_KEYWORDS` + `classify_email_type()` public function — invoice > lead > customer_inquiry
+- [x] `_build_invoice_default_actions(job)` — `create_monday_item` + `create_internal_task`
+- [x] `extract_invoice_amount`, `extract_invoice_number`, `extract_due_date`, `extract_invoice_data`
+- [x] Extraction wired into invoice default actions (amount, invoice_number, due_date, supplier_name, raw_text)
+- [x] `tests/test_invoice_default_actions.py` — 32 tests; `tests/test_invoice_extraction.py` — 47 tests
+
+### Inbox type inference
+- [x] `/gmail/process-inbox` infers `job_type` from message content via `classify_email_type`
+- [x] Per-type tenant gate — skips with `"{type}_disabled"` if not enabled
+- [x] Job created with inferred `JobType`; no hardcoded `actions` in `input_data`
+- [x] `tests/test_gmail_tenant_config_gate.py` — rewritten (17 tests)
+
+**702/702 tests pass. Sellable MVP complete.**
+
 ## Next (priority order)
-- [ ] No remaining MVP backlog items — all core slices complete
+- [ ] Follow-up question flow — detect when lead/inquiry needs clarification, auto-generate question before routing
+- [ ] Post-MVP activity view — operator visibility into jobs, outcomes, tenant health in UI
+- [ ] Scheduler / cron trigger — periodic external call to `POST /gmail/process-inbox`
 
 ## Future UI improvements (out of current scope)
 - [ ] Filtering and search — filter jobs by status, type, date range
@@ -90,9 +115,9 @@
 - [ ] Audit log view — surface `GET /audit-events` in the UI
 - [ ] Retries / re-run — trigger re-processing of failed jobs
 - [ ] Notifications — surface action failures inline without manual refresh
-- [ ] Improved UX — replace inline HTML/CSS with a proper component approach if scope grows
 
 ## Known risks
 - `app/api/routes/jobs.py` is dead code (not mounted in main.py) — remove or wire up
 - No DB migration tooling yet (tables created via SQLAlchemy `create_all` on startup)
 - Gmail token is short-lived; onboarding flow for OAuth refresh not built
+- `create_internal_task` is stubbed — no persistence beyond the job result payload

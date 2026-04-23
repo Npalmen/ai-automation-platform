@@ -130,10 +130,11 @@ def _call(
 
     with patch("app.main.get_integration_connection_config", return_value={}), \
          patch("app.main.get_integration_adapter", return_value=mock_adapter), \
-         patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead"]}), \
+         patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead", "invoice", "customer_inquiry"]}), \
          patch("app.main.JobRepository.get_by_gmail_message_id", return_value=None), \
          patch("app.main.JobRepository.create_job", side_effect=lambda db, job: job), \
-         patch("app.main.run_pipeline", side_effect=fake_run_pipeline):
+         patch("app.main.run_pipeline", side_effect=fake_run_pipeline), \
+         patch("app.main.dispatch_action", return_value={"status": "success"}):
         return gmail_process_inbox(
             request=GmailProcessInboxRequest(max_results=max_results),
             db=MagicMock(),
@@ -180,10 +181,11 @@ class TestGmailProcessInbox:
 
         with patch("app.main.get_integration_connection_config", return_value={}), \
              patch("app.main.get_integration_adapter", return_value=mock_adapter), \
-             patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead"]}), \
+             patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead", "invoice", "customer_inquiry"]}), \
              patch("app.main.JobRepository.get_by_gmail_message_id", return_value=None), \
              patch("app.main.JobRepository.create_job", side_effect=lambda db, job: job), \
-             patch("app.main.run_pipeline", side_effect=fake_run_pipeline):
+             patch("app.main.run_pipeline", side_effect=fake_run_pipeline), \
+             patch("app.main.dispatch_action", return_value={"status": "success"}):
             gmail_process_inbox(
                 request=GmailProcessInboxRequest(max_results=1),
                 db=MagicMock(),
@@ -197,11 +199,7 @@ class TestGmailProcessInbox:
         assert captured["source"]["system"] == "gmail"
         assert captured["source"]["message_id"] == "msg1"
         assert captured["source"]["thread_id"] == "tmsg1"
-        assert len(captured["actions"]) == 1
-        action = captured["actions"][0]
-        assert action["type"] == "create_monday_item"
-        assert "msg1" in action["item_name"] or "Sender msg1" in action["item_name"]
-        assert action["tenant_id"] == "TENANT_1001"
+        assert "actions" not in captured
 
     def test_skips_message_when_get_message_raises(self):
         result = _call(

@@ -1,12 +1,12 @@
 """
-Tests for lead-creation Slack notification in POST /gmail/process-inbox.
+Tests for job-creation Slack notification in POST /gmail/process-inbox.
 
 Covers:
-  - Successful lead creation triggers dispatch_action with notify_slack
+  - Successful job creation triggers dispatch_action with notify_slack
   - notify_slack action contains correct tenant_id, channel, message fields
-  - message body contains sender, subject, priority, job_id, tenant, source
+  - message body contains sender, subject, job_id, tenant, source, type
   - Duplicate message does NOT trigger notification
-  - lead_disabled skip does NOT trigger notification
+  - type_disabled skip does NOT trigger notification
   - get_message failure does NOT trigger notification
   - pipeline failure does NOT trigger notification
   - Notification failure is non-fatal: processed still counted, notified=False
@@ -68,8 +68,8 @@ def _detail_result(
     }
 
 
-_CONFIG_LEAD_ENABLED = {"enabled_job_types": ["lead"]}
-_CONFIG_LEAD_DISABLED = {"enabled_job_types": ["invoice"]}
+_CONFIG_ALL_ENABLED = {"enabled_job_types": ["lead", "invoice", "customer_inquiry"]}
+_CONFIG_INQUIRY_DISABLED = {"enabled_job_types": ["lead", "invoice"]}
 
 
 def _call(
@@ -77,7 +77,7 @@ def _call(
     existing_jobs: dict,
     detail_results: dict,            # {message_id: dict | Exception}
     pipeline_jobs: dict,             # {message_id: Job | Exception}
-    tenant_config: dict = _CONFIG_LEAD_ENABLED,
+    tenant_config: dict = _CONFIG_ALL_ENABLED,
     dispatch_action_side_effect=None,  # None=success, Exception=failure
     tenant_id: str = "TENANT_1001",
 ):
@@ -156,7 +156,7 @@ class TestNotificationTriggeredOnSuccess:
         action = mock_dispatch.call_args[0][0]
         assert action["tenant_id"] == "TENANT_1001"
 
-    def test_action_targets_leads_channel(self):
+    def test_action_targets_inbox_channel(self):
         _, mock_dispatch = _call(
             list_result=_list_result(["msg1"]),
             existing_jobs={"msg1": None},
@@ -164,7 +164,7 @@ class TestNotificationTriggeredOnSuccess:
             pipeline_jobs={"msg1": _make_processed_job("job-1")},
         )
         action = mock_dispatch.call_args[0][0]
-        assert action["channel"] == "#leads"
+        assert action["channel"] == "#inbox"
 
     def test_message_body_contains_sender(self):
         _, mock_dispatch = _call(
@@ -186,15 +186,15 @@ class TestNotificationTriggeredOnSuccess:
         msg = mock_dispatch.call_args[0][0]["message"]
         assert "Pricing question" in msg
 
-    def test_message_body_contains_priority(self):
+    def test_message_body_contains_inferred_type(self):
         _, mock_dispatch = _call(
             list_result=_list_result(["msg1"]),
             existing_jobs={"msg1": None},
-            detail_results={"msg1": _detail_result("msg1", subject="URGENT: help")},
+            detail_results={"msg1": _detail_result("msg1", subject="Faktura #99")},
             pipeline_jobs={"msg1": _make_processed_job("job-1")},
         )
         msg = mock_dispatch.call_args[0][0]["message"]
-        assert "high" in msg
+        assert "invoice" in msg
 
     def test_message_body_contains_job_id(self):
         _, mock_dispatch = _call(
@@ -238,13 +238,13 @@ class TestNotificationNotTriggered:
         )
         mock_dispatch.assert_not_called()
 
-    def test_lead_disabled_does_not_notify(self):
+    def test_type_disabled_does_not_notify(self):
         _, mock_dispatch = _call(
             list_result=_list_result(["msg1"]),
             existing_jobs={"msg1": None},
-            detail_results={},
+            detail_results={"msg1": _detail_result("msg1", subject="Hej, fråga om service")},
             pipeline_jobs={},
-            tenant_config=_CONFIG_LEAD_DISABLED,
+            tenant_config=_CONFIG_INQUIRY_DISABLED,
         )
         mock_dispatch.assert_not_called()
 

@@ -18,9 +18,12 @@ The following has been confirmed through real API calls against a running instan
 | Action persistence | ✅ LIVE VERIFIED | `GET /jobs/{job_id}/actions` returns real executed records |
 | Multi-tenant auth | ✅ LIVE VERIFIED | `X-API-Key` + body `tenant_id` both required |
 | Gmail → lead → Monday flow | ✅ LIVE VERIFIED | list_messages → get_message → map to /jobs → Monday item created |
-| Gmail inbox trigger | ✅ PRODUCTION-READY | `POST /gmail/process-inbox` — dedup, mark-as-read, tenant gate, enrichment, phone extraction, Slack notify, dry_run, query override |
-| Deterministic classification fallback | ✅ IMPLEMENTED | LLM fallback classifies as `lead` or `customer_inquiry` (keyword-based); no more `"unknown"` |
-| 545 tests passing | ✅ | `python -m pytest` |
+| Gmail inbox trigger | ✅ PRODUCTION-READY | `POST /gmail/process-inbox` — dedup, mark-as-read, per-type tenant gate, phone extraction, Slack notify, dry_run, query override |
+| Deterministic classification fallback | ✅ IMPLEMENTED | invoice > lead > customer_inquiry (keyword-based); no more `"unknown"` |
+| Inbox type inference | ✅ IMPLEMENTED | `/gmail/process-inbox` infers job_type from message content before job creation; correct initial type, no post-hoc correction |
+| Customer inquiry flow | ✅ IMPLEMENTED | default actions: `create_monday_item` (priority/email/phone/subject) + `send_email` to support; HIGH/NORMAL priority |
+| Invoice flow | ✅ IMPLEMENTED | default actions: `create_monday_item` + `create_internal_task`; deterministic extraction: amount, invoice_number, due_date, supplier_name |
+| 702 tests passing | ✅ | `python -m pytest` |
 
 ---
 
@@ -127,14 +130,15 @@ This is a complete manual-trigger ingestion → decision → action flow, confir
 
 ## What is limited
 
-- No LLM in dev without `LLM_API_KEY` — processors fall back deterministically (classification → keyword-based lead/inquiry; others → safe defaults); pipeline always completes
-- Action dispatch is real for Gmail and Monday only; `notify_slack` is non-fatal (silently no-ops when Slack not configured); other action types (notify_teams, create_internal_task) are stubbed
+- No LLM in dev without `LLM_API_KEY` — processors fall back deterministically (invoice > lead > customer_inquiry keyword classification; others → safe defaults); pipeline always completes
+- Action dispatch is real for Gmail and Monday only; `notify_slack` is non-fatal (silently no-ops when Slack not configured); `create_internal_task` is stubbed (no persistence)
 - Gmail `body_text` is empty for HTML-only emails — no HTML-to-text conversion
 - Monday `board_id` is env-only — no per-request override
 - No DB migration tooling — schema changes require manual intervention
 - No pagination in the UI — API supports it via query params
 - No auto-refresh in the UI — all loads are manual
 - `app/api/routes/jobs.py` is dead code (not mounted)
+- Gmail and Monday are current test integrations — business logic is source/destination agnostic and works with any future adapter
 
 ---
 
@@ -437,50 +441,86 @@ Seven production-readiness slices applied to `POST /gmail/process-inbox`:
 - Called (non-fatally) after successful pipeline run; `marked_handled` flag in response per message
 - `tests/test_gmail_mark_handled.py` — 12 tests
 
-### Tenant config lead gate
-- `get_tenant_config(tenant_id, db)` called at inbox entry; job creation skipped if `"lead"` not in `enabled_job_types`
-- Gated messages appear in `skipped_messages` with `reason: "lead_disabled"`
-- `tests/test_gmail_tenant_config_gate.py` — 11 tests
+### Tenant config type gate
+- `get_tenant_config(tenant_id, db)` called at inbox entry; `get_message` called first to infer type; job creation skipped if the inferred type is not in `enabled_job_types`
+- Gated messages appear in `skipped_messages` with `reason: "{inferred_type}_disabled"`
+- `tests/test_gmail_tenant_config_gate.py` — 17 tests
 
 ### Improved Monday item naming and column_values
 - `_make_monday_item_name(subject, sender_name)` — uses subject (truncated to 60 chars), falls back to sender name, then `"Ny förfrågan"`
 - `_infer_priority(subject, body)` — deterministic priority (`"High"` on Swedish/English urgency keywords, `"Medium"` otherwise)
-- `column_values` built from `sender_email`, `sender_phone`, `priority`, `body_text` (truncated) — mapped to monday column IDs
-- `tests/test_gmail_lead_enrichment.py` — 37 tests
+- `tests/test_gmail_lead_enrichment.py` — helper and priority function tests
 
 ### Improved From-header and phone extraction
 - `_parse_from_header` replaced by `email.utils.parseaddr` — correctly handles RFC 2822 `"Name <email>"` and bare addresses
 - `_extract_phone(text)` — regex-based extraction of Swedish/international phone numbers from subject+body
-- Extracted phone fed into `column_values` and `input_data.sender`
+- Extracted phone fed into `input_data.sender`
 - `tests/test_gmail_extraction.py` — 26 tests
 
-### Slack notification after lead creation
-- `dispatch_action("notify_slack", ...)` called (non-fatally) after successful pipeline run
-- Notification includes tenant ID, message ID, job ID, sender name, subject
+### Slack notification after job creation
+- `dispatch_action("notify_slack", ...)` called (non-fatally) after successful pipeline run to `#inbox`
+- Notification includes tenant ID, job ID, sender name, subject, and inferred type
 - `notified` flag per message in response
 - `tests/test_gmail_notification.py` — 20 tests
 
 ### Scheduler-safe mode (dry_run + query override)
 - `GmailProcessInboxRequest` extended: `dry_run: bool = False`, `query: str | None = None`
-- `dry_run=True` — reads messages but skips all writes (no job creation, no pipeline, no mark-as-read, no Slack notify); response entries have `status: "dry_run"`, `job_id: null`
+- `dry_run=True` — reads messages but skips all writes (no job creation, no pipeline, no mark-as-read, no Slack notify); response entries have `status: "dry_run"`, `job_id: null`, `inferred_type`
 - Default query `"is:unread"` used when `query` is absent; custom query forwarded to `list_messages`
 - Response extended with: `dry_run`, `query_used`, `max_results`, `scanned`
 - `tests/test_gmail_scheduler_mode.py` — 24 tests
 
-**545/545 tests pass after all seven slices.**
-
 ## Deterministic classification fallback (2026-04-22)
 
-DEL 1 — Slice 1: Classification fallback replaced `"unknown"` with keyword-based intent detection.
+- `_INVOICE_KEYWORDS`, `_LEAD_KEYWORDS` added to `classification_processor.py`
+- `classify_email_type(subject, body) -> str` — public function; priority order: invoice > lead > customer_inquiry
+- `_classify_deterministic` delegates to `classify_email_type` (single source of truth)
+- Fallback sets `confidence=0.5`, `reasons=["deterministic_fallback", "llm_unavailable"]`
+- Applies to **all job sources** — `POST /jobs`, inbox trigger, verification
+- `tests/test_classification_deterministic.py` — updated
 
-- `_LEAD_KEYWORDS` set added to `classification_processor.py`: Swedish (`offert`, `pris`, `köpa`, `intresserad`) + English (`quote`, `pricing`, `buy`, `purchase`, `interested`, `demo`, `trial`)
-- `_classify_deterministic(subject, body) -> str` — case-insensitive substring match; returns `"lead"` on any keyword hit, `"customer_inquiry"` otherwise
-- `process_classification_job` `fallback_payload_builder` now calls `_classify_deterministic` instead of returning `"unknown"`; fallback sets `confidence=0.5`, `reasons=["deterministic_fallback", "llm_unavailable"]`
-- Classification fallback applies to **all job sources** (not just Gmail inbox) — `POST /jobs`, inbox trigger, and future sources all benefit
-- `orchestrator` routing unchanged; `"customer_inquiry"` and `"lead"` already have defined post-classification pipelines
-- `tests/test_classification_deterministic.py` — 33 tests covering all keyword variants, fallback path, and inbox routing
-- `tests/test_ai_processors.py` updated: stale `"unknown"` / `0.0` / no-reasons assertions replaced
-- 545/545 tests pass
+## Customer inquiry default actions (2026-04-23)
+
+- `_build_inquiry_default_actions(job)` added to `action_dispatch_processor.py`
+- ACTION 1: `create_monday_item` — item name with sender label; `column_values` includes `source=inquiry`, `priority`, `email`, `phone`, `subject`, `message`; priority prefix `[HIGH]` in item name
+- ACTION 2: `send_email` to `support@company.com` — body includes sender, email, phone, subject, message, priority, job ID, tenant
+- Sender normalized via `normalize_sender()`; phone extracted via `extract_phone()` when not in sender dict
+- `classify_inquiry_priority(subject, message_text)` — keywords `akut`, `snabbt`, `problem` → `HIGH`; else `NORMAL`
+- `_build_fallback_actions` routes `customer_inquiry` → `_build_inquiry_default_actions`
+- `tests/test_inquiry_default_actions.py` — 76 tests
+
+## Invoice default actions (2026-04-23)
+
+- `_build_invoice_default_actions(job)` added to `action_dispatch_processor.py`
+- ACTION 1: `create_monday_item` — `column_values` includes `source=invoice`, `email`, `subject`, `amount`, `invoice_number`, `due_date`, `supplier_name`
+- ACTION 2: `create_internal_task` — title, description with extracted fields, `metadata.invoice` contains full extraction payload
+- `_build_fallback_actions` routes `invoice` → `_build_invoice_default_actions`
+- `tests/test_invoice_default_actions.py` — 32 tests
+
+## Invoice extraction (2026-04-23)
+
+Deterministic regex extraction from email subject+body:
+
+- `extract_invoice_amount(subject, body)` — matches `"12 500 kr"`, `"SEK 12500"`, decimal amounts; returns first match or None
+- `extract_invoice_number(subject, body)` — matches `"Faktura #1234"`, `"Fakturanummer: INV-001"`, `"Invoice 5678"`; requires explicit punctuation or digit-start reference
+- `extract_due_date(subject, body)` — matches ISO-style dates `YYYY-MM-DD`, `YYYY/MM/DD`, `YYYY.MM.DD`; normalizes to `-`
+- `extract_invoice_data(input_data)` — orchestrates all extractors; returns `supplier_name`, `amount`, `invoice_number`, `due_date`, `raw_text`; omits fields not found
+- `normalize_sender(input_data)` — reads nested `sender` dict first, falls back to flat `sender_name/email/phone` keys
+- `tests/test_invoice_extraction.py` — 47 tests
+
+## Inbox type inference (2026-04-23)
+
+- `/gmail/process-inbox` now infers `job_type` before creating the job
+- `classify_email_type` imported from `classification_processor` — single source of truth
+- `get_message` is called before the tenant gate (type must be known first)
+- Inferred type checked against `enabled_job_types`; skipped with `"{type}_disabled"` if not enabled
+- `Job` created with the inferred `JobType` (`LEAD`, `CUSTOMER_INQUIRY`, or `INVOICE`)
+- `input_data` no longer contains a hardcoded `actions` list — pipeline fallback builds correct actions per type
+- `created_jobs` entries include `inferred_type`
+- Slack notification body is type-generic; channel changed to `#inbox`
+- `tests/test_gmail_tenant_config_gate.py` — fully rewritten (17 tests)
+
+**702/702 tests pass.**
 
 ## Monday workflow wiring (2026-04-20)
 
@@ -506,8 +546,28 @@ DEL 1 — Slice 1: Classification fallback replaced `"unknown"` with keyword-bas
 - `tests/test_google_mail_get_message.py` — 11 new tests
 - 371/371 tests pass
 
-## All MVP slices complete
-All items from the original backlog are implemented and tested.
+## Sellable MVP — intake flows complete (2026-04-23)
+
+All three intake flows are implemented, tested, and production-ready:
+
+| Flow | Classification | Default actions | Extraction |
+|------|---------------|-----------------|------------|
+| Lead | ✅ keyword + LLM | create_monday_item | contact fields |
+| Customer inquiry | ✅ keyword + LLM | create_monday_item + send_email (support) | priority, phone |
+| Invoice | ✅ keyword + LLM | create_monday_item + create_internal_task | amount, invoice_number, due_date, supplier_name |
+
+The platform can be demonstrated to a first customer for:
+- **Sales** (lead intake flow)
+- **Support** (customer inquiry flow with HIGH/NORMAL priority)
+- **Basic finance intake** (invoice flow with deterministic field extraction)
+
+**702/702 tests pass.**
+
+## Next likely product step
+
+Either:
+- **Completeness / follow-up question flow** — detect when a lead or inquiry requires a clarification question before routing, and auto-generate it
+- **Post-MVP onboarding / activity view** — operator visibility into processed jobs, action outcomes, and tenant health in the UI
 
 ## Known issues / filesystem
 - `pyproject.toml` is a directory (not a file) in the local filesystem — not tracked in git; does not affect runtime

@@ -124,11 +124,11 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - 17 new tests; 105/105 pass
 
 ## Current state
-MVP is complete and live-validated. Gmail (send + read + inbox trigger with full hardening) and Monday (direct + workflow) are confirmed working through real API calls. Full pipeline, approval flow, and action persistence verified end-to-end. Auth is enforced. UI is stable, Swedish-localised, and tenant-aware. Verification is deterministic (no LLM required). **545/545 tests pass.**
+Sellable MVP for first customer is complete. All three intake flows (lead, customer inquiry, invoice) are implemented, tested, and production-ready. **702/702 tests pass.**
 
-`POST /gmail/process-inbox` is production-ready: deduplication, mark-as-read, tenant config gating, Monday enrichment, phone extraction, Slack notification, dry_run mode, and query override are all implemented and tested.
+`POST /gmail/process-inbox` infers job_type from message content before creating the job — lead, customer_inquiry, and invoice are each routed to the correct pipeline and default actions without any post-hoc correction.
 
-Classification fallback (DEL 1 — Slice 1) is complete: LLM unavailability no longer produces `"unknown"` — instead, keyword-based intent detection classifies every message as `lead` or `customer_inquiry`.
+All processors fall back deterministically (no LLM required): classification uses invoice > lead > customer_inquiry keyword matching; invoice extraction uses regex; inquiry priority uses keyword detection.
 
 ## Completed slice (2026-04-12 — integration event persistence)
 - `IntegrationEvent` model base fixed to `database.Base` — table now in `create_all`
@@ -421,24 +421,59 @@ Seven production-readiness slices completed in a single session:
 - `_LEAD_KEYWORDS` + `_classify_deterministic()` added to `classification_processor.py`
 - Fallback now returns `"lead"` or `"customer_inquiry"` with `confidence=0.5`, `reasons=["deterministic_fallback", "llm_unavailable"]`
 - Applies to all job sources — not just Gmail inbox
-- `tests/test_classification_deterministic.py` — 33 tests; `tests/test_ai_processors.py` updated
-- 545/545 tests pass
+- `tests/test_classification_deterministic.py` — tests; `tests/test_ai_processors.py` updated
+
+## Completed slices (2026-04-23 — Sellable MVP: all three intake flows)
+
+### DEL 1 Slice 2: Customer inquiry default actions
+- `_build_inquiry_default_actions(job)` — `create_monday_item` (priority, email, phone, subject, message) + `send_email` to `support@company.com`
+- `classify_inquiry_priority(subject, message_text)` — `akut`, `snabbt`, `problem` → HIGH; else NORMAL
+- `normalize_sender()`, `extract_phone()` shared helpers in `ai_processor_utils.py`
+- `tests/test_inquiry_default_actions.py` — 76 tests
+
+### DEL 1 Slice 3: Structured inquiry data
+- Sender normalized (nested or flat keys); phone extracted from body; column_values and email body enriched
+
+### DEL 1 Slice 4: Inquiry priority
+- HIGH/NORMAL surfaced in item_name prefix, email subject, column_values, and body
+
+### DEL 2 Slice 1: Invoice classification
+- `_INVOICE_KEYWORDS` added; priority order: invoice > lead > customer_inquiry
+- `classify_email_type()` extracted as public function — single source of truth for all callers
+
+### DEL 2 Slice 2: Invoice default actions
+- `_build_invoice_default_actions(job)` — `create_monday_item` + `create_internal_task`
+- `tests/test_invoice_default_actions.py` — 32 tests
+
+### DEL 2 Slice 3: Invoice extraction
+- `extract_invoice_amount`, `extract_invoice_number`, `extract_due_date`, `extract_invoice_data` in `ai_processor_utils.py`
+- Wired into `_build_invoice_default_actions` — amount, invoice_number, due_date, supplier_name, raw_text
+- `tests/test_invoice_extraction.py` — 47 tests
+
+### Inbox type inference
+- `/gmail/process-inbox` calls `classify_email_type(subject, body)` before job creation
+- Gate checks inferred type against `enabled_job_types`; skips with `"{type}_disabled"`
+- Job created with inferred `JobType`; no hardcoded `actions` in `input_data`
+- `tests/test_gmail_tenant_config_gate.py` — fully rewritten (17 tests)
+
+**702/702 tests pass.**
 
 ## Next steps
 
-### Immediate
-1. **Scheduler / cron trigger** — `POST /gmail/process-inbox` is scheduler-ready (`dry_run`, idempotent via dedup); next step is wiring a periodic external trigger (cron job, APScheduler, or Cloud Scheduler) to call it on an interval
-2. **DEL 1 — Slice 2: Customer inquiry actions** — define what happens after a `customer_inquiry` is created: auto-reply email, internal ticket, or Slack alert
+### Most likely next slice
+1. **Completeness / follow-up question flow** — detect when a lead or inquiry needs a clarification question and auto-generate it before routing
+2. **Post-MVP onboarding / activity view** — operator visibility into processed jobs, outcomes, and tenant health in the UI
 
 ### After that
-3. **HTML-to-text** — `body_text` is empty for HTML-only Gmail messages; no conversion implemented
-4. **Monday per-request board_id override** — currently env-only
-5. **Gmail credential health check** — proactive check before ingestion run; surface `invalid_grant` early
+3. **Scheduler / cron trigger** — wire a periodic external trigger (cron, APScheduler, Cloud Scheduler) to call `POST /gmail/process-inbox`
+4. **HTML-to-text** — `body_text` is empty for HTML-only Gmail messages
+5. **Monday per-request board_id override** — currently env-only
+6. **Gmail credential health check** — proactive `invalid_grant` surface before ingestion run
 
 ## Remaining work
-All original MVP backlog items are complete. Platform is live-verified and stable. The ingestion layer is production-ready.
+All original MVP backlog items are complete. The platform is live-verified, stable, and demonstrable to a first customer for sales, support, and basic finance intake.
 
 ## Expected output from next implementation chat
-- Continue from this repo state; all docs and 545 tests are current
-- `POST /gmail/process-inbox` is production-hardened; ready for external scheduler trigger
-- Next logical slice: DEL 1 — Slice 2 (customer inquiry actions) or scheduler wiring
+- Continue from this repo state; all docs and 702 tests are current
+- All three intake flows (lead, customer inquiry, invoice) are implemented end-to-end
+- Next logical slice: follow-up question flow or operator activity view

@@ -21,6 +21,15 @@ def _classify_deterministic(subject: str, body: str) -> str:
     Priority order: invoice > lead > customer_inquiry.
     Checks combined subject+body text case-insensitively.
     """
+    return classify_email_type(subject, body)
+
+
+def classify_email_type(subject: str, body: str) -> str:
+    """Public deterministic classifier — invoice > lead > customer_inquiry.
+
+    Reusable by any intake path (inbox, webhook, manual POST) so classification
+    rules stay in a single place.
+    """
     combined = f"{subject} {body}".lower()
     if any(kw in combined for kw in _INVOICE_KEYWORDS):
         return "invoice"

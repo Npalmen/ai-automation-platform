@@ -77,7 +77,8 @@ def _call(
             if isinstance(r, Exception):
                 raise r
             return r
-        raise ValueError(f"unexpected action: {action}")
+        # mark_as_read and other side-effect actions
+        return {"status": "success"}
 
     def fake_get_by_gmail_message_id(db, t_id, message_id):
         return existing_jobs.get(message_id)
@@ -94,13 +95,14 @@ def _call(
 
     with patch("app.main.get_integration_connection_config", return_value={}), \
          patch("app.main.get_integration_adapter", return_value=mock_adapter), \
-         patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead"]}), \
+         patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead", "invoice", "customer_inquiry"]}), \
          patch(
              "app.main.JobRepository.get_by_gmail_message_id",
              side_effect=fake_get_by_gmail_message_id,
          ), \
          patch("app.main.JobRepository.create_job", side_effect=lambda db, job: job), \
-         patch("app.main.run_pipeline", side_effect=fake_run_pipeline):
+         patch("app.main.run_pipeline", side_effect=fake_run_pipeline), \
+         patch("app.main.dispatch_action", return_value={"status": "success"}):
         return gmail_process_inbox(
             request=GmailProcessInboxRequest(max_results=max_results),
             db=MagicMock(),
@@ -136,9 +138,10 @@ class TestDeduplication:
 
         with patch("app.main.get_integration_connection_config", return_value={}), \
              patch("app.main.get_integration_adapter") as mock_get_adapter, \
-             patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead"]}), \
+             patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead", "invoice", "customer_inquiry"]}), \
              patch("app.main.JobRepository.get_by_gmail_message_id", return_value=existing), \
-             patch("app.main.JobRepository.create_job") as mock_create:
+             patch("app.main.JobRepository.create_job") as mock_create, \
+             patch("app.main.dispatch_action", return_value={"status": "success"}):
 
             mock_adapter = MagicMock()
             mock_adapter.execute_action.return_value = _list_result(["msg1"])
@@ -183,9 +186,11 @@ class TestDeduplication:
 
         with patch("app.main.get_integration_connection_config", return_value={}), \
              patch("app.main.get_integration_adapter", return_value=mock_adapter), \
+             patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead", "invoice", "customer_inquiry"]}), \
              patch("app.main.JobRepository.get_by_gmail_message_id", side_effect=fake_get_by_gmail), \
              patch("app.main.JobRepository.create_job", side_effect=lambda db, job: job), \
-             patch("app.main.run_pipeline", return_value=_make_processed_job()):
+             patch("app.main.run_pipeline", return_value=_make_processed_job()), \
+             patch("app.main.dispatch_action", return_value={"status": "success"}):
             gmail_process_inbox(
                 request=GmailProcessInboxRequest(max_results=5),
                 db=MagicMock(),

@@ -74,8 +74,8 @@ def _detail_result(message_id: str = "msg1") -> dict:
     }
 
 
-_CONFIG_LEAD_ENABLED = {"enabled_job_types": ["lead"]}
-_CONFIG_LEAD_DISABLED = {"enabled_job_types": ["invoice"]}
+_CONFIG_ALL_ENABLED = {"enabled_job_types": ["lead", "invoice", "customer_inquiry"]}
+_CONFIG_NO_LEAD = {"enabled_job_types": ["invoice", "customer_inquiry"]}
 
 
 def _call(
@@ -86,7 +86,7 @@ def _call(
     max_results: int = 5,
     dry_run: bool = False,
     query: str | None = None,
-    tenant_config: dict = _CONFIG_LEAD_ENABLED,
+    tenant_config: dict = _CONFIG_ALL_ENABLED,
     tenant_id: str = "TENANT_1001",
 ):
     captured_list_payloads: list = []
@@ -333,13 +333,27 @@ class TestDryRun:
         assert result["skipped"] == 1
         assert result["skipped_messages"][0]["reason"] == "duplicate"
 
-    def test_dry_run_skips_lead_disabled_normally(self):
+    def test_dry_run_skips_type_disabled_normally(self):
+        # A lead-keyword email is skipped when lead is not in enabled_job_types.
         result, *_ = _call(
             list_result=_list_result(["msg1"]),
             existing_jobs={"msg1": None},
-            detail_results={},
+            detail_results={"msg1": {
+                "status": "success",
+                "message": {
+                    "message_id": "msg1",
+                    "thread_id": "tmsg1",
+                    "from": "Erik <erik@example.com>",
+                    "to": "me@example.com",
+                    "subject": "Offert önskas",
+                    "received_at": "Mon, 21 Apr 2026 10:00:00 +0000",
+                    "snippet": "snippet",
+                    "label_ids": ["INBOX", "UNREAD"],
+                    "body_text": "",
+                },
+            }},
             pipeline_jobs={},
-            tenant_config=_CONFIG_LEAD_DISABLED,
+            tenant_config=_CONFIG_NO_LEAD,
             dry_run=True,
         )
         assert result["skipped"] == 1
