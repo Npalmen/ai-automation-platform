@@ -1,7 +1,14 @@
 """
-Tests for customer_inquiry default action injection and structured data.
+Tests for customer_inquiry default action injection, structured data, and priority.
 
 Covers:
+  classify_inquiry_priority:
+    - subject keywords → HIGH
+    - body keywords → HIGH
+    - normal message → NORMAL
+    - case-insensitive
+    - empty strings → NORMAL
+
   normalize_sender / extract_phone (shared helpers):
     - nested sender dict
     - flat sender_* keys
@@ -10,10 +17,11 @@ Covers:
 
   _build_inquiry_default_actions:
     - produces create_monday_item + send_email
-    - item_name format: "Support: {sender} - {subject}"
-    - column_values includes email, phone, source, subject, message
+    - HIGH priority: item_name prefixed with [HIGH], email subject includes [HIGH]
+    - NORMAL priority: no prefix, standard email subject
+    - column_values includes priority, email, phone, source, subject, message
     - phone omitted from column_values when absent
-    - email body includes all structured fields
+    - email body includes priority and all structured fields
     - flat sender_name / sender_email backward-compatible
     - empty input still produces valid actions
 
@@ -41,7 +49,11 @@ from app.workflows.processors.action_dispatch_processor import (
     _resolve_actions,
     process_action_dispatch_job,
 )
-from app.workflows.processors.ai_processor_utils import extract_phone, normalize_sender
+from app.workflows.processors.ai_processor_utils import (
+    classify_inquiry_priority,
+    extract_phone,
+    normalize_sender,
+)
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -83,6 +95,46 @@ def _lead_job(input_data: dict | None = None) -> Job:
         input_data=input_data,
         classification_detected="lead",
     )
+
+
+# ── classify_inquiry_priority ────────────────────────────────────────────────
+
+class TestClassifyInquiryPriority:
+    def test_subject_akut_is_high(self):
+        assert classify_inquiry_priority("akut problem", "") == "HIGH"
+
+    def test_subject_snabbt_is_high(self):
+        assert classify_inquiry_priority("Behöver hjälp snabbt", "") == "HIGH"
+
+    def test_subject_problem_is_high(self):
+        assert classify_inquiry_priority("problem med produkten", "") == "HIGH"
+
+    def test_body_akut_is_high(self):
+        assert classify_inquiry_priority("", "Det är akut") == "HIGH"
+
+    def test_body_snabbt_is_high(self):
+        assert classify_inquiry_priority("Fråga", "Behöver svar snabbt") == "HIGH"
+
+    def test_body_problem_is_high(self):
+        assert classify_inquiry_priority("Support", "Har ett problem med faktura") == "HIGH"
+
+    def test_normal_message_is_normal(self):
+        assert classify_inquiry_priority("Fråga om leverans", "När kommer min order?") == "NORMAL"
+
+    def test_empty_subject_and_body_is_normal(self):
+        assert classify_inquiry_priority("", "") == "NORMAL"
+
+    def test_case_insensitive_upper(self):
+        assert classify_inquiry_priority("AKUT ÄRENDE", "") == "HIGH"
+
+    def test_case_insensitive_mixed(self):
+        assert classify_inquiry_priority("", "Det är ett Problem") == "HIGH"
+
+    def test_keyword_in_body_wins(self):
+        assert classify_inquiry_priority("Vanlig fråga", "men det är akut") == "HIGH"
+
+    def test_no_false_positive_on_unrelated_word(self):
+        assert classify_inquiry_priority("Fråga om öppettider", "Hej, när öppnar ni?") == "NORMAL"
 
 
 # ── normalize_sender ──────────────────────────────────────────────────────────
@@ -193,6 +245,53 @@ class TestBuildInquiryDefaultActions:
     def test_item_name_flat_sender_keys(self):
         job = _inquiry_job({"subject": "Test", "sender_name": "Flat", "sender_email": "flat@ex.com"})
         assert "Flat" in _build_inquiry_default_actions(job)[0]["item_name"]
+
+    # priority ---
+
+    def test_high_priority_prefixes_item_name(self):
+        job = _inquiry_job({"subject": "Akut problem med enheten", "sender": {"name": "Anna"}})
+        item_name = _build_inquiry_default_actions(job)[0]["item_name"]
+        assert item_name.startswith("[HIGH]")
+
+    def test_normal_priority_no_prefix(self):
+        job = _inquiry_job({"subject": "Fråga om leverans", "sender": {"name": "Bo"}})
+        item_name = _build_inquiry_default_actions(job)[0]["item_name"]
+        assert not item_name.startswith("[HIGH]")
+
+    def test_high_priority_email_subject_includes_high(self):
+        job = _inquiry_job({"subject": "Akut", "message_text": ""})
+        email_subject = _build_inquiry_default_actions(job)[1]["subject"]
+        assert "[HIGH]" in email_subject
+
+    def test_normal_priority_email_subject_no_high(self):
+        job = _inquiry_job({"subject": "Fråga"})
+        email_subject = _build_inquiry_default_actions(job)[1]["subject"]
+        assert "[HIGH]" not in email_subject
+
+    def test_email_body_contains_priority_high(self):
+        job = _inquiry_job({"subject": "Akut ärende"})
+        body = _build_inquiry_default_actions(job)[1]["body"]
+        assert "HIGH" in body
+
+    def test_email_body_contains_priority_normal(self):
+        job = _inquiry_job({"subject": "Vanlig fråga"})
+        body = _build_inquiry_default_actions(job)[1]["body"]
+        assert "NORMAL" in body
+
+    def test_column_values_contains_priority(self):
+        job = _inquiry_job({"subject": "Test"})
+        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        assert cv["priority"] in ("HIGH", "NORMAL")
+
+    def test_column_values_priority_high_for_urgent(self):
+        job = _inquiry_job({"subject": "Akut"})
+        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        assert cv["priority"] == "HIGH"
+
+    def test_column_values_priority_normal_for_standard(self):
+        job = _inquiry_job({"subject": "Fråga"})
+        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        assert cv["priority"] == "NORMAL"
 
     # column_values ---
 
@@ -334,6 +433,12 @@ class TestFallbackActionRouting:
         job = _make_job(job_type=JobType.UNKNOWN, classification_detected="unknown")
         types = [a["type"] for a in _build_fallback_actions(job)]
         assert "create_internal_task" in types
+
+    def test_lead_fallback_has_no_inquiry_priority_field(self):
+        job = _lead_job({"subject": "Offert"})
+        for action in _build_fallback_actions(job):
+            cv = action.get("column_values", {})
+            assert cv.get("source") != "inquiry"
 
 
 # ── _resolve_actions override behaviour ──────────────────────────────────────

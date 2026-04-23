@@ -36,6 +36,21 @@ def extract_phone(subject: str, body_text: str) -> str | None:
     return None
 
 
+_INQUIRY_HIGH_KEYWORDS = {"akut", "snabbt", "problem"}
+
+
+def classify_inquiry_priority(subject: str, message_text: str) -> str:
+    """Return 'HIGH' or 'NORMAL' for a customer inquiry.
+
+    Checks subject and message_text case-insensitively against a small set
+    of urgency keywords. Returns 'HIGH' on any match, 'NORMAL' otherwise.
+    """
+    combined = f"{subject} {message_text}".lower()
+    if any(kw in combined for kw in _INQUIRY_HIGH_KEYWORDS):
+        return "HIGH"
+    return "NORMAL"
+
+
 def normalize_sender(input_data: dict[str, Any]) -> dict[str, str]:
     """Return a clean sender dict from nested or flat input_data fields.
 

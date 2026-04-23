@@ -10,6 +10,7 @@ from app.repositories.postgres.action_execution_repository import ActionExecutio
 from app.workflows.action_executor import execute_action
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
+    classify_inquiry_priority,
     extract_phone,
     get_latest_processor_payload,
     normalize_sender,
@@ -74,11 +75,15 @@ def _build_inquiry_default_actions(job: Job) -> list[dict[str, Any]]:
     if isinstance(source, dict):
         source = source.get("system") or "inquiry"
 
-    sender_label = sender_name or sender_email or "Okänd avsändare"
-    raw_name = f"Support: {sender_label} - {subject}"
-    item_name = raw_name[:80].rstrip()
+    priority = classify_inquiry_priority(subject, message_text)
 
-    column_values: dict[str, Any] = {"source": "inquiry"}
+    sender_label = sender_name or sender_email or "Okänd avsändare"
+    base_name = f"Support: {sender_label} - {subject}"
+    if priority == "HIGH":
+        base_name = f"[HIGH] {base_name}"
+    item_name = base_name[:80].rstrip()
+
+    column_values: dict[str, Any] = {"source": "inquiry", "priority": priority}
     if sender_email:
         column_values["email"] = sender_email
     if sender_phone:
@@ -89,8 +94,10 @@ def _build_inquiry_default_actions(job: Job) -> list[dict[str, Any]]:
         column_values["message"] = message_text[:200].rstrip()
 
     phone_line = f"Telefon:   {sender_phone}\n" if sender_phone else ""
+    email_subject = f"Ny kundfråga [{priority}]" if priority == "HIGH" else "Ny kundfråga"
     email_body = (
         f"Ny kundfråga inkom via AI Automation Platform.\n\n"
+        f"Prioritet: {priority}\n"
         f"Från:      {sender_label}\n"
         f"E-post:    {sender_email or '(okänd)'}\n"
         f"{phone_line}"
@@ -111,7 +118,7 @@ def _build_inquiry_default_actions(job: Job) -> list[dict[str, Any]]:
         {
             "type": "send_email",
             "to": _DEFAULT_SUPPORT_EMAIL,
-            "subject": "Ny kundfråga",
+            "subject": email_subject,
             "body": email_body,
         },
     ]
