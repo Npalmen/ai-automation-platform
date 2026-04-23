@@ -6,6 +6,8 @@ from app.workflows.processors.ai_processor_utils import run_ai_step
 PROCESSOR_NAME = "classification_processor"
 PROMPT_NAME = "classification"
 
+_INVOICE_KEYWORDS = {"faktura", "invoice"}
+
 _LEAD_KEYWORDS = {
     "offert", "pris", "köpa", "intresserad",
     "quote", "pricing", "buy", "purchase", "interested",
@@ -14,12 +16,14 @@ _LEAD_KEYWORDS = {
 
 
 def _classify_deterministic(subject: str, body: str) -> str:
-    """Return 'lead' or 'customer_inquiry' based on keyword match.
+    """Return 'invoice', 'lead', or 'customer_inquiry' based on keyword match.
 
+    Priority order: invoice > lead > customer_inquiry.
     Checks combined subject+body text case-insensitively.
-    Returns 'lead' on any lead-intent keyword match, 'customer_inquiry' otherwise.
     """
     combined = f"{subject} {body}".lower()
+    if any(kw in combined for kw in _INVOICE_KEYWORDS):
+        return "invoice"
     if any(kw in combined for kw in _LEAD_KEYWORDS):
         return "lead"
     return "customer_inquiry"

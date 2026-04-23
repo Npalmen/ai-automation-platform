@@ -3,21 +3,24 @@ Tests for deterministic classification fallback.
 
 Covers:
   _classify_deterministic helper:
-    A. Lead keywords (offert, pris, köpa, intresserad, and English equivalents)
-    B. Non-lead -> customer_inquiry
-    C. Empty/unclear -> customer_inquiry
-    D. Case-insensitivity
+    A. Invoice keywords (faktura, invoice) — highest priority
+    B. Lead keywords (offert, pris, köpa, intresserad, and English equivalents)
+    C. Non-lead, non-invoice -> customer_inquiry
+    D. Empty/unclear -> customer_inquiry
+    E. Case-insensitivity
+    F. Invoice beats lead when both keywords present
 
   process_classification_job (LLM unavailable = fallback path):
+    - Invoice-like job classified as invoice
     - Lead-like job classified as lead
-    - Non-lead job classified as customer_inquiry
+    - Non-lead, non-invoice job classified as customer_inquiry
     - Fallback confidence is 0.5, reasons include deterministic_fallback
     - Explicitly provided job_type on the Job object is NOT overridden by fallback
       (classification writes to payload; routing reads payload, not job.job_type)
 
   gmail_process_inbox path:
-    - Lead-like email -> job with lead pipeline routing
-    - Non-lead email -> job records customer_inquiry (via classification)
+    - Lead-like email -> job created (inbox default)
+    - Non-lead email -> job created (dedup/gating not broken)
     - Dedup / tenant-gating not broken
 """
 from __future__ import annotations
@@ -38,6 +41,33 @@ from app.main import GmailProcessInboxRequest, gmail_process_inbox
 # ── _classify_deterministic ───────────────────────────────────────────────────
 
 class TestClassifyDeterministic:
+    # Invoice keywords
+    @pytest.mark.parametrize("subject,body", [
+        ("Faktura #1234", ""),
+        ("", "Please find the invoice attached"),
+        ("Invoice for services rendered", ""),
+        ("", "Hej, bifogad faktura avser mars"),
+        ("Re: faktura", "Se bifogad fil"),
+    ])
+    def test_invoice_keywords(self, subject, body):
+        assert _classify_deterministic(subject, body) == "invoice"
+
+    def test_invoice_keyword_in_body_wins(self):
+        assert _classify_deterministic("Hej", "din faktura är nu betald") == "invoice"
+
+    def test_invoice_beats_lead_when_both_present(self):
+        # "Faktura / pricing question" — invoice takes priority over lead
+        assert _classify_deterministic("Faktura / pricing question", "") == "invoice"
+
+    def test_invoice_beats_lead_keywords_in_body(self):
+        assert _classify_deterministic("", "invoice for the demo you requested") == "invoice"
+
+    def test_invoice_case_insensitive_upper(self):
+        assert _classify_deterministic("FAKTURA ÄRENDE", "") == "invoice"
+
+    def test_invoice_case_insensitive_mixed(self):
+        assert _classify_deterministic("", "Bifogad Invoice från leverantör") == "invoice"
+
     # Lead keywords — Swedish
     @pytest.mark.parametrize("subject,body", [
         ("Vill ha offert", ""),
@@ -62,14 +92,13 @@ class TestClassifyDeterministic:
     def test_english_lead_keywords(self, subject, body):
         assert _classify_deterministic(subject, body) == "lead"
 
-    # Support / non-lead
+    # Support / non-lead, non-invoice
     @pytest.mark.parametrize("subject,body", [
-        ("Problem med faktura", "Hej, min faktura är felaktig"),
         ("Min produkt fungerar inte", "Kan ni hjälpa?"),
         ("Question about delivery", "When will my order arrive?"),
         ("Technical issue", "Getting error 500"),
     ])
-    def test_non_lead_is_customer_inquiry(self, subject, body):
+    def test_non_lead_non_invoice_is_customer_inquiry(self, subject, body):
         assert _classify_deterministic(subject, body) == "customer_inquiry"
 
     def test_empty_subject_and_body_is_customer_inquiry(self):
@@ -84,7 +113,7 @@ class TestClassifyDeterministic:
     def test_case_insensitive_mixed(self):
         assert _classify_deterministic("", "Jag är Intresserad av er lösning") == "lead"
 
-    def test_keyword_in_body_wins(self):
+    def test_lead_keyword_in_body_wins_over_neutral_subject(self):
         assert _classify_deterministic("Support fråga", "men vi vill också ha ett pris") == "lead"
 
     def test_no_false_positive_on_similar_word(self):
@@ -115,6 +144,16 @@ class TestClassificationFallback:
             return_value=_FailingClient(),
         ):
             return process_classification_job(job)
+
+    def test_invoice_job_classified_as_invoice_on_fallback(self):
+        job = _make_job("Faktura #5678", "Se bifogad faktura för mars")
+        result = self._run_with_llm_error(job)
+        assert result.result["payload"]["detected_job_type"] == "invoice"
+
+    def test_invoice_beats_lead_on_fallback(self):
+        job = _make_job("Faktura / pricing question", "")
+        result = self._run_with_llm_error(job)
+        assert result.result["payload"]["detected_job_type"] == "invoice"
 
     def test_lead_job_classified_as_lead_on_fallback(self):
         job = _make_job("Vill ha offert", "Vi är intresserade av köp")
