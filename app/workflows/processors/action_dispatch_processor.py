@@ -10,7 +10,9 @@ from app.repositories.postgres.action_execution_repository import ActionExecutio
 from app.workflows.action_executor import execute_action
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
+    extract_phone,
     get_latest_processor_payload,
+    normalize_sender,
 )
 
 PROCESSOR_NAME = "action_dispatch_processor"
@@ -57,23 +59,43 @@ _DEFAULT_SUPPORT_EMAIL = "support@company.com"
 
 def _build_inquiry_default_actions(job: Job) -> list[dict[str, Any]]:
     input_data = job.input_data or {}
-    sender = input_data.get("sender") or {}
+    sender = normalize_sender(input_data)
 
-    sender_name = sender.get("name") or input_data.get("sender_name") or ""
-    sender_email = sender.get("email") or input_data.get("sender_email") or ""
+    sender_name = sender.get("name", "")
+    sender_email = sender.get("email", "")
+    sender_phone = sender.get("phone") or extract_phone(
+        input_data.get("subject") or "",
+        input_data.get("message_text") or "",
+    ) or ""
+
     subject = input_data.get("subject") or "Support"
     message_text = input_data.get("message_text") or ""
+    source = input_data.get("source") or "inquiry"
+    if isinstance(source, dict):
+        source = source.get("system") or "inquiry"
 
     sender_label = sender_name or sender_email or "Okänd avsändare"
-
     raw_name = f"Support: {sender_label} - {subject}"
     item_name = raw_name[:80].rstrip()
 
+    column_values: dict[str, Any] = {"source": "inquiry"}
+    if sender_email:
+        column_values["email"] = sender_email
+    if sender_phone:
+        column_values["phone"] = sender_phone
+    if subject and subject != "Support":
+        column_values["subject"] = subject[:60].rstrip()
+    if message_text:
+        column_values["message"] = message_text[:200].rstrip()
+
+    phone_line = f"Telefon:   {sender_phone}\n" if sender_phone else ""
     email_body = (
         f"Ny kundfråga inkom via AI Automation Platform.\n\n"
         f"Från:      {sender_label}\n"
         f"E-post:    {sender_email or '(okänd)'}\n"
+        f"{phone_line}"
         f"Ämne:      {subject}\n"
+        f"Källa:     {source}\n\n"
         f"Meddelande:\n{message_text or '(inget meddelande)'}\n\n"
         f"Job ID:    {job.job_id}\n"
         f"Tenant:    {job.tenant_id}"
@@ -84,11 +106,7 @@ def _build_inquiry_default_actions(job: Job) -> list[dict[str, Any]]:
             "type": "create_monday_item",
             "item_name": item_name,
             "tenant_id": job.tenant_id,
-            "column_values": {
-                "source": "inquiry",
-                "email": sender_email,
-                "subject": subject[:60].rstrip(),
-            },
+            "column_values": column_values,
         },
         {
             "type": "send_email",

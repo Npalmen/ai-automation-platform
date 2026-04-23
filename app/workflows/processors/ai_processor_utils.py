@@ -1,4 +1,5 @@
 import json
+import re
 import time
 from typing import Any
 
@@ -8,6 +9,52 @@ from app.ai.exceptions import LLMClientError
 from app.ai.llm.client import get_llm_client
 from app.ai.prompts.registry import render_prompt
 from app.domain.workflows.models import Job
+
+
+# ── shared extraction helpers ─────────────────────────────────────────────────
+
+# Matches Swedish and international phone numbers; requires ≥7 digits.
+_PHONE_RE = re.compile(
+    r"(?<!\d)"
+    r"(\+46|0046)?"
+    r"[\s\-]?"
+    r"(0\d{1,3}|\d{2,3})"
+    r"[\s\-]?"
+    r"\d{2,4}"
+    r"(?:[\s\-]?\d{2,4}){1,3}"
+    r"(?!\d)",
+)
+
+
+def extract_phone(subject: str, body_text: str) -> str | None:
+    """Return the first plausible phone number in subject or body, or None."""
+    for text in (subject, body_text):
+        m = _PHONE_RE.search(text or "")
+        if m:
+            raw = m.group(0).strip()
+            return re.sub(r"[\s\-]+", "-", raw)
+    return None
+
+
+def normalize_sender(input_data: dict[str, Any]) -> dict[str, str]:
+    """Return a clean sender dict from nested or flat input_data fields.
+
+    Reads nested ``input_data["sender"]`` first; falls back to flat
+    ``sender_name`` / ``sender_email`` / ``sender_phone`` keys.
+    All values are stripped strings; missing fields are omitted.
+    """
+    nested = input_data.get("sender") or {}
+    name = (nested.get("name") or input_data.get("sender_name") or "").strip()
+    email = (nested.get("email") or input_data.get("sender_email") or "").strip().lower()
+    phone = (nested.get("phone") or input_data.get("sender_phone") or "").strip()
+    sender: dict[str, str] = {}
+    if name:
+        sender["name"] = name
+    if email:
+        sender["email"] = email
+    if phone:
+        sender["phone"] = phone
+    return sender
 
 
 def get_latest_processor_payload(job: Job, processor_name: str) -> dict[str, Any]:

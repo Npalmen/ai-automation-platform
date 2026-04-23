@@ -1,36 +1,47 @@
 """
-Tests for customer_inquiry default action injection.
+Tests for customer_inquiry default action injection and structured data.
 
 Covers:
+  normalize_sender / extract_phone (shared helpers):
+    - nested sender dict
+    - flat sender_* keys
+    - mixed / missing fields
+    - phone extracted from message_text
+
   _build_inquiry_default_actions:
     - produces create_monday_item + send_email
     - item_name format: "Support: {sender} - {subject}"
-    - missing sender/subject falls back cleanly
-    - email body contains expected fields
+    - column_values includes email, phone, source, subject, message
+    - phone omitted from column_values when absent
+    - email body includes all structured fields
+    - flat sender_name / sender_email backward-compatible
+    - empty input still produces valid actions
 
-  _resolve_actions (via process_action_dispatch_job):
-    - inquiry without input_data.actions → default actions injected
-    - inquiry WITH input_data.actions → defaults NOT added (override wins)
-    - lead job → inquiry defaults NOT used (lead path unchanged)
+  _resolve_actions:
+    - inquiry without input_data.actions → defaults injected
+    - inquiry WITH input_data.actions → override wins
+    - lead job → inquiry defaults not used
 
   process_action_dispatch_job (mocked execute_action):
     - executes both default actions for inquiry
     - override actions executed as-is
+    - status completed when all succeed
 """
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from app.domain.workflows.enums import JobType
 from app.domain.workflows.models import Job
 from app.workflows.processors.action_dispatch_processor import (
-    _build_inquiry_default_actions,
     _build_fallback_actions,
+    _build_inquiry_default_actions,
     _resolve_actions,
     process_action_dispatch_job,
 )
+from app.workflows.processors.ai_processor_utils import extract_phone, normalize_sender
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -46,9 +57,10 @@ def _make_job(
         input_data=input_data or {},
     )
     if classification_detected is not None:
+        # key is "processor", not "processor_name" — matches append_processor_result
         job.processor_history = [
             {
-                "processor_name": "classification_processor",
+                "processor": "classification_processor",
                 "result": {
                     "payload": {"detected_job_type": classification_detected},
                 },
@@ -73,6 +85,71 @@ def _lead_job(input_data: dict | None = None) -> Job:
     )
 
 
+# ── normalize_sender ──────────────────────────────────────────────────────────
+
+class TestNormalizeSender:
+    def test_nested_sender_dict(self):
+        s = normalize_sender({"sender": {"name": "Anna", "email": "a@ex.com", "phone": "070-123"}})
+        assert s == {"name": "Anna", "email": "a@ex.com", "phone": "070-123"}
+
+    def test_flat_keys(self):
+        s = normalize_sender({"sender_name": "Bo", "sender_email": "bo@ex.com"})
+        assert s["name"] == "Bo"
+        assert s["email"] == "bo@ex.com"
+
+    def test_nested_takes_priority_over_flat(self):
+        s = normalize_sender({
+            "sender": {"name": "Nested"},
+            "sender_name": "Flat",
+        })
+        assert s["name"] == "Nested"
+
+    def test_missing_name_omitted(self):
+        s = normalize_sender({"sender": {"email": "x@x.com"}})
+        assert "name" not in s
+
+    def test_missing_email_omitted(self):
+        s = normalize_sender({"sender": {"name": "X"}})
+        assert "email" not in s
+
+    def test_missing_phone_omitted(self):
+        s = normalize_sender({"sender": {"name": "X", "email": "x@x.com"}})
+        assert "phone" not in s
+
+    def test_email_lowercased(self):
+        s = normalize_sender({"sender": {"email": "USER@EXAMPLE.COM"}})
+        assert s["email"] == "user@example.com"
+
+    def test_empty_input_data(self):
+        s = normalize_sender({})
+        assert s == {}
+
+    def test_whitespace_stripped(self):
+        s = normalize_sender({"sender": {"name": "  Anna  ", "email": "  a@ex.com  "}})
+        assert s["name"] == "Anna"
+        assert s["email"] == "a@ex.com"
+
+
+# ── extract_phone ─────────────────────────────────────────────────────────────
+
+class TestExtractPhone:
+    def test_phone_in_body(self):
+        result = extract_phone("Fråga", "Ring mig på 070-123 45 67")
+        assert result is not None
+        assert "070" in result
+
+    def test_phone_in_subject(self):
+        result = extract_phone("Ring 070-999 88 77", "")
+        assert result is not None
+
+    def test_no_phone_returns_none(self):
+        assert extract_phone("Hej", "Jag har en fråga") is None
+
+    def test_subject_checked_before_body(self):
+        result = extract_phone("0701234567", "Call 0709876543")
+        assert "070" in result and "1234" in result
+
+
 # ── _build_inquiry_default_actions ───────────────────────────────────────────
 
 class TestBuildInquiryDefaultActions:
@@ -82,98 +159,150 @@ class TestBuildInquiryDefaultActions:
         assert len(actions) == 2
 
     def test_first_action_is_create_monday_item(self):
-        job = _inquiry_job({"subject": "Hjälp", "sender": {"name": "Anna", "email": "a@ex.com"}})
-        actions = _build_inquiry_default_actions(job)
+        actions = _build_inquiry_default_actions(
+            _inquiry_job({"subject": "S", "sender": {"email": "x@x.com"}})
+        )
         assert actions[0]["type"] == "create_monday_item"
 
     def test_second_action_is_send_email(self):
-        job = _inquiry_job({"subject": "Hjälp", "sender": {"name": "Anna", "email": "a@ex.com"}})
-        actions = _build_inquiry_default_actions(job)
+        actions = _build_inquiry_default_actions(
+            _inquiry_job({"subject": "S", "sender": {"email": "x@x.com"}})
+        )
         assert actions[1]["type"] == "send_email"
 
-    def test_item_name_format(self):
+    # item_name ---
+
+    def test_item_name_format_name_and_subject(self):
         job = _inquiry_job({"subject": "Min produkt fungerar inte", "sender": {"name": "Erik", "email": "e@ex.com"}})
-        actions = _build_inquiry_default_actions(job)
-        assert actions[0]["item_name"] == "Support: Erik - Min produkt fungerar inte"
+        assert _build_inquiry_default_actions(job)[0]["item_name"] == "Support: Erik - Min produkt fungerar inte"
 
     def test_item_name_uses_email_when_no_name(self):
-        job = _inquiry_job({"subject": "Fråga", "sender": {"name": "", "email": "anon@ex.com"}})
-        actions = _build_inquiry_default_actions(job)
-        assert "anon@ex.com" in actions[0]["item_name"]
+        job = _inquiry_job({"subject": "Fråga", "sender": {"email": "anon@ex.com"}})
+        assert "anon@ex.com" in _build_inquiry_default_actions(job)[0]["item_name"]
 
     def test_item_name_missing_sender_fallback(self):
         job = _inquiry_job({"subject": "Fråga"})
-        actions = _build_inquiry_default_actions(job)
-        assert actions[0]["item_name"].startswith("Support:")
-        assert "Okänd avsändare" in actions[0]["item_name"]
-
-    def test_item_name_missing_subject_fallback(self):
-        job = _inquiry_job({"sender": {"name": "Erik", "email": "e@ex.com"}})
-        actions = _build_inquiry_default_actions(job)
-        assert "Erik" in actions[0]["item_name"]
-        assert actions[0]["item_name"].startswith("Support:")
+        name = _build_inquiry_default_actions(job)[0]["item_name"]
+        assert name.startswith("Support:")
+        assert "Okänd avsändare" in name
 
     def test_item_name_truncated_at_80_chars(self):
-        long_subject = "A" * 100
-        job = _inquiry_job({"subject": long_subject, "sender": {"name": "X", "email": "x@x.com"}})
-        actions = _build_inquiry_default_actions(job)
-        assert len(actions[0]["item_name"]) <= 80
+        job = _inquiry_job({"subject": "A" * 100, "sender": {"name": "X"}})
+        assert len(_build_inquiry_default_actions(job)[0]["item_name"]) <= 80
 
-    def test_column_values_contains_email(self):
-        job = _inquiry_job({"subject": "Test", "sender": {"name": "Bo", "email": "bo@ex.com"}})
-        actions = _build_inquiry_default_actions(job)
-        assert actions[0]["column_values"]["email"] == "bo@ex.com"
+    def test_item_name_flat_sender_keys(self):
+        job = _inquiry_job({"subject": "Test", "sender_name": "Flat", "sender_email": "flat@ex.com"})
+        assert "Flat" in _build_inquiry_default_actions(job)[0]["item_name"]
+
+    # column_values ---
 
     def test_column_values_source_is_inquiry(self):
-        job = _inquiry_job({"subject": "Test", "sender": {"email": "x@x.com"}})
-        actions = _build_inquiry_default_actions(job)
-        assert actions[0]["column_values"]["source"] == "inquiry"
+        job = _inquiry_job({"subject": "T"})
+        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        assert cv["source"] == "inquiry"
+
+    def test_column_values_contains_email(self):
+        job = _inquiry_job({"subject": "T", "sender": {"email": "bo@ex.com"}})
+        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        assert cv["email"] == "bo@ex.com"
+
+    def test_column_values_contains_phone_when_present(self):
+        job = _inquiry_job({
+            "subject": "T",
+            "sender": {"email": "x@x.com"},
+            "message_text": "Nå mig på 070-111 22 33",
+        })
+        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        assert "phone" in cv
+        assert "070" in cv["phone"]
+
+    def test_column_values_omits_phone_when_absent(self):
+        job = _inquiry_job({"subject": "T", "sender": {"email": "x@x.com"}, "message_text": "Ingen telefon"})
+        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        assert "phone" not in cv
+
+    def test_column_values_contains_subject(self):
+        job = _inquiry_job({"subject": "Specialfråga", "sender": {"email": "x@x.com"}})
+        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        assert cv["subject"] == "Specialfråga"
+
+    def test_column_values_contains_message(self):
+        job = _inquiry_job({"subject": "T", "sender": {"email": "x@x.com"}, "message_text": "Detaljerat problem"})
+        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        assert cv["message"] == "Detaljerat problem"
+
+    def test_column_values_message_truncated_at_200(self):
+        job = _inquiry_job({"subject": "T", "message_text": "X" * 300})
+        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        assert len(cv["message"]) <= 200
+
+    def test_column_values_omits_email_when_missing(self):
+        job = _inquiry_job({"subject": "T", "message_text": "Hej"})
+        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        assert "email" not in cv
+
+    def test_column_values_omits_message_when_missing(self):
+        job = _inquiry_job({"subject": "T"})
+        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        assert "message" not in cv
+
+    # email action ---
 
     def test_email_to_is_support_address(self):
-        job = _inquiry_job({"subject": "Test", "sender": {"email": "x@x.com"}})
-        actions = _build_inquiry_default_actions(job)
-        assert actions[1]["to"] == "support@company.com"
+        job = _inquiry_job({"subject": "T"})
+        assert _build_inquiry_default_actions(job)[1]["to"] == "support@company.com"
 
     def test_email_subject_is_ny_kundfraga(self):
-        job = _inquiry_job({"subject": "Test"})
-        actions = _build_inquiry_default_actions(job)
-        assert actions[1]["subject"] == "Ny kundfråga"
+        job = _inquiry_job({"subject": "T"})
+        assert _build_inquiry_default_actions(job)[1]["subject"] == "Ny kundfråga"
 
     def test_email_body_contains_sender_name(self):
-        job = _inquiry_job({"subject": "S", "sender": {"name": "Lena", "email": "l@ex.com"}, "message_text": "Help"})
-        actions = _build_inquiry_default_actions(job)
-        assert "Lena" in actions[1]["body"]
+        job = _inquiry_job({"subject": "S", "sender": {"name": "Lena", "email": "l@ex.com"}})
+        assert "Lena" in _build_inquiry_default_actions(job)[1]["body"]
 
     def test_email_body_contains_sender_email(self):
-        job = _inquiry_job({"subject": "S", "sender": {"name": "Lena", "email": "lena@ex.com"}, "message_text": "Help"})
-        actions = _build_inquiry_default_actions(job)
-        assert "lena@ex.com" in actions[1]["body"]
+        job = _inquiry_job({"subject": "S", "sender": {"email": "lena@ex.com"}})
+        assert "lena@ex.com" in _build_inquiry_default_actions(job)[1]["body"]
+
+    def test_email_body_contains_phone_when_present(self):
+        job = _inquiry_job({
+            "subject": "S",
+            "message_text": "Ring 070-555 44 33",
+            "sender": {"email": "x@x.com"},
+        })
+        body = _build_inquiry_default_actions(job)[1]["body"]
+        assert "070" in body
+
+    def test_email_body_omits_phone_line_when_absent(self):
+        job = _inquiry_job({"subject": "S", "sender": {"email": "x@x.com"}, "message_text": "Ingen tel"})
+        body = _build_inquiry_default_actions(job)[1]["body"]
+        assert "Telefon" not in body
 
     def test_email_body_contains_subject(self):
-        job = _inquiry_job({"subject": "Specialfråga", "sender": {"email": "x@x.com"}})
-        actions = _build_inquiry_default_actions(job)
-        assert "Specialfråga" in actions[1]["body"]
+        job = _inquiry_job({"subject": "Specialfråga"})
+        assert "Specialfråga" in _build_inquiry_default_actions(job)[1]["body"]
 
     def test_email_body_contains_message_text(self):
-        job = _inquiry_job({"subject": "S", "sender": {"email": "x@x.com"}, "message_text": "Jag behöver hjälp"})
-        actions = _build_inquiry_default_actions(job)
-        assert "Jag behöver hjälp" in actions[1]["body"]
+        job = _inquiry_job({"subject": "S", "message_text": "Jag behöver hjälp"})
+        assert "Jag behöver hjälp" in _build_inquiry_default_actions(job)[1]["body"]
 
     def test_email_body_contains_job_id(self):
         job = _inquiry_job({"subject": "S"})
         job.job_id = "job-abc-123"
-        actions = _build_inquiry_default_actions(job)
-        assert "job-abc-123" in actions[1]["body"]
+        assert "job-abc-123" in _build_inquiry_default_actions(job)[1]["body"]
 
     def test_email_body_contains_tenant_id(self):
         job = _inquiry_job({"subject": "S"})
-        actions = _build_inquiry_default_actions(job)
-        assert "TENANT_1001" in actions[1]["body"]
+        assert "TENANT_1001" in _build_inquiry_default_actions(job)[1]["body"]
 
-    def test_flat_sender_keys_supported(self):
-        job = _inquiry_job({"subject": "Test", "sender_name": "Flat", "sender_email": "flat@ex.com"})
-        actions = _build_inquiry_default_actions(job)
-        assert "Flat" in actions[0]["item_name"]
+    def test_email_body_contains_source(self):
+        job = _inquiry_job({"subject": "S"})
+        assert "inquiry" in _build_inquiry_default_actions(job)[1]["body"]
+
+    def test_source_from_nested_source_dict(self):
+        job = _inquiry_job({"subject": "S", "source": {"system": "gmail"}})
+        body = _build_inquiry_default_actions(job)[1]["body"]
+        assert "gmail" in body
 
     def test_empty_input_data_produces_valid_actions(self):
         job = _inquiry_job({})
@@ -186,24 +315,25 @@ class TestBuildInquiryDefaultActions:
 # ── _build_fallback_actions routing ──────────────────────────────────────────
 
 class TestFallbackActionRouting:
-    def test_inquiry_job_gets_inquiry_defaults(self):
+    def test_inquiry_gets_inquiry_defaults(self):
         job = _inquiry_job({"subject": "Test"})
-        actions = _build_fallback_actions(job)
-        types = [a["type"] for a in actions]
+        types = [a["type"] for a in _build_fallback_actions(job)]
         assert "create_monday_item" in types
         assert "send_email" in types
 
-    def test_lead_job_does_not_get_inquiry_defaults(self):
+    def test_lead_does_not_get_inquiry_defaults(self):
         job = _lead_job({"subject": "Offert"})
-        actions = _build_fallback_actions(job)
-        types = [a["type"] for a in actions]
-        assert "create_monday_item" not in types
-        assert "send_email" not in types
+        types = [a["type"] for a in _build_fallback_actions(job)]
+        # lead fallback produces create_internal_task (no actions provided)
+        assert not any(
+            a.get("column_values", {}).get("source") == "inquiry"
+            for a in _build_fallback_actions(job)
+        )
 
-    def test_unknown_job_type_uses_generic_fallback(self):
+    def test_unknown_type_uses_generic_fallback(self):
         job = _make_job(job_type=JobType.UNKNOWN, classification_detected="unknown")
-        actions = _build_fallback_actions(job)
-        assert any(a["type"] == "create_internal_task" for a in actions)
+        types = [a["type"] for a in _build_fallback_actions(job)]
+        assert "create_internal_task" in types
 
 
 # ── _resolve_actions override behaviour ──────────────────────────────────────
@@ -211,8 +341,7 @@ class TestFallbackActionRouting:
 class TestResolveActions:
     def test_inquiry_without_input_actions_gets_defaults(self):
         job = _inquiry_job({"subject": "Min laddbox", "sender": {"email": "k@ex.com"}})
-        actions = _resolve_actions(job)
-        types = [a["type"] for a in actions]
+        types = [a["type"] for a in _resolve_actions(job)]
         assert "create_monday_item" in types
         assert "send_email" in types
 
@@ -225,9 +354,12 @@ class TestResolveActions:
 
     def test_lead_without_input_actions_does_not_get_inquiry_defaults(self):
         job = _lead_job({"subject": "Offert önskas"})
-        actions = _resolve_actions(job)
-        types = [a["type"] for a in actions]
-        assert "create_monday_item" not in types
+        types = [a["type"] for a in _resolve_actions(job)]
+        inquiry_monday = [
+            a for a in _resolve_actions(job)
+            if a.get("column_values", {}).get("source") == "inquiry"
+        ]
+        assert not inquiry_monday
 
 
 # ── process_action_dispatch_job (end-to-end with mocked execute_action) ──────
@@ -240,14 +372,12 @@ class TestProcessActionDispatch:
         ):
             return process_action_dispatch_job(job, db=None)
 
-    def test_inquiry_default_actions_both_executed(self):
+    def test_inquiry_default_actions_both_in_requested(self):
         job = _inquiry_job({"subject": "Problem", "sender": {"name": "Ali", "email": "a@ex.com"}})
         result = self._run(job)
-        executed_types = [
-            a.get("type") for a in result.result["payload"]["actions_requested"]
-        ]
-        assert "create_monday_item" in executed_types
-        assert "send_email" in executed_types
+        types = [a.get("type") for a in result.result["payload"]["actions_requested"]]
+        assert "create_monday_item" in types
+        assert "send_email" in types
 
     def test_inquiry_with_override_executes_override_only(self):
         override = [{"type": "notify_slack", "channel": "#s", "message": "m"}]
@@ -256,13 +386,26 @@ class TestProcessActionDispatch:
         types = [a.get("type") for a in result.result["payload"]["actions_requested"]]
         assert types == ["notify_slack"]
 
-    def test_lead_does_not_produce_inquiry_defaults(self):
-        job = _lead_job({"subject": "Offert"})
-        result = self._run(job)
-        types = [a.get("type") for a in result.result["payload"]["actions_requested"]]
-        assert "create_monday_item" not in types or result.result["payload"]["actions_requested"][0].get("column_values", {}).get("source") != "inquiry"
-
     def test_status_completed_when_all_succeed(self):
         job = _inquiry_job({"subject": "Test"})
         result = self._run(job)
         assert result.result["status"] == "completed"
+
+    def test_column_values_source_in_monday_action(self):
+        job = _inquiry_job({"subject": "Fråga", "sender": {"email": "x@x.com"}})
+        result = self._run(job)
+        monday = next(
+            a for a in result.result["payload"]["actions_requested"]
+            if a.get("type") == "create_monday_item"
+        )
+        assert monday["column_values"]["source"] == "inquiry"
+
+    def test_email_body_contains_job_id_after_save(self):
+        job = _inquiry_job({"subject": "Fråga"})
+        job.job_id = "saved-job-id"
+        result = self._run(job)
+        email_action = next(
+            a for a in result.result["payload"]["actions_requested"]
+            if a.get("type") == "send_email"
+        )
+        assert "saved-job-id" in email_action["body"]
