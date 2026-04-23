@@ -51,6 +51,103 @@ def classify_inquiry_priority(subject: str, message_text: str) -> str:
     return "NORMAL"
 
 
+# ── invoice extraction helpers ────────────────────────────────────────────────
+
+# Amount: "12 500 kr", "12500 kr", "1 250,50 kr", "SEK 12500".
+# The kr-suffix branch comes first; the SEK-prefix branch is the fallback.
+_AMOUNT_RE = re.compile(
+    r"(\d{1,3}(?:[\s]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*kr\b"
+    r"|"
+    r"\bSEK\s*(\d+(?:[.,]\d{1,2})?)",
+    re.IGNORECASE,
+)
+
+# Invoice number: keyword marker then a reference of ≥2 chars starting with
+# an alphanumeric and optionally followed by alphanumerics, hyphens, or slashes.
+# Requires either explicit punctuation (#/:/-) or the reference starts with
+# a digit, to avoid matching stray words after "fakturanummer".
+_INVOICE_NO_RE = re.compile(
+    r"(?:faktura(?:nummer)?|invoice(?:\s*no\.?)?|inv)"
+    r"(?:"
+    r"\s*[:#-]\s*([A-Za-z0-9][A-Za-z0-9_/\-]{1,19})"   # explicit punctuation path
+    r"|"
+    r"\s+(\d[A-Za-z0-9_/\-]{0,19})"                      # space + starts with digit
+    r")",
+    re.IGNORECASE,
+)
+
+# Due date: ISO-style YYYY-MM-DD, YYYY/MM/DD, or YYYY.MM.DD.
+_DUE_DATE_RE = re.compile(r"\b(20\d{2}[-/.]\d{2}[-/.]\d{2})\b")
+
+
+def extract_invoice_amount(subject: str, body_text: str) -> str | None:
+    """Return the first plausible amount string from subject or body, or None."""
+    for text in (subject, body_text):
+        m = _AMOUNT_RE.search(text or "")
+        if m:
+            raw = m.group(0).strip()
+            return re.sub(r"\s+", " ", raw)
+    return None
+
+
+def extract_invoice_number(subject: str, body_text: str) -> str | None:
+    """Return the first plausible invoice reference from subject or body, or None."""
+    for text in (subject, body_text):
+        m = _INVOICE_NO_RE.search(text or "")
+        if m:
+            # group(1) = punctuation path, group(2) = digit-start path
+            return (m.group(1) or m.group(2)).strip()
+    return None
+
+
+def extract_due_date(subject: str, body_text: str) -> str | None:
+    """Return the first ISO-style due date (YYYY-MM-DD etc.) found, or None.
+
+    Normalises separators to '-' so the returned string is always YYYY-MM-DD.
+    """
+    for text in (subject, body_text):
+        m = _DUE_DATE_RE.search(text or "")
+        if m:
+            raw = m.group(1)
+            return re.sub(r"[/.]", "-", raw)
+    return None
+
+
+def extract_invoice_data(input_data: dict[str, Any]) -> dict[str, Any]:
+    """Return a structured invoice payload extracted deterministically from input_data.
+
+    Fields returned (omitted when not found):
+        supplier_name, amount, invoice_number, due_date, raw_text
+    """
+    sender = normalize_sender(input_data)
+    supplier_name = sender.get("name") or sender.get("email") or ""
+
+    subject = input_data.get("subject") or ""
+    message_text = input_data.get("message_text") or ""
+    raw_text = f"{subject}\n{message_text}".strip()
+
+    payload: dict[str, Any] = {}
+    if supplier_name:
+        payload["supplier_name"] = supplier_name
+
+    amount = extract_invoice_amount(subject, message_text)
+    if amount:
+        payload["amount"] = amount
+
+    invoice_number = extract_invoice_number(subject, message_text)
+    if invoice_number:
+        payload["invoice_number"] = invoice_number
+
+    due_date = extract_due_date(subject, message_text)
+    if due_date:
+        payload["due_date"] = due_date
+
+    if raw_text:
+        payload["raw_text"] = raw_text
+
+    return payload
+
+
 def normalize_sender(input_data: dict[str, Any]) -> dict[str, str]:
     """Return a clean sender dict from nested or flat input_data fields.
 

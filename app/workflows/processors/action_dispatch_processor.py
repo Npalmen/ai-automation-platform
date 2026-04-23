@@ -11,6 +11,7 @@ from app.workflows.action_executor import execute_action
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
     classify_inquiry_priority,
+    extract_invoice_data,
     extract_phone,
     get_latest_processor_payload,
     normalize_sender,
@@ -126,20 +127,40 @@ def _build_inquiry_default_actions(job: Job) -> list[dict[str, Any]]:
 
 def _build_invoice_default_actions(job: Job) -> list[dict[str, Any]]:
     input_data = job.input_data or {}
-    sender = normalize_sender(input_data)
+    invoice = extract_invoice_data(input_data)
 
+    sender = normalize_sender(input_data)
     sender_name = sender.get("name", "")
     sender_email = sender.get("email", "")
-    subject = input_data.get("subject") or ""
-
     sender_label = sender_name or sender_email or "Okänd avsändare"
+
     item_name = f"Faktura: {sender_label}"
 
     column_values: dict[str, Any] = {"source": "invoice"}
-    if subject:
-        column_values["subject"] = subject[:60].rstrip()
     if sender_email:
         column_values["email"] = sender_email
+    subject = input_data.get("subject") or ""
+    if subject:
+        column_values["subject"] = subject[:60].rstrip()
+    if invoice.get("amount"):
+        column_values["amount"] = invoice["amount"]
+    if invoice.get("invoice_number"):
+        column_values["invoice_number"] = invoice["invoice_number"]
+    if invoice.get("due_date"):
+        column_values["due_date"] = invoice["due_date"]
+    if invoice.get("supplier_name"):
+        column_values["supplier_name"] = invoice["supplier_name"]
+
+    desc_parts = [f"Inkommande faktura från {sender_label}."]
+    if subject:
+        desc_parts.append(f"Ämne: {subject}.")
+    if invoice.get("amount"):
+        desc_parts.append(f"Belopp: {invoice['amount']}.")
+    if invoice.get("invoice_number"):
+        desc_parts.append(f"Fakturanummer: {invoice['invoice_number']}.")
+    if invoice.get("due_date"):
+        desc_parts.append(f"Förfallodatum: {invoice['due_date']}.")
+    description = " ".join(desc_parts)
 
     return [
         {
@@ -151,15 +172,13 @@ def _build_invoice_default_actions(job: Job) -> list[dict[str, Any]]:
         {
             "type": "create_internal_task",
             "title": f"Granska faktura: {sender_label}",
-            "description": (
-                f"Inkommande faktura från {sender_label}."
-                + (f" Ämne: {subject}" if subject else "")
-            ),
+            "description": description,
             "assignee": None,
             "metadata": {
                 "job_id": job.job_id,
                 "tenant_id": job.tenant_id,
                 "detected_job_type": "invoice",
+                "invoice": invoice,
             },
         },
     ]
