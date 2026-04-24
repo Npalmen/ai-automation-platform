@@ -21,6 +21,7 @@
 - [x] Follow-up question engine — completeness evaluation + follow-up email for incomplete lead/inquiry; invoice incomplete info in internal task
 - [x] Thread continuation — inbox replies in same Gmail thread update existing job, no duplicate created
 - [x] Activity Dashboard — GET /dashboard/summary + GET /dashboard/activity; Dashboard tab in operator UI
+- [x] ROI Dashboard — GET /dashboard/roi; estimated time/value savings; ROI section in Dashboard tab
 
 ## Docs
 - [x] current-state updated

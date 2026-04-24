@@ -152,8 +152,10 @@ header input {
 
 /* ── Dashboard cards ── */
 .dash-card { background:#fff; border:1px solid #e5e7eb; border-radius:6px; padding:14px 16px; }
+.dash-card.roi-highlight { border-color:#bfdbfe; background:#eff6ff; }
 .dash-label { font-size:11px; color:#6b7280; margin-bottom:6px; }
 .dash-value { font-size:28px; font-weight:700; color:#111; }
+.dash-sublabel { font-size:11px; color:#9ca3af; margin-top:2px; }
 
 /* ── Activity table ── */
 .act-table { width:100%; border-collapse:collapse; font-size:12px; }
@@ -392,6 +394,22 @@ pre {
     <div class="dash-card"><div class="dash-label">Klara idag</div><div class="dash-value" id="dCompleted">–</div></div>
   </div>
 
+  <!-- ROI section -->
+  <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Sparad tid &amp; värde (idag)</h2>
+  <div id="roiError" class="msg msg-error" style="display:none;"></div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin-bottom:16px;">
+    <div class="dash-card roi-highlight"><div class="dash-label">Sparad tid</div><div class="dash-value" id="rHours">–</div><div class="dash-sublabel">timmar</div></div>
+    <div class="dash-card roi-highlight"><div class="dash-label">Uppskattat värde</div><div class="dash-value" id="rValue">–</div><div class="dash-sublabel">SEK</div></div>
+    <div class="dash-card"><div class="dash-label">Leads skapade</div><div class="dash-value" id="rLeads">–</div></div>
+    <div class="dash-card"><div class="dash-label">Supportärenden hanterade</div><div class="dash-value" id="rSupport">–</div></div>
+    <div class="dash-card"><div class="dash-label">Fakturor sorterade</div><div class="dash-value" id="rInvoices">–</div></div>
+    <div class="dash-card"><div class="dash-label">Uppföljningar skickade</div><div class="dash-value" id="rFollowups">–</div></div>
+  </div>
+  <details style="margin-bottom:24px;">
+    <summary style="font-size:11px; color:#9ca3af; cursor:pointer;">Antaganden</summary>
+    <div id="roiAssumptions" style="font-size:11px; color:#6b7280; margin-top:6px; line-height:1.8;"></div>
+  </details>
+
   <!-- Recent activity table -->
   <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Senaste aktivitet</h2>
   <div id="dashActivity">
@@ -624,6 +642,9 @@ function switchView(name) {
 async function loadDashboard() {
   document.getElementById('dashError').style.display = 'none';
 
+  // ROI
+  loadRoi();
+
   // Summary
   try {
     const s = await apiFetch('/dashboard/summary');
@@ -676,6 +697,33 @@ async function loadDashboard() {
     actEl.innerHTML = '<span class="empty" style="color:#991b1b;">Fel: ' + escapeHtml(e.message) + '</span>';
   }
 }
+
+async function loadRoi() {
+  document.getElementById('roiError').style.display = 'none';
+  try {
+    const r = await apiFetch('/dashboard/roi');
+    document.getElementById('rHours').textContent    = r.estimated_hours_saved ?? '–';
+    document.getElementById('rValue').textContent    = r.estimated_value_sek   != null
+      ? r.estimated_value_sek.toLocaleString('sv-SE') : '–';
+    document.getElementById('rLeads').textContent    = r.leads_created          ?? '–';
+    document.getElementById('rSupport').textContent  = r.support_cases_handled  ?? '–';
+    document.getElementById('rInvoices').textContent = r.invoices_processed      ?? '–';
+    document.getElementById('rFollowups').textContent= r.followups_sent          ?? '–';
+
+    const a = r.assumptions || {};
+    document.getElementById('roiAssumptions').innerHTML =
+      `Lead: ${a.lead_minutes_saved ?? '?'} min &nbsp;|&nbsp; `
+    + `Support: ${a.support_minutes_saved ?? '?'} min &nbsp;|&nbsp; `
+    + `Faktura: ${a.invoice_minutes_saved ?? '?'} min &nbsp;|&nbsp; `
+    + `Uppföljning: ${a.followup_minutes_saved ?? '?'} min &nbsp;|&nbsp; `
+    + `Timvärde: ${a.hourly_value_sek ?? '?'} SEK/h`;
+  } catch (e) {
+    const el = document.getElementById('roiError');
+    el.textContent = 'Kunde inte ladda ROI: ' + e.message;
+    el.style.display = 'block';
+  }
+}
+
 
 // ---------------------------------------------------------------------------
 // Tabs (within Drift view)

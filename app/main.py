@@ -1295,6 +1295,83 @@ def dashboard_summary(
     }
 
 
+# ── ROI assumptions (minutes saved per handled item, hourly staff value) ──────
+_ROI_LEAD_MIN      = 10
+_ROI_SUPPORT_MIN   = 8
+_ROI_INVOICE_MIN   = 6
+_ROI_FOLLOWUP_MIN  = 5
+_ROI_HOURLY_SEK    = 500
+
+
+@app.get("/dashboard/roi")
+def dashboard_roi(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return today's ROI metrics for the tenant based on fixed time-saving assumptions."""
+    from datetime import date, datetime, timezone
+    from sqlalchemy import func
+    from app.repositories.postgres.action_execution_models import ActionExecutionRecord
+
+    today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
+
+    def _count_jobs(job_type: str) -> int:
+        return (
+            db.query(func.count(JobRecord.job_id))
+            .filter(
+                JobRecord.tenant_id == tenant_id,
+                JobRecord.job_type == job_type,
+                JobRecord.created_at >= today_start,
+            )
+            .scalar() or 0
+        )
+
+    leads_created        = _count_jobs("lead")
+    support_cases        = _count_jobs("customer_inquiry")
+    invoices_processed   = _count_jobs("invoice")
+
+    # Count send_email actions today where the job is a lead or customer_inquiry
+    # (follow-up emails are send_email executions against those job types).
+    followups_sent = (
+        db.query(func.count(ActionExecutionRecord.execution_id))
+        .join(JobRecord, ActionExecutionRecord.job_id == JobRecord.job_id)
+        .filter(
+            ActionExecutionRecord.tenant_id == tenant_id,
+            ActionExecutionRecord.action_type == "send_email",
+            ActionExecutionRecord.executed_at >= today_start,
+            JobRecord.job_type.in_(["lead", "customer_inquiry"]),
+        )
+        .scalar() or 0
+    )
+
+    total_minutes = (
+        leads_created      * _ROI_LEAD_MIN
+        + support_cases    * _ROI_SUPPORT_MIN
+        + invoices_processed * _ROI_INVOICE_MIN
+        + followups_sent   * _ROI_FOLLOWUP_MIN
+    )
+    total_hours = round(total_minutes / 60, 2)
+    estimated_value_sek = round(total_hours * _ROI_HOURLY_SEK)
+
+    return {
+        "period": "today",
+        "leads_created":           leads_created,
+        "support_cases_handled":   support_cases,
+        "invoices_processed":      invoices_processed,
+        "followups_sent":          followups_sent,
+        "estimated_minutes_saved": total_minutes,
+        "estimated_hours_saved":   total_hours,
+        "estimated_value_sek":     estimated_value_sek,
+        "assumptions": {
+            "lead_minutes_saved":     _ROI_LEAD_MIN,
+            "support_minutes_saved":  _ROI_SUPPORT_MIN,
+            "invoice_minutes_saved":  _ROI_INVOICE_MIN,
+            "followup_minutes_saved": _ROI_FOLLOWUP_MIN,
+            "hourly_value_sek":       _ROI_HOURLY_SEK,
+        },
+    }
+
+
 @app.get("/dashboard/activity")
 def dashboard_activity(
     db: Session = Depends(get_db),

@@ -124,7 +124,7 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - 17 new tests; 105/105 pass
 
 ## Current state
-Activity dashboard, thread continuation, and follow-up engine are complete. **761/761 tests pass.**
+Activity dashboard, ROI dashboard, thread continuation, and follow-up engine are complete. **780/780 tests pass.**
 
 All three intake flows (lead, customer inquiry, invoice) are implemented and production-ready. Each flow evaluates completeness deterministically (no LLM) and sends a Swedish-language follow-up email to the customer when required information is missing.
 
@@ -484,6 +484,14 @@ Deterministic completeness evaluation and automatic follow-up action injection. 
 - Continuation: merges into `conversation_messages`, updates `latest_*` fields, resets history, re-runs pipeline, marks as read
 - `dry_run` detects continuation but makes no writes; response includes `continued`, `continuation_reason`
 - `tests/test_thread_continuation.py` — 18 tests; 743/743 pass
+
+## Completed slice (2026-04-24 — ROI Dashboard)
+
+- `GET /dashboard/roi` — today's counts + estimated time/value savings
+- Fixed assumptions: lead=10 min, support=8 min, invoice=6 min, follow-up=5 min, 500 SEK/h (constants `_ROI_*` in `main.py`)
+- `followups_sent` counted from `action_executions` table (action_type=send_email on lead/inquiry jobs today)
+- ROI section in Dashboard tab: 2 highlight cards (hours + SEK), 4 count cards, collapsible assumptions
+- `tests/test_dashboard_roi.py` — 19 tests; 780/780 pass
 
 ## Completed slice (2026-04-24 — Activity Dashboard)
 

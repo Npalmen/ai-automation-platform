@@ -26,7 +26,8 @@ The following has been confirmed through real API calls against a running instan
 | Follow-up question engine | ✅ IMPLEMENTED | deterministic completeness check per job type; follow-up `send_email` to customer when lead/inquiry is incomplete; invoice incomplete info surfaced in internal task description + metadata; no LLM |
 | Thread continuation | ✅ IMPLEMENTED | inbox replies in same Gmail thread update existing job instead of creating duplicate; `conversation_messages` appended; pipeline re-runs |
 | Activity Dashboard | ✅ IMPLEMENTED | `GET /dashboard/summary` (today's counts by type + status) + `GET /dashboard/activity` (recent jobs with type/status/action/priority); Dashboard tab in operator UI |
-| 761 tests passing | ✅ | `python -m pytest` |
+| ROI Dashboard | ✅ IMPLEMENTED | `GET /dashboard/roi` (estimated minutes/hours saved, SEK value, item counts for today); ROI section in Dashboard tab; fixed assumptions, easy to tune |
+| 780 tests passing | ✅ | `python -m pytest` |
 
 ---
 
@@ -578,6 +579,17 @@ Deterministic completeness evaluation and follow-up action injection — no LLM.
 - Response shape: `continued: true/false` + `continuation_reason` on all entries
 - `tests/test_thread_continuation.py` — 18 tests; 743/743 pass
 
+## ROI Dashboard (2026-04-24)
+
+- `GET /dashboard/roi` — tenant-scoped, period=today
+  - Counts: `leads_created`, `support_cases_handled`, `invoices_processed`, `followups_sent`
+  - `followups_sent` = `send_email` action executions today on lead/customer_inquiry jobs
+  - Derived: `estimated_minutes_saved`, `estimated_hours_saved`, `estimated_value_sek`
+  - Fixed assumptions (constants in `main.py`, easy to adjust): lead=10 min, support=8 min, invoice=6 min, follow-up=5 min, hourly value=500 SEK
+  - `assumptions` key included in response for transparency
+- ROI section added to Dashboard tab in operator UI: "Sparad tid" + "Uppskattat värde" highlight cards + 4 count cards; collapsible Antaganden panel
+- `tests/test_dashboard_roi.py` — 19 tests covering shape, empty state, calculation correctness, tenant isolation; 780/780 pass
+
 ## Activity Dashboard (2026-04-24)
 
 - `GET /dashboard/summary` — tenant-scoped summary: `leads_today`, `inquiries_today`, `invoices_today`, `waiting_customer`, `ready_cases`, `completed_today`
@@ -603,7 +615,7 @@ The platform can be demonstrated to a first customer for:
 - **Support** (customer inquiry flow with HIGH/NORMAL priority)
 - **Basic finance intake** (invoice flow with deterministic field extraction)
 
-**761/761 tests pass.**
+**780/780 tests pass.**
 
 ## Next likely product step
 
