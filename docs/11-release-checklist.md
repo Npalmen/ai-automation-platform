@@ -26,6 +26,7 @@
 - [x] Inbox sync trigger — POST /dashboard/inbox-sync wired to _run_gmail_inbox_sync; 503 if not configured
 - [x] Case View — GET /cases (list) + GET /cases/{job_id} (detail); Ärenden tab in operator UI
 - [x] Setup / Onboarding Wizard — GET /setup/status (readiness score) + PUT /setup/modules + POST /setup/verify; Onboarding tab in operator UI
+- [x] Customer Notifications — GET/PUT /notifications/settings + POST /notifications/daily-digest/send; Notifieringar tab in operator UI
 
 ## Docs
 - [x] current-state updated

@@ -134,6 +134,16 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - `tests/test_control_panel.py` — 21 tests: shape, stored-settings, defaults, persist, validation, tenant isolation, inbox-sync
 - 801/801 tests pass
 
+## Completed slice (2026-04-25 — Customer Notifications / Daily Digest)
+- Refactored: `_compute_summary(db, tenant_id)` and `_compute_roi(db, tenant_id)` extracted as module-level helpers; `dashboard_summary` and `dashboard_roi` endpoints now delegate to them; digest reuses the same functions
+- `GET /notifications/settings` — returns `{enabled, recipient_email, frequency, send_hour}` from `settings.notifications`; defaults to `{enabled:false, frequency:"daily", send_hour:8}`
+- `PUT /notifications/settings` — validates frequency (daily|weekly|off), send_hour (0–23), email required when enabled; persists to `settings.notifications` via `update_settings` (merges into full settings dict to avoid clobbering control panel keys)
+- `POST /notifications/daily-digest/send` — 400 if no recipient; calls `_compute_summary` + `_compute_roi`; `_build_digest_body` formats Swedish plain-text report; dispatches via `dispatch_action(send_email)` which falls back to stub if Gmail not configured
+- `NotificationSettingsRequest` Pydantic model
+- `app/ui/index.html` — Notifieringar tab: enabled toggle, recipient email, frequency dropdown, send_hour input, Spara inställningar + Skicka testrapport nu buttons; result card shows status/recipient/subject
+- `tests/test_notifications.py` — 36 tests: GET shape/defaults/stored, PUT persists/validates (frequency, send_hour bounds, email required, format), send success (dispatch called, correct recipient/type, body contains summary+ROI values, subject), missing recipient 400, dispatch failure 500, tenant isolation
+- 942/942 tests pass
+
 ## Completed slice (2026-04-25 — Manual Inbox Sync Wiring)
 - Extracted `_run_gmail_inbox_sync(tenant_id, db, max_results, query, dry_run)` from `gmail_process_inbox` — contains all processing logic (dedup, thread continuation, job creation, mark-as-read, Slack notify)
 - `gmail_process_inbox` is now a thin wrapper calling `_run_gmail_inbox_sync`; its response shape is unchanged
@@ -162,7 +172,7 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - 833/833 tests pass
 
 ## Current state
-Manual inbox sync wired, Setup Wizard, Case View, Control Panel, Activity dashboard, ROI dashboard, thread continuation, and follow-up engine are complete. **906/906 tests pass.**
+Customer Notifications, Manual inbox sync, Setup Wizard, Case View, Control Panel, Activity dashboard, ROI dashboard, thread continuation, and follow-up engine are complete. **942/942 tests pass.**
 
 All three intake flows (lead, customer inquiry, invoice) are implemented and production-ready. Each flow evaluates completeness deterministically (no LLM) and sends a Swedish-language follow-up email to the customer when required information is missing.
 

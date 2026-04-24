@@ -374,7 +374,8 @@ pre {
   <div class="view-tab"        id="viewTabSetup" onclick="switchView('setup')">Inställningar</div>
   <div class="view-tab"        id="viewTabCtrl"  onclick="switchView('ctrl')">Kontrollpanel</div>
   <div class="view-tab"        id="viewTabCases" onclick="switchView('cases')">Ärenden</div>
-  <div class="view-tab"        id="viewTabOnboarding" onclick="switchView('onboarding')">Onboarding</div>
+  <div class="view-tab"        id="viewTabOnboarding"  onclick="switchView('onboarding')">Onboarding</div>
+  <div class="view-tab"        id="viewTabNotif"       onclick="switchView('notif')">Notifieringar</div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ DASHBOARD -->
@@ -690,6 +691,60 @@ pre {
 
 </div><!-- /viewOnboarding -->
 
+<!-- ══════════════════════════════════════════════════════ NOTIFIERINGAR -->
+<div id="viewNotif" style="display:none; padding:24px; overflow-y:auto; flex:1; max-width:600px;">
+
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+    <h1 style="font-size:18px; font-weight:700; color:#111; margin:0;">Notifieringar</h1>
+    <button class="btn btn-primary btn-sm" onclick="loadNotifSettings()">Uppdatera</button>
+  </div>
+
+  <div id="notifError" class="msg msg-error" style="display:none;"></div>
+
+  <div class="setup-card" style="margin-bottom:16px;">
+    <h2 style="font-size:13px; font-weight:600; margin:0 0 14px;">Daglig rapport</h2>
+
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+        <input type="checkbox" id="notifEnabled"> <span>Aktiv</span>
+      </label>
+
+      <div class="form-field">
+        <label>Mottagare</label>
+        <input id="notifEmail" type="email" placeholder="ops@example.com"
+               style="width:100%; box-sizing:border-box;">
+      </div>
+
+      <div class="form-field">
+        <label>Frekvens</label>
+        <select id="notifFrequency" style="width:100%; box-sizing:border-box;">
+          <option value="daily">Dagligen</option>
+          <option value="weekly">Veckovis</option>
+          <option value="off">Av</option>
+        </select>
+      </div>
+
+      <div class="form-field">
+        <label>Skicka klockan</label>
+        <input id="notifHour" type="number" min="0" max="23" value="8"
+               style="width:80px; box-sizing:border-box;">
+      </div>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="saveNotifSettings()">Spara inställningar</button>
+      <button class="btn btn-neutral" id="btnSendDigest" onclick="sendTestDigest()">Skicka testrapport nu</button>
+    </div>
+    <div id="notifSaveMsg" style="margin-top:8px; font-size:12px; color:#6b7280;"></div>
+  </div>
+
+  <div id="digestResultWrap" style="display:none;" class="setup-card">
+    <h2 style="font-size:13px; font-weight:600; margin:0 0 10px;">Resultat</h2>
+    <div id="digestResult" style="font-size:13px;"></div>
+  </div>
+
+</div><!-- /viewNotif -->
+
 <script>
 // ---------------------------------------------------------------------------
 // Label maps — presentationslager (ändrar inte backend-nycklar)
@@ -784,17 +839,20 @@ function switchView(name) {
   document.getElementById('viewCtrl').style.display  = name === 'ctrl'  ? 'block' : 'none';
   document.getElementById('viewCases').style.display      = name === 'cases'      ? 'block' : 'none';
   document.getElementById('viewOnboarding').style.display = name === 'onboarding' ? 'block' : 'none';
+  document.getElementById('viewNotif').style.display      = name === 'notif'      ? 'block' : 'none';
   document.getElementById('viewTabDash').classList.toggle('active',       name === 'dash');
   document.getElementById('viewTabOps').classList.toggle('active',        name === 'ops');
   document.getElementById('viewTabSetup').classList.toggle('active',      name === 'setup');
   document.getElementById('viewTabCtrl').classList.toggle('active',       name === 'ctrl');
   document.getElementById('viewTabCases').classList.toggle('active',      name === 'cases');
   document.getElementById('viewTabOnboarding').classList.toggle('active', name === 'onboarding');
+  document.getElementById('viewTabNotif').classList.toggle('active',      name === 'notif');
   if (name === 'setup')      loadSetup();
   if (name === 'dash')       loadDashboard();
   if (name === 'ctrl')       loadControl();
   if (name === 'cases')      loadCases();
   if (name === 'onboarding') loadOnboarding();
+  if (name === 'notif')      loadNotifSettings();
 }
 
 // ---------------------------------------------------------------------------
@@ -1858,6 +1916,67 @@ async function runOnboardingVerify() {
       </div>`;
   } catch (e) {
     resultEl.innerHTML = `<div class="msg msg-error">Fel: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Notifieringar
+// ---------------------------------------------------------------------------
+async function loadNotifSettings() {
+  const errEl = document.getElementById('notifError');
+  errEl.style.display = 'none';
+  try {
+    const r = await apiFetch('/notifications/settings');
+    document.getElementById('notifEnabled').checked      = !!r.enabled;
+    document.getElementById('notifEmail').value          = r.recipient_email || '';
+    document.getElementById('notifFrequency').value      = r.frequency || 'daily';
+    document.getElementById('notifHour').value           = r.send_hour ?? 8;
+  } catch (e) {
+    errEl.textContent = 'Kunde inte ladda notifieringsinställningar: ' + escapeHtml(e.message);
+    errEl.style.display = 'block';
+  }
+}
+
+async function saveNotifSettings() {
+  const msgEl = document.getElementById('notifSaveMsg');
+  msgEl.style.color = '#6b7280';
+  const body = {
+    enabled:         document.getElementById('notifEnabled').checked,
+    recipient_email: document.getElementById('notifEmail').value.trim() || '',
+    frequency:       document.getElementById('notifFrequency').value,
+    send_hour:       parseInt(document.getElementById('notifHour').value, 10) || 8,
+  };
+  try {
+    await apiFetch('/notifications/settings', { method: 'PUT', body: JSON.stringify(body) });
+    msgEl.textContent  = 'Inställningar sparade.';
+    msgEl.style.color  = '#16a34a';
+  } catch (e) {
+    msgEl.textContent  = 'Fel: ' + escapeHtml(e.message);
+    msgEl.style.color  = '#dc2626';
+  }
+}
+
+async function sendTestDigest() {
+  const btn     = document.getElementById('btnSendDigest');
+  const wrapEl  = document.getElementById('digestResultWrap');
+  const resEl   = document.getElementById('digestResult');
+  const msgEl   = document.getElementById('notifSaveMsg');
+  btn.disabled  = true;
+  msgEl.textContent = '';
+  wrapEl.style.display = 'none';
+  try {
+    const r = await apiFetch('/notifications/daily-digest/send', { method: 'POST' });
+    wrapEl.style.display = 'block';
+    const color = r.status === 'success' ? '#16a34a' : '#dc2626';
+    resEl.innerHTML = `
+      <div style="color:${color}; font-weight:600; margin-bottom:6px;">${escapeHtml(r.message || r.status)}</div>
+      <div style="font-size:12px; color:#6b7280;">Mottagare: ${escapeHtml(r.recipient || '–')}</div>
+      <div style="font-size:12px; color:#6b7280;">Ämne: ${escapeHtml(r.subject || '–')}</div>`;
+  } catch (e) {
+    wrapEl.style.display = 'block';
+    resEl.innerHTML = `<div class="msg msg-error">${escapeHtml(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
   }
 }
 

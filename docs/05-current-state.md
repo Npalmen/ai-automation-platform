@@ -31,7 +31,8 @@ The following has been confirmed through real API calls against a running instan
 | Inbox sync trigger | ✅ WIRED | `POST /dashboard/inbox-sync` calls the same Gmail processing logic as `POST /gmail/process-inbox` via shared `_run_gmail_inbox_sync()` helper; returns `{status, processed, created_jobs, continued_threads, deduped, errors, message}`; 503 if Gmail not configured |
 | Case View | ✅ IMPLEMENTED | `GET /cases` (list with subject/customer_name/priority derived from job data) + `GET /cases/{job_id}` (full detail: original message, extracted data, thread history, actions, errors); Ärenden tab in operator UI |
 | Setup / Onboarding Wizard | ✅ IMPLEMENTED | `GET /setup/status` (readiness score 0–100, module status, connection status, automation settings, missing items list) + `PUT /setup/modules` (persist sales/support/finance module enablement) + `POST /setup/verify` (lightweight check-based verification: tenant config, modules, email, scheduler, destination integration); Onboarding tab in operator UI |
-| 906 tests passing | ✅ | `python -m pytest` |
+| Customer Notifications / Daily Digest | ✅ IMPLEMENTED | `GET /notifications/settings` + `PUT /notifications/settings` (enabled, recipient_email, frequency, send_hour; stored in `tenant_configs.settings.notifications`) + `POST /notifications/daily-digest/send` (builds digest from `_compute_summary`+`_compute_roi`, dispatches via existing `send_email` action path; 400 if no recipient, 500 on dispatch failure); Notifieringar tab in operator UI |
+| 942 tests passing | ✅ | `python -m pytest` |
 
 ---
 

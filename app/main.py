@@ -1268,18 +1268,14 @@ def gmail_process_inbox(
     )
 
 
-@app.get("/dashboard/summary")
-def dashboard_summary(
-    db: Session = Depends(get_db),
-    tenant_id: str = Depends(get_verified_tenant),
-):
-    """Return today's job counts grouped by type and status for the tenant."""
+def _compute_summary(db: "Session", tenant_id: str) -> dict:
+    """Return today's job counts for the tenant. Shared by dashboard and digest."""
     from datetime import date, datetime, timezone
     from sqlalchemy import func
 
     today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
 
-    def _count(job_type: str | None, status: str | None, since: datetime | None = None) -> int:
+    def _count(job_type: str | None, status: str | None, since: "datetime | None" = None) -> int:
         q = db.query(func.count(JobRecord.job_id)).filter(JobRecord.tenant_id == tenant_id)
         if job_type:
             q = q.filter(JobRecord.job_type == job_type)
@@ -1289,15 +1285,12 @@ def dashboard_summary(
             q = q.filter(JobRecord.created_at >= since)
         return q.scalar() or 0
 
-    leads_today      = _count("lead",             None,              today_start)
-    inquiries_today  = _count("customer_inquiry", None,              today_start)
-    invoices_today   = _count("invoice",          None,              today_start)
+    leads_today      = _count("lead",             None,               today_start)
+    inquiries_today  = _count("customer_inquiry", None,               today_start)
+    invoices_today   = _count("invoice",          None,               today_start)
     ready_cases      = _count(None,               "awaiting_approval", None)
-    completed_today  = _count(None,               "completed",       today_start)
+    completed_today  = _count(None,               "completed",        today_start)
 
-    # waiting_customer: active jobs (not completed/failed) where the
-    # action_dispatch result payload has recommended_status=needs_customer_info.
-    # Use a JSON path filter on the result column.
     waiting_customer = (
         db.query(func.count(JobRecord.job_id))
         .filter(
@@ -1318,6 +1311,15 @@ def dashboard_summary(
     }
 
 
+@app.get("/dashboard/summary")
+def dashboard_summary(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return today's job counts grouped by type and status for the tenant."""
+    return _compute_summary(db, tenant_id)
+
+
 # ── ROI assumptions (minutes saved per handled item, hourly staff value) ──────
 _ROI_LEAD_MIN      = 10
 _ROI_SUPPORT_MIN   = 8
@@ -1326,12 +1328,8 @@ _ROI_FOLLOWUP_MIN  = 5
 _ROI_HOURLY_SEK    = 500
 
 
-@app.get("/dashboard/roi")
-def dashboard_roi(
-    db: Session = Depends(get_db),
-    tenant_id: str = Depends(get_verified_tenant),
-):
-    """Return today's ROI metrics for the tenant based on fixed time-saving assumptions."""
+def _compute_roi(db: "Session", tenant_id: str) -> dict:
+    """Return today's ROI metrics for the tenant. Shared by dashboard and digest."""
     from datetime import date, datetime, timezone
     from sqlalchemy import func
     from app.repositories.postgres.action_execution_models import ActionExecutionRecord
@@ -1349,12 +1347,11 @@ def dashboard_roi(
             .scalar() or 0
         )
 
-    leads_created        = _count_jobs("lead")
-    support_cases        = _count_jobs("customer_inquiry")
-    invoices_processed   = _count_jobs("invoice")
+    leads_created      = _count_jobs("lead")
+    support_cases      = _count_jobs("customer_inquiry")
+    invoices_processed = _count_jobs("invoice")
 
-    # Count send_email actions today where the job is a lead or customer_inquiry
-    # (follow-up emails are send_email executions against those job types).
+    # Count send_email actions today where the job is a lead or customer_inquiry.
     followups_sent = (
         db.query(func.count(ActionExecutionRecord.execution_id))
         .join(JobRecord, ActionExecutionRecord.job_id == JobRecord.job_id)
@@ -1367,17 +1364,13 @@ def dashboard_roi(
         .scalar() or 0
     )
 
-    total_minutes = (
-        leads_created      * _ROI_LEAD_MIN
-        + support_cases    * _ROI_SUPPORT_MIN
-        + invoices_processed * _ROI_INVOICE_MIN
-        + followups_sent   * _ROI_FOLLOWUP_MIN
-    )
-    total_hours = round(total_minutes / 60, 2)
+    total_minutes       = (leads_created * _ROI_LEAD_MIN + support_cases * _ROI_SUPPORT_MIN
+                           + invoices_processed * _ROI_INVOICE_MIN + followups_sent * _ROI_FOLLOWUP_MIN)
+    total_hours         = round(total_minutes / 60, 2)
     estimated_value_sek = round(total_hours * _ROI_HOURLY_SEK)
 
     return {
-        "period": "today",
+        "period":                  "today",
         "leads_created":           leads_created,
         "support_cases_handled":   support_cases,
         "invoices_processed":      invoices_processed,
@@ -1393,6 +1386,15 @@ def dashboard_roi(
             "hourly_value_sek":       _ROI_HOURLY_SEK,
         },
     }
+
+
+@app.get("/dashboard/roi")
+def dashboard_roi(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return today's ROI metrics for the tenant based on fixed time-saving assumptions."""
+    return _compute_roi(db, tenant_id)
 
 
 @app.get("/dashboard/activity")
@@ -1871,6 +1873,158 @@ def post_setup_verify(
         message = "System ready for onboarding"
 
     return {"status": overall, "checks": checks, "message": message}
+
+
+# ── Notifications ─────────────────────────────────────────────────────────────
+
+_VALID_FREQUENCIES = {"daily", "weekly", "off"}
+
+_DEFAULT_NOTIF_SETTINGS: dict = {
+    "enabled":          False,
+    "recipient_email":  "",
+    "frequency":        "daily",
+    "send_hour":        8,
+}
+
+
+def _get_notif_settings(ctrl_settings: dict) -> dict:
+    raw = ctrl_settings.get("notifications") or {}
+    return {
+        "enabled":         bool(raw.get("enabled",         _DEFAULT_NOTIF_SETTINGS["enabled"])),
+        "recipient_email": raw.get("recipient_email",       _DEFAULT_NOTIF_SETTINGS["recipient_email"]) or "",
+        "frequency":       raw.get("frequency",             _DEFAULT_NOTIF_SETTINGS["frequency"]),
+        "send_hour":       int(raw.get("send_hour",         _DEFAULT_NOTIF_SETTINGS["send_hour"])),
+    }
+
+
+@app.get("/notifications/settings")
+def get_notification_settings(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return tenant-scoped notification settings."""
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    ctrl = TenantConfigRepository.get_settings(db, tenant_id)
+    return _get_notif_settings(ctrl)
+
+
+class NotificationSettingsRequest(_BaseModel):
+    enabled:         bool = False
+    recipient_email: str = ""
+    frequency:       str = "daily"
+    send_hour:       int = 8
+
+
+@app.put("/notifications/settings")
+def put_notification_settings(
+    request: NotificationSettingsRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Persist tenant-scoped notification settings."""
+    import re as _re
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    if request.frequency not in _VALID_FREQUENCIES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"frequency must be one of: {', '.join(sorted(_VALID_FREQUENCIES))}",
+        )
+    if not (0 <= request.send_hour <= 23):
+        raise HTTPException(status_code=422, detail="send_hour must be 0–23")
+
+    email = (request.recipient_email or "").strip()
+    if request.enabled and not email:
+        raise HTTPException(status_code=422, detail="recipient_email is required when enabled=true")
+    if email and not _re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise HTTPException(status_code=422, detail="recipient_email must be a valid email address")
+
+    existing = TenantConfigRepository.get_settings(db, tenant_id)
+    updated = dict(existing)
+    updated["notifications"] = {
+        "enabled":        request.enabled,
+        "recipient_email": email,
+        "frequency":      request.frequency,
+        "send_hour":      request.send_hour,
+    }
+    TenantConfigRepository.update_settings(db, tenant_id, updated)
+    return _get_notif_settings(updated)
+
+
+def _build_digest_body(tenant_id: str, summary: dict, roi: dict) -> tuple[str, str]:
+    """Build (subject, body) for the daily digest email."""
+    from datetime import date
+    today_str = date.today().isoformat()
+    subject   = f"AI Automation Report – {today_str}"
+
+    errors_today = 0  # could be extended to query failed jobs; kept simple for now
+
+    body = f"""Daglig rapport för {tenant_id} – {today_str}
+
+Sammanfattning:
+- Leads skapade:           {summary.get('leads_today', 0)}
+- Supportärenden hanterade: {summary.get('inquiries_today', 0)}
+- Fakturor behandlade:     {summary.get('invoices_today', 0)}
+- Väntar på kund:          {summary.get('waiting_customer', 0)}
+- Klara idag:              {summary.get('completed_today', 0)}
+
+Uppskattat värde:
+- Sparad tid:              {roi.get('estimated_hours_saved', 0)} h
+- Uppskattat värde:        {roi.get('estimated_value_sek', 0)} SEK
+
+Status:
+- Fel idag:                {errors_today}
+
+Logga in i dashboarden för mer detaljer.
+"""
+    return subject, body
+
+
+@app.post("/notifications/daily-digest/send")
+def send_daily_digest(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Manually trigger the daily digest email for this tenant."""
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    ctrl = TenantConfigRepository.get_settings(db, tenant_id)
+    notif = _get_notif_settings(ctrl)
+
+    recipient = notif["recipient_email"]
+    if not recipient:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "failed",
+                "message": "No recipient_email configured. Set it via PUT /notifications/settings first.",
+            },
+        )
+
+    summary = _compute_summary(db, tenant_id)
+    roi     = _compute_roi(db, tenant_id)
+    subject, body = _build_digest_body(tenant_id, summary, roi)
+
+    try:
+        dispatch_action({
+            "type":      "send_email",
+            "tenant_id": tenant_id,
+            "to":        recipient,
+            "subject":   subject,
+            "body":      body,
+        })
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "failed", "message": f"Email dispatch failed: {exc}"},
+        ) from exc
+
+    return {
+        "status":    "success",
+        "recipient": recipient,
+        "subject":   subject,
+        "message":   "Daily digest sent",
+    }
 
 
 @app.get("/cases")
