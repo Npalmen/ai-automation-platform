@@ -142,6 +142,27 @@ class JobRepository:
             return None
         return JobRepository._to_domain(record)
 
+    @staticmethod
+    def get_by_source_thread_id(
+        db: Session,
+        tenant_id: str,
+        source_system: str,
+        thread_id: str,
+    ) -> "Job | None":
+        record = (
+            db.query(JobRecord)
+            .filter(
+                JobRecord.tenant_id == tenant_id,
+                JobRecord.input_data["source"]["system"].as_string() == source_system,
+                JobRecord.input_data["source"]["thread_id"].as_string() == thread_id,
+            )
+            .order_by(JobRecord.created_at.desc())
+            .first()
+        )
+        if record is None:
+            return None
+        return JobRepository._to_domain(record)
+
     # Aliases used by main.py
     @staticmethod
     def list_jobs(

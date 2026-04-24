@@ -256,6 +256,7 @@ def _run_inbox(detail: dict, tenant_config: dict | None = None) -> Job:
          patch("app.main.get_integration_adapter", return_value=mock_adapter), \
          patch("app.main.get_tenant_config", return_value=cfg), \
          patch("app.main.JobRepository.get_by_gmail_message_id", return_value=None), \
+         patch("app.main.JobRepository.get_by_source_thread_id", return_value=None), \
          patch("app.main.JobRepository.create_job", side_effect=fake_create), \
          patch("app.main.run_pipeline", return_value=_make_processed_job()), \
          patch("app.main.dispatch_action"):
@@ -331,6 +332,7 @@ class TestGmailInboxClassificationRouting:
              patch("app.main.get_integration_adapter", return_value=mock_adapter), \
              patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["invoice"]}), \
              patch("app.main.JobRepository.get_by_gmail_message_id", return_value=None), \
+             patch("app.main.JobRepository.get_by_source_thread_id", return_value=None), \
              patch("app.main.JobRepository.create_job") as mock_create, \
              patch("app.main.dispatch_action"):
             result = gmail_process_inbox(

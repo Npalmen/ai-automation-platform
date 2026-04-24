@@ -972,13 +972,18 @@ def gmail_process_inbox(
     tenant_id: str = Depends(get_verified_tenant),
 ):
     """
-    Read recent unread Gmail messages and create a job for each one.
+    Read recent unread Gmail messages and create or continue a job for each one.
 
-    The job type (lead, customer_inquiry, invoice) is inferred from subject+body.
-    Messages whose inferred type is not in tenant enabled_job_types are skipped.
-    Skips messages that already have a job (deduplication via source.message_id).
-    Marks successfully processed messages as read via Gmail modify API.
-    Set dry_run=true to preview what would happen without creating jobs or side effects.
+    Processing order per message:
+    1. Skip if message_id is missing.
+    2. Dedup: skip if a job already exists for this Gmail message_id.
+    3. Fetch full message detail.
+    4. Thread continuation: if a job with the same thread_id exists, update it instead of
+       creating a new one.
+    5. If no existing thread: infer type, apply tenant gate, create new job.
+
+    Marks successfully processed messages as read.
+    Set dry_run=true to preview without any side effects.
     """
     from app.domain.workflows.enums import JobType
 
@@ -1021,16 +1026,17 @@ def gmail_process_inbox(
             failed_messages.append({"message_id": "", "reason": "missing message_id"})
             continue
 
-        # Deduplication: skip if a job already exists for this Gmail message.
-        existing = JobRepository.get_by_gmail_message_id(db, tenant_id, message_id)
-        if existing is not None:
+        # Step 1: dedup — skip if a job already exists for this exact Gmail message.
+        existing_by_msg = JobRepository.get_by_gmail_message_id(db, tenant_id, message_id)
+        if existing_by_msg is not None:
             skipped_messages.append({
                 "message_id": message_id,
                 "reason": "duplicate",
-                "job_id": existing.job_id,
+                "job_id": existing_by_msg.job_id,
             })
             continue
 
+        # Step 2: fetch full message detail.
         try:
             detail_result = adapter.execute_action(
                 action="get_message",
@@ -1047,6 +1053,88 @@ def gmail_process_inbox(
         body_text = msg.get("body_text") or ""
         thread_id = msg.get("thread_id") or ""
 
+        # Step 3: thread continuation — look for existing job with same thread_id.
+        continuation_job = None
+        if thread_id:
+            continuation_job = JobRepository.get_by_source_thread_id(
+                db, tenant_id, "gmail", thread_id
+            )
+
+        if continuation_job is not None:
+            # --- CONTINUATION PATH ---
+            phone = _extract_phone(subject, body_text)
+            sender_dict: dict = {"name": sender_name, "email": sender_email}
+            if phone:
+                sender_dict["phone"] = phone
+
+            new_message_entry = {
+                "source": "gmail",
+                "message_id": message_id,
+                "thread_id": thread_id,
+                "subject": subject,
+                "message_text": body_text,
+                "sender": sender_dict,
+            }
+
+            inferred_type = classify_email_type(subject, body_text)
+
+            if request.dry_run:
+                created_jobs.append({
+                    "message_id": message_id,
+                    "job_id": continuation_job.job_id,
+                    "status": "dry_run",
+                    "inferred_type": inferred_type,
+                    "continued": False,
+                    "continuation_reason": "thread_id_match",
+                    "marked_handled": False,
+                    "notified": False,
+                })
+                continue
+
+            # Merge new message into existing job input_data.
+            updated_input = dict(continuation_job.input_data)
+            conversation = list(updated_input.get("conversation_messages") or [])
+            conversation.append(new_message_entry)
+            updated_input["conversation_messages"] = conversation
+            updated_input["latest_message_text"] = body_text
+            updated_input["latest_subject"] = subject
+            updated_input["latest_sender"] = sender_dict
+
+            continuation_job.input_data = updated_input
+            # Reset processor history so the pipeline runs fresh on updated data.
+            continuation_job.processor_history = []
+
+            try:
+                JobRepository.update_job(db, continuation_job)
+                processed_job = run_pipeline(continuation_job, db)
+            except Exception as exc:
+                failed_messages.append({"message_id": message_id, "reason": str(exc)})
+                continue
+
+            marked_handled = False
+            mark_warning: str | None = None
+            try:
+                adapter.execute_action(action="mark_as_read", payload={"message_id": message_id})
+                marked_handled = True
+            except Exception as exc:
+                mark_warning = str(exc)
+
+            entry: dict = {
+                "message_id": message_id,
+                "job_id": processed_job.job_id,
+                "inferred_type": inferred_type,
+                "status": processed_job.status.value if hasattr(processed_job.status, "value") else str(processed_job.status),
+                "continued": True,
+                "continuation_reason": "thread_id_match",
+                "marked_handled": marked_handled,
+                "notified": False,
+            }
+            if mark_warning:
+                entry["mark_warning"] = mark_warning
+            created_jobs.append(entry)
+            continue
+
+        # --- NEW JOB PATH ---
         # Infer job type from message content, then gate against tenant config.
         inferred_type = classify_email_type(subject, body_text)
         if inferred_type not in enabled_job_types:
@@ -1056,7 +1144,7 @@ def gmail_process_inbox(
         job_type = _INFERRED_TYPE_TO_JOB_TYPE[inferred_type]
 
         phone = _extract_phone(subject, body_text)
-        sender_dict: dict = {"name": sender_name, "email": sender_email}
+        sender_dict = {"name": sender_name, "email": sender_email}
         if phone:
             sender_dict["phone"] = phone
 
@@ -1077,6 +1165,7 @@ def gmail_process_inbox(
                 "job_id": None,
                 "status": "dry_run",
                 "inferred_type": inferred_type,
+                "continued": False,
                 "marked_handled": False,
                 "notified": False,
             })
@@ -1096,7 +1185,7 @@ def gmail_process_inbox(
             continue
 
         marked_handled = False
-        mark_warning: str | None = None
+        mark_warning = None
         try:
             adapter.execute_action(action="mark_as_read", payload={"message_id": message_id})
             marked_handled = True
@@ -1126,11 +1215,12 @@ def gmail_process_inbox(
         except Exception as exc:
             notify_warning = str(exc)
 
-        entry: dict = {
+        entry = {
             "message_id": message_id,
             "job_id": processed_job.job_id,
             "inferred_type": inferred_type,
             "status": processed_job.status.value if hasattr(processed_job.status, "value") else str(processed_job.status),
+            "continued": False,
             "marked_handled": marked_handled,
             "notified": notified,
         }

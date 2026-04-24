@@ -188,6 +188,7 @@ def _run_inbox(detail: dict, tenant_id: str = "TENANT_1001"):
          patch("app.main.get_integration_adapter", return_value=mock_adapter), \
          patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead", "invoice", "customer_inquiry"]}), \
          patch("app.main.JobRepository.get_by_gmail_message_id", return_value=None), \
+         patch("app.main.JobRepository.get_by_source_thread_id", return_value=None), \
          patch("app.main.JobRepository.create_job", side_effect=fake_create_job), \
          patch("app.main.run_pipeline", return_value=_make_processed_job()), \
          patch("app.main.dispatch_action", return_value={"status": "success"}):
