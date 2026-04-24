@@ -134,6 +134,16 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - `tests/test_control_panel.py` — 21 tests: shape, stored-settings, defaults, persist, validation, tenant isolation, inbox-sync
 - 801/801 tests pass
 
+## Completed slice (2026-04-25 — Setup / Onboarding Wizard)
+- `GET /setup/status` — tenant-scoped readiness overview: modules (sales/support/finance derived from `enabled_job_types`), connections (env-credential-based: google_mail, microsoft_mail, monday, fortnox, visma), automation (scheduler_mode + followups_enabled from `settings` column), readiness score (0–100) and status (needs_setup/almost_ready/ready), missing items list
+- Scoring: email +30, any module enabled +20, scheduler not paused +20, support_email configured +10, destination integration +20; clamped to 0–100
+- `PUT /setup/modules` — persists sales/support/finance checkboxes to `enabled_job_types` via `TenantConfigRepository.upsert`; preserves non-module job types
+- `POST /setup/verify` — 5 lightweight checks (tenant config in DB, modules, email, scheduler, destination integration); returns `ok/warning/failed` with per-check details
+- `_build_setup_status()` pure helper for easy unit testing (no DB call inside)
+- `app/ui/index.html` — Onboarding tab: readiness score card + status badge + missing list; module checkboxes with Save; connection badges (Ansluten/Ej ansluten); automation display; Verifiera system button with detailed check result
+- `tests/test_setup_wizard.py` — 45 tests: shape, module derivation, connection detection, scoring (additive, bounds, per-factor), PUT modules, POST verify
+- 878/878 tests pass
+
 ## Completed slice (2026-04-25 — Case View)
 - `GET /cases` — tenant-scoped paginated list; optional `status`/`type` filters; derives `subject` from `input_data.subject` or `latest_message_subject`; derives `customer_name` from entity extraction → intake origin → sender dict; derives `priority` from action_dispatch processor_history
 - `GET /cases/{job_id}` — full detail: `original_message` (from/email/body), `extracted_data` (from entity extraction payload), `thread_messages` (from `conversation_messages`), `actions` (from `action_executions` table), `errors` (from `error_message` on failed actions + processor error entries); 404 on unknown job_id
@@ -143,7 +153,7 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - 833/833 tests pass
 
 ## Current state
-Case View, Control Panel, Activity dashboard, ROI dashboard, thread continuation, and follow-up engine are complete. **833/833 tests pass.**
+Setup Wizard, Case View, Control Panel, Activity dashboard, ROI dashboard, thread continuation, and follow-up engine are complete. **878/878 tests pass.**
 
 All three intake flows (lead, customer inquiry, invoice) are implemented and production-ready. Each flow evaluates completeness deterministically (no LLM) and sends a Swedish-language follow-up email to the customer when required information is missing.
 

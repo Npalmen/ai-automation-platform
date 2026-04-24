@@ -374,6 +374,7 @@ pre {
   <div class="view-tab"        id="viewTabSetup" onclick="switchView('setup')">Inställningar</div>
   <div class="view-tab"        id="viewTabCtrl"  onclick="switchView('ctrl')">Kontrollpanel</div>
   <div class="view-tab"        id="viewTabCases" onclick="switchView('cases')">Ärenden</div>
+  <div class="view-tab"        id="viewTabOnboarding" onclick="switchView('onboarding')">Onboarding</div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ DASHBOARD -->
@@ -623,6 +624,72 @@ pre {
 
 </div><!-- /viewCases -->
 
+<!-- ══════════════════════════════════════════════════════════ ONBOARDING -->
+<div id="viewOnboarding" style="display:none; padding:24px; overflow-y:auto; flex:1; max-width:720px;">
+
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+    <h1 style="font-size:18px; font-weight:700; color:#111; margin:0;">Onboarding</h1>
+    <button class="btn btn-primary btn-sm" onclick="loadOnboarding()">Uppdatera</button>
+  </div>
+
+  <div id="onboardingError" class="msg msg-error" style="display:none;"></div>
+
+  <!-- A. Readiness card -->
+  <div class="setup-card" style="margin-bottom:16px;">
+    <h2 style="font-size:13px; font-weight:600; margin:0 0 12px;">Redo att starta</h2>
+    <div style="display:flex; align-items:center; gap:16px; margin-bottom:12px;">
+      <div id="obScore" style="font-size:36px; font-weight:800; color:#111;">–</div>
+      <div>
+        <div id="obStatus" style="font-size:14px; font-weight:600; color:#6b7280;">–</div>
+        <div style="font-size:12px; color:#9ca3af;">av 100 möjliga poäng</div>
+      </div>
+    </div>
+    <div id="obMissing" style="font-size:12px; color:#6b7280;"></div>
+  </div>
+
+  <!-- B. Modules -->
+  <div class="setup-card" style="margin-bottom:16px;">
+    <h2 style="font-size:13px; font-weight:600; margin:0 0 12px;">Moduler</h2>
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+        <input type="checkbox" id="obSales"> <span>Försäljning</span>
+      </label>
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+        <input type="checkbox" id="obSupport"> <span>Support</span>
+      </label>
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+        <input type="checkbox" id="obFinance"> <span>Ekonomi</span>
+      </label>
+    </div>
+    <div style="margin-top:14px;">
+      <button class="btn btn-primary btn-sm" onclick="saveModules()">Spara moduler</button>
+      <span id="obSaveMsg" style="margin-left:10px; font-size:12px; color:#6b7280;"></span>
+    </div>
+  </div>
+
+  <!-- C. Connections -->
+  <div class="setup-card" style="margin-bottom:16px;">
+    <h2 style="font-size:13px; font-weight:600; margin:0 0 12px;">Integrationer</h2>
+    <div id="obConnections" style="display:flex; flex-direction:column; gap:8px; font-size:13px;"></div>
+  </div>
+
+  <!-- D. Automation -->
+  <div class="setup-card" style="margin-bottom:16px;">
+    <h2 style="font-size:13px; font-weight:600; margin:0 0 12px;">Automatisering</h2>
+    <div style="font-size:13px; display:flex; flex-direction:column; gap:6px;">
+      <div>Körläge: <strong id="obSchedulerMode">–</strong></div>
+      <div>Uppföljningsmail: <strong id="obFollowups">–</strong></div>
+    </div>
+  </div>
+
+  <!-- E. Verify -->
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="runOnboardingVerify()">Verifiera system</button>
+  </div>
+  <div id="obVerifyResult" style="margin-top:12px;"></div>
+
+</div><!-- /viewOnboarding -->
+
 <script>
 // ---------------------------------------------------------------------------
 // Label maps — presentationslager (ändrar inte backend-nycklar)
@@ -715,16 +782,19 @@ function switchView(name) {
   document.getElementById('viewOps').style.display   = name === 'ops'   ? 'flex'  : 'none';
   document.getElementById('viewSetup').style.display = name === 'setup' ? 'block' : 'none';
   document.getElementById('viewCtrl').style.display  = name === 'ctrl'  ? 'block' : 'none';
-  document.getElementById('viewCases').style.display = name === 'cases' ? 'block' : 'none';
-  document.getElementById('viewTabDash').classList.toggle('active',  name === 'dash');
-  document.getElementById('viewTabOps').classList.toggle('active',   name === 'ops');
-  document.getElementById('viewTabSetup').classList.toggle('active', name === 'setup');
-  document.getElementById('viewTabCtrl').classList.toggle('active',  name === 'ctrl');
-  document.getElementById('viewTabCases').classList.toggle('active', name === 'cases');
-  if (name === 'setup') loadSetup();
-  if (name === 'dash')  loadDashboard();
-  if (name === 'ctrl')  loadControl();
-  if (name === 'cases') loadCases();
+  document.getElementById('viewCases').style.display      = name === 'cases'      ? 'block' : 'none';
+  document.getElementById('viewOnboarding').style.display = name === 'onboarding' ? 'block' : 'none';
+  document.getElementById('viewTabDash').classList.toggle('active',       name === 'dash');
+  document.getElementById('viewTabOps').classList.toggle('active',        name === 'ops');
+  document.getElementById('viewTabSetup').classList.toggle('active',      name === 'setup');
+  document.getElementById('viewTabCtrl').classList.toggle('active',       name === 'ctrl');
+  document.getElementById('viewTabCases').classList.toggle('active',      name === 'cases');
+  document.getElementById('viewTabOnboarding').classList.toggle('active', name === 'onboarding');
+  if (name === 'setup')      loadSetup();
+  if (name === 'dash')       loadDashboard();
+  if (name === 'ctrl')       loadControl();
+  if (name === 'cases')      loadCases();
+  if (name === 'onboarding') loadOnboarding();
 }
 
 // ---------------------------------------------------------------------------
@@ -1664,6 +1734,117 @@ async function openCase(jobId) {
 function closeCaseDetail() {
   document.getElementById('caseDetailWrap').style.display = 'none';
   document.getElementById('casesListWrap').style.display  = 'block';
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding
+// ---------------------------------------------------------------------------
+const READINESS_LABELS = {
+  ready:        'Klar för drift',
+  almost_ready: 'Nästan klar',
+  needs_setup:  'Kräver setup',
+};
+const READINESS_COLORS = { ready: '#16a34a', almost_ready: '#d97706', needs_setup: '#dc2626' };
+
+const CONN_LABELS = {
+  google_mail:    'Google Mail',
+  microsoft_mail: 'Microsoft Mail',
+  monday:         'Monday',
+  fortnox:        'Fortnox',
+  visma:          'Visma',
+};
+
+async function loadOnboarding() {
+  const errEl = document.getElementById('onboardingError');
+  errEl.style.display = 'none';
+  try {
+    const r = await apiFetch('/setup/status');
+
+    // Readiness
+    const rd = r.readiness || {};
+    const scoreEl  = document.getElementById('obScore');
+    const statusEl = document.getElementById('obStatus');
+    scoreEl.textContent  = rd.score ?? '–';
+    statusEl.textContent = READINESS_LABELS[rd.status] || rd.status || '–';
+    statusEl.style.color = READINESS_COLORS[rd.status] || '#6b7280';
+
+    const missingEl = document.getElementById('obMissing');
+    if (r.missing && r.missing.length) {
+      missingEl.innerHTML = '<strong>Saknas:</strong> ' + r.missing.map(escapeHtml).join(' &nbsp;·&nbsp; ');
+    } else {
+      missingEl.innerHTML = '<span style="color:#16a34a;">✓ Alla krav uppfyllda</span>';
+    }
+
+    // Modules
+    const m = r.modules || {};
+    document.getElementById('obSales').checked   = !!m.sales;
+    document.getElementById('obSupport').checked = !!m.support;
+    document.getElementById('obFinance').checked = !!m.finance;
+
+    // Connections
+    const c = r.connections || {};
+    const connEl = document.getElementById('obConnections');
+    connEl.innerHTML = Object.entries(CONN_LABELS).map(([key, label]) => {
+      const connected = !!c[key];
+      const badge = connected
+        ? '<span style="color:#16a34a; font-weight:600;">Ansluten</span>'
+        : '<span style="color:#9ca3af;">Ej ansluten</span>';
+      return `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #f3f4f6;">
+        <span>${escapeHtml(label)}</span>${badge}</div>`;
+    }).join('');
+
+    // Automation
+    const auto = r.automation || {};
+    document.getElementById('obSchedulerMode').textContent =
+      { manual: 'Manuell', scheduled: 'Schemalagd', paused: 'Pausad' }[auto.scheduler_mode] || auto.scheduler_mode || '–';
+    document.getElementById('obFollowups').textContent = auto.followups_enabled ? 'Aktiverat' : 'Inaktiverat';
+
+  } catch (e) {
+    errEl.textContent = 'Kunde inte ladda onboarding-status: ' + escapeHtml(e.message);
+    errEl.style.display = 'block';
+  }
+}
+
+async function saveModules() {
+  const msgEl = document.getElementById('obSaveMsg');
+  const body = {
+    sales:   document.getElementById('obSales').checked,
+    support: document.getElementById('obSupport').checked,
+    finance: document.getElementById('obFinance').checked,
+  };
+  try {
+    await apiFetch('/setup/modules', { method: 'PUT', body: JSON.stringify(body) });
+    msgEl.textContent = 'Moduler sparade.';
+    msgEl.style.color = '#16a34a';
+    loadOnboarding();
+  } catch (e) {
+    msgEl.textContent = 'Fel: ' + escapeHtml(e.message);
+    msgEl.style.color = '#dc2626';
+  }
+}
+
+async function runOnboardingVerify() {
+  const resultEl = document.getElementById('obVerifyResult');
+  resultEl.innerHTML = '<span class="empty">Kör verifiering…</span>';
+  try {
+    const r = await apiFetch('/setup/verify', { method: 'POST' });
+    const statusColors = { ok: '#16a34a', warning: '#d97706', failed: '#dc2626' };
+    const color = statusColors[r.status] || '#6b7280';
+    const checksHtml = (r.checks || []).map(ch => {
+      const c = statusColors[ch.status] || '#6b7280';
+      const detail = ch.detail ? ` <span style="color:#9ca3af;">— ${escapeHtml(ch.detail)}</span>` : '';
+      return `<div style="font-size:12px; padding:4px 0;">
+        <span style="color:${c}; font-weight:600;">${ch.status.toUpperCase()}</span>
+        &nbsp;${escapeHtml(ch.name)}${detail}</div>`;
+    }).join('');
+    resultEl.innerHTML = `
+      <div class="setup-card">
+        <div style="font-size:14px; font-weight:700; color:${color}; margin-bottom:8px;">${escapeHtml(r.message)}</div>
+        ${checksHtml}
+      </div>`;
+  } catch (e) {
+    resultEl.innerHTML = `<div class="msg msg-error">Fel: ${escapeHtml(e.message)}</div>`;
+  }
 }
 
 // ---------------------------------------------------------------------------

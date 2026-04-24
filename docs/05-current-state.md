@@ -30,7 +30,8 @@ The following has been confirmed through real API calls against a running instan
 | Control Panel | ✅ IMPLEMENTED | `GET /dashboard/control` + `PUT /dashboard/control` — tenant-scoped automation flags (leads/support/invoices/followups), support email, scheduler run_mode (manual/scheduled/paused); stored in `tenant_configs.settings` JSON column; Kontrollpanel tab in operator UI |
 | Inbox sync trigger | ⚠️ NOT_AVAILABLE | `POST /dashboard/inbox-sync` returns `not_available` — scheduler not yet wired; call `POST /gmail/process-inbox` directly |
 | Case View | ✅ IMPLEMENTED | `GET /cases` (list with subject/customer_name/priority derived from job data) + `GET /cases/{job_id}` (full detail: original message, extracted data, thread history, actions, errors); Ärenden tab in operator UI |
-| 833 tests passing | ✅ | `python -m pytest` |
+| Setup / Onboarding Wizard | ✅ IMPLEMENTED | `GET /setup/status` (readiness score 0–100, module status, connection status, automation settings, missing items list) + `PUT /setup/modules` (persist sales/support/finance module enablement) + `POST /setup/verify` (lightweight check-based verification: tenant config, modules, email, scheduler, destination integration); Onboarding tab in operator UI |
+| 878 tests passing | ✅ | `python -m pytest` |
 
 ---
 

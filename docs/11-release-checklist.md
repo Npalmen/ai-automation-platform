@@ -25,6 +25,7 @@
 - [x] Control Panel — GET/PUT /dashboard/control; automation toggles, support email, scheduler run_mode; Kontrollpanel tab in UI
 - [x] Inbox sync trigger — POST /dashboard/inbox-sync returns not_available (documented limitation)
 - [x] Case View — GET /cases (list) + GET /cases/{job_id} (detail); Ärenden tab in operator UI
+- [x] Setup / Onboarding Wizard — GET /setup/status (readiness score) + PUT /setup/modules + POST /setup/verify; Onboarding tab in operator UI
 
 ## Docs
 - [x] current-state updated

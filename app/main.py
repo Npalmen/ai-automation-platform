@@ -1574,6 +1574,232 @@ def trigger_inbox_sync(
     }
 
 
+# ── Setup / Onboarding ────────────────────────────────────────────────────────
+
+# Module → job types that must be enabled for the module to count as active.
+_MODULE_JOB_TYPES: dict[str, list[str]] = {
+    "sales":   ["lead"],
+    "support": ["customer_inquiry"],
+    "finance": ["invoice"],
+}
+
+
+def _build_setup_status(
+    tenant_id: str,
+    cfg: dict,
+    ctrl_settings: dict,
+    s: "Settings",
+) -> dict:
+    """Derive setup/readiness data from tenant config, control settings, and env."""
+    enabled_types: list[str] = cfg.get("enabled_job_types") or []
+
+    # Modules
+    modules = {name: any(t in enabled_types for t in types)
+               for name, types in _MODULE_JOB_TYPES.items()}
+
+    # Connections — env-credential-based
+    google_mail_ok   = bool(s.GOOGLE_MAIL_ACCESS_TOKEN)
+    microsoft_mail_ok = bool(s.MICROSOFT_MAIL_ACCESS_TOKEN)
+    monday_ok        = bool(s.MONDAY_API_KEY)
+    fortnox_ok       = bool(s.FORTNOX_ACCESS_TOKEN)
+    visma_ok         = bool(s.VISMA_ACCESS_TOKEN)
+    email_connected  = google_mail_ok or microsoft_mail_ok
+
+    connections = {
+        "email_connected":   email_connected,
+        "google_mail":       google_mail_ok,
+        "microsoft_mail":    microsoft_mail_ok,
+        "fortnox":           fortnox_ok,
+        "visma":             visma_ok,
+        "monday":            monday_ok,
+    }
+
+    # Automation
+    sched = ctrl_settings.get("scheduler") or {}
+    auto  = ctrl_settings.get("automation") or {}
+    scheduler_mode     = sched.get("run_mode") or "manual"
+    followups_enabled  = bool(auto.get("followups_enabled", True))
+    support_email      = ctrl_settings.get("support_email") or ""
+
+    automation = {
+        "scheduler_mode":    scheduler_mode,
+        "followups_enabled": followups_enabled,
+    }
+
+    # Readiness scoring
+    score = 0
+    missing: list[str] = []
+
+    if email_connected:
+        score += 30
+    else:
+        missing.append("No email integration connected")
+
+    if any(modules.values()):
+        score += 20
+    else:
+        missing.append("No modules enabled")
+
+    if scheduler_mode != "paused":
+        score += 20
+    else:
+        missing.append("Scheduler is paused")
+
+    if support_email:
+        score += 10
+    else:
+        missing.append("Support email not configured")
+
+    if monday_ok or fortnox_ok or visma_ok:
+        score += 20
+    else:
+        missing.append("No destination integration connected (Monday / Fortnox / Visma)")
+
+    score = max(0, min(100, score))
+
+    if score >= 90:
+        readiness_status = "ready"
+    elif score >= 50:
+        readiness_status = "almost_ready"
+    else:
+        readiness_status = "needs_setup"
+
+    return {
+        "tenant_id":   tenant_id,
+        "modules":     modules,
+        "connections": connections,
+        "automation":  automation,
+        "readiness": {
+            "score":  score,
+            "status": readiness_status,
+        },
+        "missing": missing,
+    }
+
+
+@app.get("/setup/status")
+def get_setup_status(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return tenant-scoped readiness overview derived from config + env credentials."""
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    cfg           = get_tenant_config(tenant_id, db=db)
+    ctrl_settings = TenantConfigRepository.get_settings(db, tenant_id)
+    s             = get_settings()
+    return _build_setup_status(tenant_id, cfg, ctrl_settings, s)
+
+
+class SetupModulesRequest(_BaseModel):
+    sales:   bool = False
+    support: bool = False
+    finance: bool = False
+
+
+@app.put("/setup/modules")
+def put_setup_modules(
+    request: SetupModulesRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Persist module enablement into tenant_configs.enabled_job_types."""
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    enabled_types: list[str] = []
+    for module, types in _MODULE_JOB_TYPES.items():
+        if getattr(request, module):
+            enabled_types.extend(types)
+
+    # Preserve other job types that aren't mapped to a module (future-proofing).
+    existing = TenantConfigRepository.get(db, tenant_id)
+    if existing:
+        current = existing.enabled_job_types or []
+        non_module_types = [t for t in current
+                            if not any(t in types for types in _MODULE_JOB_TYPES.values())]
+        enabled_types = non_module_types + enabled_types
+
+    TenantConfigRepository.upsert(db, tenant_id, enabled_job_types=enabled_types)
+    return {
+        "enabled_job_types": enabled_types,
+        "modules": {m: getattr(request, m) for m in ("sales", "support", "finance")},
+    }
+
+
+@app.post("/setup/verify")
+def post_setup_verify(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Run lightweight system checks and return structured readiness report."""
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    cfg           = get_tenant_config(tenant_id, db=db)
+    ctrl_settings = TenantConfigRepository.get_settings(db, tenant_id)
+    s             = get_settings()
+
+    checks: list[dict] = []
+    warnings = 0
+    failures = 0
+
+    # Check 1: tenant config exists in DB
+    record = TenantConfigRepository.get(db, tenant_id)
+    if record is not None:
+        checks.append({"name": "Tenant config", "status": "ok"})
+    else:
+        checks.append({"name": "Tenant config", "status": "warning",
+                       "detail": "Tenant not in DB — using static fallback config"})
+        warnings += 1
+
+    # Check 2: at least one module enabled
+    enabled_types = cfg.get("enabled_job_types") or []
+    if enabled_types:
+        checks.append({"name": "Modules", "status": "ok",
+                       "detail": f"{len(enabled_types)} job type(s) enabled"})
+    else:
+        checks.append({"name": "Modules", "status": "failed",
+                       "detail": "No job types enabled — no jobs will be processed"})
+        failures += 1
+
+    # Check 3: email connection
+    if s.GOOGLE_MAIL_ACCESS_TOKEN or s.MICROSOFT_MAIL_ACCESS_TOKEN:
+        checks.append({"name": "Email connection", "status": "ok"})
+    else:
+        checks.append({"name": "Email connection", "status": "warning",
+                       "detail": "No email credentials configured"})
+        warnings += 1
+
+    # Check 4: scheduler mode
+    sched_mode = (ctrl_settings.get("scheduler") or {}).get("run_mode") or "manual"
+    if sched_mode == "paused":
+        checks.append({"name": "Scheduler mode", "status": "warning",
+                       "detail": "Scheduler is paused — inbox sync will not run automatically"})
+        warnings += 1
+    else:
+        checks.append({"name": "Scheduler mode", "status": "ok",
+                       "detail": f"Mode: {sched_mode}"})
+
+    # Check 5: destination integration
+    if s.MONDAY_API_KEY or s.FORTNOX_ACCESS_TOKEN or s.VISMA_ACCESS_TOKEN:
+        checks.append({"name": "Destination integration", "status": "ok"})
+    else:
+        checks.append({"name": "Destination integration", "status": "warning",
+                       "detail": "No destination integration credentials configured (Monday / Fortnox / Visma)"})
+        warnings += 1
+
+    if failures > 0:
+        overall = "failed"
+        message = f"System has {failures} critical issue(s) — action required before go-live"
+    elif warnings > 0:
+        overall = "warning"
+        message = f"System has {warnings} warning(s) — review before go-live"
+    else:
+        overall = "ok"
+        message = "System ready for onboarding"
+
+    return {"status": overall, "checks": checks, "message": message}
+
+
 @app.get("/cases")
 def list_cases(
     db: Session = Depends(get_db),
