@@ -2027,6 +2027,172 @@ def send_daily_digest(
     }
 
 
+# ── Scheduler ─────────────────────────────────────────────────────────────────
+
+def _run_scheduler_pass(tenant_id: str, db: "Session", now_utc: "datetime") -> dict:
+    """Run one scheduler pass for a single tenant. Returns per-tenant result dict."""
+    from datetime import datetime, timezone
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    s = get_settings()
+    ctrl = TenantConfigRepository.get_settings(db, tenant_id)
+    sched = ctrl.get("scheduler") or {}
+    run_mode = sched.get("run_mode") or "manual"
+    state = ctrl.get("scheduler_state") or {}
+
+    inbox_sync_result: dict | None = None
+    digest_result: dict | None = None
+    error: str | None = None
+
+    try:
+        # ── Inbox sync ────────────────────────────────────────────────────────
+        if run_mode == "scheduled":
+            if not s.GOOGLE_MAIL_ACCESS_TOKEN:
+                inbox_sync_result = {"skipped": True, "reason": "gmail_not_configured"}
+            else:
+                raw = _run_gmail_inbox_sync(
+                    tenant_id=tenant_id, db=db, max_results=10,
+                )
+                inbox_sync_result = {
+                    "skipped":          False,
+                    "processed":        raw.get("processed", 0),
+                    "created_jobs":     raw.get("created_jobs", []),
+                    "continued_threads": raw.get("continued_threads", 0),
+                    "deduped":          raw.get("deduped", 0),
+                    "errors":           raw.get("errors", []),
+                }
+                state["last_inbox_sync_at"] = now_utc.isoformat()
+        else:
+            inbox_sync_result = {"skipped": True, "reason": f"run_mode={run_mode}"}
+
+        # ── Daily digest ──────────────────────────────────────────────────────
+        notif = _get_notif_settings(ctrl)
+        notif_enabled   = notif.get("enabled") and notif.get("frequency") != "off"
+        send_hour       = notif.get("send_hour", 8)
+        recipient       = notif.get("recipient_email") or ""
+
+        if not notif_enabled or not recipient:
+            digest_result = {"skipped": True, "reason": "notifications_disabled_or_no_recipient"}
+        elif now_utc.hour < send_hour:
+            digest_result = {"skipped": True, "reason": f"before_send_hour ({now_utc.hour} < {send_hour})"}
+        else:
+            last_sent = state.get("last_digest_sent_at")
+            today_str = now_utc.strftime("%Y-%m-%d")
+            if last_sent and last_sent[:10] == today_str:
+                digest_result = {"skipped": True, "reason": "already_sent_today"}
+            else:
+                summary = _compute_summary(db, tenant_id)
+                roi     = _compute_roi(db, tenant_id)
+                subject, body = _build_digest_body(tenant_id, summary, roi)
+                dispatch_action({
+                    "type":      "send_email",
+                    "tenant_id": tenant_id,
+                    "to":        recipient,
+                    "subject":   subject,
+                    "body":      body,
+                })
+                state["last_digest_sent_at"] = now_utc.isoformat()
+                digest_result = {"skipped": False, "recipient": recipient, "subject": subject}
+
+        state["last_scheduler_run_at"] = now_utc.isoformat()
+        state["last_status"] = "success"
+        state["last_error"]  = None
+
+    except Exception as exc:
+        error = str(exc)
+        state["last_scheduler_run_at"] = now_utc.isoformat()
+        state["last_status"] = "failed"
+        state["last_error"]  = error
+
+    # persist updated state
+    updated = dict(ctrl)
+    updated["scheduler_state"] = state
+    TenantConfigRepository.update_settings(db, tenant_id, updated)
+
+    return {
+        "tenant_id":        tenant_id,
+        "run_mode":         run_mode,
+        "inbox_sync":       inbox_sync_result,
+        "digest":           digest_result,
+        "error":            error,
+    }
+
+
+@app.post("/scheduler/run-once")
+def scheduler_run_once(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Run one scheduler pass for all tenants. Returns aggregate result."""
+    from datetime import datetime, timezone
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    now_utc = datetime.now(timezone.utc)
+    records = TenantConfigRepository.list_all(db)
+
+    tenants_checked  = 0
+    inbox_syncs_run  = 0
+    digests_sent     = 0
+    skipped          = 0
+    errors: list[dict] = []
+    tenant_results: list[dict] = []
+
+    for record in records:
+        tid = record.tenant_id
+        tenants_checked += 1
+        result = _run_scheduler_pass(tid, db, now_utc)
+        tenant_results.append(result)
+
+        if result.get("error"):
+            errors.append({"tenant_id": tid, "error": result["error"]})
+        else:
+            ib = result.get("inbox_sync") or {}
+            dg = result.get("digest") or {}
+            if not ib.get("skipped"):
+                inbox_syncs_run += 1
+            if not dg.get("skipped"):
+                digests_sent += 1
+            if ib.get("skipped") and dg.get("skipped"):
+                skipped += 1
+
+    return {
+        "status":         "success" if not errors else "warning",
+        "run_at":         now_utc.isoformat(),
+        "tenants_checked": tenants_checked,
+        "inbox_syncs_run": inbox_syncs_run,
+        "digests_sent":    digests_sent,
+        "skipped":         skipped,
+        "errors":          errors,
+        "tenant_results":  tenant_results,
+    }
+
+
+@app.get("/scheduler/status")
+def scheduler_status(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return scheduler state and configuration for this tenant."""
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    ctrl  = TenantConfigRepository.get_settings(db, tenant_id)
+    sched = ctrl.get("scheduler") or {}
+    state = ctrl.get("scheduler_state") or {}
+    notif = _get_notif_settings(ctrl)
+
+    return {
+        "run_mode":              sched.get("run_mode") or "manual",
+        "notifications_enabled": notif.get("enabled") or False,
+        "notifications_frequency": notif.get("frequency") or "daily",
+        "send_hour":             notif.get("send_hour") or 8,
+        "last_inbox_sync_at":    state.get("last_inbox_sync_at"),
+        "last_digest_sent_at":   state.get("last_digest_sent_at"),
+        "last_scheduler_run_at": state.get("last_scheduler_run_at"),
+        "last_status":           state.get("last_status") or "never_run",
+        "last_error":            state.get("last_error"),
+    }
+
+
 @app.get("/cases")
 def list_cases(
     db: Session = Depends(get_db),

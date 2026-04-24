@@ -595,6 +595,22 @@ pre {
   </div>
   <div id="syncMsg" style="margin-top:8px; font-size:12px; color:#6b7280;"></div>
 
+  <!-- Scheduler status -->
+  <div class="setup-card" style="margin-top:20px;">
+    <h2 style="font-size:13px; font-weight:600; margin:0 0 12px;">Scheduler-status</h2>
+    <div id="schedStatusWrap" style="font-size:13px; display:flex; flex-direction:column; gap:6px; color:#374151;">
+      <div>Status: <strong id="schedLastStatus">–</strong></div>
+      <div>Senaste inbox-sync: <strong id="schedLastInbox">–</strong></div>
+      <div>Senaste daglig rapport: <strong id="schedLastDigest">–</strong></div>
+      <div>Senaste scheduler-körning: <strong id="schedLastRun">–</strong></div>
+      <div id="schedLastError" style="color:#dc2626; display:none;"></div>
+    </div>
+    <div style="margin-top:14px;">
+      <button class="btn btn-neutral btn-sm" id="btnRunScheduler" onclick="runSchedulerOnce()">Kör scheduler nu</button>
+      <span id="schedRunMsg" style="margin-left:10px; font-size:12px; color:#6b7280;"></span>
+    </div>
+  </div>
+
 </div><!-- /viewCtrl -->
 
 <!-- ══════════════════════════════════════════════════════════════ ÄRENDEN -->
@@ -1590,6 +1606,13 @@ async function runVerification() {
 // ---------------------------------------------------------------------------
 // Kontrollpanel
 // ---------------------------------------------------------------------------
+function _fmtTs(iso) {
+  if (!iso) return '–';
+  try {
+    return new Date(iso).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' });
+  } catch { return iso; }
+}
+
 async function loadControl() {
   const msgEl = document.getElementById('ctrlMsg');
   msgEl.style.display = 'none';
@@ -1605,6 +1628,44 @@ async function loadControl() {
     msgEl.textContent = 'Kunde inte ladda inställningar: ' + escapeHtml(e.message);
     msgEl.className = 'msg msg-error';
     msgEl.style.display = 'block';
+  }
+  // load scheduler status (best-effort, non-blocking)
+  try {
+    const st = await apiFetch('/scheduler/status');
+    const statusColors = { success: '#16a34a', failed: '#dc2626', warning: '#d97706', never_run: '#6b7280' };
+    document.getElementById('schedLastStatus').textContent = st.last_status || 'never_run';
+    document.getElementById('schedLastStatus').style.color = statusColors[st.last_status] || '#6b7280';
+    document.getElementById('schedLastInbox').textContent  = _fmtTs(st.last_inbox_sync_at);
+    document.getElementById('schedLastDigest').textContent = _fmtTs(st.last_digest_sent_at);
+    document.getElementById('schedLastRun').textContent    = _fmtTs(st.last_scheduler_run_at);
+    const errEl = document.getElementById('schedLastError');
+    if (st.last_error) {
+      errEl.textContent    = 'Fel: ' + escapeHtml(st.last_error);
+      errEl.style.display  = 'block';
+    } else {
+      errEl.style.display  = 'none';
+    }
+  } catch (_) { /* non-critical — scheduler status missing is not a blocker */ }
+}
+
+async function runSchedulerOnce() {
+  const btn    = document.getElementById('btnRunScheduler');
+  const msgEl  = document.getElementById('schedRunMsg');
+  btn.disabled = true;
+  msgEl.style.color = '#6b7280';
+  msgEl.textContent = 'Kör scheduler…';
+  try {
+    const r = await apiFetch('/scheduler/run-once', { method: 'POST' });
+    const color = r.status === 'success' ? '#16a34a' : '#d97706';
+    msgEl.style.color = color;
+    msgEl.textContent = `Klart · Tenants: ${r.tenants_checked} · Inbox: ${r.inbox_syncs_run} · Rapporter: ${r.digests_sent} · Hoppade: ${r.skipped}`;
+    loadControl(); // refresh status fields
+    if (typeof loadDashboard === 'function') loadDashboard();
+  } catch (e) {
+    msgEl.style.color = '#dc2626';
+    msgEl.textContent = 'Fel: ' + escapeHtml(e.message);
+  } finally {
+    btn.disabled = false;
   }
 }
 

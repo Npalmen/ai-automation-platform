@@ -171,8 +171,16 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - `tests/test_cases.py` — 32 tests: list shape, derivation logic, tenant isolation, 404, detail content
 - 833/833 tests pass
 
+## Completed slice (2026-04-24 — Scheduler for Inbox Sync + Daily Digest)
+- `_run_scheduler_pass(tenant_id, db, now_utc)` — pure helper; reads run_mode + notifications from `settings`; runs inbox sync when `run_mode=scheduled` (skips if Gmail not configured); sends digest when `enabled`, `frequency != off`, `now_utc.hour >= send_hour`, and not already sent today (dedup by date comparison of `last_digest_sent_at`); persists `scheduler_state` (last_inbox_sync_at, last_digest_sent_at, last_scheduler_run_at, last_status, last_error) back to `settings` column; on exception: captures error, sets last_status=failed, still persists state
+- `POST /scheduler/run-once` — iterates all tenants via `TenantConfigRepository.list_all`; calls `_run_scheduler_pass` per tenant; returns `{status, run_at, tenants_checked, inbox_syncs_run, digests_sent, skipped, errors, tenant_results}`; status=warning when any tenant errors
+- `GET /scheduler/status` — tenant-scoped; returns `{run_mode, notifications_enabled, notifications_frequency, send_hour, last_inbox_sync_at, last_digest_sent_at, last_scheduler_run_at, last_status, last_error}`
+- `app/ui/index.html` — Scheduler-status card added inside Kontrollpanel tab: last_status (colour-coded), last_inbox_sync_at, last_digest_sent_at, last_scheduler_run_at, Kör scheduler nu button; `loadControl()` now also fetches `/scheduler/status`; `runSchedulerOnce()` calls `POST /scheduler/run-once`, shows aggregate counts, refreshes status + dashboard
+- `tests/test_scheduler.py` — 41 tests: GET status (shape/defaults/stored/tenant isolation), `_run_scheduler_pass` (run_mode gates, digest dedup by date, before/after send_hour, state persistence, error capture), `POST /scheduler/run-once` (tenant count, sync count, digest count, skip count, status=warning on error)
+- 983/983 tests pass
+
 ## Current state
-Customer Notifications, Manual inbox sync, Setup Wizard, Case View, Control Panel, Activity dashboard, ROI dashboard, thread continuation, and follow-up engine are complete. **942/942 tests pass.**
+Scheduler (inbox sync + daily digest), Customer Notifications, Manual inbox sync, Setup Wizard, Case View, Control Panel, Activity dashboard, ROI dashboard, thread continuation, and follow-up engine are complete. **983/983 tests pass.**
 
 All three intake flows (lead, customer inquiry, invoice) are implemented and production-ready. Each flow evaluates completeness deterministically (no LLM) and sends a Swedish-language follow-up email to the customer when required information is missing.
 

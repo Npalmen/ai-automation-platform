@@ -32,7 +32,8 @@ The following has been confirmed through real API calls against a running instan
 | Case View | ✅ IMPLEMENTED | `GET /cases` (list with subject/customer_name/priority derived from job data) + `GET /cases/{job_id}` (full detail: original message, extracted data, thread history, actions, errors); Ärenden tab in operator UI |
 | Setup / Onboarding Wizard | ✅ IMPLEMENTED | `GET /setup/status` (readiness score 0–100, module status, connection status, automation settings, missing items list) + `PUT /setup/modules` (persist sales/support/finance module enablement) + `POST /setup/verify` (lightweight check-based verification: tenant config, modules, email, scheduler, destination integration); Onboarding tab in operator UI |
 | Customer Notifications / Daily Digest | ✅ IMPLEMENTED | `GET /notifications/settings` + `PUT /notifications/settings` (enabled, recipient_email, frequency, send_hour; stored in `tenant_configs.settings.notifications`) + `POST /notifications/daily-digest/send` (builds digest from `_compute_summary`+`_compute_roi`, dispatches via existing `send_email` action path; 400 if no recipient, 500 on dispatch failure); Notifieringar tab in operator UI |
-| 942 tests passing | ✅ | `python -m pytest` |
+| Scheduler — Inbox Sync + Daily Digest | ✅ IMPLEMENTED | `POST /scheduler/run-once` (multi-tenant pass: inbox sync when run_mode=scheduled, digest when enabled+send_hour reached+not already sent today) + `GET /scheduler/status` (tenant-scoped: run_mode, notif config, last_inbox_sync_at, last_digest_sent_at, last_scheduler_run_at, last_status, last_error); state stored in `tenant_configs.settings.scheduler_state`; Scheduler-status section in Kontrollpanel UI tab |
+| 983 tests passing | ✅ | `python -m pytest` |
 
 ---
 

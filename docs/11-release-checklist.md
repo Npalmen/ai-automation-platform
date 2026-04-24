@@ -27,6 +27,7 @@
 - [x] Case View — GET /cases (list) + GET /cases/{job_id} (detail); Ärenden tab in operator UI
 - [x] Setup / Onboarding Wizard — GET /setup/status (readiness score) + PUT /setup/modules + POST /setup/verify; Onboarding tab in operator UI
 - [x] Customer Notifications — GET/PUT /notifications/settings + POST /notifications/daily-digest/send; Notifieringar tab in operator UI
+- [x] Scheduler — POST /scheduler/run-once (multi-tenant inbox sync + digest with dedup/send_hour gate) + GET /scheduler/status; scheduler_state persisted in tenant_configs.settings; Scheduler-status section in Kontrollpanel UI
 
 ## Docs
 - [x] current-state updated
