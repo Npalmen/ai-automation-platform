@@ -1574,6 +1574,214 @@ def trigger_inbox_sync(
     }
 
 
+@app.get("/cases")
+def list_cases(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+    limit: int = 25,
+    offset: int = 0,
+    status: str | None = None,
+    type: str | None = None,
+):
+    """Tenant-scoped list of recent cases with derived subject/customer_name/priority."""
+    q = db.query(JobRecord).filter(JobRecord.tenant_id == tenant_id)
+    if status:
+        q = q.filter(JobRecord.status == status)
+    if type:
+        q = q.filter(JobRecord.job_type == type)
+    total = q.count()
+    records = q.order_by(JobRecord.created_at.desc()).offset(offset).limit(limit).all()
+
+    items = []
+    for r in records:
+        inp = r.input_data or {}
+        result = r.result or {}
+        history = result.get("processor_history") or []
+
+        # Derive subject: prefer input_data.subject, then latest_message_subject
+        subject: str | None = inp.get("subject") or inp.get("latest_message_subject") or None
+
+        # Derive customer_name from entity extraction in processor_history
+        customer_name: str | None = None
+        for entry in reversed(history):
+            p = (entry.get("result") or {}).get("payload") or {}
+            entities = p.get("entities") or {}
+            name = entities.get("customer_name")
+            if name:
+                customer_name = name
+                break
+        # Fall back to intake origin sender_name
+        if not customer_name:
+            for entry in history:
+                p = (entry.get("result") or {}).get("payload") or {}
+                origin = p.get("origin") or {}
+                name = origin.get("sender_name")
+                if name:
+                    customer_name = name
+                    break
+        # Fall back to input_data sender
+        if not customer_name:
+            sender = inp.get("sender") or {}
+            customer_name = sender.get("name") or inp.get("sender_name") or None
+
+        # Derive priority from action_dispatch processor history
+        priority: str | None = None
+        for entry in reversed(history):
+            if entry.get("processor") == "action_dispatch_processor":
+                for action in ((entry.get("result") or {}).get("payload") or {}).get("actions_requested") or []:
+                    p = action.get("column_values", {}).get("priority")
+                    if p:
+                        priority = p.lower()
+                        break
+            if priority:
+                break
+
+        items.append({
+            "job_id":        r.job_id,
+            "created_at":    r.created_at.isoformat() if r.created_at else None,
+            "type":          r.job_type or "unknown",
+            "status":        r.status or "unknown",
+            "subject":       subject,
+            "customer_name": customer_name,
+            "priority":      priority,
+        })
+
+    return {"items": items, "total": total}
+
+
+@app.get("/cases/{job_id}")
+def get_case(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Tenant-scoped detailed case view including messages, actions, and errors."""
+    from app.repositories.postgres.action_execution_models import ActionExecutionRecord
+
+    r = (
+        db.query(JobRecord)
+        .filter(JobRecord.job_id == job_id, JobRecord.tenant_id == tenant_id)
+        .first()
+    )
+    if r is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    inp = r.input_data or {}
+    result = r.result or {}
+    history = result.get("processor_history") or []
+
+    # --- original_message ---
+    sender = inp.get("sender") or {}
+    original_message = {
+        "from":  sender.get("name") or inp.get("sender_name") or None,
+        "email": sender.get("email") or inp.get("sender_email") or None,
+        "body":  inp.get("message_text") or None,
+    }
+
+    # --- extracted_data: from entity extraction processor ---
+    extracted_data: dict | None = None
+    for entry in history:
+        p = (entry.get("result") or {}).get("payload") or {}
+        if "entities" in p:
+            extracted_data = p["entities"]
+            break
+
+    # --- thread_messages: from conversation_messages list ---
+    raw_msgs = inp.get("conversation_messages") or []
+    thread_messages = []
+    for msg in raw_msgs:
+        src = msg.get("source") or "gmail"
+        direction = "outgoing" if src in ("system", "outgoing") else "incoming"
+        thread_messages.append({
+            "created_at": msg.get("received_at") or msg.get("created_at") or None,
+            "direction":  direction,
+            "subject":    msg.get("subject") or None,
+            "body":       msg.get("message_text") or msg.get("body") or None,
+        })
+
+    # --- actions from action_executions table ---
+    action_records = (
+        db.query(ActionExecutionRecord)
+        .filter(
+            ActionExecutionRecord.job_id == job_id,
+            ActionExecutionRecord.tenant_id == tenant_id,
+        )
+        .order_by(ActionExecutionRecord.executed_at.asc())
+        .all()
+    )
+    actions = [
+        {
+            "created_at": a.executed_at.isoformat() if a.executed_at else None,
+            "type":       a.action_type,
+            "status":     a.status,
+            "result":     a.result_payload,
+        }
+        for a in action_records
+    ]
+
+    # --- errors: failed actions + any processor error entries ---
+    errors = []
+    for a in action_records:
+        if a.error_message:
+            errors.append({
+                "created_at": a.executed_at.isoformat() if a.executed_at else None,
+                "message":    a.error_message,
+            })
+    for entry in history:
+        err = (entry.get("result") or {}).get("error")
+        if err:
+            errors.append({"created_at": None, "message": str(err)})
+
+    # --- subject + customer_name + priority (reuse same logic as list) ---
+    subject: str | None = inp.get("subject") or inp.get("latest_message_subject") or None
+
+    customer_name: str | None = None
+    for entry in reversed(history):
+        p = (entry.get("result") or {}).get("payload") or {}
+        entities = p.get("entities") or {}
+        name = entities.get("customer_name")
+        if name:
+            customer_name = name
+            break
+    if not customer_name:
+        for entry in history:
+            p = (entry.get("result") or {}).get("payload") or {}
+            origin = p.get("origin") or {}
+            name = origin.get("sender_name")
+            if name:
+                customer_name = name
+                break
+    if not customer_name:
+        customer_name = sender.get("name") or inp.get("sender_name") or None
+
+    priority: str | None = None
+    for entry in reversed(history):
+        if entry.get("processor") == "action_dispatch_processor":
+            for action in ((entry.get("result") or {}).get("payload") or {}).get("actions_requested") or []:
+                p = action.get("column_values", {}).get("priority")
+                if p:
+                    priority = p.lower()
+                    break
+        if priority:
+            break
+
+    return {
+        "job_id":           r.job_id,
+        "created_at":       r.created_at.isoformat() if r.created_at else None,
+        "updated_at":       r.updated_at.isoformat() if r.updated_at else None,
+        "type":             r.job_type or "unknown",
+        "status":           r.status or "unknown",
+        "priority":         priority,
+        "subject":          subject,
+        "customer_name":    customer_name,
+        "original_message": original_message,
+        "extracted_data":   extracted_data,
+        "thread_messages":  thread_messages,
+        "actions":          actions,
+        "errors":           errors,
+    }
+
+
 @app.get("/audit-events", response_model=AuditEventListResponse)
 def list_audit_events(
     db: Session = Depends(get_db),

@@ -373,6 +373,7 @@ pre {
   <div class="view-tab active" id="viewTabOps"   onclick="switchView('ops')">Drift</div>
   <div class="view-tab"        id="viewTabSetup" onclick="switchView('setup')">Inställningar</div>
   <div class="view-tab"        id="viewTabCtrl"  onclick="switchView('ctrl')">Kontrollpanel</div>
+  <div class="view-tab"        id="viewTabCases" onclick="switchView('cases')">Ärenden</div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ DASHBOARD -->
@@ -594,6 +595,34 @@ pre {
 
 </div><!-- /viewCtrl -->
 
+<!-- ══════════════════════════════════════════════════════════════ ÄRENDEN -->
+<div id="viewCases" style="display:none; padding:24px; overflow-y:auto; flex:1;">
+
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+    <h1 style="font-size:18px; font-weight:700; color:#111; margin:0;">Ärenden</h1>
+    <button class="btn btn-primary btn-sm" onclick="loadCases()">Uppdatera</button>
+  </div>
+
+  <div id="casesError" class="msg msg-error" style="display:none;"></div>
+
+  <!-- Cases list -->
+  <div id="casesListWrap" style="margin-bottom:28px;">
+    <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Senaste ärenden</h2>
+    <div id="casesList"><span class="empty">Laddar…</span></div>
+  </div>
+
+  <!-- Case detail panel -->
+  <div id="caseDetailWrap" style="display:none;">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+      <button class="btn btn-neutral btn-sm" onclick="closeCaseDetail()">← Tillbaka</button>
+      <h2 style="font-size:14px; font-weight:600; color:#111; margin:0;" id="caseDetailTitle">Detaljer</h2>
+    </div>
+    <div id="caseDetailError" class="msg msg-error" style="display:none;"></div>
+    <div id="caseDetail"></div>
+  </div>
+
+</div><!-- /viewCases -->
+
 <script>
 // ---------------------------------------------------------------------------
 // Label maps — presentationslager (ändrar inte backend-nycklar)
@@ -686,13 +715,16 @@ function switchView(name) {
   document.getElementById('viewOps').style.display   = name === 'ops'   ? 'flex'  : 'none';
   document.getElementById('viewSetup').style.display = name === 'setup' ? 'block' : 'none';
   document.getElementById('viewCtrl').style.display  = name === 'ctrl'  ? 'block' : 'none';
+  document.getElementById('viewCases').style.display = name === 'cases' ? 'block' : 'none';
   document.getElementById('viewTabDash').classList.toggle('active',  name === 'dash');
   document.getElementById('viewTabOps').classList.toggle('active',   name === 'ops');
   document.getElementById('viewTabSetup').classList.toggle('active', name === 'setup');
   document.getElementById('viewTabCtrl').classList.toggle('active',  name === 'ctrl');
+  document.getElementById('viewTabCases').classList.toggle('active', name === 'cases');
   if (name === 'setup') loadSetup();
   if (name === 'dash')  loadDashboard();
   if (name === 'ctrl')  loadControl();
+  if (name === 'cases') loadCases();
 }
 
 // ---------------------------------------------------------------------------
@@ -1486,6 +1518,152 @@ async function triggerInboxSync() {
   } finally {
     btn.disabled = false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Ärenden (Cases)
+// ---------------------------------------------------------------------------
+const CASE_TYPE_LABELS = {
+  lead: 'Lead', customer_inquiry: 'Supportärende', invoice: 'Faktura', unknown: 'Okänd',
+};
+
+async function loadCases() {
+  const listEl  = document.getElementById('casesList');
+  const errEl   = document.getElementById('casesError');
+  const detailW = document.getElementById('caseDetailWrap');
+  const listW   = document.getElementById('casesListWrap');
+  errEl.style.display = 'none';
+  detailW.style.display = 'none';
+  listW.style.display   = 'block';
+  listEl.innerHTML = '<span class="empty">Laddar…</span>';
+
+  try {
+    const r = await apiFetch('/cases?limit=50');
+    if (!r.items || r.items.length === 0) {
+      listEl.innerHTML = '<span class="empty">Inga ärenden ännu.</span>';
+      return;
+    }
+    const rows = r.items.map(item => {
+      const type    = CASE_TYPE_LABELS[item.type] || escapeHtml(item.type);
+      const status  = item.status ? statusBadge(item.status) : '–';
+      const subject = item.subject ? escapeHtml(item.subject) : '<span style="color:#9ca3af">–</span>';
+      const cust    = item.customer_name ? escapeHtml(item.customer_name) : '<span style="color:#9ca3af">–</span>';
+      const ts      = item.created_at ? new Date(item.created_at).toLocaleString('sv-SE') : '–';
+      return `<tr style="cursor:pointer;" onclick="openCase('${escapeHtml(item.job_id)}')">
+        <td style="color:#888; white-space:nowrap">${ts}</td>
+        <td>${escapeHtml(type)}</td>
+        <td>${subject}</td>
+        <td>${status}</td>
+        <td>${cust}</td>
+      </tr>`;
+    }).join('');
+    listEl.innerHTML = `
+      <table class="act-table">
+        <thead><tr>
+          <th>Datum</th><th>Typ</th><th>Ämne</th><th>Status</th><th>Kund</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="font-size:11px; color:#9ca3af; margin-top:8px;">Visar ${r.items.length} av ${r.total} ärenden</div>`;
+  } catch (e) {
+    errEl.textContent = 'Kunde inte ladda ärenden: ' + escapeHtml(e.message);
+    errEl.style.display = 'block';
+    listEl.innerHTML = '';
+  }
+}
+
+async function openCase(jobId) {
+  const listW   = document.getElementById('casesListWrap');
+  const detailW = document.getElementById('caseDetailWrap');
+  const detailEl= document.getElementById('caseDetail');
+  const titleEl = document.getElementById('caseDetailTitle');
+  const errEl   = document.getElementById('caseDetailError');
+
+  listW.style.display   = 'none';
+  detailW.style.display = 'block';
+  errEl.style.display   = 'none';
+  detailEl.innerHTML    = '<span class="empty">Laddar…</span>';
+  titleEl.textContent   = 'Detaljer – ' + jobId;
+
+  try {
+    const c = await apiFetch('/cases/' + encodeURIComponent(jobId));
+    titleEl.textContent = `Ärende ${c.job_id} · ${CASE_TYPE_LABELS[c.type] || c.type} · ${c.status}`;
+
+    // original message
+    const om = c.original_message || {};
+    const omHtml = `
+      <div class="setup-card" style="margin-bottom:14px;">
+        <h3 style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; margin:0 0 10px;">Ursprungligt mail</h3>
+        <div style="font-size:13px; margin-bottom:4px;"><strong>Från:</strong> ${escapeHtml(om.from || '–')} &lt;${escapeHtml(om.email || '–')}&gt;</div>
+        <div style="font-size:13px; margin-bottom:4px;"><strong>Ämne:</strong> ${escapeHtml(c.subject || '–')}</div>
+        <pre style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:10px; font-size:12px; white-space:pre-wrap; margin:8px 0 0;">${escapeHtml(om.body || '–')}</pre>
+      </div>`;
+
+    // extracted data
+    const extHtml = c.extracted_data
+      ? `<div class="setup-card" style="margin-bottom:14px;">
+           <h3 style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; margin:0 0 10px;">Extraherad data</h3>
+           <pre style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:10px; font-size:12px; white-space:pre-wrap; margin:0;">${escapeHtml(JSON.stringify(c.extracted_data, null, 2))}</pre>
+         </div>`
+      : '';
+
+    // thread messages
+    const threadRows = (c.thread_messages || []).map(m => {
+      const dir  = m.direction === 'outgoing' ? '→ Utgående' : '← Inkommande';
+      const ts   = m.created_at ? new Date(m.created_at).toLocaleString('sv-SE') : '–';
+      const subj = m.subject ? `<div style="font-size:12px; color:#374151; margin-bottom:4px;"><strong>${escapeHtml(m.subject)}</strong></div>` : '';
+      return `<div style="border-left:3px solid ${m.direction==='outgoing'?'#2563eb':'#10b981'}; padding:8px 12px; margin-bottom:8px; background:#f9fafb; border-radius:0 6px 6px 0;">
+        <div style="font-size:11px; color:#9ca3af; margin-bottom:4px;">${dir} · ${ts}</div>
+        ${subj}
+        <div style="font-size:12px; white-space:pre-wrap;">${escapeHtml(m.body || '–')}</div>
+      </div>`;
+    }).join('');
+    const threadHtml = `
+      <div class="setup-card" style="margin-bottom:14px;">
+        <h3 style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; margin:0 0 10px;">Trådhistorik</h3>
+        ${threadRows || '<span class="empty">Ingen trådhistorik.</span>'}
+      </div>`;
+
+    // actions
+    const actRows = (c.actions || []).map(a => {
+      const ts = a.created_at ? new Date(a.created_at).toLocaleString('sv-SE') : '–';
+      return `<tr>
+        <td style="color:#888; white-space:nowrap; font-size:12px;">${ts}</td>
+        <td style="font-size:12px;">${escapeHtml(a.type || '–')}</td>
+        <td>${statusBadge(a.status)}</td>
+      </tr>`;
+    }).join('');
+    const actHtml = `
+      <div class="setup-card" style="margin-bottom:14px;">
+        <h3 style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; margin:0 0 10px;">Åtgärder</h3>
+        ${actRows
+          ? `<table class="act-table"><thead><tr><th>Tid</th><th>Typ</th><th>Status</th></tr></thead><tbody>${actRows}</tbody></table>`
+          : '<span class="empty">Inga åtgärder.</span>'}
+      </div>`;
+
+    // errors
+    const errRows = (c.errors || []).map(e => {
+      const ts = e.created_at ? new Date(e.created_at).toLocaleString('sv-SE') : '–';
+      return `<div class="msg msg-error" style="margin-bottom:6px; font-size:12px;">${ts ? ts + ' — ' : ''}${escapeHtml(e.message)}</div>`;
+    }).join('');
+    const errHtml = c.errors && c.errors.length
+      ? `<div class="setup-card" style="margin-bottom:14px;">
+           <h3 style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; margin:0 0 10px;">Fel</h3>
+           ${errRows}
+         </div>`
+      : '';
+
+    detailEl.innerHTML = omHtml + extHtml + threadHtml + actHtml + errHtml;
+  } catch (e) {
+    errEl.textContent = 'Kunde inte ladda ärendedetaljer: ' + escapeHtml(e.message);
+    errEl.style.display = 'block';
+    detailEl.innerHTML = '';
+  }
+}
+
+function closeCaseDetail() {
+  document.getElementById('caseDetailWrap').style.display = 'none';
+  document.getElementById('casesListWrap').style.display  = 'block';
 }
 
 // ---------------------------------------------------------------------------

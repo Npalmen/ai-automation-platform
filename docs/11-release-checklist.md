@@ -24,6 +24,7 @@
 - [x] ROI Dashboard — GET /dashboard/roi; estimated time/value savings; ROI section in Dashboard tab
 - [x] Control Panel — GET/PUT /dashboard/control; automation toggles, support email, scheduler run_mode; Kontrollpanel tab in UI
 - [x] Inbox sync trigger — POST /dashboard/inbox-sync returns not_available (documented limitation)
+- [x] Case View — GET /cases (list) + GET /cases/{job_id} (detail); Ärenden tab in operator UI
 
 ## Docs
 - [x] current-state updated

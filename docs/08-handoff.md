@@ -134,8 +134,16 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - `tests/test_control_panel.py` — 21 tests: shape, stored-settings, defaults, persist, validation, tenant isolation, inbox-sync
 - 801/801 tests pass
 
+## Completed slice (2026-04-25 — Case View)
+- `GET /cases` — tenant-scoped paginated list; optional `status`/`type` filters; derives `subject` from `input_data.subject` or `latest_message_subject`; derives `customer_name` from entity extraction → intake origin → sender dict; derives `priority` from action_dispatch processor_history
+- `GET /cases/{job_id}` — full detail: `original_message` (from/email/body), `extracted_data` (from entity extraction payload), `thread_messages` (from `conversation_messages`), `actions` (from `action_executions` table), `errors` (from `error_message` on failed actions + processor error entries); 404 on unknown job_id
+- No new DB tables or columns — all data derived from existing `jobs` and `action_executions` tables
+- `app/ui/index.html` — Ärenden tab added; case list table (date/type/subject/status/customer, clickable rows); detail panel (Ursprungligt mail, Extraherad data, Trådhistorik, Åtgärder, Fel sections); back button
+- `tests/test_cases.py` — 32 tests: list shape, derivation logic, tenant isolation, 404, detail content
+- 833/833 tests pass
+
 ## Current state
-Control Panel, Activity dashboard, ROI dashboard, thread continuation, and follow-up engine are complete. **801/801 tests pass.**
+Case View, Control Panel, Activity dashboard, ROI dashboard, thread continuation, and follow-up engine are complete. **833/833 tests pass.**
 
 All three intake flows (lead, customer inquiry, invoice) are implemented and production-ready. Each flow evaluates completeness deterministically (no LLM) and sends a Swedish-language follow-up email to the customer when required information is missing.
 

@@ -29,7 +29,8 @@ The following has been confirmed through real API calls against a running instan
 | ROI Dashboard | ✅ IMPLEMENTED | `GET /dashboard/roi` (estimated minutes/hours saved, SEK value, item counts for today); ROI section in Dashboard tab; fixed assumptions, easy to tune |
 | Control Panel | ✅ IMPLEMENTED | `GET /dashboard/control` + `PUT /dashboard/control` — tenant-scoped automation flags (leads/support/invoices/followups), support email, scheduler run_mode (manual/scheduled/paused); stored in `tenant_configs.settings` JSON column; Kontrollpanel tab in operator UI |
 | Inbox sync trigger | ⚠️ NOT_AVAILABLE | `POST /dashboard/inbox-sync` returns `not_available` — scheduler not yet wired; call `POST /gmail/process-inbox` directly |
-| 801 tests passing | ✅ | `python -m pytest` |
+| Case View | ✅ IMPLEMENTED | `GET /cases` (list with subject/customer_name/priority derived from job data) + `GET /cases/{job_id}` (full detail: original message, extracted data, thread history, actions, errors); Ärenden tab in operator UI |
+| 833 tests passing | ✅ | `python -m pytest` |
 
 ---
 
