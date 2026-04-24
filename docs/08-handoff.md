@@ -124,11 +124,13 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - 17 new tests; 105/105 pass
 
 ## Current state
-Sellable MVP for first customer is complete. All three intake flows (lead, customer inquiry, invoice) are implemented, tested, and production-ready. **702/702 tests pass.**
+Sellable MVP with follow-up question engine is complete. **725/725 tests pass.**
 
-`POST /gmail/process-inbox` infers job_type from message content before creating the job — lead, customer_inquiry, and invoice are each routed to the correct pipeline and default actions without any post-hoc correction.
+All three intake flows (lead, customer inquiry, invoice) are implemented and production-ready. Each flow evaluates completeness deterministically (no LLM) and sends a Swedish-language follow-up email to the customer when required information is missing.
 
-All processors fall back deterministically (no LLM required): classification uses invoice > lead > customer_inquiry keyword matching; invoice extraction uses regex; inquiry priority uses keyword detection.
+`POST /gmail/process-inbox` infers job_type from message content before creating the job — lead, customer_inquiry, and invoice are each routed to the correct pipeline and default actions.
+
+All processors fall back deterministically (no LLM required): classification uses invoice > lead > customer_inquiry keyword matching; invoice extraction uses regex; inquiry priority uses keyword detection; completeness evaluation uses field-presence rules.
 
 ## Completed slice (2026-04-12 — integration event persistence)
 - `IntegrationEvent` model base fixed to `database.Base` — table now in `create_all`
@@ -458,22 +460,39 @@ Seven production-readiness slices completed in a single session:
 
 **702/702 tests pass.**
 
+## Completed slice (2026-04-24 — Follow-up Question Engine)
+
+Deterministic completeness evaluation and automatic follow-up action injection. No LLM.
+
+- `evaluate_information_completeness(job_type, input_data)` in `ai_processor_utils.py`
+  - `lead`: requires `email` + (`message_text ≥ 10 chars` OR meaningful subject); `phone` is soft (missing but not blocking)
+  - `customer_inquiry`: requires `email` + `message_text ≥ 15 chars`
+  - `invoice`: requires `supplier_name` + at least one of `amount / invoice_number / due_date`
+  - Returns: `is_complete`, `missing_fields`, `follow_up_questions` (Swedish), `recommended_status`
+- `_build_lead_default_actions(job)` — new first-class builder for leads (previously fell through to generic fallback)
+- `_build_follow_up_email(sender_email, questions)` — builds a `send_email` action; no new integration type
+- All three builders surface `completeness_status` and `missing_fields` in Monday `column_values`
+- Invoice incomplete info included in `create_internal_task` description (`SAKNAD INFORMATION: ...`) and metadata
+- Explicit `input_data.actions` or `decisioning_processor` actions still override all defaults
+- `tests/test_followup_engine.py` — 23 tests; `tests/test_inquiry_default_actions.py` — 1 test fixed
+- 725/725 tests pass
+
 ## Next steps
 
 ### Most likely next slice
-1. **Completeness / follow-up question flow** — detect when a lead or inquiry needs a clarification question and auto-generate it before routing
-2. **Post-MVP onboarding / activity view** — operator visibility into processed jobs, outcomes, and tenant health in the UI
+1. **Thread continuation** — when a customer replies to the follow-up email, detect the reply, match it to the original job by subject/thread ID, and update the existing job rather than creating a new one
+2. **Post-MVP activity view** — operator visibility into processed jobs, outcomes, and tenant health in the UI
 
 ### After that
-3. **Scheduler / cron trigger** — wire a periodic external trigger (cron, APScheduler, Cloud Scheduler) to call `POST /gmail/process-inbox`
+3. **Scheduler / cron trigger** — wire a periodic external trigger to call `POST /gmail/process-inbox`
 4. **HTML-to-text** — `body_text` is empty for HTML-only Gmail messages
 5. **Monday per-request board_id override** — currently env-only
 6. **Gmail credential health check** — proactive `invalid_grant` surface before ingestion run
 
 ## Remaining work
-All original MVP backlog items are complete. The platform is live-verified, stable, and demonstrable to a first customer for sales, support, and basic finance intake.
+All original MVP backlog items are complete. The follow-up question engine is implemented and tested. The platform is live-verified, stable, and demonstrable to a first customer.
 
 ## Expected output from next implementation chat
-- Continue from this repo state; all docs and 702 tests are current
-- All three intake flows (lead, customer inquiry, invoice) are implemented end-to-end
-- Next logical slice: follow-up question flow or operator activity view
+- Continue from this repo state; all docs and 725 tests are current
+- Follow-up engine is implemented; leads/inquiries/invoices get completeness evaluation and auto follow-up
+- Next logical slice: thread continuation (reply matching) or operator activity view

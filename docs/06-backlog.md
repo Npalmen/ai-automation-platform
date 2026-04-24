@@ -104,8 +104,17 @@
 
 **702/702 tests pass. Sellable MVP complete.**
 
+## Done (follow-up question engine — 2026-04-24)
+- [x] `evaluate_information_completeness(job_type, input_data)` — deterministic completeness check for lead, customer_inquiry, invoice
+- [x] `_build_lead_default_actions(job)` — new first-class builder (previously fell through to generic fallback)
+- [x] `_build_follow_up_email(sender_email, questions)` — follow-up `send_email` using existing action type; no new integration
+- [x] `_build_inquiry_default_actions` + `_build_invoice_default_actions` updated: completeness fields in column_values and task metadata
+- [x] Explicit `input_data.actions` still overrides defaults (override behavior preserved)
+- [x] `tests/test_followup_engine.py` — 23 tests; `tests/test_inquiry_default_actions.py` fix (1 test)
+- [x] 725/725 tests pass
+
 ## Next (priority order)
-- [ ] Follow-up question flow — detect when lead/inquiry needs clarification, auto-generate question before routing
+- [ ] Thread continuation — when customer replies to follow-up email, match reply to original job and update it rather than creating a new job
 - [ ] Post-MVP activity view — operator visibility into jobs, outcomes, tenant health in UI
 - [ ] Scheduler / cron trigger — periodic external call to `POST /gmail/process-inbox`
 

@@ -11,6 +11,7 @@ from app.workflows.action_executor import execute_action
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
     classify_inquiry_priority,
+    evaluate_information_completeness,
     extract_invoice_data,
     extract_phone,
     get_latest_processor_payload,
@@ -58,6 +59,79 @@ def _build_actions_from_decisioning(job: Job) -> list[dict[str, Any]]:
 
 _DEFAULT_SUPPORT_EMAIL = "support@company.com"
 
+_FOLLOW_UP_SUBJECT = "Vi behöver lite mer information"
+_FOLLOW_UP_GREETING = (
+    "Hej!\n\n"
+    "Tack för ditt meddelande. För att kunna hjälpa dig behöver vi komplettera med:\n\n"
+)
+_FOLLOW_UP_CLOSING = "\nSvara gärna direkt på detta mejl.\n\nVänliga hälsningar"
+
+
+def _build_follow_up_email(
+    sender_email: str,
+    questions: list[str],
+) -> dict[str, Any]:
+    bullet_lines = "\n".join(f"* {q}" for q in questions)
+    body = _FOLLOW_UP_GREETING + bullet_lines + _FOLLOW_UP_CLOSING
+    return {
+        "type": "send_email",
+        "to": sender_email,
+        "subject": _FOLLOW_UP_SUBJECT,
+        "body": body,
+    }
+
+
+def _build_lead_default_actions(job: Job) -> list[dict[str, Any]]:
+    input_data = job.input_data or {}
+    sender = normalize_sender(input_data)
+
+    sender_name = sender.get("name", "")
+    sender_email = sender.get("email", "")
+    sender_phone = sender.get("phone") or extract_phone(
+        input_data.get("subject") or "",
+        input_data.get("message_text") or "",
+    ) or ""
+
+    subject = input_data.get("subject") or "Lead"
+    message_text = input_data.get("message_text") or ""
+    source = input_data.get("source") or "lead"
+    if isinstance(source, dict):
+        source = source.get("system") or "lead"
+
+    sender_label = sender_name or sender_email or "Okänd avsändare"
+    item_name = f"Lead: {sender_label} - {subject}"[:80].rstrip()
+
+    completeness = evaluate_information_completeness("lead", input_data)
+
+    column_values: dict[str, Any] = {
+        "source": source if isinstance(source, str) else "lead",
+        "completeness_status": completeness["recommended_status"],
+    }
+    if sender_email:
+        column_values["email"] = sender_email
+    if sender_phone:
+        column_values["phone"] = sender_phone
+    if subject and subject != "Lead":
+        column_values["subject"] = subject[:60].rstrip()
+    if message_text:
+        column_values["message"] = message_text[:200].rstrip()
+    if completeness["missing_fields"]:
+        column_values["missing_fields"] = ", ".join(completeness["missing_fields"])
+
+    actions: list[dict[str, Any]] = [
+        {
+            "type": "create_monday_item",
+            "item_name": item_name,
+            "tenant_id": job.tenant_id,
+            "column_values": column_values,
+        },
+    ]
+
+    if not completeness["is_complete"] and sender_email and completeness["follow_up_questions"]:
+        actions.append(_build_follow_up_email(sender_email, completeness["follow_up_questions"]))
+
+    return actions
+
 
 def _build_inquiry_default_actions(job: Job) -> list[dict[str, Any]]:
     input_data = job.input_data or {}
@@ -77,6 +151,7 @@ def _build_inquiry_default_actions(job: Job) -> list[dict[str, Any]]:
         source = source.get("system") or "inquiry"
 
     priority = classify_inquiry_priority(subject, message_text)
+    completeness = evaluate_information_completeness("customer_inquiry", input_data)
 
     sender_label = sender_name or sender_email or "Okänd avsändare"
     base_name = f"Support: {sender_label} - {subject}"
@@ -84,7 +159,11 @@ def _build_inquiry_default_actions(job: Job) -> list[dict[str, Any]]:
         base_name = f"[HIGH] {base_name}"
     item_name = base_name[:80].rstrip()
 
-    column_values: dict[str, Any] = {"source": "inquiry", "priority": priority}
+    column_values: dict[str, Any] = {
+        "source": "inquiry",
+        "priority": priority,
+        "completeness_status": completeness["recommended_status"],
+    }
     if sender_email:
         column_values["email"] = sender_email
     if sender_phone:
@@ -93,6 +172,8 @@ def _build_inquiry_default_actions(job: Job) -> list[dict[str, Any]]:
         column_values["subject"] = subject[:60].rstrip()
     if message_text:
         column_values["message"] = message_text[:200].rstrip()
+    if completeness["missing_fields"]:
+        column_values["missing_fields"] = ", ".join(completeness["missing_fields"])
 
     phone_line = f"Telefon:   {sender_phone}\n" if sender_phone else ""
     email_subject = f"Ny kundfråga [{priority}]" if priority == "HIGH" else "Ny kundfråga"
@@ -109,7 +190,7 @@ def _build_inquiry_default_actions(job: Job) -> list[dict[str, Any]]:
         f"Tenant:    {job.tenant_id}"
     )
 
-    return [
+    actions: list[dict[str, Any]] = [
         {
             "type": "create_monday_item",
             "item_name": item_name,
@@ -124,6 +205,11 @@ def _build_inquiry_default_actions(job: Job) -> list[dict[str, Any]]:
         },
     ]
 
+    if not completeness["is_complete"] and sender_email and completeness["follow_up_questions"]:
+        actions.append(_build_follow_up_email(sender_email, completeness["follow_up_questions"]))
+
+    return actions
+
 
 def _build_invoice_default_actions(job: Job) -> list[dict[str, Any]]:
     input_data = job.input_data or {}
@@ -134,9 +220,14 @@ def _build_invoice_default_actions(job: Job) -> list[dict[str, Any]]:
     sender_email = sender.get("email", "")
     sender_label = sender_name or sender_email or "Okänd avsändare"
 
+    completeness = evaluate_information_completeness("invoice", input_data)
+
     item_name = f"Faktura: {sender_label}"
 
-    column_values: dict[str, Any] = {"source": "invoice"}
+    column_values: dict[str, Any] = {
+        "source": "invoice",
+        "completeness_status": completeness["recommended_status"],
+    }
     if sender_email:
         column_values["email"] = sender_email
     subject = input_data.get("subject") or ""
@@ -150,6 +241,8 @@ def _build_invoice_default_actions(job: Job) -> list[dict[str, Any]]:
         column_values["due_date"] = invoice["due_date"]
     if invoice.get("supplier_name"):
         column_values["supplier_name"] = invoice["supplier_name"]
+    if completeness["missing_fields"]:
+        column_values["missing_fields"] = ", ".join(completeness["missing_fields"])
 
     desc_parts = [f"Inkommande faktura från {sender_label}."]
     if subject:
@@ -160,6 +253,9 @@ def _build_invoice_default_actions(job: Job) -> list[dict[str, Any]]:
         desc_parts.append(f"Fakturanummer: {invoice['invoice_number']}.")
     if invoice.get("due_date"):
         desc_parts.append(f"Förfallodatum: {invoice['due_date']}.")
+    if not completeness["is_complete"]:
+        missing_str = ", ".join(completeness["missing_fields"])
+        desc_parts.append(f"SAKNAD INFORMATION: {missing_str}. Kräver manuell granskning.")
     description = " ".join(desc_parts)
 
     return [
@@ -179,6 +275,7 @@ def _build_invoice_default_actions(job: Job) -> list[dict[str, Any]]:
                 "tenant_id": job.tenant_id,
                 "detected_job_type": "invoice",
                 "invoice": invoice,
+                "completeness": completeness,
             },
         },
     ]
@@ -195,6 +292,9 @@ def _build_fallback_actions(job: Job) -> list[dict[str, Any]]:
 
     if detected_job_type == "customer_inquiry":
         return _build_inquiry_default_actions(job)
+
+    if detected_job_type == "lead":
+        return _build_lead_default_actions(job)
 
     subject = input_data.get("subject") or f"New {detected_job_type}"
     message_text = input_data.get("message_text") or ""

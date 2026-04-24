@@ -169,6 +169,91 @@ def normalize_sender(input_data: dict[str, Any]) -> dict[str, str]:
     return sender
 
 
+def evaluate_information_completeness(
+    job_type: str,
+    input_data: dict[str, Any],
+) -> dict[str, Any]:
+    """Deterministic completeness check for lead, customer_inquiry, and invoice.
+
+    Returns:
+        is_complete: bool
+        missing_fields: list[str]  — machine-readable field names
+        follow_up_questions: list[str]  — Swedish customer-facing sentences
+        recommended_status: "ready_for_action" | "needs_customer_info" | "needs_internal_review"
+    """
+    sender = normalize_sender(input_data)
+    sender_email = sender.get("email", "")
+    sender_phone = sender.get("phone", "")
+    message_text = (input_data.get("message_text") or "").strip()
+    subject = (input_data.get("subject") or "").strip()
+
+    missing: list[str] = []
+    questions: list[str] = []
+
+    if job_type == "lead":
+        if not sender_email:
+            missing.append("email")
+            questions.append("Vilket e-postadress kan vi nå dig på?")
+
+        has_details = len(message_text) >= 10 or (
+            subject and subject.lower() not in {"(no subject)", "no subject", ""}
+            and len(subject) >= 5
+        )
+        if not has_details:
+            missing.append("request_details")
+            questions.append("Vad vill du ha hjälp med? Beskriv gärna ditt ärende.")
+
+        if not sender_phone:
+            phone_in_text = extract_phone(subject, message_text)
+            if not phone_in_text:
+                missing.append("phone")
+                questions.append("Vilket telefonnummer kan vi nå dig på?")
+
+        is_complete = "email" not in missing and "request_details" not in missing
+        status = "ready_for_action" if is_complete else "needs_customer_info"
+
+    elif job_type == "customer_inquiry":
+        if not sender_email:
+            missing.append("email")
+            questions.append("Vilket e-postadress kan vi nå dig på?")
+
+        if len(message_text) < 15:
+            missing.append("problem_description")
+            questions.append("Beskriv gärna problemet lite mer.")
+            questions.append("När uppstod problemet?")
+            questions.append("Finns det någon bild, felkod eller produktmodell?")
+
+        is_complete = "email" not in missing and "problem_description" not in missing
+        status = "ready_for_action" if is_complete else "needs_customer_info"
+
+    elif job_type == "invoice":
+        invoice = extract_invoice_data(input_data)
+        has_supplier = bool(invoice.get("supplier_name"))
+        has_any_detail = any(
+            invoice.get(f) for f in ("amount", "invoice_number", "due_date")
+        )
+
+        if not has_supplier:
+            missing.append("supplier_name")
+        if not has_any_detail:
+            missing.append("invoice_details")
+
+        is_complete = has_supplier and has_any_detail
+        status = "ready_for_action" if is_complete else "needs_internal_review"
+        questions = []  # no customer-facing questions for invoice
+
+    else:
+        is_complete = True
+        status = "ready_for_action"
+
+    return {
+        "is_complete": is_complete,
+        "missing_fields": missing,
+        "follow_up_questions": questions,
+        "recommended_status": status,
+    }
+
+
 def get_latest_processor_payload(job: Job, processor_name: str) -> dict[str, Any]:
     for item in reversed(job.processor_history):
         if item.get("processor") != processor_name:

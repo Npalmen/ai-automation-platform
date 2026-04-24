@@ -23,7 +23,8 @@ The following has been confirmed through real API calls against a running instan
 | Inbox type inference | ✅ IMPLEMENTED | `/gmail/process-inbox` infers job_type from message content before job creation; correct initial type, no post-hoc correction |
 | Customer inquiry flow | ✅ IMPLEMENTED | default actions: `create_monday_item` (priority/email/phone/subject) + `send_email` to support; HIGH/NORMAL priority |
 | Invoice flow | ✅ IMPLEMENTED | default actions: `create_monday_item` + `create_internal_task`; deterministic extraction: amount, invoice_number, due_date, supplier_name |
-| 702 tests passing | ✅ | `python -m pytest` |
+| Follow-up question engine | ✅ IMPLEMENTED | deterministic completeness check per job type; follow-up `send_email` to customer when lead/inquiry is incomplete; invoice incomplete info surfaced in internal task description + metadata; no LLM |
+| 725 tests passing | ✅ | `python -m pytest` |
 
 ---
 
@@ -101,7 +102,7 @@ These are sharp edges discovered during live testing. Each one has caused a real
 
 `input_data.actions` is the primary control path for action dispatch. When actions are provided explicitly, the workflow engine executes them directly without requiring LLM output. The LLM is used for classification, extraction, and decisioning — but if those processors fall back (no `LLM_API_KEY`), the policy processor still routes to `auto_execute` for `lead` and `customer_inquiry` job types, and action_dispatch runs.
 
-**The workflow does NOT auto-generate actions** — actions must be provided in `input_data.actions` or derived from a future decisioning rule. Without them, action_dispatch runs but executes nothing.
+**Default actions are auto-generated per job type** — `_build_fallback_actions` in `action_dispatch_processor.py` produces correct actions for `lead`, `customer_inquiry`, and `invoice` without any explicit `input_data.actions`. Explicit `input_data.actions` (or `decisioning_processor` actions) still override defaults completely.
 
 ### Audit
 - All pipeline steps emit audit events: `step_started`, `step_completed`, `step_failed`, `workflow_completed`, `workflow_failed`
@@ -482,8 +483,9 @@ Seven production-readiness slices applied to `POST /gmail/process-inbox`:
 ## Customer inquiry default actions (2026-04-23)
 
 - `_build_inquiry_default_actions(job)` added to `action_dispatch_processor.py`
-- ACTION 1: `create_monday_item` — item name with sender label; `column_values` includes `source=inquiry`, `priority`, `email`, `phone`, `subject`, `message`; priority prefix `[HIGH]` in item name
+- ACTION 1: `create_monday_item` — item name with sender label; `column_values` includes `source=inquiry`, `priority`, `email`, `phone`, `subject`, `message`, `completeness_status`, `missing_fields`; priority prefix `[HIGH]` in item name
 - ACTION 2: `send_email` to `support@company.com` — body includes sender, email, phone, subject, message, priority, job ID, tenant
+- ACTION 3 (conditional): `send_email` to customer — added when `is_complete=False` and `sender_email` is known; Swedish follow-up questions as bullet list
 - Sender normalized via `normalize_sender()`; phone extracted via `extract_phone()` when not in sender dict
 - `classify_inquiry_priority(subject, message_text)` — keywords `akut`, `snabbt`, `problem` → `HIGH`; else `NORMAL`
 - `_build_fallback_actions` routes `customer_inquiry` → `_build_inquiry_default_actions`
@@ -492,8 +494,9 @@ Seven production-readiness slices applied to `POST /gmail/process-inbox`:
 ## Invoice default actions (2026-04-23)
 
 - `_build_invoice_default_actions(job)` added to `action_dispatch_processor.py`
-- ACTION 1: `create_monday_item` — `column_values` includes `source=invoice`, `email`, `subject`, `amount`, `invoice_number`, `due_date`, `supplier_name`
-- ACTION 2: `create_internal_task` — title, description with extracted fields, `metadata.invoice` contains full extraction payload
+- ACTION 1: `create_monday_item` — `column_values` includes `source=invoice`, `email`, `subject`, `amount`, `invoice_number`, `due_date`, `supplier_name`, `completeness_status`, `missing_fields`
+- ACTION 2: `create_internal_task` — title, description includes `SAKNAD INFORMATION: <fields>` when incomplete; `metadata` includes `invoice` extraction payload and `completeness` result
+- No follow-up email to supplier — internal review only
 - `_build_fallback_actions` routes `invoice` → `_build_invoice_default_actions`
 - `tests/test_invoice_default_actions.py` — 32 tests
 
@@ -546,6 +549,24 @@ Deterministic regex extraction from email subject+body:
 - `tests/test_google_mail_get_message.py` — 11 new tests
 - 371/371 tests pass
 
+## Follow-up Question Engine (2026-04-24)
+
+Deterministic completeness evaluation and follow-up action injection — no LLM.
+
+- `evaluate_information_completeness(job_type, input_data)` added to `ai_processor_utils.py`
+  - Returns: `is_complete`, `missing_fields`, `follow_up_questions`, `recommended_status`
+  - `lead`: requires `email` + either `message_text ≥ 10 chars` or a meaningful subject; `phone` is missing but not blocking
+  - `customer_inquiry`: requires `email` + `message_text ≥ 15 chars`
+  - `invoice`: requires `supplier_name` + at least one of `amount`, `invoice_number`, `due_date`
+  - All other job types: always `is_complete=True`
+- `_build_lead_default_actions(job)` added — previously leads fell through to generic fallback
+  - `create_monday_item` with `completeness_status` and `missing_fields` in `column_values`
+  - Follow-up `send_email` to customer when incomplete and `sender_email` known
+- `_build_inquiry_default_actions` and `_build_invoice_default_actions` updated with completeness fields
+- `_build_follow_up_email(sender_email, questions)` helper — uses `send_email` action type (no new integration)
+- Explicit `input_data.actions` or `decisioning_processor` actions still bypass all default/follow-up logic
+- `tests/test_followup_engine.py` — 23 tests; 725/725 pass
+
 ## Sellable MVP — intake flows complete (2026-04-23)
 
 All three intake flows are implemented, tested, and production-ready:
@@ -561,13 +582,12 @@ The platform can be demonstrated to a first customer for:
 - **Support** (customer inquiry flow with HIGH/NORMAL priority)
 - **Basic finance intake** (invoice flow with deterministic field extraction)
 
-**702/702 tests pass.**
+**725/725 tests pass.**
 
 ## Next likely product step
 
-Either:
-- **Completeness / follow-up question flow** — detect when a lead or inquiry requires a clarification question before routing, and auto-generate it
-- **Post-MVP onboarding / activity view** — operator visibility into processed jobs, action outcomes, and tenant health in the UI
+- **Thread continuation** — when a customer replies to the follow-up email, detect the reply, match it to the original job, and update the existing record rather than creating a new one
+- **Post-MVP activity view** — operator visibility into processed jobs, action outcomes, and tenant health in the UI
 
 ## Known issues / filesystem
 - `pyproject.toml` is a directory (not a file) in the local filesystem — not tracked in git; does not affect runtime

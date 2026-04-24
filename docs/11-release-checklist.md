@@ -18,6 +18,7 @@
 - [x] Multi-action dispatch tested live (Monday + Gmail in single job)
 - [x] Real lead ingestion flow verified (manual): list_messages → get_message → /jobs → Monday item
 - [x] Automated ingestion flow implemented: POST /gmail/process-inbox → lead jobs → Monday
+- [x] Follow-up question engine — completeness evaluation + follow-up email for incomplete lead/inquiry; invoice incomplete info in internal task
 
 ## Docs
 - [x] current-state updated
@@ -47,4 +48,4 @@
 - [x] Customer inquiry flow — `create_monday_item` + `send_email` to support; HIGH/NORMAL priority
 - [x] Invoice flow — `create_monday_item` + `create_internal_task`; deterministic extraction of amount, invoice_number, due_date, supplier_name
 - [x] Inbox type inference — `/gmail/process-inbox` infers correct `job_type` before job creation
-- [x] 702/702 tests pass
+- [x] 702/702 tests pass (now 725/725 after follow-up engine)

@@ -206,7 +206,11 @@ class TestExtractPhone:
 
 class TestBuildInquiryDefaultActions:
     def test_produces_two_actions(self):
-        job = _inquiry_job({"subject": "Hjälp", "sender": {"name": "Anna", "email": "a@ex.com"}})
+        job = _inquiry_job({
+            "subject": "Hjälp",
+            "sender": {"name": "Anna", "email": "a@ex.com"},
+            "message_text": "Jag behöver hjälp med mitt abonnemang snarast.",
+        })
         actions = _build_inquiry_default_actions(job)
         assert len(actions) == 2
 
