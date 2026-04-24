@@ -23,7 +23,7 @@
 - [x] Activity Dashboard — GET /dashboard/summary + GET /dashboard/activity; Dashboard tab in operator UI
 - [x] ROI Dashboard — GET /dashboard/roi; estimated time/value savings; ROI section in Dashboard tab
 - [x] Control Panel — GET/PUT /dashboard/control; automation toggles, support email, scheduler run_mode; Kontrollpanel tab in UI
-- [x] Inbox sync trigger — POST /dashboard/inbox-sync returns not_available (documented limitation)
+- [x] Inbox sync trigger — POST /dashboard/inbox-sync wired to _run_gmail_inbox_sync; 503 if not configured
 - [x] Case View — GET /cases (list) + GET /cases/{job_id} (detail); Ärenden tab in operator UI
 - [x] Setup / Onboarding Wizard — GET /setup/status (readiness score) + PUT /setup/modules + POST /setup/verify; Onboarding tab in operator UI
 

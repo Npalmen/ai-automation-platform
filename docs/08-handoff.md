@@ -134,6 +134,15 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - `tests/test_control_panel.py` — 21 tests: shape, stored-settings, defaults, persist, validation, tenant isolation, inbox-sync
 - 801/801 tests pass
 
+## Completed slice (2026-04-25 — Manual Inbox Sync Wiring)
+- Extracted `_run_gmail_inbox_sync(tenant_id, db, max_results, query, dry_run)` from `gmail_process_inbox` — contains all processing logic (dedup, thread continuation, job creation, mark-as-read, Slack notify)
+- `gmail_process_inbox` is now a thin wrapper calling `_run_gmail_inbox_sync`; its response shape is unchanged
+- `trigger_inbox_sync` (POST /dashboard/inbox-sync) now calls `_run_gmail_inbox_sync` with `max_results=10, query=None, dry_run=False`; returns structured `{status, processed, created_jobs, continued_threads, deduped, errors, message}`; raises 503 with clean JSON if `GOOGLE_MAIL_ACCESS_TOKEN` is empty; passes through `HTTPException`; wraps unexpected exceptions as 500
+- UI updated: `triggerInboxSync()` shows colour-coded result, counts (nya jobb / trådar / dubbletter / fel), then refreshes Dashboard and Cases if open
+- `tests/test_inbox_sync.py` — 24 tests: missing credentials (6), response shape (5), success path (9), processor raises (3), tenant isolation (1)
+- 3 outdated stub tests in `test_control_panel.py` replaced with 7 tests for the new behavior
+- 906/906 tests pass
+
 ## Completed slice (2026-04-25 — Setup / Onboarding Wizard)
 - `GET /setup/status` — tenant-scoped readiness overview: modules (sales/support/finance derived from `enabled_job_types`), connections (env-credential-based: google_mail, microsoft_mail, monday, fortnox, visma), automation (scheduler_mode + followups_enabled from `settings` column), readiness score (0–100) and status (needs_setup/almost_ready/ready), missing items list
 - Scoring: email +30, any module enabled +20, scheduler not paused +20, support_email configured +10, destination integration +20; clamped to 0–100
@@ -153,7 +162,7 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - 833/833 tests pass
 
 ## Current state
-Setup Wizard, Case View, Control Panel, Activity dashboard, ROI dashboard, thread continuation, and follow-up engine are complete. **878/878 tests pass.**
+Manual inbox sync wired, Setup Wizard, Case View, Control Panel, Activity dashboard, ROI dashboard, thread continuation, and follow-up engine are complete. **906/906 tests pass.**
 
 All three intake flows (lead, customer inquiry, invoice) are implemented and production-ready. Each flow evaluates completeness deterministically (no LLM) and sends a Swedish-language follow-up email to the customer when required information is missing.
 

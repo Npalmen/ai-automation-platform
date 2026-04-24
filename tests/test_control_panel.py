@@ -39,11 +39,39 @@ def _put(body: dict, tenant_id: str = "T1", stored_settings: dict | None = None)
         return result, mock_save
 
 
-def _post_sync(tenant_id: str = "T1"):
+def _post_sync_no_creds(tenant_id: str = "T1"):
+    """Call trigger_inbox_sync with no Gmail credentials configured."""
+    from app.main import trigger_inbox_sync
+    import pytest
+    from fastapi import HTTPException
+
+    db = MagicMock()
+    s = MagicMock()
+    s.GOOGLE_MAIL_ACCESS_TOKEN = ""
+    with patch("app.main.get_settings", return_value=s):
+        with pytest.raises(HTTPException) as exc_info:
+            trigger_inbox_sync(db=db, tenant_id=tenant_id)
+        return exc_info.value
+
+
+def _post_sync_success(tenant_id: str = "T1"):
+    """Call trigger_inbox_sync with mocked _run_gmail_inbox_sync returning empty result."""
     from app.main import trigger_inbox_sync
 
     db = MagicMock()
-    return trigger_inbox_sync(db=db, tenant_id=tenant_id)
+    s = MagicMock()
+    s.GOOGLE_MAIL_ACCESS_TOKEN = "tok"
+    empty_raw = {
+        "processed": 0, "skipped": 0, "failed": 0,
+        "scanned": 0, "dry_run": False, "query_used": "is:unread",
+        "max_results": 10,
+        "created_jobs": [], "skipped_messages": [], "failed_messages": [],
+    }
+    with (
+        patch("app.main.get_settings", return_value=s),
+        patch("app.main._run_gmail_inbox_sync", return_value=empty_raw),
+    ):
+        return trigger_inbox_sync(db=db, tenant_id=tenant_id)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -224,16 +252,31 @@ class TestControlTenantIsolation:
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestInboxSync:
-    def test_returns_not_available_status(self):
-        r = _post_sync()
-        assert r["status"] == "not_available"
+    def test_no_gmail_credentials_raises_503(self):
+        exc = _post_sync_no_creds()
+        assert exc.status_code == 503
 
-    def test_returns_message(self):
-        r = _post_sync()
-        assert "message" in r
-        assert isinstance(r["message"], str)
-        assert len(r["message"]) > 0
+    def test_503_detail_contains_status_failed(self):
+        exc = _post_sync_no_creds()
+        assert exc.detail["status"] == "failed"
 
-    def test_message_mentions_process_inbox(self):
-        r = _post_sync()
-        assert "process-inbox" in r["message"]
+    def test_503_detail_has_message(self):
+        exc = _post_sync_no_creds()
+        assert "message" in exc.detail
+        assert isinstance(exc.detail["message"], str)
+
+    def test_success_response_shape(self):
+        r = _post_sync_success()
+        for key in ("status", "processed", "created_jobs", "continued_threads",
+                    "deduped", "errors", "message"):
+            assert key in r, f"Missing key: {key}"
+
+    def test_success_status_value(self):
+        r = _post_sync_success()
+        assert r["status"] == "success"
+
+    def test_success_errors_is_list(self):
+        assert isinstance(_post_sync_success()["errors"], list)
+
+    def test_success_message_is_string(self):
+        assert isinstance(_post_sync_success()["message"], str)

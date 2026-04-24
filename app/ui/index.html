@@ -1576,15 +1576,29 @@ async function saveControl() {
 }
 
 async function triggerInboxSync() {
-  const btn = document.getElementById('btnInboxSync');
+  const btn    = document.getElementById('btnInboxSync');
   const infoEl = document.getElementById('syncMsg');
-  btn.disabled = true;
-  infoEl.textContent = 'Startar…';
+  btn.disabled    = true;
+  infoEl.style.color = '#6b7280';
+  infoEl.textContent  = 'Startar inbox-sync…';
   try {
     const r = await apiFetch('/dashboard/inbox-sync', { method: 'POST' });
-    infoEl.textContent = r.message || r.status;
+    const color = r.status === 'success' ? '#16a34a' : r.status === 'warning' ? '#d97706' : '#dc2626';
+    let detail = r.message || '';
+    if (r.created_jobs > 0 || r.continued_threads > 0 || r.deduped > 0) {
+      detail += ` · Nya jobb: ${r.created_jobs} · Trådar: ${r.continued_threads} · Dubbletter: ${r.deduped}`;
+    }
+    if (r.errors && r.errors.length > 0) {
+      detail += ` · Fel: ${r.errors.map(e => escapeHtml(e.message)).join(', ')}`;
+    }
+    infoEl.style.color = color;
+    infoEl.textContent  = detail;
+    // Refresh dashboard and cases if those tabs exist
+    if (typeof loadDashboard === 'function') loadDashboard();
+    if (typeof loadCases === 'function' && document.getElementById('viewCases').style.display !== 'none') loadCases();
   } catch (e) {
-    infoEl.textContent = 'Fel: ' + escapeHtml(e.message);
+    infoEl.style.color = '#dc2626';
+    infoEl.textContent  = 'Fel: ' + escapeHtml(e.message);
   } finally {
     btn.disabled = false;
   }

@@ -28,10 +28,10 @@ The following has been confirmed through real API calls against a running instan
 | Activity Dashboard | ✅ IMPLEMENTED | `GET /dashboard/summary` (today's counts by type + status) + `GET /dashboard/activity` (recent jobs with type/status/action/priority); Dashboard tab in operator UI |
 | ROI Dashboard | ✅ IMPLEMENTED | `GET /dashboard/roi` (estimated minutes/hours saved, SEK value, item counts for today); ROI section in Dashboard tab; fixed assumptions, easy to tune |
 | Control Panel | ✅ IMPLEMENTED | `GET /dashboard/control` + `PUT /dashboard/control` — tenant-scoped automation flags (leads/support/invoices/followups), support email, scheduler run_mode (manual/scheduled/paused); stored in `tenant_configs.settings` JSON column; Kontrollpanel tab in operator UI |
-| Inbox sync trigger | ⚠️ NOT_AVAILABLE | `POST /dashboard/inbox-sync` returns `not_available` — scheduler not yet wired; call `POST /gmail/process-inbox` directly |
+| Inbox sync trigger | ✅ WIRED | `POST /dashboard/inbox-sync` calls the same Gmail processing logic as `POST /gmail/process-inbox` via shared `_run_gmail_inbox_sync()` helper; returns `{status, processed, created_jobs, continued_threads, deduped, errors, message}`; 503 if Gmail not configured |
 | Case View | ✅ IMPLEMENTED | `GET /cases` (list with subject/customer_name/priority derived from job data) + `GET /cases/{job_id}` (full detail: original message, extracted data, thread history, actions, errors); Ärenden tab in operator UI |
 | Setup / Onboarding Wizard | ✅ IMPLEMENTED | `GET /setup/status` (readiness score 0–100, module status, connection status, automation settings, missing items list) + `PUT /setup/modules` (persist sales/support/finance module enablement) + `POST /setup/verify` (lightweight check-based verification: tenant config, modules, email, scheduler, destination integration); Onboarding tab in operator UI |
-| 878 tests passing | ✅ | `python -m pytest` |
+| 906 tests passing | ✅ | `python -m pytest` |
 
 ---
 

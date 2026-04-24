@@ -966,29 +966,23 @@ def _extract_phone(subject: str, body_text: str) -> str | None:
     return None
 
 
-@app.post("/gmail/process-inbox")
-def gmail_process_inbox(
-    request: GmailProcessInboxRequest,
-    db: Session = Depends(get_db),
-    tenant_id: str = Depends(get_verified_tenant),
-):
+def _run_gmail_inbox_sync(
+    tenant_id: str,
+    db: "Session",
+    max_results: int = 5,
+    query: str | None = None,
+    dry_run: bool = False,
+) -> dict:
     """
-    Read recent unread Gmail messages and create or continue a job for each one.
+    Core Gmail inbox processing logic — shared by /gmail/process-inbox and
+    /dashboard/inbox-sync.
 
-    Processing order per message:
-    1. Skip if message_id is missing.
-    2. Dedup: skip if a job already exists for this Gmail message_id.
-    3. Fetch full message detail.
-    4. Thread continuation: if a job with the same thread_id exists, update it instead of
-       creating a new one.
-    5. If no existing thread: infer type, apply tenant gate, create new job.
-
-    Marks successfully processed messages as read.
-    Set dry_run=true to preview without any side effects.
+    Raises HTTPException(503) if Gmail credentials are missing or the API call fails.
+    Returns a raw result dict with created_jobs / skipped_messages / failed_messages lists.
     """
     from app.domain.workflows.enums import JobType
 
-    query_used = request.query if request.query is not None else "is:unread"
+    query_used = query if query is not None else "is:unread"
 
     connection_config = get_integration_connection_config(
         tenant_id=tenant_id,
@@ -1002,15 +996,15 @@ def gmail_process_inbox(
     try:
         list_result = adapter.execute_action(
             action="list_messages",
-            payload={"max_results": request.max_results, "query": query_used},
+            payload={"max_results": max_results, "query": query_used},
         )
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=503, detail=f"Gmail list_messages failed: {exc}") from exc
 
     messages = list_result.get("messages") or []
-    created_jobs = []
-    skipped_messages = []
-    failed_messages = []
+    created_jobs: list[dict] = []
+    skipped_messages: list[dict] = []
+    failed_messages: list[dict] = []
 
     tenant_config = get_tenant_config(tenant_id, db=db)
     enabled_job_types = set(tenant_config.get("enabled_job_types") or [])
@@ -1079,7 +1073,7 @@ def gmail_process_inbox(
 
             inferred_type = classify_email_type(subject, body_text)
 
-            if request.dry_run:
+            if dry_run:
                 created_jobs.append({
                     "message_id": message_id,
                     "job_id": continuation_job.job_id,
@@ -1160,7 +1154,7 @@ def gmail_process_inbox(
             },
         }
 
-        if request.dry_run:
+        if dry_run:
             created_jobs.append({
                 "message_id": message_id,
                 "job_id": None,
@@ -1235,14 +1229,43 @@ def gmail_process_inbox(
         "processed": len(created_jobs),
         "skipped": len(skipped_messages),
         "failed": len(failed_messages),
-        "dry_run": request.dry_run,
+        "dry_run": dry_run,
         "query_used": query_used,
-        "max_results": request.max_results,
+        "max_results": max_results,
         "scanned": len(messages),
         "created_jobs": created_jobs,
         "skipped_messages": skipped_messages,
         "failed_messages": failed_messages,
     }
+
+
+@app.post("/gmail/process-inbox")
+def gmail_process_inbox(
+    request: GmailProcessInboxRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Read recent unread Gmail messages and create or continue a job for each one.
+
+    Processing order per message:
+    1. Skip if message_id is missing.
+    2. Dedup: skip if a job already exists for this Gmail message_id.
+    3. Fetch full message detail.
+    4. Thread continuation: if a job with the same thread_id exists, update it instead of
+       creating a new one.
+    5. If no existing thread: infer type, apply tenant gate, create new job.
+
+    Marks successfully processed messages as read.
+    Set dry_run=true to preview without any side effects.
+    """
+    return _run_gmail_inbox_sync(
+        tenant_id=tenant_id,
+        db=db,
+        max_results=request.max_results,
+        query=request.query,
+        dry_run=request.dry_run,
+    )
 
 
 @app.get("/dashboard/summary")
@@ -1557,20 +1580,70 @@ def trigger_inbox_sync(
     tenant_id: str = Depends(get_verified_tenant),
 ):
     """
-    Trigger a manual inbox sync for this tenant.
+    Trigger a manual Gmail inbox sync for this tenant.
 
-    The /gmail/process-inbox endpoint exists but requires OAuth credentials
-    that are resolved from environment variables, not the request context.
-    A true scheduled trigger requires a scheduler process (not yet wired).
-    Until scheduler integration is in place this endpoint returns not_available
-    so the UI can surface the correct status rather than a fake success.
+    Runs the same processing logic as POST /gmail/process-inbox (dedup, thread
+    continuation, job creation, mark-as-read).  Uses default settings: max 10
+    messages, query "is:unread", dry_run=False.
+
+    Returns 503 with a clean JSON body if Gmail credentials are not configured.
     """
+    s = get_settings()
+    if not s.GOOGLE_MAIL_ACCESS_TOKEN:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "failed",
+                "message": "Gmail not configured — set GOOGLE_MAIL_ACCESS_TOKEN in environment",
+                "processed": 0,
+                "created_jobs": 0,
+                "continued_threads": 0,
+                "deduped": 0,
+                "errors": [],
+            },
+        )
+
+    try:
+        raw = _run_gmail_inbox_sync(
+            tenant_id=tenant_id,
+            db=db,
+            max_results=10,
+            query=None,
+            dry_run=False,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "failed",
+                "message": f"Inbox sync failed: {exc}",
+                "processed": 0,
+                "created_jobs": 0,
+                "continued_threads": 0,
+                "deduped": 0,
+                "errors": [{"message": str(exc)}],
+            },
+        ) from exc
+
+    new_jobs       = sum(1 for j in raw["created_jobs"] if not j.get("continued"))
+    continued      = sum(1 for j in raw["created_jobs"] if j.get("continued"))
+    deduped        = sum(1 for s in raw["skipped_messages"] if s.get("reason") == "duplicate")
+    errors         = [{"message": f["reason"]} for f in raw["failed_messages"]]
+
+    overall_status = "failed" if raw["failed"] > 0 and raw["processed"] == 0 else \
+                     "warning" if raw["failed"] > 0 else "success"
+
     return {
-        "status": "not_available",
-        "message": (
-            "Manual inbox sync is not wired yet. "
-            "Call POST /gmail/process-inbox directly with your API key to trigger a sync."
-        ),
+        "status":           overall_status,
+        "processed":        raw["processed"],
+        "created_jobs":     new_jobs,
+        "continued_threads": continued,
+        "deduped":          deduped,
+        "errors":           errors,
+        "message":          f"Inbox sync completed — {raw['scanned']} scanned, "
+                            f"{raw['processed']} processed, {raw['skipped']} skipped",
     }
 
 
