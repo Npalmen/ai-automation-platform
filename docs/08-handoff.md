@@ -124,7 +124,7 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - 17 new tests; 105/105 pass
 
 ## Current state
-Sellable MVP with follow-up question engine is complete. **725/725 tests pass.**
+Activity dashboard, thread continuation, and follow-up engine are complete. **761/761 tests pass.**
 
 All three intake flows (lead, customer inquiry, invoice) are implemented and production-ready. Each flow evaluates completeness deterministically (no LLM) and sends a Swedish-language follow-up email to the customer when required information is missing.
 
@@ -477,22 +477,36 @@ Deterministic completeness evaluation and automatic follow-up action injection. 
 - `tests/test_followup_engine.py` — 23 tests; `tests/test_inquiry_default_actions.py` — 1 test fixed
 - 725/725 tests pass
 
+## Completed slice (2026-04-24 — Thread continuation)
+
+- `JobRepository.get_by_source_thread_id(db, tenant_id, source_system, thread_id)` — generic lookup by source system + thread_id
+- `gmail_process_inbox` order: dedup → get_message → thread continuation → new-job path
+- Continuation: merges into `conversation_messages`, updates `latest_*` fields, resets history, re-runs pipeline, marks as read
+- `dry_run` detects continuation but makes no writes; response includes `continued`, `continuation_reason`
+- `tests/test_thread_continuation.py` — 18 tests; 743/743 pass
+
+## Completed slice (2026-04-24 — Activity Dashboard)
+
+- `GET /dashboard/summary` — tenant-scoped: leads_today, inquiries_today, invoices_today, waiting_customer, ready_cases, completed_today
+- `GET /dashboard/activity` — recent jobs with type, status, latest_action, priority, created_at; supports limit/offset
+- Dashboard tab in operator UI (`/ui`): 6 summary cards + activity table; Swedish labels; empty + error states
+- `tests/test_dashboard.py` — 18 tests; 761/761 pass
+
 ## Next steps
 
 ### Most likely next slice
-1. **Thread continuation** — when a customer replies to the follow-up email, detect the reply, match it to the original job by subject/thread ID, and update the existing job rather than creating a new one
-2. **Post-MVP activity view** — operator visibility into processed jobs, outcomes, and tenant health in the UI
+1. **Scheduler / cron trigger** — wire a periodic external trigger to call `POST /gmail/process-inbox`
+2. **Dashboard polish** — date-range filters, charts, auto-refresh
 
 ### After that
-3. **Scheduler / cron trigger** — wire a periodic external trigger to call `POST /gmail/process-inbox`
-4. **HTML-to-text** — `body_text` is empty for HTML-only Gmail messages
-5. **Monday per-request board_id override** — currently env-only
-6. **Gmail credential health check** — proactive `invalid_grant` surface before ingestion run
+3. **HTML-to-text** — `body_text` is empty for HTML-only Gmail messages
+4. **Monday per-request board_id override** — currently env-only
+5. **Gmail credential health check** — proactive `invalid_grant` surface before ingestion run
 
 ## Remaining work
-All original MVP backlog items are complete. The follow-up question engine is implemented and tested. The platform is live-verified, stable, and demonstrable to a first customer.
+All original MVP backlog items are complete. The platform is live-verified, stable, and demonstrable.
 
 ## Expected output from next implementation chat
-- Continue from this repo state; all docs and 725 tests are current
-- Follow-up engine is implemented; leads/inquiries/invoices get completeness evaluation and auto follow-up
-- Next logical slice: thread continuation (reply matching) or operator activity view
+- Continue from this repo state; 761/761 tests are current
+- Dashboard (summary + activity) and thread continuation are implemented
+- Next logical slice: scheduler trigger or dashboard polish

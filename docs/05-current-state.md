@@ -24,7 +24,9 @@ The following has been confirmed through real API calls against a running instan
 | Customer inquiry flow | ✅ IMPLEMENTED | default actions: `create_monday_item` (priority/email/phone/subject) + `send_email` to support; HIGH/NORMAL priority |
 | Invoice flow | ✅ IMPLEMENTED | default actions: `create_monday_item` + `create_internal_task`; deterministic extraction: amount, invoice_number, due_date, supplier_name |
 | Follow-up question engine | ✅ IMPLEMENTED | deterministic completeness check per job type; follow-up `send_email` to customer when lead/inquiry is incomplete; invoice incomplete info surfaced in internal task description + metadata; no LLM |
-| 725 tests passing | ✅ | `python -m pytest` |
+| Thread continuation | ✅ IMPLEMENTED | inbox replies in same Gmail thread update existing job instead of creating duplicate; `conversation_messages` appended; pipeline re-runs |
+| Activity Dashboard | ✅ IMPLEMENTED | `GET /dashboard/summary` (today's counts by type + status) + `GET /dashboard/activity` (recent jobs with type/status/action/priority); Dashboard tab in operator UI |
+| 761 tests passing | ✅ | `python -m pytest` |
 
 ---
 
@@ -567,6 +569,25 @@ Deterministic completeness evaluation and follow-up action injection — no LLM.
 - Explicit `input_data.actions` or `decisioning_processor` actions still bypass all default/follow-up logic
 - `tests/test_followup_engine.py` — 23 tests; 725/725 pass
 
+## Thread continuation (2026-04-24)
+
+- `JobRepository.get_by_source_thread_id(db, tenant_id, source_system, thread_id)` — generic lookup by source system + thread_id
+- `gmail_process_inbox` processing order: dedup by message_id → `get_message` → thread continuation check → new-job path
+- Continuation: merges new message into `input_data.conversation_messages`; updates `latest_message_text/subject/sender`; resets `processor_history`; re-runs pipeline on existing job; marks Gmail message as read
+- `dry_run`: continuation detected but no writes; response includes `job_id` + `continuation_reason`
+- Response shape: `continued: true/false` + `continuation_reason` on all entries
+- `tests/test_thread_continuation.py` — 18 tests; 743/743 pass
+
+## Activity Dashboard (2026-04-24)
+
+- `GET /dashboard/summary` — tenant-scoped summary: `leads_today`, `inquiries_today`, `invoices_today`, `waiting_customer`, `ready_cases`, `completed_today`
+  - `waiting_customer` counts active jobs where result payload `recommended_status=needs_customer_info`
+  - `ready_cases` counts jobs with `status=awaiting_approval`
+  - "today" = jobs created since midnight UTC on the current date
+- `GET /dashboard/activity` — recent jobs list with `type`, `status`, `latest_action` (from `action_executions` table), `priority` (from action_dispatch result payload), `created_at`, `tenant`; supports `limit`/`offset`
+- Dashboard tab added to operator UI (`/ui`): 6 summary cards + recent activity table; Swedish labels; empty + error states; "Uppdatera" button
+- `tests/test_dashboard.py` — 18 tests; 761/761 pass
+
 ## Sellable MVP — intake flows complete (2026-04-23)
 
 All three intake flows are implemented, tested, and production-ready:
@@ -582,12 +603,12 @@ The platform can be demonstrated to a first customer for:
 - **Support** (customer inquiry flow with HIGH/NORMAL priority)
 - **Basic finance intake** (invoice flow with deterministic field extraction)
 
-**725/725 tests pass.**
+**761/761 tests pass.**
 
 ## Next likely product step
 
-- **Thread continuation** — when a customer replies to the follow-up email, detect the reply, match it to the original job, and update the existing record rather than creating a new one
-- **Post-MVP activity view** — operator visibility into processed jobs, action outcomes, and tenant health in the UI
+- **Scheduler / cron trigger** — wire a periodic external trigger to call `POST /gmail/process-inbox`
+- **Dashboard polish** — date-range filters, charts, auto-refresh interval
 
 ## Known issues / filesystem
 - `pyproject.toml` is a directory (not a file) in the local filesystem — not tracked in git; does not affect runtime

@@ -150,6 +150,17 @@ header input {
 .badge-pending            { background: #f3f4f6; color: #374151; }
 .badge-default            { background: #e5e7eb; color: #374151; }
 
+/* ── Dashboard cards ── */
+.dash-card { background:#fff; border:1px solid #e5e7eb; border-radius:6px; padding:14px 16px; }
+.dash-label { font-size:11px; color:#6b7280; margin-bottom:6px; }
+.dash-value { font-size:28px; font-weight:700; color:#111; }
+
+/* ── Activity table ── */
+.act-table { width:100%; border-collapse:collapse; font-size:12px; }
+.act-table th { text-align:left; padding:6px 8px; border-bottom:2px solid #e5e7eb; color:#6b7280; font-weight:600; font-size:11px; }
+.act-table td { padding:7px 8px; border-bottom:1px solid #f3f4f6; vertical-align:middle; }
+.act-table tr:hover td { background:#f9fafb; }
+
 /* ── KV table ── */
 .section { margin-bottom: 22px; }
 h2 {
@@ -356,8 +367,37 @@ pre {
 </div>
 
 <div class="view-nav">
+  <div class="view-tab"        id="viewTabDash"  onclick="switchView('dash')">Dashboard</div>
   <div class="view-tab active" id="viewTabOps"   onclick="switchView('ops')">Drift</div>
   <div class="view-tab"        id="viewTabSetup" onclick="switchView('setup')">Inställningar</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ DASHBOARD -->
+<div id="viewDash" style="display:none; padding:24px; overflow-y:auto; flex:1;">
+
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+    <h1 style="font-size:18px; font-weight:700; color:#111; margin:0;">Dashboard</h1>
+    <button class="btn btn-primary btn-sm" onclick="loadDashboard()">Uppdatera</button>
+  </div>
+
+  <div id="dashError" class="msg msg-error" style="display:none;"></div>
+
+  <!-- Summary cards -->
+  <div id="dashCards" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin-bottom:28px;">
+    <div class="dash-card"><div class="dash-label">Leads idag</div><div class="dash-value" id="dLeadsToday">–</div></div>
+    <div class="dash-card"><div class="dash-label">Supportärenden idag</div><div class="dash-value" id="dInquiriesToday">–</div></div>
+    <div class="dash-card"><div class="dash-label">Fakturor idag</div><div class="dash-value" id="dInvoicesToday">–</div></div>
+    <div class="dash-card"><div class="dash-label">Väntar på kund</div><div class="dash-value" id="dWaiting">–</div></div>
+    <div class="dash-card"><div class="dash-label">Redo</div><div class="dash-value" id="dReady">–</div></div>
+    <div class="dash-card"><div class="dash-label">Klara idag</div><div class="dash-value" id="dCompleted">–</div></div>
+  </div>
+
+  <!-- Recent activity table -->
+  <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Senaste aktivitet</h2>
+  <div id="dashActivity">
+    <span class="empty">Laddar…</span>
+  </div>
+
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════ DRIFT -->
@@ -565,15 +605,76 @@ function initApiKey() {
 }
 
 // ---------------------------------------------------------------------------
-// View switcher (Drift / Inställningar)
+// View switcher (Dashboard / Drift / Inställningar)
 // ---------------------------------------------------------------------------
 function switchView(name) {
-  const isOps = name === 'ops';
-  document.getElementById('viewOps').style.display   = isOps ? 'flex' : 'none';
-  document.getElementById('viewSetup').style.display = isOps ? 'none' : 'block';
-  document.getElementById('viewTabOps').classList.toggle('active',   isOps);
-  document.getElementById('viewTabSetup').classList.toggle('active', !isOps);
-  if (!isOps) loadSetup();
+  document.getElementById('viewDash').style.display  = name === 'dash'  ? 'block' : 'none';
+  document.getElementById('viewOps').style.display   = name === 'ops'   ? 'flex'  : 'none';
+  document.getElementById('viewSetup').style.display = name === 'setup' ? 'block' : 'none';
+  document.getElementById('viewTabDash').classList.toggle('active',  name === 'dash');
+  document.getElementById('viewTabOps').classList.toggle('active',   name === 'ops');
+  document.getElementById('viewTabSetup').classList.toggle('active', name === 'setup');
+  if (name === 'setup') loadSetup();
+  if (name === 'dash')  loadDashboard();
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
+async function loadDashboard() {
+  document.getElementById('dashError').style.display = 'none';
+
+  // Summary
+  try {
+    const s = await apiFetch('/dashboard/summary');
+    document.getElementById('dLeadsToday').textContent     = s.leads_today      ?? '–';
+    document.getElementById('dInquiriesToday').textContent = s.inquiries_today   ?? '–';
+    document.getElementById('dInvoicesToday').textContent  = s.invoices_today    ?? '–';
+    document.getElementById('dWaiting').textContent        = s.waiting_customer  ?? '–';
+    document.getElementById('dReady').textContent          = s.ready_cases       ?? '–';
+    document.getElementById('dCompleted').textContent      = s.completed_today   ?? '–';
+  } catch (e) {
+    const el = document.getElementById('dashError');
+    el.textContent = 'Kunde inte ladda sammanfattning: ' + e.message;
+    el.style.display = 'block';
+  }
+
+  // Activity
+  const actEl = document.getElementById('dashActivity');
+  try {
+    const r = await apiFetch('/dashboard/activity?limit=50');
+    if (!r.items || r.items.length === 0) {
+      actEl.innerHTML = '<span class="empty">Ingen aktivitet ännu.</span>';
+      return;
+    }
+    const TYPE_LABELS = {
+      lead: 'Lead', customer_inquiry: 'Supportärende', invoice: 'Faktura', unknown: 'Okänd',
+    };
+    const rows = r.items.map(item => {
+      const type    = TYPE_LABELS[item.type] || escapeHtml(item.type);
+      const status  = item.status ? statusBadge(item.status) : '–';
+      const action  = item.latest_action ? escapeHtml(item.latest_action) : '–';
+      const prio    = item.priority ? escapeHtml(item.priority.toUpperCase()) : '–';
+      const ts      = item.created_at ? new Date(item.created_at).toLocaleString('sv-SE') : '–';
+      return `<tr>
+        <td style="color:#888; white-space:nowrap">${ts}</td>
+        <td>${escapeHtml(type)}</td>
+        <td>${status}</td>
+        <td>${action}</td>
+        <td>${prio}</td>
+      </tr>`;
+    }).join('');
+    actEl.innerHTML = `
+      <table class="act-table">
+        <thead><tr>
+          <th>Tid</th><th>Typ</th><th>Status</th><th>Senaste åtgärd</th><th>Prioritet</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="font-size:11px; color:#9ca3af; margin-top:8px;">Visar ${r.items.length} av ${r.total} poster</div>`;
+  } catch (e) {
+    actEl.innerHTML = '<span class="empty" style="color:#991b1b;">Fel: ' + escapeHtml(e.message) + '</span>';
+  }
 }
 
 // ---------------------------------------------------------------------------

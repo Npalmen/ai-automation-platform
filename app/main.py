@@ -43,6 +43,7 @@ from app.repositories.postgres.approval_repository import ApprovalRequestReposit
 from app.repositories.postgres.audit_repository import AuditRepository
 from app.repositories.postgres.database import Base
 from app.repositories.postgres.integration_repository import IntegrationRepository
+from app.repositories.postgres.job_models import JobRecord
 from app.repositories.postgres.job_repository import JobRepository
 from app.repositories.postgres.session import engine
 from app.workflows.action_executor import execute_action as dispatch_action
@@ -1242,6 +1243,139 @@ def gmail_process_inbox(
         "skipped_messages": skipped_messages,
         "failed_messages": failed_messages,
     }
+
+
+@app.get("/dashboard/summary")
+def dashboard_summary(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return today's job counts grouped by type and status for the tenant."""
+    from datetime import date, datetime, timezone
+    from sqlalchemy import func
+
+    today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
+
+    def _count(job_type: str | None, status: str | None, since: datetime | None = None) -> int:
+        q = db.query(func.count(JobRecord.job_id)).filter(JobRecord.tenant_id == tenant_id)
+        if job_type:
+            q = q.filter(JobRecord.job_type == job_type)
+        if status:
+            q = q.filter(JobRecord.status == status)
+        if since:
+            q = q.filter(JobRecord.created_at >= since)
+        return q.scalar() or 0
+
+    leads_today      = _count("lead",             None,              today_start)
+    inquiries_today  = _count("customer_inquiry", None,              today_start)
+    invoices_today   = _count("invoice",          None,              today_start)
+    ready_cases      = _count(None,               "awaiting_approval", None)
+    completed_today  = _count(None,               "completed",       today_start)
+
+    # waiting_customer: active jobs (not completed/failed) where the
+    # action_dispatch result payload has recommended_status=needs_customer_info.
+    # Use a JSON path filter on the result column.
+    waiting_customer = (
+        db.query(func.count(JobRecord.job_id))
+        .filter(
+            JobRecord.tenant_id == tenant_id,
+            JobRecord.status.notin_(["completed", "failed"]),
+            JobRecord.result["payload"]["recommended_status"].as_string() == "needs_customer_info",
+        )
+        .scalar() or 0
+    )
+
+    return {
+        "leads_today":      leads_today,
+        "inquiries_today":  inquiries_today,
+        "invoices_today":   invoices_today,
+        "waiting_customer": waiting_customer,
+        "ready_cases":      ready_cases,
+        "completed_today":  completed_today,
+    }
+
+
+@app.get("/dashboard/activity")
+def dashboard_activity(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+    limit: int = 50,
+    offset: int = 0,
+):
+    """Return recent jobs with type, status, latest action, and priority."""
+    from app.repositories.postgres.action_execution_models import ActionExecutionRecord
+    from sqlalchemy import func
+
+    records = (
+        db.query(JobRecord)
+        .filter(JobRecord.tenant_id == tenant_id)
+        .order_by(JobRecord.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    total = (
+        db.query(func.count(JobRecord.job_id))
+        .filter(JobRecord.tenant_id == tenant_id)
+        .scalar() or 0
+    )
+
+    # Fetch latest action_type per job in one query.
+    job_ids = [r.job_id for r in records]
+    latest_actions: dict[str, str] = {}
+    if job_ids:
+        subq = (
+            db.query(
+                ActionExecutionRecord.job_id,
+                func.max(ActionExecutionRecord.executed_at).label("max_at"),
+            )
+            .filter(
+                ActionExecutionRecord.tenant_id == tenant_id,
+                ActionExecutionRecord.job_id.in_(job_ids),
+            )
+            .group_by(ActionExecutionRecord.job_id)
+            .subquery()
+        )
+        rows = (
+            db.query(ActionExecutionRecord.job_id, ActionExecutionRecord.action_type)
+            .join(
+                subq,
+                (ActionExecutionRecord.job_id == subq.c.job_id)
+                & (ActionExecutionRecord.executed_at == subq.c.max_at),
+            )
+            .filter(ActionExecutionRecord.tenant_id == tenant_id)
+            .all()
+        )
+        for job_id, action_type in rows:
+            latest_actions[job_id] = action_type
+
+    items = []
+    for r in records:
+        # Extract priority from result payload.
+        priority: str | None = None
+        result = r.result or {}
+        history = result.get("processor_history") or []
+        for entry in reversed(history):
+            if entry.get("processor") == "action_dispatch_processor":
+                for action in (entry.get("result") or {}).get("payload", {}).get("actions_requested") or []:
+                    p = action.get("column_values", {}).get("priority")
+                    if p:
+                        priority = p.lower()
+                        break
+            if priority:
+                break
+
+        items.append({
+            "job_id":        r.job_id,
+            "created_at":    r.created_at.isoformat() if r.created_at else None,
+            "type":          r.job_type or "unknown",
+            "status":        r.status or "unknown",
+            "latest_action": latest_actions.get(r.job_id),
+            "tenant":        r.tenant_id,
+            "priority":      priority,
+        })
+
+    return {"items": items, "total": total}
 
 
 @app.get("/audit-events", response_model=AuditEventListResponse)

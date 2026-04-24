@@ -19,6 +19,8 @@
 - [x] Real lead ingestion flow verified (manual): list_messages → get_message → /jobs → Monday item
 - [x] Automated ingestion flow implemented: POST /gmail/process-inbox → lead jobs → Monday
 - [x] Follow-up question engine — completeness evaluation + follow-up email for incomplete lead/inquiry; invoice incomplete info in internal task
+- [x] Thread continuation — inbox replies in same Gmail thread update existing job, no duplicate created
+- [x] Activity Dashboard — GET /dashboard/summary + GET /dashboard/activity; Dashboard tab in operator UI
 
 ## Docs
 - [x] current-state updated
