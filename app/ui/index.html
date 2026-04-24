@@ -372,6 +372,7 @@ pre {
   <div class="view-tab"        id="viewTabDash"  onclick="switchView('dash')">Dashboard</div>
   <div class="view-tab active" id="viewTabOps"   onclick="switchView('ops')">Drift</div>
   <div class="view-tab"        id="viewTabSetup" onclick="switchView('setup')">Inställningar</div>
+  <div class="view-tab"        id="viewTabCtrl"  onclick="switchView('ctrl')">Kontrollpanel</div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ DASHBOARD -->
@@ -538,6 +539,61 @@ pre {
 
 </div><!-- /setup-panel -->
 
+<!-- ══════════════════════════════════════════════════════ KONTROLLPANEL -->
+<div id="viewCtrl" style="display:none; padding:24px; overflow-y:auto; flex:1; max-width:640px;">
+
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+    <h1 style="font-size:18px; font-weight:700; color:#111; margin:0;">Kontrollpanel</h1>
+    <button class="btn btn-primary btn-sm" onclick="loadControl()">Uppdatera</button>
+  </div>
+
+  <div id="ctrlMsg" class="msg" style="display:none;"></div>
+
+  <!-- Automatisering -->
+  <div class="setup-card" style="margin-bottom:16px;">
+    <h2 style="font-size:13px; font-weight:600; margin:0 0 14px;">Automatisering</h2>
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+        <input type="checkbox" id="ctrlLeads"> <span>Leads</span>
+      </label>
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+        <input type="checkbox" id="ctrlSupport"> <span>Support</span>
+      </label>
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+        <input type="checkbox" id="ctrlInvoices"> <span>Fakturor</span>
+      </label>
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+        <input type="checkbox" id="ctrlFollowups"> <span>Uppföljningsmail</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Supportmail + Körläge -->
+  <div class="setup-card" style="margin-bottom:16px;">
+    <h2 style="font-size:13px; font-weight:600; margin:0 0 14px;">Inställningar</h2>
+    <div class="form-field" style="margin-bottom:12px;">
+      <label>Supportmail</label>
+      <input id="ctrlSupportEmail" type="email" placeholder="support@example.com" style="width:100%; box-sizing:border-box;">
+    </div>
+    <div class="form-field">
+      <label>Körläge</label>
+      <select id="ctrlRunMode" style="width:100%; box-sizing:border-box;">
+        <option value="manual">Manuell</option>
+        <option value="scheduled">Schemalagd</option>
+        <option value="paused">Pausad</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="saveControl()">Spara inställningar</button>
+    <button class="btn btn-neutral" onclick="triggerInboxSync()" id="btnInboxSync">Kör inbox-sync nu</button>
+  </div>
+  <div id="syncMsg" style="margin-top:8px; font-size:12px; color:#6b7280;"></div>
+
+</div><!-- /viewCtrl -->
+
 <script>
 // ---------------------------------------------------------------------------
 // Label maps — presentationslager (ändrar inte backend-nycklar)
@@ -629,11 +685,14 @@ function switchView(name) {
   document.getElementById('viewDash').style.display  = name === 'dash'  ? 'block' : 'none';
   document.getElementById('viewOps').style.display   = name === 'ops'   ? 'flex'  : 'none';
   document.getElementById('viewSetup').style.display = name === 'setup' ? 'block' : 'none';
+  document.getElementById('viewCtrl').style.display  = name === 'ctrl'  ? 'block' : 'none';
   document.getElementById('viewTabDash').classList.toggle('active',  name === 'dash');
   document.getElementById('viewTabOps').classList.toggle('active',   name === 'ops');
   document.getElementById('viewTabSetup').classList.toggle('active', name === 'setup');
+  document.getElementById('viewTabCtrl').classList.toggle('active',  name === 'ctrl');
   if (name === 'setup') loadSetup();
   if (name === 'dash')  loadDashboard();
+  if (name === 'ctrl')  loadControl();
 }
 
 // ---------------------------------------------------------------------------
@@ -1365,6 +1424,67 @@ async function runVerification() {
   } finally {
     spin('spinVerify', false);
     document.getElementById('btnRunVerify').disabled = false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Kontrollpanel
+// ---------------------------------------------------------------------------
+async function loadControl() {
+  const msgEl = document.getElementById('ctrlMsg');
+  msgEl.style.display = 'none';
+  try {
+    const r = await apiFetch('/dashboard/control');
+    document.getElementById('ctrlLeads').checked    = !!r.automation?.leads_enabled;
+    document.getElementById('ctrlSupport').checked  = !!r.automation?.support_enabled;
+    document.getElementById('ctrlInvoices').checked = !!r.automation?.invoices_enabled;
+    document.getElementById('ctrlFollowups').checked= !!r.automation?.followups_enabled;
+    document.getElementById('ctrlSupportEmail').value = r.support_email || '';
+    document.getElementById('ctrlRunMode').value    = r.scheduler?.run_mode || 'manual';
+  } catch (e) {
+    msgEl.textContent = 'Kunde inte ladda inställningar: ' + escapeHtml(e.message);
+    msgEl.className = 'msg msg-error';
+    msgEl.style.display = 'block';
+  }
+}
+
+async function saveControl() {
+  const msgEl = document.getElementById('ctrlMsg');
+  msgEl.style.display = 'none';
+  const body = {
+    automation: {
+      leads_enabled:    document.getElementById('ctrlLeads').checked,
+      support_enabled:  document.getElementById('ctrlSupport').checked,
+      invoices_enabled: document.getElementById('ctrlInvoices').checked,
+      followups_enabled:document.getElementById('ctrlFollowups').checked,
+    },
+    support_email: document.getElementById('ctrlSupportEmail').value.trim() || null,
+    scheduler: { run_mode: document.getElementById('ctrlRunMode').value },
+  };
+  try {
+    await apiFetch('/dashboard/control', { method: 'PUT', body: JSON.stringify(body) });
+    msgEl.textContent = 'Inställningar sparade.';
+    msgEl.className = 'msg msg-success';
+    msgEl.style.display = 'block';
+  } catch (e) {
+    msgEl.textContent = 'Fel vid sparning: ' + escapeHtml(e.message);
+    msgEl.className = 'msg msg-error';
+    msgEl.style.display = 'block';
+  }
+}
+
+async function triggerInboxSync() {
+  const btn = document.getElementById('btnInboxSync');
+  const infoEl = document.getElementById('syncMsg');
+  btn.disabled = true;
+  infoEl.textContent = 'Startar…';
+  try {
+    const r = await apiFetch('/dashboard/inbox-sync', { method: 'POST' });
+    infoEl.textContent = r.message || r.status;
+  } catch (e) {
+    infoEl.textContent = 'Fel: ' + escapeHtml(e.message);
+  } finally {
+    btn.disabled = false;
   }
 }
 

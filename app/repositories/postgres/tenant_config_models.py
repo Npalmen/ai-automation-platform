@@ -12,3 +12,4 @@ class TenantConfigRecord(Base):
     enabled_job_types: Mapped[list | None] = mapped_column(JSON, nullable=True)
     allowed_integrations: Mapped[list | None] = mapped_column(JSON, nullable=True)
     auto_actions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    settings: Mapped[dict | None] = mapped_column(JSON, nullable=True)

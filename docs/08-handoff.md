@@ -123,8 +123,19 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - Workflow/integration policy callers unchanged (no `db` arg → static fallback, backward compatible)
 - 17 new tests; 105/105 pass
 
+## Completed slice (2026-04-25 — Control Panel)
+- `settings` JSON column added to `TenantConfigRecord` (picked up by `create_all` on startup — no manual migration needed)
+- `TenantConfigRepository.get_settings` / `update_settings` added
+- `GET /dashboard/control` — returns tenant-scoped automation flags, support_email, scheduler.run_mode; defaults all-enabled/manual
+- `PUT /dashboard/control` — validates run_mode (manual|scheduled|paused) and email format; persists to `settings` column
+- `POST /dashboard/inbox-sync` — returns `not_available` (scheduler not wired yet); honest response, not a fake success
+- `ControlPanelRequest` Pydantic model with nested `_Automation` and `_Scheduler`
+- `app/ui/index.html` — "Kontrollpanel" tab added; toggles for all four automation flags; support email input; run_mode select; Save + Trigger sync buttons; Swedish labels
+- `tests/test_control_panel.py` — 21 tests: shape, stored-settings, defaults, persist, validation, tenant isolation, inbox-sync
+- 801/801 tests pass
+
 ## Current state
-Activity dashboard, ROI dashboard, thread continuation, and follow-up engine are complete. **780/780 tests pass.**
+Control Panel, Activity dashboard, ROI dashboard, thread continuation, and follow-up engine are complete. **801/801 tests pass.**
 
 All three intake flows (lead, customer inquiry, invoice) are implemented and production-ready. Each flow evaluates completeness deterministically (no LLM) and sends a Swedish-language follow-up email to the customer when required information is missing.
 

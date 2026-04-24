@@ -46,6 +46,30 @@ class TenantConfigRepository:
         return record
 
     @staticmethod
+    def get_settings(db: Session, tenant_id: str) -> dict:
+        record = (
+            db.query(TenantConfigRecord)
+            .filter(TenantConfigRecord.tenant_id == tenant_id)
+            .first()
+        )
+        return (record.settings or {}) if record else {}
+
+    @staticmethod
+    def update_settings(db: Session, tenant_id: str, settings: dict) -> TenantConfigRecord:
+        record = (
+            db.query(TenantConfigRecord)
+            .filter(TenantConfigRecord.tenant_id == tenant_id)
+            .first()
+        )
+        if record is None:
+            record = TenantConfigRecord(tenant_id=tenant_id)
+            db.add(record)
+        record.settings = settings
+        db.commit()
+        db.refresh(record)
+        return record
+
+    @staticmethod
     def list_all(db: Session) -> list[TenantConfigRecord]:
         return db.query(TenantConfigRecord).order_by(TenantConfigRecord.tenant_id).all()
 

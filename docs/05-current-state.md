@@ -27,7 +27,9 @@ The following has been confirmed through real API calls against a running instan
 | Thread continuation | ✅ IMPLEMENTED | inbox replies in same Gmail thread update existing job instead of creating duplicate; `conversation_messages` appended; pipeline re-runs |
 | Activity Dashboard | ✅ IMPLEMENTED | `GET /dashboard/summary` (today's counts by type + status) + `GET /dashboard/activity` (recent jobs with type/status/action/priority); Dashboard tab in operator UI |
 | ROI Dashboard | ✅ IMPLEMENTED | `GET /dashboard/roi` (estimated minutes/hours saved, SEK value, item counts for today); ROI section in Dashboard tab; fixed assumptions, easy to tune |
-| 780 tests passing | ✅ | `python -m pytest` |
+| Control Panel | ✅ IMPLEMENTED | `GET /dashboard/control` + `PUT /dashboard/control` — tenant-scoped automation flags (leads/support/invoices/followups), support email, scheduler run_mode (manual/scheduled/paused); stored in `tenant_configs.settings` JSON column; Kontrollpanel tab in operator UI |
+| Inbox sync trigger | ⚠️ NOT_AVAILABLE | `POST /dashboard/inbox-sync` returns `not_available` — scheduler not yet wired; call `POST /gmail/process-inbox` directly |
+| 801 tests passing | ✅ | `python -m pytest` |
 
 ---
 

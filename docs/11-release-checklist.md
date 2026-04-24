@@ -22,6 +22,8 @@
 - [x] Thread continuation — inbox replies in same Gmail thread update existing job, no duplicate created
 - [x] Activity Dashboard — GET /dashboard/summary + GET /dashboard/activity; Dashboard tab in operator UI
 - [x] ROI Dashboard — GET /dashboard/roi; estimated time/value savings; ROI section in Dashboard tab
+- [x] Control Panel — GET/PUT /dashboard/control; automation toggles, support email, scheduler run_mode; Kontrollpanel tab in UI
+- [x] Inbox sync trigger — POST /dashboard/inbox-sync returns not_available (documented limitation)
 
 ## Docs
 - [x] current-state updated

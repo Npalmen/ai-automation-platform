@@ -1455,6 +1455,125 @@ def dashboard_activity(
     return {"items": items, "total": total}
 
 
+# ── Control panel ─────────────────────────────────────────────────────────────
+
+_VALID_RUN_MODES = {"manual", "scheduled", "paused"}
+
+_DEFAULT_CONTROL = {
+    "automation": {
+        "leads_enabled":    True,
+        "support_enabled":  True,
+        "invoices_enabled": True,
+        "followups_enabled": True,
+    },
+    "support_email": "",
+    "scheduler": {
+        "run_mode": "manual",
+    },
+}
+
+
+def _build_control_response(settings: dict) -> dict:
+    auto = settings.get("automation") or {}
+    sched = settings.get("scheduler") or {}
+    return {
+        "automation": {
+            "leads_enabled":     bool(auto.get("leads_enabled",    _DEFAULT_CONTROL["automation"]["leads_enabled"])),
+            "support_enabled":   bool(auto.get("support_enabled",  _DEFAULT_CONTROL["automation"]["support_enabled"])),
+            "invoices_enabled":  bool(auto.get("invoices_enabled", _DEFAULT_CONTROL["automation"]["invoices_enabled"])),
+            "followups_enabled": bool(auto.get("followups_enabled",_DEFAULT_CONTROL["automation"]["followups_enabled"])),
+        },
+        "support_email": settings.get("support_email") or "",
+        "scheduler": {
+            "run_mode": sched.get("run_mode") or "manual",
+        },
+    }
+
+
+class ControlPanelRequest(_BaseModel):
+    class _Automation(_BaseModel):
+        leads_enabled:    bool = True
+        support_enabled:  bool = True
+        invoices_enabled: bool = True
+        followups_enabled: bool = True
+
+    class _Scheduler(_BaseModel):
+        run_mode: str = "manual"
+
+    automation:    _Automation = _Automation()
+    support_email: str | None = None
+    scheduler:     _Scheduler = _Scheduler()
+
+
+@app.get("/dashboard/control")
+def get_control_panel(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return current tenant-scoped control panel settings."""
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    settings = TenantConfigRepository.get_settings(db, tenant_id)
+    return _build_control_response(settings)
+
+
+@app.put("/dashboard/control")
+def put_control_panel(
+    request: ControlPanelRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Persist tenant-scoped control panel settings."""
+    import re as _re
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    run_mode = request.scheduler.run_mode
+    if run_mode not in _VALID_RUN_MODES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"scheduler.run_mode must be one of: {', '.join(sorted(_VALID_RUN_MODES))}",
+        )
+
+    email = (request.support_email or "").strip()
+    if email and not _re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise HTTPException(status_code=422, detail="support_email must be a valid email address or empty")
+
+    settings = {
+        "automation": {
+            "leads_enabled":     request.automation.leads_enabled,
+            "support_enabled":   request.automation.support_enabled,
+            "invoices_enabled":  request.automation.invoices_enabled,
+            "followups_enabled": request.automation.followups_enabled,
+        },
+        "support_email": email,
+        "scheduler": {"run_mode": run_mode},
+    }
+    TenantConfigRepository.update_settings(db, tenant_id, settings)
+    return _build_control_response(settings)
+
+
+@app.post("/dashboard/inbox-sync")
+def trigger_inbox_sync(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Trigger a manual inbox sync for this tenant.
+
+    The /gmail/process-inbox endpoint exists but requires OAuth credentials
+    that are resolved from environment variables, not the request context.
+    A true scheduled trigger requires a scheduler process (not yet wired).
+    Until scheduler integration is in place this endpoint returns not_available
+    so the UI can surface the correct status rather than a fake success.
+    """
+    return {
+        "status": "not_available",
+        "message": (
+            "Manual inbox sync is not wired yet. "
+            "Call POST /gmail/process-inbox directly with your API key to trigger a sync."
+        ),
+    }
+
+
 @app.get("/audit-events", response_model=AuditEventListResponse)
 def list_audit_events(
     db: Session = Depends(get_db),
