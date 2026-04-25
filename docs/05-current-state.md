@@ -21,7 +21,7 @@ The following has been confirmed through real API calls against a running instan
 | Gmail inbox trigger | ✅ PRODUCTION-READY | `POST /gmail/process-inbox` — dedup, mark-as-read, per-type tenant gate, phone extraction, Slack notify, dry_run, query override |
 | Deterministic classification fallback | ✅ IMPLEMENTED | invoice > lead > customer_inquiry (keyword-based); no more `"unknown"` |
 | Inbox type inference | ✅ IMPLEMENTED | `/gmail/process-inbox` infers job_type from message content before job creation; correct initial type, no post-hoc correction |
-| Customer inquiry flow | ✅ IMPLEMENTED | default actions: `create_monday_item` (priority/email/phone/subject) + `send_email` to support; HIGH/NORMAL priority |
+| Customer inquiry flow | ✅ IMPLEMENTED | default actions: `send_customer_auto_reply` + `send_internal_handoff` to support + `create_monday_item`; HIGH/NORMAL priority; skipped when no email or followups_enabled=false |
 | Invoice flow | ✅ IMPLEMENTED | default actions: `create_monday_item` + `create_internal_task`; deterministic extraction: amount, invoice_number, due_date, supplier_name |
 | Follow-up question engine | ✅ IMPLEMENTED | deterministic completeness check per job type; follow-up `send_email` to customer when lead/inquiry is incomplete; invoice incomplete info surfaced in internal task description + metadata; no LLM |
 | Thread continuation | ✅ IMPLEMENTED | inbox replies in same Gmail thread update existing job instead of creating duplicate; `conversation_messages` appended; pipeline re-runs |
@@ -34,7 +34,9 @@ The following has been confirmed through real API calls against a running instan
 | Customer Notifications / Daily Digest | ✅ IMPLEMENTED | `GET /notifications/settings` + `PUT /notifications/settings` (enabled, recipient_email, frequency, send_hour; stored in `tenant_configs.settings.notifications`) + `POST /notifications/daily-digest/send` (builds digest from `_compute_summary`+`_compute_roi`, dispatches via existing `send_email` action path; 400 if no recipient, 500 on dispatch failure); Notifieringar tab in operator UI |
 | Scheduler — Inbox Sync + Daily Digest | ✅ IMPLEMENTED | `POST /scheduler/run-once` (multi-tenant pass: inbox sync when run_mode=scheduled, digest when enabled+send_hour reached+not already sent today) + `GET /scheduler/status` (tenant-scoped: run_mode, notif config, last_inbox_sync_at, last_digest_sent_at, last_scheduler_run_at, last_status, last_error); state stored in `tenant_configs.settings.scheduler_state`; Scheduler-status section in Kontrollpanel UI tab |
 | Runtime schema safeguard | ✅ IMPLEMENTED | `ensure_runtime_schema(engine)` called at startup after `create_all`; runs `ALTER TABLE tenant_configs ADD COLUMN IF NOT EXISTS settings JSON`; idempotent; fails startup loudly if migration cannot run |
-| 1000 tests passing | ✅ | `python -m pytest` |
+| Customer Auto-Reply + Internal Handoff | ✅ IMPLEMENTED | `send_customer_auto_reply` (Swedish confirmation to sender) + `send_internal_handoff` (structured lead/support summary to internal team) injected for lead + inquiry flows; gated by `followups_enabled` and presence of customer email; skipped actions persisted with `status=skipped` and skip reason; `skipped_count` + `actions_skipped` in dispatch result |
+| UI action label map | ✅ IMPLEMENTED | Case View renders human-readable labels: Kundsvar / Intern notifiering / Monday-objekt / Slack-notis / etc.; shows recipient and Gmail message_id when available |
+| 1022 tests passing | ✅ | `python -m pytest` |
 
 ---
 

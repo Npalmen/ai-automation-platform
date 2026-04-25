@@ -29,6 +29,7 @@
 - [x] Customer Notifications — GET/PUT /notifications/settings + POST /notifications/daily-digest/send; Notifieringar tab in operator UI
 - [x] Scheduler — POST /scheduler/run-once (multi-tenant inbox sync + digest with dedup/send_hour gate) + GET /scheduler/status; scheduler_state persisted in tenant_configs.settings; Scheduler-status section in Kontrollpanel UI
 - [x] Runtime schema safeguard — ensure_runtime_schema() adds missing tenant_configs.settings column at startup; idempotent; fails loudly if blocked
+- [x] Customer Auto-Reply + Internal Handoff — send_customer_auto_reply + send_internal_handoff injected for lead + inquiry; gated by followups_enabled + customer email; skipped actions persisted with reason; UI labels updated
 
 ## Docs
 - [x] current-state updated

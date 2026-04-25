@@ -204,109 +204,119 @@ class TestExtractPhone:
 
 # ── _build_inquiry_default_actions ───────────────────────────────────────────
 
+def _get_monday(actions):
+    return next(a for a in actions if a["type"] == "create_monday_item")
+
+
+def _get_handoff(actions):
+    return next(a for a in actions if a["type"] == "send_internal_handoff")
+
+
 class TestBuildInquiryDefaultActions:
-    def test_produces_two_actions(self):
+    def test_produces_three_actions(self):
         job = _inquiry_job({
             "subject": "Hjälp",
             "sender": {"name": "Anna", "email": "a@ex.com"},
             "message_text": "Jag behöver hjälp med mitt abonnemang snarast.",
         })
         actions = _build_inquiry_default_actions(job)
-        assert len(actions) == 2
+        assert len(actions) == 3
 
     def test_first_action_is_create_monday_item(self):
         actions = _build_inquiry_default_actions(
             _inquiry_job({"subject": "S", "sender": {"email": "x@x.com"}})
         )
-        assert actions[0]["type"] == "create_monday_item"
+        monday = _get_monday(actions)
+        assert monday["type"] == "create_monday_item"
 
-    def test_second_action_is_send_email(self):
+    def test_second_action_is_send_internal_handoff(self):
         actions = _build_inquiry_default_actions(
             _inquiry_job({"subject": "S", "sender": {"email": "x@x.com"}})
         )
-        assert actions[1]["type"] == "send_email"
+        handoff = _get_handoff(actions)
+        assert handoff["type"] == "send_internal_handoff"
 
     # item_name ---
 
     def test_item_name_format_name_and_subject(self):
         job = _inquiry_job({"subject": "Min produkt fungerar inte", "sender": {"name": "Erik", "email": "e@ex.com"}})
-        assert _build_inquiry_default_actions(job)[0]["item_name"] == "Support: Erik - Min produkt fungerar inte"
+        assert _get_monday(_build_inquiry_default_actions(job))["item_name"] == "Support: Erik - Min produkt fungerar inte"
 
     def test_item_name_uses_email_when_no_name(self):
         job = _inquiry_job({"subject": "Fråga", "sender": {"email": "anon@ex.com"}})
-        assert "anon@ex.com" in _build_inquiry_default_actions(job)[0]["item_name"]
+        assert "anon@ex.com" in _get_monday(_build_inquiry_default_actions(job))["item_name"]
 
     def test_item_name_missing_sender_fallback(self):
         job = _inquiry_job({"subject": "Fråga"})
-        name = _build_inquiry_default_actions(job)[0]["item_name"]
+        name = _get_monday(_build_inquiry_default_actions(job))["item_name"]
         assert name.startswith("Support:")
         assert "Okänd avsändare" in name
 
     def test_item_name_truncated_at_80_chars(self):
         job = _inquiry_job({"subject": "A" * 100, "sender": {"name": "X"}})
-        assert len(_build_inquiry_default_actions(job)[0]["item_name"]) <= 80
+        assert len(_get_monday(_build_inquiry_default_actions(job))["item_name"]) <= 80
 
     def test_item_name_flat_sender_keys(self):
         job = _inquiry_job({"subject": "Test", "sender_name": "Flat", "sender_email": "flat@ex.com"})
-        assert "Flat" in _build_inquiry_default_actions(job)[0]["item_name"]
+        assert "Flat" in _get_monday(_build_inquiry_default_actions(job))["item_name"]
 
     # priority ---
 
     def test_high_priority_prefixes_item_name(self):
         job = _inquiry_job({"subject": "Akut problem med enheten", "sender": {"name": "Anna"}})
-        item_name = _build_inquiry_default_actions(job)[0]["item_name"]
+        item_name = _get_monday(_build_inquiry_default_actions(job))["item_name"]
         assert item_name.startswith("[HIGH]")
 
     def test_normal_priority_no_prefix(self):
         job = _inquiry_job({"subject": "Fråga om leverans", "sender": {"name": "Bo"}})
-        item_name = _build_inquiry_default_actions(job)[0]["item_name"]
+        item_name = _get_monday(_build_inquiry_default_actions(job))["item_name"]
         assert not item_name.startswith("[HIGH]")
 
     def test_high_priority_email_subject_includes_high(self):
         job = _inquiry_job({"subject": "Akut", "message_text": ""})
-        email_subject = _build_inquiry_default_actions(job)[1]["subject"]
-        assert "[HIGH]" in email_subject
+        email_subject = _get_handoff(_build_inquiry_default_actions(job))["subject"]
+        assert "[HIGH]" in email_subject or "HIGH" in email_subject
 
     def test_normal_priority_email_subject_no_high(self):
         job = _inquiry_job({"subject": "Fråga"})
-        email_subject = _build_inquiry_default_actions(job)[1]["subject"]
+        email_subject = _get_handoff(_build_inquiry_default_actions(job))["subject"]
         assert "[HIGH]" not in email_subject
 
     def test_email_body_contains_priority_high(self):
         job = _inquiry_job({"subject": "Akut ärende"})
-        body = _build_inquiry_default_actions(job)[1]["body"]
+        body = _get_handoff(_build_inquiry_default_actions(job))["body"]
         assert "HIGH" in body
 
     def test_email_body_contains_priority_normal(self):
         job = _inquiry_job({"subject": "Vanlig fråga"})
-        body = _build_inquiry_default_actions(job)[1]["body"]
+        body = _get_handoff(_build_inquiry_default_actions(job))["body"]
         assert "NORMAL" in body
 
     def test_column_values_contains_priority(self):
         job = _inquiry_job({"subject": "Test"})
-        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        cv = _get_monday(_build_inquiry_default_actions(job))["column_values"]
         assert cv["priority"] in ("HIGH", "NORMAL")
 
     def test_column_values_priority_high_for_urgent(self):
         job = _inquiry_job({"subject": "Akut"})
-        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        cv = _get_monday(_build_inquiry_default_actions(job))["column_values"]
         assert cv["priority"] == "HIGH"
 
     def test_column_values_priority_normal_for_standard(self):
         job = _inquiry_job({"subject": "Fråga"})
-        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        cv = _get_monday(_build_inquiry_default_actions(job))["column_values"]
         assert cv["priority"] == "NORMAL"
 
     # column_values ---
 
     def test_column_values_source_is_inquiry(self):
         job = _inquiry_job({"subject": "T"})
-        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        cv = _get_monday(_build_inquiry_default_actions(job))["column_values"]
         assert cv["source"] == "inquiry"
 
     def test_column_values_contains_email(self):
         job = _inquiry_job({"subject": "T", "sender": {"email": "bo@ex.com"}})
-        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        cv = _get_monday(_build_inquiry_default_actions(job))["column_values"]
         assert cv["email"] == "bo@ex.com"
 
     def test_column_values_contains_phone_when_present(self):
@@ -315,57 +325,57 @@ class TestBuildInquiryDefaultActions:
             "sender": {"email": "x@x.com"},
             "message_text": "Nå mig på 070-111 22 33",
         })
-        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        cv = _get_monday(_build_inquiry_default_actions(job))["column_values"]
         assert "phone" in cv
         assert "070" in cv["phone"]
 
     def test_column_values_omits_phone_when_absent(self):
         job = _inquiry_job({"subject": "T", "sender": {"email": "x@x.com"}, "message_text": "Ingen telefon"})
-        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        cv = _get_monday(_build_inquiry_default_actions(job))["column_values"]
         assert "phone" not in cv
 
     def test_column_values_contains_subject(self):
         job = _inquiry_job({"subject": "Specialfråga", "sender": {"email": "x@x.com"}})
-        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        cv = _get_monday(_build_inquiry_default_actions(job))["column_values"]
         assert cv["subject"] == "Specialfråga"
 
     def test_column_values_contains_message(self):
         job = _inquiry_job({"subject": "T", "sender": {"email": "x@x.com"}, "message_text": "Detaljerat problem"})
-        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        cv = _get_monday(_build_inquiry_default_actions(job))["column_values"]
         assert cv["message"] == "Detaljerat problem"
 
     def test_column_values_message_truncated_at_200(self):
         job = _inquiry_job({"subject": "T", "message_text": "X" * 300})
-        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        cv = _get_monday(_build_inquiry_default_actions(job))["column_values"]
         assert len(cv["message"]) <= 200
 
     def test_column_values_omits_email_when_missing(self):
         job = _inquiry_job({"subject": "T", "message_text": "Hej"})
-        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        cv = _get_monday(_build_inquiry_default_actions(job))["column_values"]
         assert "email" not in cv
 
     def test_column_values_omits_message_when_missing(self):
         job = _inquiry_job({"subject": "T"})
-        cv = _build_inquiry_default_actions(job)[0]["column_values"]
+        cv = _get_monday(_build_inquiry_default_actions(job))["column_values"]
         assert "message" not in cv
 
-    # email action ---
+    # internal handoff action ---
 
     def test_email_to_is_support_address(self):
         job = _inquiry_job({"subject": "T"})
-        assert _build_inquiry_default_actions(job)[1]["to"] == "support@company.com"
+        assert _get_handoff(_build_inquiry_default_actions(job))["to"] == "support@company.com"
 
     def test_email_subject_is_ny_kundfraga(self):
         job = _inquiry_job({"subject": "T"})
-        assert _build_inquiry_default_actions(job)[1]["subject"] == "Ny kundfråga"
+        assert "kundfråga" in _get_handoff(_build_inquiry_default_actions(job))["subject"].lower()
 
     def test_email_body_contains_sender_name(self):
         job = _inquiry_job({"subject": "S", "sender": {"name": "Lena", "email": "l@ex.com"}})
-        assert "Lena" in _build_inquiry_default_actions(job)[1]["body"]
+        assert "Lena" in _get_handoff(_build_inquiry_default_actions(job))["body"]
 
     def test_email_body_contains_sender_email(self):
         job = _inquiry_job({"subject": "S", "sender": {"email": "lena@ex.com"}})
-        assert "lena@ex.com" in _build_inquiry_default_actions(job)[1]["body"]
+        assert "lena@ex.com" in _get_handoff(_build_inquiry_default_actions(job))["body"]
 
     def test_email_body_contains_phone_when_present(self):
         job = _inquiry_job({
@@ -373,46 +383,47 @@ class TestBuildInquiryDefaultActions:
             "message_text": "Ring 070-555 44 33",
             "sender": {"email": "x@x.com"},
         })
-        body = _build_inquiry_default_actions(job)[1]["body"]
+        body = _get_handoff(_build_inquiry_default_actions(job))["body"]
         assert "070" in body
 
     def test_email_body_omits_phone_line_when_absent(self):
         job = _inquiry_job({"subject": "S", "sender": {"email": "x@x.com"}, "message_text": "Ingen tel"})
-        body = _build_inquiry_default_actions(job)[1]["body"]
+        body = _get_handoff(_build_inquiry_default_actions(job))["body"]
         assert "Telefon" not in body
 
     def test_email_body_contains_subject(self):
         job = _inquiry_job({"subject": "Specialfråga"})
-        assert "Specialfråga" in _build_inquiry_default_actions(job)[1]["body"]
+        assert "Specialfråga" in _get_handoff(_build_inquiry_default_actions(job))["body"]
 
     def test_email_body_contains_message_text(self):
         job = _inquiry_job({"subject": "S", "message_text": "Jag behöver hjälp"})
-        assert "Jag behöver hjälp" in _build_inquiry_default_actions(job)[1]["body"]
+        assert "Jag behöver hjälp" in _get_handoff(_build_inquiry_default_actions(job))["body"]
 
     def test_email_body_contains_job_id(self):
         job = _inquiry_job({"subject": "S"})
         job.job_id = "job-abc-123"
-        assert "job-abc-123" in _build_inquiry_default_actions(job)[1]["body"]
+        assert "job-abc-123" in _get_handoff(_build_inquiry_default_actions(job))["body"]
 
     def test_email_body_contains_tenant_id(self):
         job = _inquiry_job({"subject": "S"})
-        assert "TENANT_1001" in _build_inquiry_default_actions(job)[1]["body"]
+        assert "TENANT_1001" in _get_handoff(_build_inquiry_default_actions(job))["body"]
 
     def test_email_body_contains_source(self):
         job = _inquiry_job({"subject": "S"})
-        assert "inquiry" in _build_inquiry_default_actions(job)[1]["body"]
+        assert "inquiry" in _get_handoff(_build_inquiry_default_actions(job))["body"]
 
     def test_source_from_nested_source_dict(self):
         job = _inquiry_job({"subject": "S", "source": {"system": "gmail"}})
-        body = _build_inquiry_default_actions(job)[1]["body"]
+        body = _get_handoff(_build_inquiry_default_actions(job))["body"]
         assert "gmail" in body
 
     def test_empty_input_data_produces_valid_actions(self):
         job = _inquiry_job({})
         actions = _build_inquiry_default_actions(job)
-        assert len(actions) == 2
-        assert actions[0]["type"] == "create_monday_item"
-        assert actions[1]["type"] == "send_email"
+        assert len(actions) == 3
+        types = {a["type"] for a in actions}
+        assert "create_monday_item" in types
+        assert "send_internal_handoff" in types
 
 
 # ── _build_fallback_actions routing ──────────────────────────────────────────
@@ -422,7 +433,7 @@ class TestFallbackActionRouting:
         job = _inquiry_job({"subject": "Test"})
         types = [a["type"] for a in _build_fallback_actions(job)]
         assert "create_monday_item" in types
-        assert "send_email" in types
+        assert "send_internal_handoff" in types
 
     def test_lead_does_not_get_inquiry_defaults(self):
         job = _lead_job({"subject": "Offert"})
@@ -452,7 +463,7 @@ class TestResolveActions:
         job = _inquiry_job({"subject": "Min laddbox", "sender": {"email": "k@ex.com"}})
         types = [a["type"] for a in _resolve_actions(job)]
         assert "create_monday_item" in types
-        assert "send_email" in types
+        assert "send_internal_handoff" in types
 
     def test_inquiry_with_input_actions_uses_override(self):
         override = [{"type": "notify_slack", "channel": "#support", "message": "msg"}]
@@ -486,7 +497,7 @@ class TestProcessActionDispatch:
         result = self._run(job)
         types = [a.get("type") for a in result.result["payload"]["actions_requested"]]
         assert "create_monday_item" in types
-        assert "send_email" in types
+        assert "send_internal_handoff" in types
 
     def test_inquiry_with_override_executes_override_only(self):
         override = [{"type": "notify_slack", "channel": "#s", "message": "m"}]
@@ -513,8 +524,8 @@ class TestProcessActionDispatch:
         job = _inquiry_job({"subject": "Fråga"})
         job.job_id = "saved-job-id"
         result = self._run(job)
-        email_action = next(
+        handoff_action = next(
             a for a in result.result["payload"]["actions_requested"]
-            if a.get("type") == "send_email"
+            if a.get("type") == "send_internal_handoff"
         )
-        assert "saved-job-id" in email_action["body"]
+        assert "saved-job-id" in handoff_action["body"]

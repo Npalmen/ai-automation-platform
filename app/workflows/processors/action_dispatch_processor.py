@@ -58,6 +58,7 @@ def _build_actions_from_decisioning(job: Job) -> list[dict[str, Any]]:
 
 
 _DEFAULT_SUPPORT_EMAIL = "support@company.com"
+_COMPANY_NAME = "AI Automation"
 
 _FOLLOW_UP_SUBJECT = "Vi behöver lite mer information"
 _FOLLOW_UP_GREETING = (
@@ -81,9 +82,25 @@ def _build_follow_up_email(
     }
 
 
-def _build_lead_default_actions(job: Job) -> list[dict[str, Any]]:
+def _build_skipped_action(action_type: str, reason: str) -> dict[str, Any]:
+    """Return a sentinel action that will be persisted as 'skipped' without being dispatched."""
+    return {
+        "type": action_type,
+        "_skip": True,
+        "_skip_reason": reason,
+    }
+
+
+def _build_lead_default_actions(
+    job: Job,
+    automation_settings: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     input_data = job.input_data or {}
     sender = normalize_sender(input_data)
+    settings = automation_settings or {}
+
+    followups_enabled = settings.get("followups_enabled", True)
+    internal_recipient = settings.get("support_email") or _DEFAULT_SUPPORT_EMAIL
 
     sender_name = sender.get("name", "")
     sender_email = sender.get("email", "")
@@ -103,6 +120,10 @@ def _build_lead_default_actions(job: Job) -> list[dict[str, Any]]:
 
     completeness = evaluate_information_completeness("lead", input_data)
 
+    lead_payload = get_latest_processor_payload(job, "lead_processor")
+    priority = lead_payload.get("priority") or "normal"
+    recommended_next_step = lead_payload.get("recommended_next_step") or ""
+
     column_values: dict[str, Any] = {
         "source": source if isinstance(source, str) else "lead",
         "completeness_status": completeness["recommended_status"],
@@ -118,14 +139,72 @@ def _build_lead_default_actions(job: Job) -> list[dict[str, Any]]:
     if completeness["missing_fields"]:
         column_values["missing_fields"] = ", ".join(completeness["missing_fields"])
 
-    actions: list[dict[str, Any]] = [
-        {
-            "type": "create_monday_item",
-            "item_name": item_name,
+    actions: list[dict[str, Any]] = []
+
+    # Customer auto-reply
+    if not followups_enabled:
+        actions.append(_build_skipped_action("send_customer_auto_reply", "followups_enabled=false"))
+    elif not sender_email:
+        actions.append(_build_skipped_action("send_customer_auto_reply", "no_customer_email"))
+    else:
+        short_summary = subject if subject != "Lead" else message_text[:120]
+        auto_reply_body = (
+            f"Hej {sender_name or 'där'},\n\n"
+            f"Tack för din förfrågan. Vi har tagit emot ditt meddelande och återkommer så snart som möjligt.\n\n"
+            f"För att kunna hjälpa dig snabbare får du gärna komplettera med:\n"
+            f"- adress/ort\n"
+            f"- bilder på nuvarande installation\n"
+            f"- telefonnummer om det saknas\n"
+            f"- när du önskar få arbetet utfört\n\n"
+            f"Sammanfattning:\n{short_summary}\n\n"
+            f"Vänliga hälsningar\n{_COMPANY_NAME}"
+        )
+        actions.append({
+            "type": "send_customer_auto_reply",
             "tenant_id": job.tenant_id,
-            "column_values": column_values,
-        },
-    ]
+            "to": sender_email,
+            "subject": "Tack för din förfrågan",
+            "body": auto_reply_body,
+        })
+
+    # Internal sales handoff
+    if not internal_recipient:
+        actions.append(_build_skipped_action("send_internal_handoff", "no_internal_recipient"))
+    else:
+        phone_line = f"Telefon:      {sender_phone}\n" if sender_phone else ""
+        city = ""
+        entities = get_latest_processor_payload(job, "entity_extraction_processor")
+        if entities:
+            city = (entities.get("entities") or {}).get("city") or ""
+        city_line = f"Ort:          {city}\n" if city else ""
+        handoff_body = (
+            f"Nytt lead inkom via AI Automation Platform.\n\n"
+            f"Prioritet:    {priority.upper()}\n"
+            f"Namn:         {sender_label}\n"
+            f"E-post:       {sender_email or '(okänd)'}\n"
+            f"{phone_line}"
+            f"{city_line}"
+            f"Ämne:         {subject}\n\n"
+            f"Meddelande:\n{message_text or '(inget meddelande)'}\n\n"
+            f"Förslag nästa steg: {recommended_next_step or 'Kontakta kunden'}\n\n"
+            f"Job ID:       {job.job_id}\n"
+            f"Tenant:       {job.tenant_id}"
+        )
+        actions.append({
+            "type": "send_internal_handoff",
+            "tenant_id": job.tenant_id,
+            "to": internal_recipient,
+            "subject": f"Nytt lead [{priority.upper()}]: {sender_label}",
+            "body": handoff_body,
+        })
+
+    # Monday item
+    actions.append({
+        "type": "create_monday_item",
+        "item_name": item_name,
+        "tenant_id": job.tenant_id,
+        "column_values": column_values,
+    })
 
     if not completeness["is_complete"] and sender_email and completeness["follow_up_questions"]:
         actions.append(_build_follow_up_email(sender_email, completeness["follow_up_questions"]))
@@ -133,9 +212,16 @@ def _build_lead_default_actions(job: Job) -> list[dict[str, Any]]:
     return actions
 
 
-def _build_inquiry_default_actions(job: Job) -> list[dict[str, Any]]:
+def _build_inquiry_default_actions(
+    job: Job,
+    automation_settings: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     input_data = job.input_data or {}
     sender = normalize_sender(input_data)
+    settings = automation_settings or {}
+
+    followups_enabled = settings.get("followups_enabled", True)
+    internal_recipient = settings.get("support_email") or _DEFAULT_SUPPORT_EMAIL
 
     sender_name = sender.get("name", "")
     sender_email = sender.get("email", "")
@@ -175,35 +261,64 @@ def _build_inquiry_default_actions(job: Job) -> list[dict[str, Any]]:
     if completeness["missing_fields"]:
         column_values["missing_fields"] = ", ".join(completeness["missing_fields"])
 
-    phone_line = f"Telefon:   {sender_phone}\n" if sender_phone else ""
-    email_subject = f"Ny kundfråga [{priority}]" if priority == "HIGH" else "Ny kundfråga"
-    email_body = (
-        f"Ny kundfråga inkom via AI Automation Platform.\n\n"
-        f"Prioritet: {priority}\n"
-        f"Från:      {sender_label}\n"
-        f"E-post:    {sender_email or '(okänd)'}\n"
-        f"{phone_line}"
-        f"Ämne:      {subject}\n"
-        f"Källa:     {source}\n\n"
-        f"Meddelande:\n{message_text or '(inget meddelande)'}\n\n"
-        f"Job ID:    {job.job_id}\n"
-        f"Tenant:    {job.tenant_id}"
-    )
+    actions: list[dict[str, Any]] = []
 
-    actions: list[dict[str, Any]] = [
-        {
-            "type": "create_monday_item",
-            "item_name": item_name,
+    # Customer auto-reply
+    if not followups_enabled:
+        actions.append(_build_skipped_action("send_customer_auto_reply", "followups_enabled=false"))
+    elif not sender_email:
+        actions.append(_build_skipped_action("send_customer_auto_reply", "no_customer_email"))
+    else:
+        short_summary = subject if subject != "Support" else message_text[:120]
+        auto_reply_body = (
+            f"Hej {sender_name or 'där'},\n\n"
+            f"Tack för ditt meddelande. Vi har tagit emot ärendet och återkommer så snart som möjligt.\n\n"
+            f"Sammanfattning:\n{short_summary}\n\n"
+            f"Om ärendet är akut, ring oss direkt.\n\n"
+            f"Vänliga hälsningar\n{_COMPANY_NAME}"
+        )
+        actions.append({
+            "type": "send_customer_auto_reply",
             "tenant_id": job.tenant_id,
-            "column_values": column_values,
-        },
-        {
-            "type": "send_email",
-            "to": _DEFAULT_SUPPORT_EMAIL,
+            "to": sender_email,
+            "subject": "Vi har tagit emot ditt ärende",
+            "body": auto_reply_body,
+        })
+
+    # Internal support handoff
+    if not internal_recipient:
+        actions.append(_build_skipped_action("send_internal_handoff", "no_internal_recipient"))
+    else:
+        phone_line = f"Telefon:   {sender_phone}\n" if sender_phone else ""
+        email_subject = f"Ny kundfråga [{priority}]" if priority == "HIGH" else "Ny kundfråga"
+        handoff_body = (
+            f"Ny kundfråga inkom via AI Automation Platform.\n\n"
+            f"Prioritet: {priority}\n"
+            f"Från:      {sender_label}\n"
+            f"E-post:    {sender_email or '(okänd)'}\n"
+            f"{phone_line}"
+            f"Ämne:      {subject}\n"
+            f"Källa:     {source}\n\n"
+            f"Meddelande:\n{message_text or '(inget meddelande)'}\n\n"
+            f"Förslag nästa steg: Kontakta kunden inom 24 h\n\n"
+            f"Job ID:    {job.job_id}\n"
+            f"Tenant:    {job.tenant_id}"
+        )
+        actions.append({
+            "type": "send_internal_handoff",
+            "tenant_id": job.tenant_id,
+            "to": internal_recipient,
             "subject": email_subject,
-            "body": email_body,
-        },
-    ]
+            "body": handoff_body,
+        })
+
+    # Monday item
+    actions.append({
+        "type": "create_monday_item",
+        "item_name": item_name,
+        "tenant_id": job.tenant_id,
+        "column_values": column_values,
+    })
 
     if not completeness["is_complete"] and sender_email and completeness["follow_up_questions"]:
         actions.append(_build_follow_up_email(sender_email, completeness["follow_up_questions"]))
@@ -281,7 +396,10 @@ def _build_invoice_default_actions(job: Job) -> list[dict[str, Any]]:
     ]
 
 
-def _build_fallback_actions(job: Job) -> list[dict[str, Any]]:
+def _build_fallback_actions(
+    job: Job,
+    automation_settings: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     input_data = job.input_data or {}
     classification_payload = get_latest_processor_payload(job, "classification_processor")
 
@@ -291,10 +409,10 @@ def _build_fallback_actions(job: Job) -> list[dict[str, Any]]:
         return _build_invoice_default_actions(job)
 
     if detected_job_type == "customer_inquiry":
-        return _build_inquiry_default_actions(job)
+        return _build_inquiry_default_actions(job, automation_settings)
 
     if detected_job_type == "lead":
-        return _build_lead_default_actions(job)
+        return _build_lead_default_actions(job, automation_settings)
 
     subject = input_data.get("subject") or f"New {detected_job_type}"
     message_text = input_data.get("message_text") or ""
@@ -351,7 +469,10 @@ def _build_fallback_actions(job: Job) -> list[dict[str, Any]]:
     return actions
 
 
-def _resolve_actions(job: Job) -> list[dict[str, Any]]:
+def _resolve_actions(
+    job: Job,
+    automation_settings: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     input_actions = _build_actions_from_input(job)
     if input_actions:
         return input_actions
@@ -360,7 +481,7 @@ def _resolve_actions(job: Job) -> list[dict[str, Any]]:
     if decisioning_actions:
         return decisioning_actions
 
-    return _build_fallback_actions(job)
+    return _build_fallback_actions(job, automation_settings)
 
 
 def _persist_successful_action(
@@ -403,12 +524,61 @@ def _persist_failed_action(
     )
 
 
+def _read_automation_settings(job: Job, db: Session | None) -> dict[str, Any]:
+    """Read tenant automation settings; returns empty dict when unavailable."""
+    if db is None:
+        return {}
+    try:
+        from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+        ctrl = TenantConfigRepository.get_settings(db, job.tenant_id)
+        auto = ctrl.get("automation") or {}
+        return {
+            "followups_enabled": auto.get("followups_enabled", True),
+            "leads_enabled":     auto.get("leads_enabled", True),
+            "support_enabled":   auto.get("support_enabled", True),
+            "support_email":     ctrl.get("support_email") or "",
+        }
+    except Exception:
+        return {}
+
+
 def process_action_dispatch_job(job: Job, db: Session | None = None) -> Job:
-    actions = _resolve_actions(job)
+    automation_settings = _read_automation_settings(job, db)
+    actions = _resolve_actions(job, automation_settings)
     executed_actions: list[dict[str, Any]] = []
     failed_actions: list[dict[str, Any]] = []
+    skipped_actions: list[dict[str, Any]] = []
 
     for index, action in enumerate(actions, start=1):
+        # Skipped sentinel — log to action_executions but do not dispatch
+        if action.get("_skip"):
+            skip_record = {
+                "type":         action["type"],
+                "status":       "skipped",
+                "skip_reason":  action.get("_skip_reason", ""),
+                "executed_at":  None,
+                "target":       None,
+                "provider":     "none",
+                "payload":      {},
+            }
+            skipped_actions.append(skip_record)
+            if db is not None:
+                ActionExecutionRepository.create_from_executed_action(
+                    db=db,
+                    tenant_id=job.tenant_id,
+                    job_id=job.job_id,
+                    request_action=action,
+                    executed_action={
+                        **skip_record,
+                        "executed_at": __import__("datetime").datetime.now(
+                            __import__("datetime").timezone.utc
+                        ).isoformat(),
+                        "integration_result": {"skipped": True, "reason": action.get("_skip_reason", "")},
+                    },
+                    attempt_no=index,
+                )
+            continue
+
         try:
             executed = execute_action(action)
             executed_actions.append(executed)
@@ -466,8 +636,10 @@ def process_action_dispatch_job(job: Job, db: Session | None = None) -> Job:
             "actions_requested": actions,
             "actions_executed": executed_actions,
             "actions_failed": failed_actions,
+            "actions_skipped": skipped_actions,
             "executed_count": len(executed_actions),
             "failed_count": len(failed_actions),
+            "skipped_count": len(skipped_actions),
             "recommended_next_step": "manual_review" if has_failures else "completed",
         },
     }

@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 SUPPORTED_ACTIONS = {
     "send_email",
+    "send_customer_auto_reply",
+    "send_internal_handoff",
     "notify_slack",
     "notify_teams",
     "create_internal_task",
@@ -282,8 +284,10 @@ def execute_action(action: dict[str, Any]) -> dict[str, Any]:
         },
     )
 
-    if action_type == "send_email":
-        return _build_email_result(action)
+    if action_type in ("send_email", "send_customer_auto_reply", "send_internal_handoff"):
+        result = _build_email_result(action)
+        result["type"] = action_type
+        return result
 
     if action_type == "notify_slack":
         return _build_slack_result(action)

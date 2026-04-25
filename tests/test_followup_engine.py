@@ -191,7 +191,7 @@ class TestLeadFollowUp:
             "message_text": "Intresserad av er produkt och prissättning.",
         })
         actions = _build_lead_default_actions(job)
-        assert actions[0]["type"] == "create_monday_item"
+        assert any(a["type"] == "create_monday_item" for a in actions)
 
     def test_lead_missing_fields_in_column_values(self):
         job = _lead_job({
@@ -236,8 +236,8 @@ class TestInquiryFollowUp:
             "message_text": "Produkten slutar fungera när jag trycker på knappen.",
         })
         actions = _build_inquiry_default_actions(job)
-        support_emails = [a for a in actions if a["type"] == "send_email" and "support" in a.get("to", "")]
-        assert len(support_emails) == 1
+        support_handoffs = [a for a in actions if a["type"] == "send_internal_handoff" and "support" in a.get("to", "")]
+        assert len(support_handoffs) == 1
 
 
 # ── invoice builder: no external email ───────────────────────────────────────

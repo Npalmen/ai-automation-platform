@@ -343,7 +343,7 @@ class TestInvoiceActionsWithExtraction:
         ]
         actions = _build_fallback_actions(job)
         types = [a["type"] for a in actions]
-        assert "send_email" in types
+        assert "send_internal_handoff" in types
         monday = next((a for a in actions if a["type"] == "create_monday_item"), None)
         if monday:
             assert monday["column_values"]["source"] == "inquiry"

@@ -1137,19 +1137,43 @@ function renderApprovalCards(approvals, fromJobDetail) {
   }).join('');
 }
 
+const ACTION_LABELS = {
+  'send_email':               'E-post',
+  'send_customer_auto_reply': 'Kundsvar',
+  'send_internal_handoff':    'Intern notifiering',
+  'notify_slack':             'Slack-notis',
+  'notify_teams':             'Teams-notis',
+  'create_internal_task':     'Intern uppgift',
+  'create_monday_item':       'Monday-objekt',
+};
+
 function renderActionCards(actions) {
   if (!actions.length) return '<span class="empty">Inga åtgärder.</span>';
-  return actions.map(a => `<div class="action-card">
+  return actions.map(a => {
+    const label = ACTION_LABELS[a.action_type] || escapeHtml(a.action_type || '—');
+    const result = a.integration_result || {};
+    let detail = '';
+    if (result.skipped) {
+      detail = `<span style="color:#92400e;">Anledning: ${escapeHtml(result.reason || '')}</span>`;
+    } else if (result.message_id) {
+      detail = `<span>Gmail ID: ${escapeHtml(result.message_id)}</span>`;
+    } else if (a.error_message) {
+      detail = `<span style="color:#b91c1c;">fel: ${escapeHtml(a.error_message)}</span>`;
+    }
+    const recipient = result.to || (a.payload && a.payload.to) || '';
+    return `<div class="action-card">
     <div class="job-meta" style="margin-bottom:4px;">
-      <strong>${escapeHtml(a.action_type || '—')}</strong>
+      <strong>${label}</strong>
       ${statusBadge(a.status)}
     </div>
     <div class="action-meta">
       ${a.attempt_no !== undefined ? `<span>försök #${a.attempt_no}</span>` : ''}
       ${a.created_at  ? `<span>${a.created_at.slice(0,19).replace('T',' ')}</span>` : ''}
-      ${a.error_message ? `<span style="color:#b91c1c;">fel: ${escapeHtml(a.error_message)}</span>` : ''}
+      ${recipient     ? `<span>till: ${escapeHtml(recipient)}</span>` : ''}
+      ${detail}
     </div>
-  </div>`).join('');
+  </div>`;
+  }).join('');
 }
 
 // ---------------------------------------------------------------------------

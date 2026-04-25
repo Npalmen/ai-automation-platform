@@ -207,7 +207,7 @@ class TestFallbackActionRouting:
     def test_inquiry_still_gets_inquiry_defaults(self):
         job = _inquiry_job({"subject": "Support fråga"})
         types = [a["type"] for a in _build_fallback_actions(job)]
-        assert "send_email" in types
+        assert "send_internal_handoff" in types
 
     def test_inquiry_monday_source_is_inquiry_not_invoice(self):
         job = _inquiry_job({"subject": "Fråga"})
@@ -290,7 +290,7 @@ class TestProcessActionDispatch:
         result = self._run(job)
         types = [a.get("type") for a in result.result["payload"]["actions_requested"]]
         assert "create_monday_item" in types
-        assert "send_email" in types
+        assert "send_internal_handoff" in types
 
     def test_lead_does_not_dispatch_invoice_actions(self):
         job = _lead_job({"subject": "Offert"})
