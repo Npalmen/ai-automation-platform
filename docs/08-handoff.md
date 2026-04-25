@@ -636,3 +636,38 @@ spam > newsletter > internal > invoice > supplier > partnership > lead > custome
 - Existing jobs (created before this slice): received_at=null; UI falls back to processed_at
 - sort_by=received_at proxies to created_at at DB level (DB sort); frontend shows received_at when available
 - No schema migration needed — received_at lives in existing input_data JSON column
+
+## Completed slice (2026-04-26 — Tenant Memory Foundation + Workflow Scan Status)
+
+### Problem solved
+Platform had no persistent memory for tenant business context — company name, industry, services, communication tone, system integrations discovered, and routing hints per job type were not stored anywhere.
+
+### What was built
+- `GET /tenant/memory` — returns tenant-scoped memory merged with defaults; always returns a complete shape even for tenants with no stored memory
+- `PUT /tenant/memory` — persists `business_profile`, `system_map`, `routing_hints` into `settings.memory`; merges into existing settings (does not clobber notifications/scheduler/other keys); each of the three top-level keys is optional in the PUT body
+- `GET /workflow-scan/status` — returns last scan metadata: `last_scan_at`, `systems_scanned`, `status`, `summary`; defaults to `never_run` when no scan has run; scan state populated by a future workflow scanner
+- `_DEFAULT_MEMORY` constant + `_get_memory(settings_dict)` pure helper — merges stored memory over defaults; importable for testing
+- `TenantMemoryRequest` Pydantic model — all three fields optional; safe to call with partial body
+- Kundminne tab in operator UI — Företagsprofil (company name, industry, services, tone inputs), Systemkarta (editable JSON textarea), Routing-hints (editable JSON textarea), Upptäckta system (rendered from scan summary), Senaste scanning card
+- `tests/test_tenant_memory.py` — 23 tests
+
+### Storage
+Memory lives in the existing `tenant_configs.settings` JSON column under the `memory` key. No schema change needed. Compatible with all existing settings keys.
+
+### Memory shape
+```json
+{
+  "business_profile": { "company_name": "", "industry": "", "services": [], "tone": "professional" },
+  "system_map": {
+    "gmail": { "known_senders": [], "subject_patterns": [], "detected_mail_types": [] },
+    "monday": { "boards": [], "groups": [], "columns": [] }
+  },
+  "routing_hints": { "lead": null, "customer_inquiry": null, "invoice": null, "partnership": null, "supplier": null }
+}
+```
+
+### Tests
+23 new tests in `tests/test_tenant_memory.py`. **1130/1130 pass.**
+
+### Next likely slice
+- Workflow Scanner — populate `settings.workflow_scan` by actually scanning Gmail inbox patterns and Monday board metadata; update `system_map.gmail.detected_mail_types` and `system_map.monday.boards`

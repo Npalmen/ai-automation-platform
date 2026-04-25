@@ -376,6 +376,7 @@ pre {
   <div class="view-tab"        id="viewTabCases" onclick="switchView('cases')">Ärenden</div>
   <div class="view-tab"        id="viewTabOnboarding"  onclick="switchView('onboarding')">Onboarding</div>
   <div class="view-tab"        id="viewTabNotif"       onclick="switchView('notif')">Notifieringar</div>
+  <div class="view-tab"        id="viewTabMemory"      onclick="switchView('memory')">Kundminne</div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ DASHBOARD -->
@@ -804,6 +805,76 @@ pre {
 
 </div><!-- /viewNotif -->
 
+<!-- ═══════════════════════════════════════════════════════════ KUNDMINNE -->
+<div id="viewMemory" style="display:none; padding:24px; overflow-y:auto; flex:1; max-width:800px;">
+
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+    <h1 style="font-size:18px; font-weight:700; color:#111; margin:0;">Kundminne</h1>
+    <button class="btn btn-primary btn-sm" onclick="loadMemory()">Ladda</button>
+  </div>
+  <div id="memoryMsg" class="msg" style="display:none; margin-bottom:16px;"></div>
+
+  <!-- Systemkarta: scanning status -->
+  <div class="setup-card" style="margin-bottom:20px;">
+    <h2 style="font-size:14px; font-weight:700; margin-bottom:12px;">Senaste scanning</h2>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:13px;">
+      <div><span style="color:#888;">Status:</span> <span id="scanStatus" style="font-weight:600;">–</span></div>
+      <div><span style="color:#888;">Senast körd:</span> <span id="scanLastAt">–</span></div>
+      <div><span style="color:#888;">System:</span> <span id="scanSystems">–</span></div>
+    </div>
+  </div>
+
+  <!-- Företagsprofil -->
+  <div class="setup-card" style="margin-bottom:20px;">
+    <h2 style="font-size:14px; font-weight:700; margin-bottom:12px;">Företagsprofil</h2>
+    <div style="display:grid; gap:10px;">
+      <div class="form-field">
+        <label>Företagsnamn</label>
+        <input id="memCompanyName" type="text" placeholder="T.ex. Lindqvist Industri AB" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:3px; font-family:monospace; font-size:13px;">
+      </div>
+      <div class="form-field">
+        <label>Bransch</label>
+        <input id="memIndustry" type="text" placeholder="T.ex. Tillverkning, Bygg, IT" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:3px; font-family:monospace; font-size:13px;">
+      </div>
+      <div class="form-field">
+        <label>Tjänster (kommaseparerat)</label>
+        <input id="memServices" type="text" placeholder="T.ex. Installation, Service, Reparation" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:3px; font-family:monospace; font-size:13px;">
+      </div>
+      <div class="form-field">
+        <label>Ton</label>
+        <select id="memTone" style="padding:6px 8px; border:1px solid #ccc; border-radius:3px; font-family:monospace; font-size:13px;">
+          <option value="professional">Professionell</option>
+          <option value="friendly">Vänlig</option>
+          <option value="formal">Formell</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Systemkarta -->
+  <div class="setup-card" style="margin-bottom:20px;">
+    <h2 style="font-size:14px; font-weight:700; margin-bottom:12px;">Systemkarta</h2>
+    <p style="font-size:12px; color:#666; margin-bottom:12px;">Redigera systemkartan direkt som JSON. Spara via knappen nedan.</p>
+    <textarea id="memSystemMap" rows="10" style="width:100%; font-family:monospace; font-size:12px; border:1px solid #ccc; border-radius:3px; padding:8px; resize:vertical;"></textarea>
+  </div>
+
+  <!-- Routing-hints -->
+  <div class="setup-card" style="margin-bottom:20px;">
+    <h2 style="font-size:14px; font-weight:700; margin-bottom:12px;">Routing-hints</h2>
+    <p style="font-size:12px; color:#666; margin-bottom:12px;">Valfria destinationshints per jobbtyp (Monday-board, grupp, e-post etc.).</p>
+    <textarea id="memRoutingHints" rows="8" style="width:100%; font-family:monospace; font-size:12px; border:1px solid #ccc; border-radius:3px; padding:8px; resize:vertical;"></textarea>
+  </div>
+
+  <!-- Upptäckta system -->
+  <div class="setup-card" style="margin-bottom:20px;">
+    <h2 style="font-size:14px; font-weight:700; margin-bottom:12px;">Upptäckta system</h2>
+    <div id="memDiscoveredSystems" style="font-size:13px; color:#555;">Ingen scanningsdata ännu.</div>
+  </div>
+
+  <button class="btn btn-primary" onclick="saveMemory()">Spara kundminne</button>
+
+</div><!-- /viewMemory -->
+
 <script>
 // ---------------------------------------------------------------------------
 // Label maps — presentationslager (ändrar inte backend-nycklar)
@@ -905,6 +976,7 @@ function switchView(name) {
   document.getElementById('viewCases').style.display      = name === 'cases'      ? 'block' : 'none';
   document.getElementById('viewOnboarding').style.display = name === 'onboarding' ? 'block' : 'none';
   document.getElementById('viewNotif').style.display      = name === 'notif'      ? 'block' : 'none';
+  document.getElementById('viewMemory').style.display     = name === 'memory'     ? 'block' : 'none';
   document.getElementById('viewTabDash').classList.toggle('active',       name === 'dash');
   document.getElementById('viewTabOps').classList.toggle('active',        name === 'ops');
   document.getElementById('viewTabSetup').classList.toggle('active',      name === 'setup');
@@ -912,12 +984,14 @@ function switchView(name) {
   document.getElementById('viewTabCases').classList.toggle('active',      name === 'cases');
   document.getElementById('viewTabOnboarding').classList.toggle('active', name === 'onboarding');
   document.getElementById('viewTabNotif').classList.toggle('active',      name === 'notif');
+  document.getElementById('viewTabMemory').classList.toggle('active',     name === 'memory');
   if (name === 'setup')      loadSetup();
   if (name === 'dash')       loadDashboard();
   if (name === 'ctrl')       loadControl();
   if (name === 'cases')      loadCases();
   if (name === 'onboarding') loadOnboarding();
   if (name === 'notif')      loadNotifSettings();
+  if (name === 'memory')     loadMemory();
 }
 
 // ---------------------------------------------------------------------------
@@ -2178,6 +2252,83 @@ async function sendTestDigest() {
     resEl.innerHTML = `<div class="msg msg-error">${escapeHtml(e.message)}</div>`;
   } finally {
     btn.disabled = false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Kundminne (Tenant Memory)
+// ---------------------------------------------------------------------------
+async function loadMemory() {
+  const msg = document.getElementById('memoryMsg');
+  msg.style.display = 'none';
+  try {
+    // Load scan status
+    const scan = await apiFetch('/workflow-scan/status');
+    document.getElementById('scanStatus').textContent    = scan.status === 'never_run' ? 'Ej körd' : scan.status;
+    document.getElementById('scanLastAt').textContent    = scan.last_scan_at || '–';
+    document.getElementById('scanSystems').textContent   = (scan.systems_scanned || []).join(', ') || '–';
+
+    // Discovered systems from summary
+    const discovered = document.getElementById('memDiscoveredSystems');
+    if (scan.summary && Object.keys(scan.summary).length > 0) {
+      discovered.textContent = JSON.stringify(scan.summary, null, 2);
+    } else {
+      discovered.textContent = 'Ingen scanningsdata ännu.';
+    }
+
+    // Load memory
+    const mem = await apiFetch('/tenant/memory');
+    const prof = mem.business_profile || {};
+    document.getElementById('memCompanyName').value = prof.company_name || '';
+    document.getElementById('memIndustry').value    = prof.industry || '';
+    document.getElementById('memServices').value    = (prof.services || []).join(', ');
+    document.getElementById('memTone').value        = prof.tone || 'professional';
+    document.getElementById('memSystemMap').value   = JSON.stringify(mem.system_map || {}, null, 2);
+    document.getElementById('memRoutingHints').value = JSON.stringify(mem.routing_hints || {}, null, 2);
+  } catch (e) {
+    msg.className = 'msg msg-error';
+    msg.textContent = 'Kunde inte ladda kundminne: ' + e.message;
+    msg.style.display = 'block';
+  }
+}
+
+async function saveMemory() {
+  const msg = document.getElementById('memoryMsg');
+  msg.style.display = 'none';
+  let systemMap, routingHints;
+  try {
+    systemMap    = JSON.parse(document.getElementById('memSystemMap').value || '{}');
+    routingHints = JSON.parse(document.getElementById('memRoutingHints').value || '{}');
+  } catch (e) {
+    msg.className = 'msg msg-error';
+    msg.textContent = 'Ogiltig JSON i systemkarta eller routing-hints: ' + e.message;
+    msg.style.display = 'block';
+    return;
+  }
+
+  const services = document.getElementById('memServices').value
+    .split(',').map(s => s.trim()).filter(Boolean);
+
+  const payload = {
+    business_profile: {
+      company_name: document.getElementById('memCompanyName').value.trim(),
+      industry:     document.getElementById('memIndustry').value.trim(),
+      services:     services,
+      tone:         document.getElementById('memTone').value,
+    },
+    system_map:    systemMap,
+    routing_hints: routingHints,
+  };
+
+  try {
+    await apiFetch('/tenant/memory', { method: 'PUT', body: JSON.stringify(payload) });
+    msg.className = 'msg msg-success';
+    msg.textContent = 'Kundminne sparat.';
+    msg.style.display = 'block';
+  } catch (e) {
+    msg.className = 'msg msg-error';
+    msg.textContent = 'Kunde inte spara: ' + e.message;
+    msg.style.display = 'block';
   }
 }
 

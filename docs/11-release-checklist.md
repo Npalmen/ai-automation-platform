@@ -7,7 +7,7 @@
 - [x] DB setup verified (`docker-compose.yml` + `scripts/create_tables.py`)
 
 ## Test
-- [x] Automated tests pass — 1107/1107 (`python -m pytest`)
+- [x] Automated tests pass — 1130/1130 (`python -m pytest`)
 - [x] Official MVP smoke test documented in README (curl commands, step by step)
 - [x] Gmail send_email verified live (real Gmail delivery confirmed)
 - [x] Gmail list_messages verified live (real inbox messages returned)
@@ -32,6 +32,8 @@
 - [x] Customer Auto-Reply + Internal Handoff — send_customer_auto_reply + send_internal_handoff injected for lead + inquiry; gated by followups_enabled + customer email; skipped actions persisted with reason; UI labels updated
 - [x] Classification v2 — 9-type taxonomy (lead/inquiry/invoice/partnership/supplier/newsletter/internal/spam/unknown); deterministic keyword rules; visibility-only types produce skipped sentinels only; 52 new tests; Swedish UI labels
 - [x] Cases UX Upgrade — search (q ILIKE), filter (type/status), sort (received_at/created_at/status/type + asc/desc), pagination (limit/offset); received_at + processed_at in list + detail; customer_email in list; Gmail inbox stores received_at; UI: search/filter/sort/pagination controls; 33 new tests
+- [x] Tenant Memory Foundation — GET/PUT /tenant/memory; business_profile, system_map, routing_hints stored in settings.memory; does not clobber other settings; Kundminne tab in UI; 23 tests
+- [x] Workflow Scan Status — GET /workflow-scan/status; default shape never_run; tenant-scoped
 
 ## Docs
 - [x] current-state updated

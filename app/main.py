@@ -2461,6 +2461,119 @@ def get_case(
     }
 
 
+# ---------------------------------------------------------------------------
+# Tenant Memory
+# ---------------------------------------------------------------------------
+
+_DEFAULT_MEMORY: dict = {
+    "business_profile": {
+        "company_name": "",
+        "industry": "",
+        "services": [],
+        "tone": "professional",
+    },
+    "system_map": {
+        "gmail": {
+            "known_senders": [],
+            "subject_patterns": [],
+            "detected_mail_types": [],
+        },
+        "monday": {
+            "boards": [],
+            "groups": [],
+            "columns": [],
+        },
+    },
+    "routing_hints": {
+        "lead": None,
+        "customer_inquiry": None,
+        "invoice": None,
+        "partnership": None,
+        "supplier": None,
+    },
+}
+
+
+def _get_memory(settings_dict: dict) -> dict:
+    """Return memory from settings, merged with defaults so missing keys are always present."""
+    import copy
+    stored = settings_dict.get("memory") or {}
+    merged = copy.deepcopy(_DEFAULT_MEMORY)
+    # Top-level keys: only overwrite if present in stored
+    for top_key in merged:
+        if top_key in stored and isinstance(stored[top_key], dict):
+            merged[top_key].update(stored[top_key])
+        elif top_key in stored:
+            merged[top_key] = stored[top_key]
+    return merged
+
+
+class TenantMemoryRequest(_BaseModel):
+    business_profile: dict | None = None
+    system_map: dict | None = None
+    routing_hints: dict | None = None
+
+
+@app.get("/tenant/memory")
+def get_tenant_memory(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return tenant-scoped memory (business profile, system map, routing hints)."""
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    s = TenantConfigRepository.get_settings(db, tenant_id)
+    return _get_memory(s)
+
+
+@app.put("/tenant/memory")
+def put_tenant_memory(
+    request: TenantMemoryRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Persist tenant memory without clobbering other settings keys."""
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    existing = TenantConfigRepository.get_settings(db, tenant_id)
+    current_memory = _get_memory(existing)
+
+    if request.business_profile is not None:
+        current_memory["business_profile"].update(request.business_profile)
+    if request.system_map is not None:
+        for system, data in request.system_map.items():
+            if system in current_memory["system_map"] and isinstance(data, dict):
+                current_memory["system_map"][system].update(data)
+            else:
+                current_memory["system_map"][system] = data
+    if request.routing_hints is not None:
+        current_memory["routing_hints"].update(request.routing_hints)
+
+    updated = dict(existing)
+    updated["memory"] = current_memory
+    TenantConfigRepository.update_settings(db, tenant_id, updated)
+    return current_memory
+
+
+# ---------------------------------------------------------------------------
+# Workflow Scan Status
+# ---------------------------------------------------------------------------
+
+@app.get("/workflow-scan/status")
+def workflow_scan_status(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return the status of the last workflow scan for this tenant."""
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    s = TenantConfigRepository.get_settings(db, tenant_id)
+    scan = s.get("workflow_scan") or {}
+    return {
+        "last_scan_at":    scan.get("last_scan_at") or None,
+        "systems_scanned": scan.get("systems_scanned") or [],
+        "status":          scan.get("status") or "never_run",
+        "summary":         scan.get("summary") or {},
+    }
+
+
 @app.get("/audit-events", response_model=AuditEventListResponse)
 def list_audit_events(
     db: Session = Depends(get_db),
