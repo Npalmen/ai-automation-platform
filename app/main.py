@@ -62,8 +62,10 @@ app = FastAPI(title=settings.APP_NAME)
 @app.on_event("startup")
 async def on_startup():
     import app.repositories.postgres  # noqa: F401
+    from app.repositories.postgres.schema_migrations import ensure_runtime_schema
 
     Base.metadata.create_all(bind=engine)
+    ensure_runtime_schema(engine)
     print("Startup complete")
 
     # TEMPORARY: local-debug — verify Google OAuth env vars are loaded from .env

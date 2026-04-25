@@ -179,8 +179,16 @@ Pending approvals show Approve (green) and Reject (red) buttons. Clicking either
 - `tests/test_scheduler.py` — 41 tests: GET status (shape/defaults/stored/tenant isolation), `_run_scheduler_pass` (run_mode gates, digest dedup by date, before/after send_hour, state persistence, error capture), `POST /scheduler/run-once` (tenant count, sync count, digest count, skip count, status=warning on error)
 - 983/983 tests pass
 
+## Completed slice (2026-04-25 — Hotfix BUG-001: settings column migration)
+- **Root cause**: `create_all` creates missing tables but does not add missing columns to existing tables. The `settings` JSON column added in Slice 3 was absent from any DB created before that slice, causing 500s on all settings-dependent endpoints (`/dashboard/control`, `/notifications/settings`, `/scheduler/status`, `/setup/status`, etc.)
+- **Fix**: `app/repositories/postgres/schema_migrations.py` — `ensure_runtime_schema(engine)` runs `ALTER TABLE tenant_configs ADD COLUMN IF NOT EXISTS settings JSON` at startup, after `create_all`. Uses `IF NOT EXISTS` — idempotent on every restart. Fails startup with a clear `RuntimeError` if the migration cannot run.
+- **Wired in**: `on_startup()` in `app/main.py` calls `ensure_runtime_schema(engine)` immediately after `create_all`
+- `_REQUIRED_COLUMNS` registry — future additive columns can be appended to the list without touching startup logic
+- `tests/test_schema_migrations.py` — 17 tests: happy path, idempotency, error wrapping, error logging, registry shape, startup ordering
+- 1000/1000 tests pass
+
 ## Current state
-Scheduler (inbox sync + daily digest), Customer Notifications, Manual inbox sync, Setup Wizard, Case View, Control Panel, Activity dashboard, ROI dashboard, thread continuation, and follow-up engine are complete. **983/983 tests pass.**
+Scheduler (inbox sync + daily digest), Customer Notifications, Manual inbox sync, Setup Wizard, Case View, Control Panel, Activity dashboard, ROI dashboard, thread continuation, and follow-up engine are complete. BUG-001 hotfix applied. **1000/1000 tests pass.**
 
 All three intake flows (lead, customer inquiry, invoice) are implemented and production-ready. Each flow evaluates completeness deterministically (no LLM) and sends a Swedish-language follow-up email to the customer when required information is missing.
 
