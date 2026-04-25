@@ -7,7 +7,7 @@
 - [x] DB setup verified (`docker-compose.yml` + `scripts/create_tables.py`)
 
 ## Test
-- [x] Automated tests pass — 1155/1155 (`python -m pytest`)
+- [x] Automated tests pass — 1187/1187 (`python -m pytest`)
 - [x] Official MVP smoke test documented in README (curl commands, step by step)
 - [x] Gmail send_email verified live (real Gmail delivery confirmed)
 - [x] Gmail list_messages verified live (real inbox messages returned)
@@ -35,6 +35,7 @@
 - [x] Tenant Memory Foundation — GET/PUT /tenant/memory; business_profile, system_map, routing_hints stored in settings.memory; does not clobber other settings; Kundminne tab in UI; 23 tests
 - [x] Workflow Scan Status — GET /workflow-scan/status; default shape never_run; tenant-scoped; returns persisted state after scan
 - [x] Gmail Workflow Scanner v1 — POST /workflow-scan/gmail; DB-only (no live API calls); known_senders/subject_patterns/detected_mail_types; no-clobber on failure; 25 tests; Skanna Gmail button in UI
+- [x] Generic Workflow Scanner Engine — WorkflowScannerEngine + BaseWorkflowScannerAdapter + ADAPTER_REGISTRY; POST /workflow-scan/{system}; 404 for unknown system; multi-system summary merge; 32 tests; future adapters added with one class + one registry line
 
 ## Docs
 - [x] current-state updated

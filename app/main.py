@@ -2554,87 +2554,28 @@ def put_tenant_memory(
 
 
 # ---------------------------------------------------------------------------
-# Workflow Scan Status
+# Workflow Scanner Engine
 # ---------------------------------------------------------------------------
 
-def _scan_gmail_jobs(records: list) -> tuple[dict, dict]:
-    """
-    Analyse a list of JobRecord rows sourced from Gmail.
-    Returns (gmail_system_map, gmail_summary).
+# Re-export the Gmail analysis helper so existing tests that import
+# _scan_gmail_jobs from app.main continue to work unchanged.
+from app.workflows.scanners.gmail_adapter import analyse_records as _scan_gmail_jobs  # noqa: E402
 
-    Pure function — no DB or external calls.
-    """
-    from collections import Counter
-    import re as _re
 
-    _STRIP_PREFIXES = _re.compile(
-        r"^(re|fwd|fw|sv|vs|aw|ant|r|f)\s*:\s*",
-        _re.IGNORECASE,
-    )
+def _make_scan_engine(db: Session, tenant_id: str):
+    """Construct a WorkflowScannerEngine with the standard repo."""
+    from app.workflows.scanners.engine import WorkflowScannerEngine
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    return WorkflowScannerEngine(db, tenant_id, TenantConfigRepository)
 
-    sender_counter: Counter = Counter()
-    raw_subjects: list[str] = []
-    type_counter: Counter = Counter()
 
-    for r in records:
-        inp = r.input_data or {}
-        sender = inp.get("sender") or {}
-
-        # Sender: prefer email, fall back to domain of sender_email flat key
-        email = (
-            sender.get("email")
-            or inp.get("sender_email")
-            or ""
-        ).strip().lower()
-        if email:
-            sender_counter[email] += 1
-
-        # Subject
-        subject = (inp.get("subject") or inp.get("latest_message_subject") or "").strip()
-        if subject:
-            raw_subjects.append(subject)
-
-        # Mail type from job_type field (already classified)
-        job_type = (r.job_type or "unknown").strip()
-        type_counter[job_type] += 1
-
-    # known_senders: top 20 by frequency, stored as {email, count}
-    known_senders = [
-        {"email": email, "count": count}
-        for email, count in sender_counter.most_common(20)
-    ]
-
-    # subject_patterns: strip Re:/Fwd: prefixes, count normalised forms, top 20
-    normalised_counter: Counter = Counter()
-    for s in raw_subjects:
-        normalised = _STRIP_PREFIXES.sub("", s).strip()
-        # Collapse runs of whitespace
-        normalised = " ".join(normalised.split())
-        if normalised:
-            normalised_counter[normalised] += 1
-
-    subject_patterns = [
-        {"pattern": pattern, "count": count}
-        for pattern, count in normalised_counter.most_common(20)
-    ]
-
-    # detected_mail_types: sorted list of type strings present in the sample
-    detected_mail_types = sorted(type_counter.keys())
-
-    gmail_map = {
-        "known_senders":      known_senders,
-        "subject_patterns":   subject_patterns,
-        "detected_mail_types": detected_mail_types,
+def _scan_result_to_response(result) -> dict:
+    return {
+        "status":          result.status,
+        "last_scan_at":    result.scanned_at,
+        "systems_scanned": [result.system],
+        "summary":         {result.system: result.summary} if result.summary else {},
     }
-
-    gmail_summary = {
-        "messages_scanned":   len(records),
-        "senders_detected":   len(known_senders),
-        "patterns_detected":  len(subject_patterns),
-        "mail_types_detected": detected_mail_types,
-    }
-
-    return gmail_map, gmail_summary
 
 
 @app.post("/workflow-scan/gmail")
@@ -2644,78 +2585,43 @@ def scan_gmail(
 ):
     """
     Scan stored Gmail-sourced jobs for this tenant and update tenant memory.
-
-    Uses only data already stored in the jobs table — no live Gmail API calls.
-    Bounded to the latest 250 Gmail-sourced jobs.
+    Delegates to WorkflowScannerEngine with the GmailWorkflowScannerAdapter.
+    No live Gmail API calls — reads only stored jobs (bounded to 250).
     """
-    from datetime import datetime, timezone
-    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
-
+    engine = _make_scan_engine(db, tenant_id)
     try:
-        # --- 1. Fetch stored Gmail jobs (bounded sample) ---
-        records = (
-            db.query(JobRecord)
-            .filter(
-                JobRecord.tenant_id == tenant_id,
-                JobRecord.input_data["source"]["system"].as_string() == "gmail",
-            )
-            .order_by(JobRecord.created_at.desc())
-            .limit(250)
-            .all()
+        result = engine.run("gmail")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    return _scan_result_to_response(result)
+
+
+@app.post("/workflow-scan/{system}")
+def scan_workflow_system(
+    system: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Generic workflow scan endpoint.
+
+    Supported systems: gmail (more coming — monday, microsoft_mail, visma, fortnox).
+    Returns 404 for unrecognised system keys.
+    """
+    from app.workflows.scanners.engine import ADAPTER_REGISTRY
+    if system not in ADAPTER_REGISTRY:
+        from app.workflows.scanners.engine import list_supported_systems
+        raise HTTPException(
+            status_code=404,
+            detail=f"No scanner registered for system '{system}'. "
+                   f"Supported: {list_supported_systems()}",
         )
-
-        # --- 2. Analyse ---
-        gmail_map, gmail_summary = _scan_gmail_jobs(records)
-
-        # --- 3. Persist: merge into existing settings (no-clobber) ---
-        existing = TenantConfigRepository.get_settings(db, tenant_id)
-        current_memory = _get_memory(existing)
-
-        # Update system_map.gmail inside memory
-        current_memory["system_map"]["gmail"] = gmail_map
-
-        scan_at = datetime.now(timezone.utc).isoformat()
-        workflow_scan = {
-            "last_scan_at":    scan_at,
-            "systems_scanned": ["gmail"],
-            "status":          "completed",
-            "summary": {
-                "gmail": gmail_summary,
-            },
-        }
-
-        updated = dict(existing)
-        updated["memory"] = current_memory
-        updated["workflow_scan"] = workflow_scan
-        TenantConfigRepository.update_settings(db, tenant_id, updated)
-
-    except Exception as exc:
-        # Failure: preserve existing memory, mark status failed
-        try:
-            existing = TenantConfigRepository.get_settings(db, tenant_id)
-        except Exception:
-            existing = {}
-        scan_at = datetime.now(timezone.utc).isoformat()
-        workflow_scan = {
-            "last_scan_at":    scan_at,
-            "systems_scanned": ["gmail"],
-            "status":          "failed",
-            "summary":         {"error": str(exc)[:200]},
-        }
-        updated = dict(existing)
-        updated["workflow_scan"] = workflow_scan
-        try:
-            TenantConfigRepository.update_settings(db, tenant_id, updated)
-        except Exception:
-            pass  # Can't persist failure state — just return error response
-        raise HTTPException(status_code=500, detail=f"Gmail scan failed: {str(exc)[:200]}")
-
-    return {
-        "status":          "completed",
-        "last_scan_at":    scan_at,
-        "systems_scanned": ["gmail"],
-        "summary":         {"gmail": gmail_summary},
-    }
+    engine = _make_scan_engine(db, tenant_id)
+    try:
+        result = engine.run(system)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    return _scan_result_to_response(result)
 
 
 @app.get("/workflow-scan/status")

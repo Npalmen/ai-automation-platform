@@ -699,3 +699,40 @@ Tenant memory had a `system_map.gmail` placeholder but no mechanism to populate 
 - No AI/LLM calls — pure deterministic analysis
 - Bounded to 250 records
 - Monday scanner not included (next slice)
+
+## Completed slice (2026-04-26 — Generic Workflow Scanner Engine)
+
+### Problem solved
+The Gmail scanner in Slice 2 was inlined directly in `main.py` with no extension points. Every future system (Monday, Visma, Fortnox, Microsoft Mail) would have required copy-pasted boilerplate. The scanning framework is now a proper engine with a clean adapter contract.
+
+### What was built
+
+**`app/workflows/scanners/` package**
+
+| File | Role |
+|------|------|
+| `base.py` | `ScanResult` dataclass + `BaseWorkflowScannerAdapter` interface |
+| `gmail_adapter.py` | `GmailWorkflowScannerAdapter` — extracted Gmail logic; `analyse_records()` public pure function |
+| `engine.py` | `WorkflowScannerEngine` — registry lookup, adapter dispatch, persistence, no-clobber merge; `ADAPTER_REGISTRY` dict; `list_supported_systems()` |
+
+**main.py changes**
+- `_scan_gmail_jobs` re-exported from `gmail_adapter.analyse_records` — existing tests unbroken
+- `scan_gmail` delegates to engine via `_make_scan_engine()`
+- `scan_workflow_system(system)` — new generic endpoint `POST /workflow-scan/{system}`; 404 with supported system list for unknown keys
+- `_scan_result_to_response()` shared formatter
+
+**Engine behaviour**
+- Success: `system_map[system]` updated, other systems' entries untouched; `workflow_scan.summary` merged (running gmail does not wipe monday state)
+- Failure: existing memory preserved exactly; `workflow_scan.status = "failed"`; `RuntimeError` raised → HTTP 500
+
+**UI**
+- `scanWorkflowSystem(system)` generic JS function
+- `scanGmail()` now calls `scanWorkflowSystem('gmail')`
+
+### Adding a future adapter
+1. Create `app/workflows/scanners/monday_adapter.py` implementing `BaseWorkflowScannerAdapter`
+2. Add one line to `ADAPTER_REGISTRY` in `engine.py`
+3. `POST /workflow-scan/monday` is immediately live
+
+### Tests
+32 new tests in `tests/test_workflow_scanner_engine.py`. All 1155 pre-existing tests still pass. **1187/1187 total.**

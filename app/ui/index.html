@@ -2323,7 +2323,7 @@ async function loadMemory() {
   }
 }
 
-async function scanGmail() {
+async function scanWorkflowSystem(system) {
   const btn = document.getElementById('scanGmailBtn');
   const running = document.getElementById('scanRunning');
   const msg = document.getElementById('memoryMsg');
@@ -2331,18 +2331,18 @@ async function scanGmail() {
   btn.disabled = true;
   running.style.display = 'block';
   try {
-    const result = await apiFetch('/workflow-scan/gmail', { method: 'POST' });
+    const result = await apiFetch(`/workflow-scan/${system}`, { method: 'POST' });
     _renderScanStatus(result);
     // Reload full memory so system_map textarea is refreshed
     await loadMemory();
+    const scanned = (result.summary?.[system]?.messages_scanned ?? result.summary?.gmail?.messages_scanned ?? 0);
     msg.className = 'msg msg-success';
-    msg.textContent = `Scanning klar. ${(result.summary?.gmail?.messages_scanned ?? 0)} meddelanden skannade.`;
+    msg.textContent = `Scanning klar (${system}). ${scanned} meddelanden skannade.`;
     msg.style.display = 'block';
   } catch (e) {
     msg.className = 'msg msg-error';
     msg.textContent = 'Scanning misslyckades: ' + e.message;
     msg.style.display = 'block';
-    // Reload status to show failed state
     try {
       const status = await apiFetch('/workflow-scan/status');
       _renderScanStatus(status);
@@ -2351,6 +2351,10 @@ async function scanGmail() {
     btn.disabled = false;
     running.style.display = 'none';
   }
+}
+
+async function scanGmail() {
+  return scanWorkflowSystem('gmail');
 }
 
 async function saveMemory() {
