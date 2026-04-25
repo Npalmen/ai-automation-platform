@@ -16,6 +16,13 @@ class JobType(str, Enum):
     CONTRACT = "contract"
     UNKNOWN = "unknown"
 
+    # Inbox taxonomy v2
+    PARTNERSHIP = "partnership"
+    SUPPLIER = "supplier"
+    NEWSLETTER = "newsletter"
+    INTERNAL = "internal"
+    SPAM = "spam"
+
     # Finance
     INVOICE = "invoice"
     RECEIPT = "receipt"

@@ -582,3 +582,43 @@ All original MVP backlog items are complete. The platform is live-verified, stab
 - Continue from this repo state; 761/761 tests are current
 - Dashboard (summary + activity) and thread continuation are implemented
 - Next logical slice: scheduler trigger or dashboard polish
+## Completed slice (2026-04-25 — Customer Auto-Reply + Internal Handoff)
+
+- `send_customer_auto_reply` (Swedish confirmation to sender) + `send_internal_handoff` (structured summary to internal team) injected as first two actions in lead and inquiry fallback pipelines
+- Gated by `followups_enabled` setting and presence of customer email; skipped conditions produce `_skip` sentinel persisted as `status=skipped`
+- `skipped_actions` / `skipped_count` added to dispatch result payload
+- UI Case View: `ACTION_LABELS` map; shows recipient and Gmail message_id when available
+- `tests/test_auto_reply_handoff.py` — 22 tests; 1022/1022 pass
+
+## Completed slice (2026-04-25 — Classification v2 / Better Inbox Taxonomy)
+
+### Problem solved
+Real-world inbox classification was too broad: partnerships/collaborations were classified as lead, newsletters became customer_inquiry, supplier order confirmations had no distinct routing.
+
+### New taxonomy (9 types)
+| Type | Trigger | Automation |
+|------|---------|------------|
+| `lead` | Quote/price/booking/installation request | Full: auto-reply + handoff + Monday |
+| `customer_inquiry` | Existing customer support/help/status question | Full: auto-reply + handoff + Monday |
+| `invoice` | Invoice/faktura/payment request | Full: Monday + internal task |
+| `partnership` | Samarbete/collaboration/B2B proposal | Visibility-only (skipped) |
+| `supplier` | Order confirmation/delivery/kvitto | Visibility-only (skipped) |
+| `newsletter` | Nyhetsbrev/unsubscribe/kampanjer | Visibility-only (skipped) |
+| `internal` | Intern notering/internal memo | Visibility-only (skipped) |
+| `spam` | You won/lottery/phishing | Visibility-only (skipped) |
+| `unknown` | LLM fallback only | Generic internal task |
+
+### Priority order (deterministic classifier)
+spam > newsletter > internal > invoice > supplier > partnership > lead > customer_inquiry
+
+### Files changed
+- `app/domain/workflows/enums.py` — 5 new JobType values
+- `app/ai/schemas.py` — 5 new AllowedJobType literals
+- `app/workflows/processors/classification_processor.py` — v2 keyword sets + extended `classify_email_type`
+- `app/workflows/processors/action_dispatch_processor.py` — `_VISIBILITY_ONLY_TYPES` + `_build_visibility_only_actions`
+- `app/ui/index.html` — Swedish labels in `JOB_TYPE_LABELS` + `CASE_TYPE_LABELS`
+- `tests/test_classification_v2.py` — 52 new tests
+- `tests/test_gmail_notification.py` — regression test subject updated (service → customer_inquiry phrase)
+
+### Tests
+1074/1074 pass

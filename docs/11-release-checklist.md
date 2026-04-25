@@ -30,6 +30,7 @@
 - [x] Scheduler — POST /scheduler/run-once (multi-tenant inbox sync + digest with dedup/send_hour gate) + GET /scheduler/status; scheduler_state persisted in tenant_configs.settings; Scheduler-status section in Kontrollpanel UI
 - [x] Runtime schema safeguard — ensure_runtime_schema() adds missing tenant_configs.settings column at startup; idempotent; fails loudly if blocked
 - [x] Customer Auto-Reply + Internal Handoff — send_customer_auto_reply + send_internal_handoff injected for lead + inquiry; gated by followups_enabled + customer email; skipped actions persisted with reason; UI labels updated
+- [x] Classification v2 — 9-type taxonomy (lead/inquiry/invoice/partnership/supplier/newsletter/internal/spam/unknown); deterministic keyword rules; visibility-only types produce skipped sentinels only; 52 new tests; Swedish UI labels
 
 ## Docs
 - [x] current-state updated

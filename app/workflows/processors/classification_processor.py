@@ -6,33 +6,81 @@ from app.workflows.processors.ai_processor_utils import run_ai_step
 PROCESSOR_NAME = "classification_processor"
 PROMPT_NAME = "classification"
 
-_INVOICE_KEYWORDS = {"faktura", "invoice"}
+# Priority order (highest → lowest):
+# spam > newsletter > internal > invoice > supplier > partnership > lead > customer_inquiry
+# 'unknown' is never returned by deterministic path — it is an LLM-only output.
+
+_SPAM_KEYWORDS = {
+    "you won", "click here to claim", "lottery", "nigerian prince",
+    "free money", "make money fast", "enlarge", "casino bonus",
+    "phishing", "wire transfer urgent", "verify your account immediately",
+}
+
+_NEWSLETTER_KEYWORDS = {
+    "nyhetsbrev", "newsletter", "unsubscribe", "avregistrera",
+    "monthly update", "campaign", "product update", "webinar invite",
+    "event invite", "promotional", "our latest offers", "denna veckas erbjudanden",
+    "denna månads kampanjer", "kampanjer", "prenumerera",
+}
+
+_INTERNAL_KEYWORDS = {
+    "intern notering", "internt", "internal note", "team update",
+    "staff notice", "internal memo", "admin notice", "system notification",
+}
+
+_INVOICE_KEYWORDS = {"faktura", "invoice", "payment request", "billing document"}
+
+_SUPPLIER_KEYWORDS = {
+    "orderbekräftelse", "order confirmation", "leveransbekräftelse",
+    "delivery confirmation", "shipment notification", "din beställning",
+    "your order", "purchase confirmation", "order status", "material order",
+    "kvitto", "receipt",
+}
+
+_PARTNERSHIP_KEYWORDS = {
+    "samarbete", "partnership", "collaboration", "affiliate",
+    "business proposal", "b2b", "subcontractor", "partner opportunity",
+    "samarbetsförslag", "vi vill diskutera", "potentiellt samarbete",
+    "joint venture", "strategic alliance",
+}
 
 _LEAD_KEYWORDS = {
-    "offert", "pris", "köpa", "intresserad",
+    "offert", "pris", "köpa", "intresserad", "installation", "montering",
+    "besiktning", "reparation", "service", "bokning", "boka",
     "quote", "pricing", "buy", "purchase", "interested",
-    "demo", "trial",
+    "demo", "trial", "inspection", "repair",
 }
 
 
 def _classify_deterministic(subject: str, body: str) -> str:
-    """Return 'invoice', 'lead', or 'customer_inquiry' based on keyword match.
+    """Return a classification type based on keyword priority order.
 
-    Priority order: invoice > lead > customer_inquiry.
-    Checks combined subject+body text case-insensitively.
+    Priority: spam > newsletter > internal > invoice > supplier > partnership > lead > customer_inquiry
+    Never returns 'unknown' — that is reserved for the LLM.
     """
     return classify_email_type(subject, body)
 
 
 def classify_email_type(subject: str, body: str) -> str:
-    """Public deterministic classifier — invoice > lead > customer_inquiry.
+    """Public deterministic classifier for inbox taxonomy v2.
 
-    Reusable by any intake path (inbox, webhook, manual POST) so classification
-    rules stay in a single place.
+    Reusable by any intake path (inbox, webhook, manual POST).
+    Priority order: spam > newsletter > internal > invoice > supplier > partnership > lead > customer_inquiry
     """
     combined = f"{subject} {body}".lower()
+
+    if any(kw in combined for kw in _SPAM_KEYWORDS):
+        return "spam"
+    if any(kw in combined for kw in _NEWSLETTER_KEYWORDS):
+        return "newsletter"
+    if any(kw in combined for kw in _INTERNAL_KEYWORDS):
+        return "internal"
     if any(kw in combined for kw in _INVOICE_KEYWORDS):
         return "invoice"
+    if any(kw in combined for kw in _SUPPLIER_KEYWORDS):
+        return "supplier"
+    if any(kw in combined for kw in _PARTNERSHIP_KEYWORDS):
+        return "partnership"
     if any(kw in combined for kw in _LEAD_KEYWORDS):
         return "lead"
     return "customer_inquiry"

@@ -769,6 +769,12 @@ const JOB_TYPE_LABELS = {
   lead:                 'Nya leads',
   invoice:              'Fakturor',
   customer_inquiry:     'Kundförfrågningar',
+  partnership:          'Samarbete',
+  supplier:             'Leverantör',
+  newsletter:           'Nyhetsbrev',
+  internal:             'Internt',
+  spam:                 'Spam',
+  unknown:              'Okänd',
   lead_qualification:   'Kvalificering av leads',
   quote:                'Offerter',
   sales_followup:       'Säljuppföljning',
@@ -1751,7 +1757,15 @@ async function triggerInboxSync() {
 // Ärenden (Cases)
 // ---------------------------------------------------------------------------
 const CASE_TYPE_LABELS = {
-  lead: 'Lead', customer_inquiry: 'Supportärende', invoice: 'Faktura', unknown: 'Okänd',
+  lead:             'Lead',
+  customer_inquiry: 'Supportärende',
+  invoice:          'Faktura',
+  partnership:      'Samarbete',
+  supplier:         'Leverantör',
+  newsletter:       'Nyhetsbrev',
+  internal:         'Internt',
+  spam:             'Spam',
+  unknown:          'Okänd',
 };
 
 async function loadCases() {

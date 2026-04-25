@@ -243,7 +243,8 @@ class TestNotificationNotTriggered:
         _, mock_dispatch = _call(
             list_result=_list_result(["msg1"]),
             existing_jobs={"msg1": None},
-            detail_results={"msg1": _detail_result("msg1", subject="Hej, fråga om service")},
+            # Subject chosen to classify as customer_inquiry (no lead/invoice/partner keywords)
+            detail_results={"msg1": _detail_result("msg1", subject="Hej, när öppnar ni?")},
             pipeline_jobs={},
             tenant_config=_CONFIG_INQUIRY_DISABLED,
         )

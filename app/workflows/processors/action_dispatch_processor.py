@@ -396,6 +396,20 @@ def _build_invoice_default_actions(job: Job) -> list[dict[str, Any]]:
     ]
 
 
+# Visibility-only types: no customer-facing emails, no Monday routing.
+# Jobs are created and visible in cases/dashboard but no outbound actions fire.
+_VISIBILITY_ONLY_TYPES = frozenset({"partnership", "supplier", "newsletter", "internal", "spam"})
+
+
+def _build_visibility_only_actions(job: Job, detected_job_type: str) -> list[dict[str, Any]]:
+    """Return skipped sentinels for types that are tracked but not acted on."""
+    reason = f"No automation configured for classification type '{detected_job_type}'"
+    return [
+        _build_skipped_action("send_customer_auto_reply", reason),
+        _build_skipped_action("send_internal_handoff", reason),
+    ]
+
+
 def _build_fallback_actions(
     job: Job,
     automation_settings: dict[str, Any] | None = None,
@@ -404,6 +418,9 @@ def _build_fallback_actions(
     classification_payload = get_latest_processor_payload(job, "classification_processor")
 
     detected_job_type = classification_payload.get("detected_job_type", job.job_type.value)
+
+    if detected_job_type in _VISIBILITY_ONLY_TYPES:
+        return _build_visibility_only_actions(job, detected_job_type)
 
     if detected_job_type == "invoice":
         return _build_invoice_default_actions(job)

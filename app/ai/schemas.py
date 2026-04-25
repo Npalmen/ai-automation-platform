@@ -7,6 +7,11 @@ AllowedJobType = Literal[
     "invoice",
     "lead",
     "customer_inquiry",
+    "partnership",
+    "supplier",
+    "newsletter",
+    "internal",
+    "spam",
     "unknown",
 ]
 
