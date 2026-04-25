@@ -622,3 +622,17 @@ spam > newsletter > internal > invoice > supplier > partnership > lead > custome
 
 ### Tests
 1074/1074 pass
+## Completed slice (2026-04-25 — Cases UX Upgrade)
+
+- GET /cases extended: q search (ILIKE on job_id + input_data blob), type filter, status filter, sort_by (received_at/created_at/status/type), sort_dir (asc/desc), limit, offset
+- Response now includes: received_at, processed_at, customer_email, limit, offset per item
+- received_at stored in input_data during Gmail inbox ingestion (from Gmail Date header)
+- GET /cases/{job_id} includes received_at + processed_at
+- Ärenden tab UI: search input, type/status/sort dropdowns, pagination (Föregående/Nästa), Visar X–Y av Z; shows received_at as primary timestamp
+- 33 new tests in test_cases.py; 1107/1107 pass
+
+### received_at behavior
+- New Gmail inbox jobs: received_at stored in input_data from Gmail Date header
+- Existing jobs (created before this slice): received_at=null; UI falls back to processed_at
+- sort_by=received_at proxies to created_at at DB level (DB sort); frontend shows received_at when available
+- No schema migration needed — received_at lives in existing input_data JSON column

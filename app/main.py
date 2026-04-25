@@ -1154,6 +1154,7 @@ def _run_gmail_inbox_sync(
                 "message_id": message_id,
                 "thread_id": thread_id,
             },
+            "received_at": msg.get("received_at") or None,
         }
 
         if dry_run:
@@ -2195,79 +2196,131 @@ def scheduler_status(
     }
 
 
+_CASES_SORT_COLUMNS = {
+    "created_at":    lambda: JobRecord.created_at,
+    "received_at":   lambda: JobRecord.created_at,   # received_at not a DB column; proxy via created_at
+    "status":        lambda: JobRecord.status,
+    "type":          lambda: JobRecord.job_type,
+}
+
+_CASES_VALID_SORT_DIR = {"asc", "desc"}
+
+
+def _derive_case_fields(r: "JobRecord") -> dict:
+    """Extract derived display fields from a JobRecord (shared by list and detail)."""
+    inp = r.input_data or {}
+    result = r.result or {}
+    history = result.get("processor_history") or []
+
+    subject: str | None = inp.get("subject") or inp.get("latest_message_subject") or None
+
+    sender = inp.get("sender") or {}
+    customer_email: str | None = sender.get("email") or inp.get("sender_email") or None
+
+    customer_name: str | None = None
+    for entry in reversed(history):
+        p = (entry.get("result") or {}).get("payload") or {}
+        entities = p.get("entities") or {}
+        name = entities.get("customer_name")
+        if name:
+            customer_name = name
+            break
+    if not customer_name:
+        for entry in history:
+            p = (entry.get("result") or {}).get("payload") or {}
+            origin = p.get("origin") or {}
+            name = origin.get("sender_name")
+            if name:
+                customer_name = name
+                break
+    if not customer_name:
+        customer_name = sender.get("name") or inp.get("sender_name") or None
+
+    priority: str | None = None
+    for entry in reversed(history):
+        if entry.get("processor") == "action_dispatch_processor":
+            for action in ((entry.get("result") or {}).get("payload") or {}).get("actions_requested") or []:
+                p = action.get("column_values", {}).get("priority")
+                if p:
+                    priority = p.lower()
+                    break
+        if priority:
+            break
+
+    received_at: str | None = inp.get("received_at") or None
+    processed_at: str | None = r.created_at.isoformat() if r.created_at else None
+
+    return {
+        "subject":       subject,
+        "customer_name": customer_name,
+        "customer_email": customer_email,
+        "priority":      priority,
+        "received_at":   received_at,
+        "processed_at":  processed_at,
+    }
+
+
 @app.get("/cases")
 def list_cases(
     db: Session = Depends(get_db),
     tenant_id: str = Depends(get_verified_tenant),
-    limit: int = 25,
+    limit: int = 50,
     offset: int = 0,
     status: str | None = None,
     type: str | None = None,
+    q: str | None = None,
+    sort_by: str | None = None,
+    sort_dir: str | None = None,
 ):
-    """Tenant-scoped list of recent cases with derived subject/customer_name/priority."""
-    q = db.query(JobRecord).filter(JobRecord.tenant_id == tenant_id)
+    """Tenant-scoped list of cases with search, filter, sort, and pagination."""
+    from sqlalchemy import cast, String, or_
+
+    query = db.query(JobRecord).filter(JobRecord.tenant_id == tenant_id)
+
     if status:
-        q = q.filter(JobRecord.status == status)
+        query = query.filter(JobRecord.status == status)
     if type:
-        q = q.filter(JobRecord.job_type == type)
-    total = q.count()
-    records = q.order_by(JobRecord.created_at.desc()).offset(offset).limit(limit).all()
+        query = query.filter(JobRecord.job_type == type)
+
+    # Full-text search: ILIKE match against job_id and JSON input_data blob
+    if q and q.strip():
+        term = f"%{q.strip()}%"
+        query = query.filter(
+            or_(
+                JobRecord.job_id.ilike(term),
+                cast(JobRecord.input_data, String).ilike(term),
+            )
+        )
+
+    total = query.count()
+
+    # Sorting
+    sort_col_key = sort_by if sort_by in _CASES_SORT_COLUMNS else "created_at"
+    direction = (sort_dir or "desc").lower()
+    if direction not in _CASES_VALID_SORT_DIR:
+        direction = "desc"
+    col = _CASES_SORT_COLUMNS[sort_col_key]()
+    query = query.order_by(col.asc() if direction == "asc" else col.desc())
+
+    records = query.offset(offset).limit(limit).all()
 
     items = []
     for r in records:
-        inp = r.input_data or {}
-        result = r.result or {}
-        history = result.get("processor_history") or []
-
-        # Derive subject: prefer input_data.subject, then latest_message_subject
-        subject: str | None = inp.get("subject") or inp.get("latest_message_subject") or None
-
-        # Derive customer_name from entity extraction in processor_history
-        customer_name: str | None = None
-        for entry in reversed(history):
-            p = (entry.get("result") or {}).get("payload") or {}
-            entities = p.get("entities") or {}
-            name = entities.get("customer_name")
-            if name:
-                customer_name = name
-                break
-        # Fall back to intake origin sender_name
-        if not customer_name:
-            for entry in history:
-                p = (entry.get("result") or {}).get("payload") or {}
-                origin = p.get("origin") or {}
-                name = origin.get("sender_name")
-                if name:
-                    customer_name = name
-                    break
-        # Fall back to input_data sender
-        if not customer_name:
-            sender = inp.get("sender") or {}
-            customer_name = sender.get("name") or inp.get("sender_name") or None
-
-        # Derive priority from action_dispatch processor history
-        priority: str | None = None
-        for entry in reversed(history):
-            if entry.get("processor") == "action_dispatch_processor":
-                for action in ((entry.get("result") or {}).get("payload") or {}).get("actions_requested") or []:
-                    p = action.get("column_values", {}).get("priority")
-                    if p:
-                        priority = p.lower()
-                        break
-            if priority:
-                break
-
+        derived = _derive_case_fields(r)
         items.append({
-            "job_id":        r.job_id,
-            "created_at":    r.created_at.isoformat() if r.created_at else None,
-            "type":          r.job_type or "unknown",
-            "status":        r.status or "unknown",
-            "subject":       subject,
-            "customer_name": customer_name,
-            "priority":      priority,
+            "job_id":         r.job_id,
+            "created_at":     r.created_at.isoformat() if r.created_at else None,
+            "received_at":    derived["received_at"],
+            "processed_at":   derived["processed_at"],
+            "type":           r.job_type or "unknown",
+            "status":         r.status or "unknown",
+            "subject":        derived["subject"],
+            "customer_name":  derived["customer_name"],
+            "customer_email": derived["customer_email"],
+            "priority":       derived["priority"],
         })
 
-    return {"items": items, "total": total}
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @app.get("/cases/{job_id}")
@@ -2386,10 +2439,15 @@ def get_case(
         if priority:
             break
 
+    received_at: str | None = inp.get("received_at") or None
+    processed_at: str | None = r.created_at.isoformat() if r.created_at else None
+
     return {
         "job_id":           r.job_id,
         "created_at":       r.created_at.isoformat() if r.created_at else None,
         "updated_at":       r.updated_at.isoformat() if r.updated_at else None,
+        "received_at":      received_at,
+        "processed_at":     processed_at,
         "type":             r.job_type or "unknown",
         "status":           r.status or "unknown",
         "priority":         priority,

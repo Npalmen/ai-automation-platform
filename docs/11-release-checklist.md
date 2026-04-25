@@ -31,6 +31,7 @@
 - [x] Runtime schema safeguard — ensure_runtime_schema() adds missing tenant_configs.settings column at startup; idempotent; fails loudly if blocked
 - [x] Customer Auto-Reply + Internal Handoff — send_customer_auto_reply + send_internal_handoff injected for lead + inquiry; gated by followups_enabled + customer email; skipped actions persisted with reason; UI labels updated
 - [x] Classification v2 — 9-type taxonomy (lead/inquiry/invoice/partnership/supplier/newsletter/internal/spam/unknown); deterministic keyword rules; visibility-only types produce skipped sentinels only; 52 new tests; Swedish UI labels
+- [x] Cases UX Upgrade — search (q ILIKE), filter (type/status), sort (received_at/created_at/status/type + asc/desc), pagination (limit/offset); received_at + processed_at in list + detail; customer_email in list; Gmail inbox stores received_at; UI: search/filter/sort/pagination controls; 33 new tests
 
 ## Docs
 - [x] current-state updated

@@ -36,8 +36,9 @@ The following has been confirmed through real API calls against a running instan
 | Runtime schema safeguard | ✅ IMPLEMENTED | `ensure_runtime_schema(engine)` called at startup after `create_all`; runs `ALTER TABLE tenant_configs ADD COLUMN IF NOT EXISTS settings JSON`; idempotent; fails startup loudly if migration cannot run |
 | Customer Auto-Reply + Internal Handoff | ✅ IMPLEMENTED | `send_customer_auto_reply` (Swedish confirmation to sender) + `send_internal_handoff` (structured lead/support summary to internal team) injected for lead + inquiry flows; gated by `followups_enabled` and presence of customer email; skipped actions persisted with `status=skipped` and skip reason; `skipped_count` + `actions_skipped` in dispatch result |
 | Classification v2 / Inbox Taxonomy | ✅ IMPLEMENTED | 9-type taxonomy: lead, customer_inquiry, invoice, partnership, supplier, newsletter, internal, spam, unknown; deterministic keyword rules with priority order (spam > newsletter > internal > invoice > supplier > partnership > lead > customer_inquiry); visibility-only types (partnership/supplier/newsletter/internal/spam) produce only skipped sentinels — no customer emails; `AllowedJobType` extended in AI schema; 5 new `JobType` enum values; Swedish labels in UI |
+| Cases UX Upgrade | ✅ IMPLEMENTED | `GET /cases` now supports `q` (search subject/customer/email/job_id via ILIKE), `type`, `status`, `sort_by` (received_at/created_at/status/type), `sort_dir` (asc/desc), `limit`, `offset`; response includes `received_at`, `processed_at`, `customer_email`, `limit`, `offset`; `GET /cases/{job_id}` includes `received_at`+`processed_at`; `received_at` stored in `input_data` during Gmail inbox ingestion; Ärenden UI has search/filter/sort/pagination controls with Swedish labels |
 | UI action label map | ✅ IMPLEMENTED | Case View renders human-readable labels: Kundsvar / Intern notifiering / Monday-objekt / Slack-notis / etc.; shows recipient and Gmail message_id when available |
-| 1074 tests passing | ✅ | `python -m pytest` |
+| 1107 tests passing | ✅ | `python -m pytest` |
 
 ---
 

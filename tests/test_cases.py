@@ -60,6 +60,11 @@ def _list(
     total: int | None = None,
     status: str | None = None,
     type_: str | None = None,
+    q: str | None = None,
+    sort_by: str | None = None,
+    sort_dir: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
 ):
     from app.main import list_cases
 
@@ -73,8 +78,10 @@ def _list(
     mock_q.count.return_value = total if total is not None else len(records or [])
     mock_q.all.return_value = records or []
 
-    return list_cases(db=db, tenant_id=tenant_id, limit=25, offset=0,
-                      status=status, type=type_)
+    return list_cases(
+        db=db, tenant_id=tenant_id, limit=limit, offset=offset,
+        status=status, type=type_, q=q, sort_by=sort_by, sort_dir=sort_dir,
+    )
 
 
 def _get(
@@ -331,3 +338,214 @@ class TestGetCaseContent:
         r = _get(record=rec)
         assert r["type"] == "customer_inquiry"
         assert r["status"] == "awaiting_approval"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GET /cases — received_at / processed_at fields
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestReceivedAt:
+    def test_list_item_has_received_at_field(self):
+        rec = _make_record()
+        item = _list(records=[rec])["items"][0]
+        assert "received_at" in item
+
+    def test_list_item_has_processed_at_field(self):
+        rec = _make_record()
+        item = _list(records=[rec])["items"][0]
+        assert "processed_at" in item
+
+    def test_received_at_from_input_data(self):
+        rec = _make_record(input_data={"received_at": "Mon, 22 Apr 2026 10:00:00 +0000"})
+        item = _list(records=[rec])["items"][0]
+        assert item["received_at"] == "Mon, 22 Apr 2026 10:00:00 +0000"
+
+    def test_received_at_null_when_absent(self):
+        rec = _make_record(input_data={})
+        item = _list(records=[rec])["items"][0]
+        assert item["received_at"] is None
+
+    def test_processed_at_equals_created_at_iso(self):
+        rec = _make_record()
+        item = _list(records=[rec])["items"][0]
+        assert item["processed_at"] == _NOW.isoformat()
+
+    def test_get_case_has_received_at(self):
+        rec = _make_record(input_data={"received_at": "Tue, 23 Apr 2026 08:00:00 +0000"})
+        r = _get(record=rec)
+        assert r["received_at"] == "Tue, 23 Apr 2026 08:00:00 +0000"
+
+    def test_get_case_has_processed_at(self):
+        rec = _make_record()
+        r = _get(record=rec)
+        assert r["processed_at"] == _NOW.isoformat()
+
+    def test_get_case_received_at_null_when_absent(self):
+        rec = _make_record(input_data={})
+        r = _get(record=rec)
+        assert r["received_at"] is None
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GET /cases — pagination response fields
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestListCasesPagination:
+    def test_response_includes_limit(self):
+        r = _list(records=[], total=0, limit=10)
+        assert r["limit"] == 10
+
+    def test_response_includes_offset(self):
+        r = _list(records=[], total=0, offset=20)
+        assert r["offset"] == 20
+
+    def test_default_limit_is_50(self):
+        import inspect
+        from app.main import list_cases
+        sig = inspect.signature(list_cases)
+        assert sig.parameters["limit"].default == 50
+
+    def test_default_offset_is_0(self):
+        import inspect
+        from app.main import list_cases
+        sig = inspect.signature(list_cases)
+        assert sig.parameters["offset"].default == 0
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GET /cases — new classification types
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestNewClassificationTypes:
+    def test_partnership_type_returned(self):
+        rec = _make_record(job_type="partnership")
+        item = _list(records=[rec])["items"][0]
+        assert item["type"] == "partnership"
+
+    def test_supplier_type_returned(self):
+        rec = _make_record(job_type="supplier")
+        item = _list(records=[rec])["items"][0]
+        assert item["type"] == "supplier"
+
+    def test_newsletter_type_returned(self):
+        rec = _make_record(job_type="newsletter")
+        item = _list(records=[rec])["items"][0]
+        assert item["type"] == "newsletter"
+
+    def test_spam_type_returned(self):
+        rec = _make_record(job_type="spam")
+        item = _list(records=[rec])["items"][0]
+        assert item["type"] == "spam"
+
+    def test_internal_type_returned(self):
+        rec = _make_record(job_type="internal")
+        item = _list(records=[rec])["items"][0]
+        assert item["type"] == "internal"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GET /cases — sort_by / sort_dir validation
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestListCasesSort:
+    def test_invalid_sort_by_defaults_safely(self):
+        r = _list(records=[], sort_by="garbage_column")
+        assert "items" in r
+
+    def test_invalid_sort_dir_defaults_safely(self):
+        r = _list(records=[], sort_dir="sideways")
+        assert "items" in r
+
+    def test_sort_by_received_at_accepted(self):
+        r = _list(records=[], sort_by="received_at")
+        assert "items" in r
+
+    def test_sort_by_created_at_accepted(self):
+        r = _list(records=[], sort_by="created_at")
+        assert "items" in r
+
+    def test_sort_by_status_accepted(self):
+        r = _list(records=[], sort_by="status")
+        assert "items" in r
+
+    def test_sort_by_type_accepted(self):
+        r = _list(records=[], sort_by="type")
+        assert "items" in r
+
+    def test_sort_dir_asc_accepted(self):
+        r = _list(records=[], sort_dir="asc")
+        assert "items" in r
+
+    def test_sort_dir_desc_accepted(self):
+        r = _list(records=[], sort_dir="desc")
+        assert "items" in r
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GET /cases — customer_email in list response
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestListCasesCustomerEmail:
+    def test_customer_email_from_sender(self):
+        rec = _make_record(input_data={"sender": {"name": "Alice", "email": "alice@ex.com"}})
+        item = _list(records=[rec])["items"][0]
+        assert item.get("customer_email") == "alice@ex.com"
+
+    def test_customer_email_null_when_absent(self):
+        rec = _make_record(input_data={})
+        item = _list(records=[rec])["items"][0]
+        assert item.get("customer_email") is None
+
+    def test_customer_email_in_item_keys(self):
+        rec = _make_record()
+        item = _list(records=[rec])["items"][0]
+        assert "customer_email" in item
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GET /cases — tenant isolation with new params
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestListCasesTenantIsolationExtended:
+    def test_tenant_isolation_with_search(self):
+        from app.main import list_cases
+        db = MagicMock()
+        mock_q = MagicMock()
+        db.query.return_value = mock_q
+        mock_q.filter.return_value = mock_q
+        mock_q.order_by.return_value = mock_q
+        mock_q.offset.return_value = mock_q
+        mock_q.limit.return_value = mock_q
+        mock_q.count.return_value = 0
+        mock_q.all.return_value = []
+        list_cases(db=db, tenant_id="TENANT_X", limit=50, offset=0,
+                   status=None, type=None, q="search term",
+                   sort_by="received_at", sort_dir="desc")
+        assert db.query.called
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GET /cases/{job_id} — received_at / processed_at in detail
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestGetCaseTimestamps:
+    def test_detail_has_received_at_key(self):
+        rec = _make_record()
+        r = _get(record=rec)
+        assert "received_at" in r
+
+    def test_detail_has_processed_at_key(self):
+        rec = _make_record()
+        r = _get(record=rec)
+        assert "processed_at" in r
+
+    def test_detail_received_at_from_input_data(self):
+        ts = "Wed, 24 Apr 2026 09:30:00 +0000"
+        rec = _make_record(input_data={"received_at": ts})
+        r = _get(record=rec)
+        assert r["received_at"] == ts
+
+    def test_detail_processed_at_is_created_at_iso(self):
+        rec = _make_record()
+        r = _get(record=rec)
+        assert r["processed_at"] == _NOW.isoformat()

@@ -616,17 +616,60 @@ pre {
 <!-- ══════════════════════════════════════════════════════════════ ÄRENDEN -->
 <div id="viewCases" style="display:none; padding:24px; overflow-y:auto; flex:1;">
 
-  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
     <h1 style="font-size:18px; font-weight:700; color:#111; margin:0;">Ärenden</h1>
     <button class="btn btn-primary btn-sm" onclick="loadCases()">Uppdatera</button>
+  </div>
+
+  <!-- Search + filter bar -->
+  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; align-items:center;">
+    <input id="casesQ" type="text" placeholder="Sök ämne, kund, job-id…"
+      style="flex:1; min-width:160px; padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;"
+      onkeydown="if(event.key==='Enter') loadCases()">
+    <select id="casesType" style="padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;" onchange="loadCases()">
+      <option value="">Filtrera typ</option>
+      <option value="lead">Lead</option>
+      <option value="customer_inquiry">Supportärende</option>
+      <option value="invoice">Faktura</option>
+      <option value="partnership">Samarbete</option>
+      <option value="supplier">Leverantör</option>
+      <option value="newsletter">Nyhetsbrev</option>
+      <option value="internal">Internt</option>
+      <option value="spam">Spam</option>
+      <option value="unknown">Okänd</option>
+    </select>
+    <select id="casesStatus" style="padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;" onchange="loadCases()">
+      <option value="">Filtrera status</option>
+      <option value="pending">Pending</option>
+      <option value="processing">Processing</option>
+      <option value="completed">Completed</option>
+      <option value="failed">Failed</option>
+      <option value="awaiting_approval">Awaiting approval</option>
+      <option value="manual_review">Manual review</option>
+    </select>
+    <select id="casesSortBy" style="padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;" onchange="loadCases()">
+      <option value="received_at">Mottaget</option>
+      <option value="created_at">Behandlat</option>
+      <option value="status">Status</option>
+      <option value="type">Typ</option>
+    </select>
+    <select id="casesSortDir" style="padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;" onchange="loadCases()">
+      <option value="desc">Nyast först</option>
+      <option value="asc">Äldst först</option>
+    </select>
   </div>
 
   <div id="casesError" class="msg msg-error" style="display:none;"></div>
 
   <!-- Cases list -->
   <div id="casesListWrap" style="margin-bottom:28px;">
-    <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Senaste ärenden</h2>
     <div id="casesList"><span class="empty">Laddar…</span></div>
+    <!-- Pagination -->
+    <div id="casesPagination" style="display:none; margin-top:10px; display:flex; align-items:center; gap:10px; font-size:13px;">
+      <button id="casesPrev" class="btn btn-neutral btn-sm" onclick="casesPrevPage()" disabled>Föregående</button>
+      <span id="casesPageInfo" style="color:#6b7280;">–</span>
+      <button id="casesNext" class="btn btn-neutral btn-sm" onclick="casesNextPage()" disabled>Nästa</button>
+    </div>
   </div>
 
   <!-- Case detail panel -->
@@ -1768,20 +1811,49 @@ const CASE_TYPE_LABELS = {
   unknown:          'Okänd',
 };
 
-async function loadCases() {
+let _casesOffset = 0;
+const _casesLimit = 50;
+
+function _getCasesParams(offset) {
+  const q       = (document.getElementById('casesQ')       || {}).value || '';
+  const type    = (document.getElementById('casesType')    || {}).value || '';
+  const status  = (document.getElementById('casesStatus')  || {}).value || '';
+  const sortBy  = (document.getElementById('casesSortBy')  || {}).value || 'received_at';
+  const sortDir = (document.getElementById('casesSortDir') || {}).value || 'desc';
+  const params = new URLSearchParams({
+    limit: _casesLimit,
+    offset: offset,
+    sort_by: sortBy,
+    sort_dir: sortDir,
+  });
+  if (q.trim())     params.set('q', q.trim());
+  if (type.trim())  params.set('type', type.trim());
+  if (status.trim()) params.set('status', status.trim());
+  return params.toString();
+}
+
+async function loadCases(resetOffset) {
+  if (resetOffset !== false) _casesOffset = 0;
   const listEl  = document.getElementById('casesList');
   const errEl   = document.getElementById('casesError');
   const detailW = document.getElementById('caseDetailWrap');
   const listW   = document.getElementById('casesListWrap');
+  const pagEl   = document.getElementById('casesPagination');
   errEl.style.display = 'none';
   detailW.style.display = 'none';
   listW.style.display   = 'block';
   listEl.innerHTML = '<span class="empty">Laddar…</span>';
 
   try {
-    const r = await apiFetch('/cases?limit=50');
+    const r = await apiFetch('/cases?' + _getCasesParams(_casesOffset));
+    const total  = r.total || 0;
+    const offset = r.offset || 0;
+    const limit  = r.limit  || _casesLimit;
+    const end    = Math.min(offset + limit, total);
+
     if (!r.items || r.items.length === 0) {
-      listEl.innerHTML = '<span class="empty">Inga ärenden ännu.</span>';
+      listEl.innerHTML = '<span class="empty">Inga ärenden matchar filtret.</span>';
+      if (pagEl) pagEl.style.display = 'none';
       return;
     }
     const rows = r.items.map(item => {
@@ -1789,9 +1861,14 @@ async function loadCases() {
       const status  = item.status ? statusBadge(item.status) : '–';
       const subject = item.subject ? escapeHtml(item.subject) : '<span style="color:#9ca3af">–</span>';
       const cust    = item.customer_name ? escapeHtml(item.customer_name) : '<span style="color:#9ca3af">–</span>';
-      const ts      = item.created_at ? new Date(item.created_at).toLocaleString('sv-SE') : '–';
+      // Prefer received_at (original email time), fall back to processed_at/created_at
+      const rawTs   = item.received_at || item.processed_at || item.created_at;
+      const ts      = rawTs ? new Date(rawTs).toLocaleString('sv-SE') : '–';
+      const tsTitle = item.received_at
+        ? `Mottaget: ${new Date(item.received_at).toLocaleString('sv-SE')}\nBehandlat: ${item.processed_at ? new Date(item.processed_at).toLocaleString('sv-SE') : '–'}`
+        : '';
       return `<tr style="cursor:pointer;" onclick="openCase('${escapeHtml(item.job_id)}')">
-        <td style="color:#888; white-space:nowrap">${ts}</td>
+        <td style="color:#888; white-space:nowrap" title="${escapeHtml(tsTitle)}">${ts}</td>
         <td>${escapeHtml(type)}</td>
         <td>${subject}</td>
         <td>${status}</td>
@@ -1801,16 +1878,36 @@ async function loadCases() {
     listEl.innerHTML = `
       <table class="act-table">
         <thead><tr>
-          <th>Datum</th><th>Typ</th><th>Ämne</th><th>Status</th><th>Kund</th>
+          <th>Mottaget</th><th>Typ</th><th>Ämne</th><th>Status</th><th>Kund</th>
         </tr></thead>
         <tbody>${rows}</tbody>
-      </table>
-      <div style="font-size:11px; color:#9ca3af; margin-top:8px;">Visar ${r.items.length} av ${r.total} ärenden</div>`;
+      </table>`;
+
+    // Pagination
+    if (pagEl) {
+      pagEl.style.display = 'flex';
+      const infoEl = document.getElementById('casesPageInfo');
+      const prevBtn = document.getElementById('casesPrev');
+      const nextBtn = document.getElementById('casesNext');
+      if (infoEl) infoEl.textContent = `Visar ${offset + 1}–${end} av ${total}`;
+      if (prevBtn) prevBtn.disabled = offset === 0;
+      if (nextBtn) nextBtn.disabled = end >= total;
+    }
   } catch (e) {
     errEl.textContent = 'Kunde inte ladda ärenden: ' + escapeHtml(e.message);
     errEl.style.display = 'block';
     listEl.innerHTML = '';
   }
+}
+
+function casesPrevPage() {
+  _casesOffset = Math.max(0, _casesOffset - _casesLimit);
+  loadCases(false);
+}
+
+function casesNextPage() {
+  _casesOffset += _casesLimit;
+  loadCases(false);
 }
 
 async function openCase(jobId) {
@@ -1830,6 +1927,10 @@ async function openCase(jobId) {
     const c = await apiFetch('/cases/' + encodeURIComponent(jobId));
     titleEl.textContent = `Ärende ${c.job_id} · ${CASE_TYPE_LABELS[c.type] || c.type} · ${c.status}`;
 
+    // timestamps
+    const receivedTs  = c.received_at  ? new Date(c.received_at).toLocaleString('sv-SE')  : '–';
+    const processedTs = c.processed_at ? new Date(c.processed_at).toLocaleString('sv-SE') : '–';
+
     // original message
     const om = c.original_message || {};
     const omHtml = `
@@ -1837,6 +1938,7 @@ async function openCase(jobId) {
         <h3 style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; margin:0 0 10px;">Ursprungligt mail</h3>
         <div style="font-size:13px; margin-bottom:4px;"><strong>Från:</strong> ${escapeHtml(om.from || '–')} &lt;${escapeHtml(om.email || '–')}&gt;</div>
         <div style="font-size:13px; margin-bottom:4px;"><strong>Ämne:</strong> ${escapeHtml(c.subject || '–')}</div>
+        <div style="font-size:12px; color:#6b7280; margin-bottom:4px;">Mottaget: ${receivedTs} · Behandlat: ${processedTs}</div>
         <pre style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:10px; font-size:12px; white-space:pre-wrap; margin:8px 0 0;">${escapeHtml(om.body || '–')}</pre>
       </div>`;
 
