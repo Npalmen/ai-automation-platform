@@ -113,14 +113,35 @@
 - [x] `tests/test_followup_engine.py` — 23 tests; `tests/test_inquiry_default_actions.py` fix (1 test)
 - [x] 725/725 tests pass
 
+## Done (Customer Auto-Reply + Internal Handoff — 2026-04-25)
+- [x] `send_customer_auto_reply` + `send_internal_handoff` injected for lead + inquiry fallback pipelines
+- [x] Gated by `followups_enabled` + presence of customer email; skipped conditions produce `_skip` sentinel
+- [x] `skipped_actions` / `skipped_count` in dispatch result payload
+- [x] UI action label map: Kundsvar / Intern notifiering / Monday-objekt / Slack-notis / etc.
+- [x] `tests/test_auto_reply_handoff.py` — 22 tests; 1022/1022 pass
+
+## Done (Classification v2 / Better Inbox Taxonomy — 2026-04-25)
+- [x] 9-type taxonomy: lead, customer_inquiry, invoice, partnership, supplier, newsletter, internal, spam, unknown
+- [x] Priority order (deterministic): spam > newsletter > internal > invoice > supplier > partnership > lead > customer_inquiry
+- [x] Visibility-only types (partnership/supplier/newsletter/internal/spam): only skipped sentinels — no customer emails
+- [x] `AllowedJobType` extended in AI schema; 5 new `JobType` enum values
+- [x] Swedish labels in UI `JOB_TYPE_LABELS` + `CASE_TYPE_LABELS`
+- [x] `tests/test_classification_v2.py` — 52 new tests; 1074/1074 pass
+
+## Done (Cases UX Upgrade — 2026-04-25)
+- [x] `GET /cases`: q (ILIKE search on job_id + input_data), type, status, sort_by, sort_dir, limit, offset
+- [x] Response includes: received_at, processed_at, customer_email, limit, offset
+- [x] `received_at` stored in `input_data` during Gmail inbox ingestion (from Gmail Date header)
+- [x] `GET /cases/{job_id}` includes received_at + processed_at
+- [x] Ärenden tab UI: search/filter/sort/pagination controls; Swedish labels; received_at as primary timestamp
+- [x] 33 new tests in test_cases.py; 1107/1107 pass
+
 ## Next (priority order)
-- [ ] Thread continuation — when customer replies to follow-up email, match reply to original job and update it rather than creating a new job
-- [ ] Post-MVP activity view — operator visibility into jobs, outcomes, tenant health in UI
-- [ ] Scheduler / cron trigger — periodic external call to `POST /gmail/process-inbox`
+- [ ] Monday Routing v2 — DEFERRED; per-job-type Monday board/group routing based on tenant config; deprioritized in favour of pipeline polish
+- [ ] Dashboard polish — date-range filters, charts, auto-refresh interval
+- [ ] Scheduler / cron trigger — external periodic call to `POST /scheduler/run-once`
 
 ## Future UI improvements (out of current scope)
-- [ ] Filtering and search — filter jobs by status, type, date range
-- [ ] Pagination controls — currently UI fetches first 100; add next/prev
 - [ ] Audit log view — surface `GET /audit-events` in the UI
 - [ ] Retries / re-run — trigger re-processing of failed jobs
 - [ ] Notifications — surface action failures inline without manual refresh

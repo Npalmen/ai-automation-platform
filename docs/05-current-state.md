@@ -61,7 +61,7 @@ These are sharp edges discovered during live testing. Each one has caused a real
 
 ---
 
-## What works (as of 2026-04-14)
+## What works (as of 2026-04-25)
 
 ### Core pipeline
 - `/jobs` endpoint accepts jobs and runs the full pipeline synchronously
@@ -150,7 +150,10 @@ This is a complete manual-trigger ingestion → decision → action flow, confir
 - Gmail `body_text` is empty for HTML-only emails — no HTML-to-text conversion
 - Monday `board_id` is env-only — no per-request override
 - No DB migration tooling — schema changes require manual intervention
-- No pagination in the UI — API supports it via query params
+- Search on `input_data` JSON blob uses `ILIKE` cast — works on PostgreSQL; not indexed (acceptable for MVP volumes)
+- `sort_by=received_at` proxies to `created_at` at DB level — same order for inbox jobs (processed within seconds of receipt)
+- Visibility-only classification types (partnership/supplier/newsletter/internal/spam) produce only skipped sentinels — no customer email sent; cases appear in Ärenden with skip reason
+- No pagination in the UI — API supports it via query params (Ärenden tab has pagination controls; other tabs do not)
 - No auto-refresh in the UI — all loads are manual
 - `app/api/routes/jobs.py` is dead code (not mounted)
 - Gmail and Monday are current test integrations — business logic is source/destination agnostic and works with any future adapter
