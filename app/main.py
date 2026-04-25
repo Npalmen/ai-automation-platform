@@ -2554,6 +2554,88 @@ def put_tenant_memory(
 
 
 # ---------------------------------------------------------------------------
+# Routing Hint Drafts
+# ---------------------------------------------------------------------------
+
+_SUPPORTED_HINT_JOB_TYPES: set[str] = {
+    "lead", "customer_inquiry", "invoice", "partnership", "supplier", "support", "internal",
+}
+
+_HINT_TARGET_KEYS: set[str] = {"board_id", "board_name", "group_id", "group_name"}
+_HINT_TOP_KEYS:    set[str] = {"system", "target", "confidence", "reason"}
+_VALID_CONFIDENCES: set[str] = {"high", "medium", "low"}
+
+
+def _validate_hint(hint: dict, job_type: str) -> None:
+    """Raise HTTPException(422) if hint shape is invalid."""
+    unknown_top = set(hint) - _HINT_TOP_KEYS
+    if unknown_top:
+        raise HTTPException(status_code=422, detail=f"Unknown hint key(s) for '{job_type}': {sorted(unknown_top)}")
+    if "system" not in hint or not hint["system"]:
+        raise HTTPException(status_code=422, detail=f"Hint for '{job_type}' missing 'system'")
+    if "target" not in hint or not isinstance(hint["target"], dict):
+        raise HTTPException(status_code=422, detail=f"Hint for '{job_type}' missing or invalid 'target'")
+    unknown_target = set(hint["target"]) - _HINT_TARGET_KEYS
+    if unknown_target:
+        raise HTTPException(status_code=422, detail=f"Unknown target key(s) for '{job_type}': {sorted(unknown_target)}")
+    confidence = hint.get("confidence")
+    if confidence is not None and confidence not in _VALID_CONFIDENCES:
+        raise HTTPException(status_code=422, detail=f"Invalid confidence '{confidence}' for '{job_type}'. Must be high/medium/low")
+
+
+@app.get("/tenant/routing-hint-drafts")
+def get_routing_hint_drafts(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return deterministic routing hint drafts based on current tenant memory (read-only)."""
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    from app.workflows.scanners.routing_hint_drafts import generate_routing_hint_drafts
+    s = TenantConfigRepository.get_settings(db, tenant_id)
+    memory = _get_memory(s)
+    return generate_routing_hint_drafts(memory)
+
+
+class RoutingHintApplyRequest(_BaseModel):
+    routing_hints: dict
+
+
+@app.post("/tenant/routing-hints/apply")
+def apply_routing_hints(
+    request: RoutingHintApplyRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Merge operator-selected routing hints into tenant memory.
+
+    Only keys present in the request body are updated — existing hints for
+    other job types are preserved.  system_map and business_profile are
+    never modified.  No external systems are touched.
+    """
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    for job_type, hint in request.routing_hints.items():
+        if job_type not in _SUPPORTED_HINT_JOB_TYPES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unsupported job type '{job_type}'. Supported: {sorted(_SUPPORTED_HINT_JOB_TYPES)}",
+            )
+        if hint is not None:
+            if not isinstance(hint, dict):
+                raise HTTPException(status_code=422, detail=f"Hint for '{job_type}' must be an object or null")
+            _validate_hint(hint, job_type)
+
+    existing = TenantConfigRepository.get_settings(db, tenant_id)
+    current_memory = _get_memory(existing)
+    current_memory["routing_hints"].update(request.routing_hints)
+    updated = dict(existing)
+    updated["memory"] = current_memory
+    TenantConfigRepository.update_settings(db, tenant_id, updated)
+    return {"status": "ok", "routing_hints": current_memory["routing_hints"]}
+
+
+# ---------------------------------------------------------------------------
 # Workflow Scanner Engine
 # ---------------------------------------------------------------------------
 

@@ -773,3 +773,45 @@ Monday.com board structure was not visible to the AI memory system. Operators ha
 
 ### Tests
 46 new tests in `tests/test_monday_scanner.py`. All 1187 pre-existing tests still pass. **1233/1233 total.**
+
+## Completed slice (2026-04-26 — Routing Hint Drafts + Review-first apply)
+
+### Problem solved
+Scanner results were informational only — operators could see board structure but had no workflow to convert that knowledge into actionable routing. This slice adds a review-first suggestion loop: the platform generates draft hints, the operator reviews them in the UI, and only explicitly saved hints become active. No auto-routing, no external writes.
+
+### What was built
+
+**`app/workflows/scanners/routing_hint_drafts.py`** — new file
+
+| Function | Role |
+|----------|------|
+| `generate_routing_hint_drafts(tenant_memory)` | Pure function; inspects `system_map.monday.boards`; for each of 7 supported job types returns a hint dict or null |
+| `_best_monday_candidate(boards, job_type)` | Prioritizes `detected_purpose` exact match (high confidence) over board name keyword match (medium/low); multiple candidates → first wins, confidence reduced |
+| `_board_name_matches(board_name, job_type)` | Keyword lookup from `_NAME_KEYWORDS` dict — same vocabulary as the Monday scanner |
+
+Confidence rules:
+- 1 board with matching purpose → `high`
+- 2+ boards with matching purpose → `medium`, first board chosen
+- 1 board with matching name → `medium`
+- 2+ boards with matching name → `low`, first board chosen
+- No match → `null`
+
+**`app/main.py`** — two new endpoints
+
+| Endpoint | Behaviour |
+|----------|-----------|
+| `GET /tenant/routing-hint-drafts` | Reads tenant memory, calls `generate_routing_hint_drafts()`, returns drafts. Read-only. |
+| `POST /tenant/routing-hints/apply` | Validates hint shape (422 on unsupported job type, non-dict hint, missing `system`, bad `confidence`, unknown keys); merges only provided keys into `memory.routing_hints`; preserves `business_profile` and `system_map`; no external writes |
+
+**`app/ui/index.html`** — Kundminne tab additions
+- "Föreslå routing" button calls `GET /tenant/routing-hint-drafts`, populates editable textarea
+- "Spara routing-hints" button calls `POST /tenant/routing-hints/apply` with textarea contents, reloads memory on success
+
+### Important constraints
+- Routing hints are **suggestions only** — operators must explicitly save/apply them
+- `POST /tenant/routing-hints/apply` modifies only `memory.routing_hints` — no other memory keys, no external systems, no Monday items
+- No auto-routing behavior changed
+- Scanner system_map is read-only input to the hint generator
+
+### Tests
+34 new tests in `tests/test_routing_hint_drafts.py`. All 1233 pre-existing tests still pass. **1267/1267 total.**

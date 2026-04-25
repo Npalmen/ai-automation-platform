@@ -898,6 +898,20 @@ pre {
     <div id="memDiscoveredSystems" style="font-size:13px; color:#555;">Ingen scanningsdata ännu.</div>
   </div>
 
+  <!-- Routing-hint-förslag -->
+  <div class="setup-card" style="margin-bottom:20px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+      <h2 style="font-size:14px; font-weight:700; margin:0;">Föreslagna routing-hints</h2>
+      <button class="btn btn-primary btn-sm" id="proposeHintsBtn" onclick="proposeRoutingHints()">Föreslå routing</button>
+    </div>
+    <p style="font-size:12px; color:#666; margin-bottom:12px;">Förslag baserade på scannade Monday-boards. Granska och spara de hints du vill aktivera.</p>
+    <div id="routingDraftMsg" class="msg" style="display:none; margin-bottom:8px;"></div>
+    <textarea id="routingHintDrafts" rows="12" style="width:100%; font-family:monospace; font-size:12px; border:1px solid #ccc; border-radius:3px; padding:8px; resize:vertical;" placeholder="Klicka 'Föreslå routing' för att generera förslag…"></textarea>
+    <div style="margin-top:10px;">
+      <button class="btn btn-primary btn-sm" onclick="applyRoutingHints()">Spara routing-hints</button>
+    </div>
+  </div>
+
   <button class="btn btn-primary" onclick="saveMemory()">Spara kundminne</button>
 
 </div><!-- /viewMemory -->
@@ -2387,6 +2401,53 @@ async function scanWorkflowSystem(system) {
 
 async function scanGmail()  { return scanWorkflowSystem('gmail');  }
 async function scanMonday() { return scanWorkflowSystem('monday'); }
+
+async function proposeRoutingHints() {
+  const btn = document.getElementById('proposeHintsBtn');
+  const draftMsg = document.getElementById('routingDraftMsg');
+  draftMsg.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Hämtar…';
+  try {
+    const drafts = await apiFetch('/tenant/routing-hint-drafts');
+    document.getElementById('routingHintDrafts').value = JSON.stringify(drafts, null, 2);
+  } catch (e) {
+    draftMsg.className = 'msg msg-error';
+    draftMsg.textContent = 'Kunde inte hämta förslag: ' + e.message;
+    draftMsg.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Föreslå routing';
+  }
+}
+
+async function applyRoutingHints() {
+  const draftMsg = document.getElementById('routingDraftMsg');
+  draftMsg.style.display = 'none';
+  let hints;
+  try {
+    hints = JSON.parse(document.getElementById('routingHintDrafts').value || '{}');
+  } catch (e) {
+    draftMsg.className = 'msg msg-error';
+    draftMsg.textContent = 'Ogiltig JSON: ' + e.message;
+    draftMsg.style.display = 'block';
+    return;
+  }
+  try {
+    await apiFetch('/tenant/routing-hints/apply', {
+      method: 'POST',
+      body: JSON.stringify({ routing_hints: hints }),
+    });
+    draftMsg.className = 'msg msg-success';
+    draftMsg.textContent = 'Routing-hints sparade.';
+    draftMsg.style.display = 'block';
+    await loadMemory();
+  } catch (e) {
+    draftMsg.className = 'msg msg-error';
+    draftMsg.textContent = 'Kunde inte spara: ' + e.message;
+    draftMsg.style.display = 'block';
+  }
+}
 
 async function saveMemory() {
   const msg = document.getElementById('memoryMsg');
