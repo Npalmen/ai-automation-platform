@@ -815,3 +815,42 @@ Confidence rules:
 
 ### Tests
 34 new tests in `tests/test_routing_hint_drafts.py`. All 1233 pre-existing tests still pass. **1267/1267 total.**
+
+## Completed slice (2026-04-26 — Routing Preview + Readiness)
+
+### Problem solved
+Routing hints were saved but invisible inside operations. Operators had no way to verify whether routing was correctly configured for each job type, and case detail gave no indication of where a job would be routed. This slice makes routing hints operationally visible — still preview only, no external writes.
+
+### What was built
+
+**`app/workflows/scanners/routing_preview.py`** — new file
+
+| Function | Role |
+|----------|------|
+| `resolve_routing_preview(routing_hints, job_type)` | Pure; returns `{job_type, status, system, target, message}`; ready when hint exists and is valid; missing_hint when null/absent; invalid_hint when malformed |
+| `resolve_routing_readiness(routing_hints)` | Pure; iterates all 7 supported job types; returns `{ready, missing, invalid, score:{ready_count, total, percent}}` |
+
+Validation rules for `ready`:
+- hint must be a dict
+- must have non-empty `system`
+- must have `target` dict with non-empty `board_id`
+
+**`app/main.py`** — two new endpoints + case detail enrichment
+
+| Endpoint | Behaviour |
+|----------|-----------|
+| `GET /tenant/routing-preview/{job_type}` | Reads tenant memory, calls `resolve_routing_preview()`; 400 for unsupported job_type |
+| `GET /tenant/routing-readiness` | Reads tenant memory, calls `resolve_routing_readiness()` |
+| `GET /cases/{job_id}` | Now includes `routing_preview` field (null when job_type not in supported list) |
+
+**`app/ui/index.html`** — UI additions
+- Case detail: colour-coded Routing Preview card (✅ Klar / ⚠ Saknas / ❌ Fel) with message and system/board info
+- Kundminne tab: "Testa routing" section with per-type buttons + readiness score (`N / 7 jobbtyper klara`)
+
+### Important constraints
+- All preview only — no auto-routing, no external writes
+- Case detail `routing_preview` is purely additive; all existing fields unchanged
+- `GET /tenant/routing-readiness` is informational only
+
+### Tests
+30 new tests in `tests/test_routing_preview.py`. All 1267 pre-existing tests still pass. **1297/1297 total.**

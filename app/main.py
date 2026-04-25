@@ -2442,6 +2442,18 @@ def get_case(
     received_at: str | None = inp.get("received_at") or None
     processed_at: str | None = r.created_at.isoformat() if r.created_at else None
 
+    # --- routing_preview: where this job_type would be routed ---
+    from app.workflows.scanners.routing_preview import resolve_routing_preview, SUPPORTED_JOB_TYPES
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository as _TCR
+    _settings = _TCR.get_settings(db, tenant_id)
+    _memory = _get_memory(_settings)
+    _job_type_str = r.job_type or "unknown"
+    routing_preview = (
+        resolve_routing_preview(_memory["routing_hints"], _job_type_str)
+        if _job_type_str in SUPPORTED_JOB_TYPES
+        else None
+    )
+
     return {
         "job_id":           r.job_id,
         "created_at":       r.created_at.isoformat() if r.created_at else None,
@@ -2458,6 +2470,7 @@ def get_case(
         "thread_messages":  thread_messages,
         "actions":          actions,
         "errors":           errors,
+        "routing_preview":  routing_preview,
     }
 
 
@@ -2633,6 +2646,48 @@ def apply_routing_hints(
     updated["memory"] = current_memory
     TenantConfigRepository.update_settings(db, tenant_id, updated)
     return {"status": "ok", "routing_hints": current_memory["routing_hints"]}
+
+
+# ---------------------------------------------------------------------------
+# Routing Preview + Readiness
+# ---------------------------------------------------------------------------
+
+@app.get("/tenant/routing-preview/{job_type}")
+def get_routing_preview(
+    job_type: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return routing preview for a single job type based on saved routing hints."""
+    from app.workflows.scanners.routing_preview import (
+        resolve_routing_preview,
+        SUPPORTED_JOB_TYPES,
+    )
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    if job_type not in SUPPORTED_JOB_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported job type '{job_type}'. Supported: {SUPPORTED_JOB_TYPES}",
+        )
+
+    s = TenantConfigRepository.get_settings(db, tenant_id)
+    memory = _get_memory(s)
+    return resolve_routing_preview(memory["routing_hints"], job_type)
+
+
+@app.get("/tenant/routing-readiness")
+def get_routing_readiness(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return routing readiness summary across all supported job types."""
+    from app.workflows.scanners.routing_preview import resolve_routing_readiness
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    s = TenantConfigRepository.get_settings(db, tenant_id)
+    memory = _get_memory(s)
+    return resolve_routing_readiness(memory["routing_hints"])
 
 
 # ---------------------------------------------------------------------------
