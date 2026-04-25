@@ -670,4 +670,32 @@ Memory lives in the existing `tenant_configs.settings` JSON column under the `me
 23 new tests in `tests/test_tenant_memory.py`. **1130/1130 pass.**
 
 ### Next likely slice
-- Workflow Scanner — populate `settings.workflow_scan` by actually scanning Gmail inbox patterns and Monday board metadata; update `system_map.gmail.detected_mail_types` and `system_map.monday.boards`
+- Workflow Scanner v2 — Monday board scanner (system_map.monday); AI-assisted pattern suggestions based on system_map data
+
+## Completed slice (2026-04-26 — Gmail Workflow Scanner v1)
+
+### Problem solved
+Tenant memory had a `system_map.gmail` placeholder but no mechanism to populate it. Platform had no way to observe what kinds of emails it had already processed.
+
+### What was built
+- `POST /workflow-scan/gmail` — tenant-scoped; queries jobs table for Gmail-sourced records (up to 250, ordered by created_at desc); no live Gmail API calls
+- `_scan_gmail_jobs(records)` — pure analysis function:
+  - `known_senders`: top 20 by occurrence, `{email, count}` shape
+  - `subject_patterns`: strips Re:/Fwd:/Fw:/Sv:/Aw: prefixes, collapses whitespace, top 20 by frequency, `{pattern, count}` shape
+  - `detected_mail_types`: unique sorted list of job_type values present in the sample
+- Persists result into two places in `settings`:
+  - `memory.system_map.gmail` — replaces gmail sub-dict only; business_profile and routing_hints untouched
+  - `workflow_scan` — `{last_scan_at, systems_scanned, status, summary.gmail}`
+- Failure path: catches any exception, preserves existing memory exactly as-is, sets `workflow_scan.status = "failed"`, raises HTTP 500
+- `GET /workflow-scan/status` now returns real persisted scan state (was already reading from `settings.workflow_scan`)
+- UI: "Skanna Gmail" button in Kundminne tab with inline running indicator; post-scan displays messages_scanned / senders_detected / patterns_detected / mail_types in card; reloads system_map textarea automatically
+
+### Tests
+25 new tests in `tests/test_gmail_scanner.py`. **1155/1155 pass.**
+
+### Constraints respected
+- No live Gmail API calls — reads only stored jobs
+- No auto-routing triggered
+- No AI/LLM calls — pure deterministic analysis
+- Bounded to 250 records
+- Monday scanner not included (next slice)

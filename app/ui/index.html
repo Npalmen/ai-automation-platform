@@ -816,11 +816,25 @@ pre {
 
   <!-- Systemkarta: scanning status -->
   <div class="setup-card" style="margin-bottom:20px;">
-    <h2 style="font-size:14px; font-weight:700; margin-bottom:12px;">Senaste scanning</h2>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:13px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+      <h2 style="font-size:14px; font-weight:700; margin:0;">Senaste scanning</h2>
+      <button class="btn btn-primary btn-sm" id="scanGmailBtn" onclick="scanGmail()">Skanna Gmail</button>
+    </div>
+    <div id="scanRunning" style="display:none; font-size:12px; color:#6b7280; margin-bottom:8px;">Skannar Gmail…</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:13px; margin-bottom:12px;">
       <div><span style="color:#888;">Status:</span> <span id="scanStatus" style="font-weight:600;">–</span></div>
       <div><span style="color:#888;">Senast körd:</span> <span id="scanLastAt">–</span></div>
       <div><span style="color:#888;">System:</span> <span id="scanSystems">–</span></div>
+    </div>
+    <!-- Gmail scan summary (shown after first scan) -->
+    <div id="scanGmailSummary" style="display:none; border-top:1px solid #e5e7eb; padding-top:12px; margin-top:4px;">
+      <div style="font-size:12px; font-weight:700; color:#374151; margin-bottom:8px;">Gmail</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px;">
+        <div><span style="color:#888;">Meddelanden skannade:</span> <span id="scanMsgCount">–</span></div>
+        <div><span style="color:#888;">Avsändare hittade:</span> <span id="scanSendersCount">–</span></div>
+        <div><span style="color:#888;">Ämnesmönster:</span> <span id="scanPatternsCount">–</span></div>
+        <div><span style="color:#888;">Mailtyper:</span> <span id="scanMailTypes">–</span></div>
+      </div>
     </div>
   </div>
 
@@ -2258,17 +2272,34 @@ async function sendTestDigest() {
 // ---------------------------------------------------------------------------
 // Kundminne (Tenant Memory)
 // ---------------------------------------------------------------------------
+function _renderScanStatus(scan) {
+  const statusLabels = { never_run: 'Ej körd', completed: 'Klar', failed: 'Misslyckades', running: 'Körs…' };
+  document.getElementById('scanStatus').textContent   = statusLabels[scan.status] || scan.status || '–';
+  document.getElementById('scanLastAt').textContent   = scan.last_scan_at || '–';
+  document.getElementById('scanSystems').textContent  = (scan.systems_scanned || []).join(', ') || '–';
+
+  const gmailSummary = (scan.summary || {}).gmail;
+  const summaryEl = document.getElementById('scanGmailSummary');
+  if (gmailSummary) {
+    summaryEl.style.display = 'block';
+    document.getElementById('scanMsgCount').textContent     = gmailSummary.messages_scanned ?? '–';
+    document.getElementById('scanSendersCount').textContent = gmailSummary.senders_detected ?? '–';
+    document.getElementById('scanPatternsCount').textContent = gmailSummary.patterns_detected ?? '–';
+    document.getElementById('scanMailTypes').textContent    = (gmailSummary.mail_types_detected || []).join(', ') || '–';
+  } else {
+    summaryEl.style.display = 'none';
+  }
+}
+
 async function loadMemory() {
   const msg = document.getElementById('memoryMsg');
   msg.style.display = 'none';
   try {
     // Load scan status
     const scan = await apiFetch('/workflow-scan/status');
-    document.getElementById('scanStatus').textContent    = scan.status === 'never_run' ? 'Ej körd' : scan.status;
-    document.getElementById('scanLastAt').textContent    = scan.last_scan_at || '–';
-    document.getElementById('scanSystems').textContent   = (scan.systems_scanned || []).join(', ') || '–';
+    _renderScanStatus(scan);
 
-    // Discovered systems from summary
+    // Discovered systems from summary (JSON view)
     const discovered = document.getElementById('memDiscoveredSystems');
     if (scan.summary && Object.keys(scan.summary).length > 0) {
       discovered.textContent = JSON.stringify(scan.summary, null, 2);
@@ -2289,6 +2320,36 @@ async function loadMemory() {
     msg.className = 'msg msg-error';
     msg.textContent = 'Kunde inte ladda kundminne: ' + e.message;
     msg.style.display = 'block';
+  }
+}
+
+async function scanGmail() {
+  const btn = document.getElementById('scanGmailBtn');
+  const running = document.getElementById('scanRunning');
+  const msg = document.getElementById('memoryMsg');
+  msg.style.display = 'none';
+  btn.disabled = true;
+  running.style.display = 'block';
+  try {
+    const result = await apiFetch('/workflow-scan/gmail', { method: 'POST' });
+    _renderScanStatus(result);
+    // Reload full memory so system_map textarea is refreshed
+    await loadMemory();
+    msg.className = 'msg msg-success';
+    msg.textContent = `Scanning klar. ${(result.summary?.gmail?.messages_scanned ?? 0)} meddelanden skannade.`;
+    msg.style.display = 'block';
+  } catch (e) {
+    msg.className = 'msg msg-error';
+    msg.textContent = 'Scanning misslyckades: ' + e.message;
+    msg.style.display = 'block';
+    // Reload status to show failed state
+    try {
+      const status = await apiFetch('/workflow-scan/status');
+      _renderScanStatus(status);
+    } catch (_) {}
+  } finally {
+    btn.disabled = false;
+    running.style.display = 'none';
   }
 }
 

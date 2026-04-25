@@ -2557,6 +2557,167 @@ def put_tenant_memory(
 # Workflow Scan Status
 # ---------------------------------------------------------------------------
 
+def _scan_gmail_jobs(records: list) -> tuple[dict, dict]:
+    """
+    Analyse a list of JobRecord rows sourced from Gmail.
+    Returns (gmail_system_map, gmail_summary).
+
+    Pure function — no DB or external calls.
+    """
+    from collections import Counter
+    import re as _re
+
+    _STRIP_PREFIXES = _re.compile(
+        r"^(re|fwd|fw|sv|vs|aw|ant|r|f)\s*:\s*",
+        _re.IGNORECASE,
+    )
+
+    sender_counter: Counter = Counter()
+    raw_subjects: list[str] = []
+    type_counter: Counter = Counter()
+
+    for r in records:
+        inp = r.input_data or {}
+        sender = inp.get("sender") or {}
+
+        # Sender: prefer email, fall back to domain of sender_email flat key
+        email = (
+            sender.get("email")
+            or inp.get("sender_email")
+            or ""
+        ).strip().lower()
+        if email:
+            sender_counter[email] += 1
+
+        # Subject
+        subject = (inp.get("subject") or inp.get("latest_message_subject") or "").strip()
+        if subject:
+            raw_subjects.append(subject)
+
+        # Mail type from job_type field (already classified)
+        job_type = (r.job_type or "unknown").strip()
+        type_counter[job_type] += 1
+
+    # known_senders: top 20 by frequency, stored as {email, count}
+    known_senders = [
+        {"email": email, "count": count}
+        for email, count in sender_counter.most_common(20)
+    ]
+
+    # subject_patterns: strip Re:/Fwd: prefixes, count normalised forms, top 20
+    normalised_counter: Counter = Counter()
+    for s in raw_subjects:
+        normalised = _STRIP_PREFIXES.sub("", s).strip()
+        # Collapse runs of whitespace
+        normalised = " ".join(normalised.split())
+        if normalised:
+            normalised_counter[normalised] += 1
+
+    subject_patterns = [
+        {"pattern": pattern, "count": count}
+        for pattern, count in normalised_counter.most_common(20)
+    ]
+
+    # detected_mail_types: sorted list of type strings present in the sample
+    detected_mail_types = sorted(type_counter.keys())
+
+    gmail_map = {
+        "known_senders":      known_senders,
+        "subject_patterns":   subject_patterns,
+        "detected_mail_types": detected_mail_types,
+    }
+
+    gmail_summary = {
+        "messages_scanned":   len(records),
+        "senders_detected":   len(known_senders),
+        "patterns_detected":  len(subject_patterns),
+        "mail_types_detected": detected_mail_types,
+    }
+
+    return gmail_map, gmail_summary
+
+
+@app.post("/workflow-scan/gmail")
+def scan_gmail(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Scan stored Gmail-sourced jobs for this tenant and update tenant memory.
+
+    Uses only data already stored in the jobs table — no live Gmail API calls.
+    Bounded to the latest 250 Gmail-sourced jobs.
+    """
+    from datetime import datetime, timezone
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    try:
+        # --- 1. Fetch stored Gmail jobs (bounded sample) ---
+        records = (
+            db.query(JobRecord)
+            .filter(
+                JobRecord.tenant_id == tenant_id,
+                JobRecord.input_data["source"]["system"].as_string() == "gmail",
+            )
+            .order_by(JobRecord.created_at.desc())
+            .limit(250)
+            .all()
+        )
+
+        # --- 2. Analyse ---
+        gmail_map, gmail_summary = _scan_gmail_jobs(records)
+
+        # --- 3. Persist: merge into existing settings (no-clobber) ---
+        existing = TenantConfigRepository.get_settings(db, tenant_id)
+        current_memory = _get_memory(existing)
+
+        # Update system_map.gmail inside memory
+        current_memory["system_map"]["gmail"] = gmail_map
+
+        scan_at = datetime.now(timezone.utc).isoformat()
+        workflow_scan = {
+            "last_scan_at":    scan_at,
+            "systems_scanned": ["gmail"],
+            "status":          "completed",
+            "summary": {
+                "gmail": gmail_summary,
+            },
+        }
+
+        updated = dict(existing)
+        updated["memory"] = current_memory
+        updated["workflow_scan"] = workflow_scan
+        TenantConfigRepository.update_settings(db, tenant_id, updated)
+
+    except Exception as exc:
+        # Failure: preserve existing memory, mark status failed
+        try:
+            existing = TenantConfigRepository.get_settings(db, tenant_id)
+        except Exception:
+            existing = {}
+        scan_at = datetime.now(timezone.utc).isoformat()
+        workflow_scan = {
+            "last_scan_at":    scan_at,
+            "systems_scanned": ["gmail"],
+            "status":          "failed",
+            "summary":         {"error": str(exc)[:200]},
+        }
+        updated = dict(existing)
+        updated["workflow_scan"] = workflow_scan
+        try:
+            TenantConfigRepository.update_settings(db, tenant_id, updated)
+        except Exception:
+            pass  # Can't persist failure state — just return error response
+        raise HTTPException(status_code=500, detail=f"Gmail scan failed: {str(exc)[:200]}")
+
+    return {
+        "status":          "completed",
+        "last_scan_at":    scan_at,
+        "systems_scanned": ["gmail"],
+        "summary":         {"gmail": gmail_summary},
+    }
+
+
 @app.get("/workflow-scan/status")
 def workflow_scan_status(
     db: Session = Depends(get_db),
