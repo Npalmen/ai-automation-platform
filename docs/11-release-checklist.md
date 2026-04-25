@@ -7,7 +7,7 @@
 - [x] DB setup verified (`docker-compose.yml` + `scripts/create_tables.py`)
 
 ## Test
-- [x] Automated tests pass — 1187/1187 (`python -m pytest`)
+- [x] Automated tests pass — 1233/1233 (`python -m pytest`)
 - [x] Official MVP smoke test documented in README (curl commands, step by step)
 - [x] Gmail send_email verified live (real Gmail delivery confirmed)
 - [x] Gmail list_messages verified live (real inbox messages returned)
@@ -36,6 +36,7 @@
 - [x] Workflow Scan Status — GET /workflow-scan/status; default shape never_run; tenant-scoped; returns persisted state after scan
 - [x] Gmail Workflow Scanner v1 — POST /workflow-scan/gmail; DB-only (no live API calls); known_senders/subject_patterns/detected_mail_types; no-clobber on failure; 25 tests; Skanna Gmail button in UI
 - [x] Generic Workflow Scanner Engine — WorkflowScannerEngine + BaseWorkflowScannerAdapter + ADAPTER_REGISTRY; POST /workflow-scan/{system}; 404 for unknown system; multi-system summary merge; 32 tests; future adapters added with one class + one registry line
+- [x] Monday Workflow Scanner v1 — MondayWorkflowScannerAdapter reads board structure via get_boards() read-only GraphQL; detect_board_purpose() deterministic keyword classification (lead/invoice/support/partnership/supplier/internal/unknown); persists system_map.monday; no-clobber; 46 tests; Skanna Monday button + summary card in UI
 
 ## Docs
 - [x] current-state updated

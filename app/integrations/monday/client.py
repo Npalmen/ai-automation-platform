@@ -87,6 +87,32 @@ class MondayClient:
 
         return self._post(query=query, variables=variables)
 
+    def get_boards(self, limit: int = 50) -> list[dict]:
+        """
+        Read-only: fetch board structure (id, name, description, groups, columns).
+        Does NOT fetch items.  Used by the workflow scanner only.
+        """
+        query = """
+        query ($limit: Int) {
+          boards(limit: $limit) {
+            id
+            name
+            description
+            groups {
+              id
+              title
+            }
+            columns {
+              id
+              title
+              type
+            }
+          }
+        }
+        """
+        data = self._post(query=query, variables={"limit": limit})
+        return data.get("data", {}).get("boards") or []
+
     def create_update(self, item_id: int, body: str) -> dict:
         query = """
         mutation ($item_id: ID!, $body: String!) {

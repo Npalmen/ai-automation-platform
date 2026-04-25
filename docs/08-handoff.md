@@ -736,3 +736,40 @@ The Gmail scanner in Slice 2 was inlined directly in `main.py` with no extension
 
 ### Tests
 32 new tests in `tests/test_workflow_scanner_engine.py`. All 1155 pre-existing tests still pass. **1187/1187 total.**
+
+## Completed slice (2026-04-26 — Monday Workflow Scanner Adapter v1)
+
+### Problem solved
+Monday.com board structure was not visible to the AI memory system. Operators had no way to tell the platform what Monday boards exist, what they are called, or what they are used for. The Monday scanner adds a read-only snapshot of all boards/groups/columns and classifies their purpose automatically.
+
+### What was built
+
+**`app/workflows/scanners/monday_adapter.py`** — new file
+
+| Function / Class | Role |
+|-----------------|------|
+| `detect_board_purpose(board)` | Deterministic keyword scan of board name + description + group titles + column titles; returns first matching purpose from: lead, customer_inquiry, invoice, support, partnership, supplier, internal, or "unknown" |
+| `analyse_boards(raw_boards)` | Pure function; builds `boards_out` (each with `detected_purpose`), `flat_groups`, `flat_columns`; returns `(monday_map, monday_summary)` |
+| `_build_monday_client(settings)` | Returns `MondayClient` if `MONDAY_API_KEY` is set, else `None` |
+| `MondayWorkflowScannerAdapter` | `BaseWorkflowScannerAdapter` implementation; calls `client.get_boards(limit=50)`, delegates to `analyse_boards()`; missing API key → `ScanResult(status="failed")` which engine converts to HTTP 500 |
+
+**`app/integrations/monday/client.py`**
+- `get_boards(limit)` added — read-only GraphQL query returning id/name/description/groups/columns for each board
+
+**`app/workflows/scanners/engine.py`**
+- `MondayWorkflowScannerAdapter` registered in `ADAPTER_REGISTRY`
+- Engine `run()` now also raises `RuntimeError` when adapter returns `ScanResult(status="failed")` (not just on exception) — consistent failure handling regardless of how the adapter signals failure
+
+**`app/ui/index.html`**
+- "Skanna Monday" button in Kundminne tab calling `scanWorkflowSystem('monday')`
+- Monday summary card rendered by `_renderScanStatus()`: boards_scanned, groups_detected, columns_detected, detected_purposes
+
+### Behaviour
+- `POST /workflow-scan/monday` calls `MondayWorkflowScannerAdapter.run()`
+- Persists into `settings.memory.system_map.monday` and `settings.workflow_scan`
+- No-clobber: running Monday scan does not touch `system_map.gmail` or `business_profile`
+- Multi-system summary merge: `workflow_scan.summary` is a dict keyed by system — running Monday does not wipe Gmail entry
+- Missing API key → HTTP 500 with clear error message
+
+### Tests
+46 new tests in `tests/test_monday_scanner.py`. All 1187 pre-existing tests still pass. **1233/1233 total.**

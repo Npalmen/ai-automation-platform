@@ -16,14 +16,15 @@ from typing import Any
 
 from app.workflows.scanners.base import BaseWorkflowScannerAdapter, ScanResult
 from app.workflows.scanners.gmail_adapter import GmailWorkflowScannerAdapter
+from app.workflows.scanners.monday_adapter import MondayWorkflowScannerAdapter
 
 # ---------------------------------------------------------------------------
 # Registry — add new adapters here
 # ---------------------------------------------------------------------------
 
 ADAPTER_REGISTRY: dict[str, BaseWorkflowScannerAdapter] = {
-    "gmail": GmailWorkflowScannerAdapter(),
-    # "monday":         MondayWorkflowScannerAdapter(),     # future
+    "gmail":  GmailWorkflowScannerAdapter(),
+    "monday": MondayWorkflowScannerAdapter(),
     # "microsoft_mail": MicrosoftMailScannerAdapter(),      # future
     # "visma":          VismaScannerAdapter(),               # future
     # "fortnox":        FortnoxScannerAdapter(),             # future
@@ -79,6 +80,10 @@ class WorkflowScannerEngine:
             )
             self._persist(existing, result, preserve_memory=True)
             raise RuntimeError(f"{system} scan failed: {str(exc)[:200]}") from exc
+
+        if result.status == "failed":
+            self._persist(existing, result, preserve_memory=True)
+            raise RuntimeError(f"{system} scan failed: {result.error or 'unknown error'}")
 
         self._persist(existing, result, preserve_memory=False)
         return result

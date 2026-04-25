@@ -818,9 +818,12 @@ pre {
   <div class="setup-card" style="margin-bottom:20px;">
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
       <h2 style="font-size:14px; font-weight:700; margin:0;">Senaste scanning</h2>
-      <button class="btn btn-primary btn-sm" id="scanGmailBtn" onclick="scanGmail()">Skanna Gmail</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-primary btn-sm" id="scanGmailBtn" onclick="scanGmail()">Skanna Gmail</button>
+        <button class="btn btn-primary btn-sm" id="scanMondayBtn" onclick="scanMonday()">Skanna Monday</button>
+      </div>
     </div>
-    <div id="scanRunning" style="display:none; font-size:12px; color:#6b7280; margin-bottom:8px;">Skannar Gmail…</div>
+    <div id="scanRunning" style="display:none; font-size:12px; color:#6b7280; margin-bottom:8px;">Skannar…</div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:13px; margin-bottom:12px;">
       <div><span style="color:#888;">Status:</span> <span id="scanStatus" style="font-weight:600;">–</span></div>
       <div><span style="color:#888;">Senast körd:</span> <span id="scanLastAt">–</span></div>
@@ -834,6 +837,16 @@ pre {
         <div><span style="color:#888;">Avsändare hittade:</span> <span id="scanSendersCount">–</span></div>
         <div><span style="color:#888;">Ämnesmönster:</span> <span id="scanPatternsCount">–</span></div>
         <div><span style="color:#888;">Mailtyper:</span> <span id="scanMailTypes">–</span></div>
+      </div>
+    </div>
+    <!-- Monday scan summary (shown after first Monday scan) -->
+    <div id="scanMondaySummary" style="display:none; border-top:1px solid #e5e7eb; padding-top:12px; margin-top:8px;">
+      <div style="font-size:12px; font-weight:700; color:#374151; margin-bottom:8px;">Monday</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px;">
+        <div><span style="color:#888;">Boards hittade:</span> <span id="scanBoardsCount">–</span></div>
+        <div><span style="color:#888;">Grupper hittade:</span> <span id="scanGroupsCount">–</span></div>
+        <div><span style="color:#888;">Kolumner hittade:</span> <span id="scanColumnsCount">–</span></div>
+        <div><span style="color:#888;">Identifierade användningsområden:</span> <span id="scanMondayPurposes">–</span></div>
       </div>
     </div>
   </div>
@@ -2279,15 +2292,27 @@ function _renderScanStatus(scan) {
   document.getElementById('scanSystems').textContent  = (scan.systems_scanned || []).join(', ') || '–';
 
   const gmailSummary = (scan.summary || {}).gmail;
-  const summaryEl = document.getElementById('scanGmailSummary');
+  const gmailEl = document.getElementById('scanGmailSummary');
   if (gmailSummary) {
-    summaryEl.style.display = 'block';
-    document.getElementById('scanMsgCount').textContent     = gmailSummary.messages_scanned ?? '–';
-    document.getElementById('scanSendersCount').textContent = gmailSummary.senders_detected ?? '–';
+    gmailEl.style.display = 'block';
+    document.getElementById('scanMsgCount').textContent      = gmailSummary.messages_scanned ?? '–';
+    document.getElementById('scanSendersCount').textContent  = gmailSummary.senders_detected ?? '–';
     document.getElementById('scanPatternsCount').textContent = gmailSummary.patterns_detected ?? '–';
-    document.getElementById('scanMailTypes').textContent    = (gmailSummary.mail_types_detected || []).join(', ') || '–';
+    document.getElementById('scanMailTypes').textContent     = (gmailSummary.mail_types_detected || []).join(', ') || '–';
   } else {
-    summaryEl.style.display = 'none';
+    gmailEl.style.display = 'none';
+  }
+
+  const mondaySummary = (scan.summary || {}).monday;
+  const mondayEl = document.getElementById('scanMondaySummary');
+  if (mondaySummary && !mondaySummary.error) {
+    mondayEl.style.display = 'block';
+    document.getElementById('scanBoardsCount').textContent   = mondaySummary.boards_scanned ?? '–';
+    document.getElementById('scanGroupsCount').textContent   = mondaySummary.groups_detected ?? '–';
+    document.getElementById('scanColumnsCount').textContent  = mondaySummary.columns_detected ?? '–';
+    document.getElementById('scanMondayPurposes').textContent = (mondaySummary.detected_purposes || []).join(', ') || '–';
+  } else {
+    mondayEl.style.display = 'none';
   }
 }
 
@@ -2324,20 +2349,26 @@ async function loadMemory() {
 }
 
 async function scanWorkflowSystem(system) {
-  const btn = document.getElementById('scanGmailBtn');
-  const running = document.getElementById('scanRunning');
+  const gmailBtn  = document.getElementById('scanGmailBtn');
+  const mondayBtn = document.getElementById('scanMondayBtn');
+  const running   = document.getElementById('scanRunning');
   const msg = document.getElementById('memoryMsg');
   msg.style.display = 'none';
-  btn.disabled = true;
+  if (gmailBtn)  gmailBtn.disabled  = true;
+  if (mondayBtn) mondayBtn.disabled = true;
   running.style.display = 'block';
   try {
     const result = await apiFetch(`/workflow-scan/${system}`, { method: 'POST' });
     _renderScanStatus(result);
-    // Reload full memory so system_map textarea is refreshed
     await loadMemory();
-    const scanned = (result.summary?.[system]?.messages_scanned ?? result.summary?.gmail?.messages_scanned ?? 0);
+    const s = result.summary?.[system] || {};
+    const detail = system === 'gmail'
+      ? `${s.messages_scanned ?? 0} meddelanden skannade`
+      : system === 'monday'
+        ? `${s.boards_scanned ?? 0} boards skannade`
+        : 'klart';
     msg.className = 'msg msg-success';
-    msg.textContent = `Scanning klar (${system}). ${scanned} meddelanden skannade.`;
+    msg.textContent = `Scanning klar (${system}). ${detail}.`;
     msg.style.display = 'block';
   } catch (e) {
     msg.className = 'msg msg-error';
@@ -2348,14 +2379,14 @@ async function scanWorkflowSystem(system) {
       _renderScanStatus(status);
     } catch (_) {}
   } finally {
-    btn.disabled = false;
+    if (gmailBtn)  gmailBtn.disabled  = false;
+    if (mondayBtn) mondayBtn.disabled = false;
     running.style.display = 'none';
   }
 }
 
-async function scanGmail() {
-  return scanWorkflowSystem('gmail');
-}
+async function scanGmail()  { return scanWorkflowSystem('gmail');  }
+async function scanMonday() { return scanWorkflowSystem('monday'); }
 
 async function saveMemory() {
   const msg = document.getElementById('memoryMsg');
