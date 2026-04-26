@@ -415,6 +415,23 @@ pre {
     <div id="roiAssumptions" style="font-size:11px; color:#6b7280; margin-top:6px; line-height:1.8;"></div>
   </details>
 
+  <!-- Dispatch observability -->
+  <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Dispatchöversikt</h2>
+  <div id="dispatchSummaryError" class="msg msg-error" style="display:none;"></div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; margin-bottom:12px;">
+    <div class="dash-card"><div class="dash-label">Totalt skickade</div><div class="dash-value" id="dsTotal">–</div></div>
+    <div class="dash-card"><div class="dash-label">Lyckade</div><div class="dash-value" id="dsSuccess" style="color:#16a34a;">–</div></div>
+    <div class="dash-card"><div class="dash-label">Misslyckade</div><div class="dash-value" id="dsFailed" style="color:#dc2626;">–</div></div>
+    <div class="dash-card"><div class="dash-label">Överhoppade</div><div class="dash-value" id="dsSkipped" style="color:#92400e;">–</div></div>
+    <div class="dash-card roi-highlight"><div class="dash-label">Uppskattad tid sparad</div><div class="dash-value" id="dsMinutes">–</div><div class="dash-sublabel">minuter</div></div>
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:12px; font-size:12px;">
+    <div class="dash-card"><div class="dash-label">Automatiska</div><div class="dash-value" id="dsModeAuto" style="font-size:16px;">–</div></div>
+    <div class="dash-card"><div class="dash-label">Manuella</div><div class="dash-value" id="dsModeManual" style="font-size:16px;">–</div></div>
+    <div class="dash-card"><div class="dash-label">Via godkännande</div><div class="dash-value" id="dsModeApproval" style="font-size:16px;">–</div></div>
+  </div>
+  <div id="dsRecent" style="margin-bottom:24px;"><span class="empty">Laddar…</span></div>
+
   <!-- Recent activity table -->
   <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Senaste aktivitet</h2>
   <div id="dashActivity">
@@ -1063,6 +1080,9 @@ async function loadDashboard() {
   // ROI
   loadRoi();
 
+  // Dispatch observability
+  loadDispatchSummary();
+
   // Summary
   try {
     const s = await apiFetch('/dashboard/summary');
@@ -1138,6 +1158,51 @@ async function loadRoi() {
   } catch (e) {
     const el = document.getElementById('roiError');
     el.textContent = 'Kunde inte ladda ROI: ' + e.message;
+    el.style.display = 'block';
+  }
+}
+
+
+async function loadDispatchSummary() {
+  document.getElementById('dispatchSummaryError').style.display = 'none';
+  try {
+    const d = await apiFetch('/dispatch/summary');
+    document.getElementById('dsTotal').textContent   = d.total_dispatches       ?? '–';
+    document.getElementById('dsSuccess').textContent = d.successful_dispatches  ?? '–';
+    document.getElementById('dsFailed').textContent  = d.failed_dispatches      ?? '–';
+    document.getElementById('dsSkipped').textContent = d.skipped_dispatches     ?? '–';
+    document.getElementById('dsMinutes').textContent = d.estimated_minutes_saved ?? '–';
+    const m = d.by_mode || {};
+    document.getElementById('dsModeAuto').textContent     = m.full_auto          ?? '0';
+    document.getElementById('dsModeManual').textContent   = m.manual             ?? '0';
+    document.getElementById('dsModeApproval').textContent = m.approval_required  ?? '0';
+
+    const el = document.getElementById('dsRecent');
+    if (!d.recent || d.recent.length === 0) {
+      el.innerHTML = '<span class="empty">Inga dispatches ännu.</span>';
+      return;
+    }
+    const rows = d.recent.map(r => {
+      const ts = r.created_at ? new Date(r.created_at).toLocaleString('sv-SE') : '–';
+      const extId = r.external_id ? `<span style="color:#6b7280; font-size:11px;">#${escapeHtml(String(r.external_id))}</span>` : '';
+      return `<tr>
+        <td style="color:#888; white-space:nowrap; font-size:11px;">${ts}</td>
+        <td>${escapeHtml(r.job_type)}</td>
+        <td>${escapeHtml(r.system)}</td>
+        <td>${statusBadge(r.status)}</td>
+        <td style="font-size:11px; color:#6b7280;">${escapeHtml(r.mode)}</td>
+        <td>${extId}</td>
+      </tr>`;
+    }).join('');
+    el.innerHTML = `<table class="act-table">
+      <thead><tr>
+        <th>Tid</th><th>Typ</th><th>System</th><th>Status</th><th>Läge</th><th>Ext-ID</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  } catch (e) {
+    const el = document.getElementById('dispatchSummaryError');
+    el.textContent = 'Kunde inte ladda dispatchöversikt: ' + e.message;
     el.style.display = 'block';
   }
 }

@@ -113,7 +113,7 @@ def maybe_auto_dispatch_job(
 
         # --- 6. Run dispatch (engine handles duplicate guard internally) ---
         engine = ControlledDispatchEngine(db=db, tenant_id=tenant_id, settings=settings)
-        result = engine.run(job=job, memory=memory, dry_run=False)
+        result = engine.run(job=job, memory=memory, dry_run=False, dispatch_mode="full_auto")
 
         return AutoDispatchResult(
             status=result.status,

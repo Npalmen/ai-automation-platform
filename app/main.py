@@ -2961,7 +2961,8 @@ def dispatch_job(
     s = TenantConfigRepository.get_settings(db, tenant_id)
     memory = _get_memory(s)
     engine = _make_dispatch_engine(db, tenant_id)
-    result = engine.run(job=r, memory=memory, dry_run=False)
+    dispatch_mode = policy.get("policy_mode", "unknown")
+    result = engine.run(job=r, memory=memory, dry_run=False, dispatch_mode=dispatch_mode)
 
     if result.status == "failed":
         raise HTTPException(status_code=400, detail=result.message)
@@ -2969,6 +2970,30 @@ def dispatch_job(
     response = _dispatch_result_to_response(result)
     response.update(policy)
     return response
+
+
+@app.get("/dispatch/summary")
+def dispatch_summary(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+    job_type: str | None = None,
+    system: str | None   = None,
+    limit_recent: int    = 10,
+):
+    """
+    Tenant-scoped dispatch observability summary.
+
+    Returns counts (total/successful/failed/skipped), breakdown by mode/job_type/system,
+    ROI estimate (5 min per successful dispatch), and recent dispatch list.
+    """
+    from app.workflows.dispatchers.observability import get_dispatch_summary
+    return get_dispatch_summary(
+        db=db,
+        tenant_id=tenant_id,
+        job_type=job_type,
+        system=system,
+        limit_recent=limit_recent,
+    )
 
 
 @app.post("/jobs/{job_id}/auto-dispatch")

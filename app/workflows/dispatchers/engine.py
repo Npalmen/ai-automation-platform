@@ -67,6 +67,7 @@ def _persist_dispatch(
     tenant_id: str,
     job_id: str,
     result: DispatchResult,
+    dispatch_mode: str = "unknown",
 ) -> None:
     """Persist a dispatch attempt as an IntegrationEvent (best-effort)."""
     from app.domain.integrations.models import IntegrationEvent
@@ -78,12 +79,13 @@ def _persist_dispatch(
         job_id=job_id,
         integration_type=_DISPATCH_INTEGRATION_TYPE,
         payload={
-            "system":       result.system,
-            "job_type":     result.job_type,
-            "target":       result.target,
-            "external_id":  result.external_id,
-            "message":      result.message,
-            "details":      result.details,
+            "system":         result.system,
+            "job_type":       result.job_type,
+            "target":         result.target,
+            "external_id":    result.external_id,
+            "message":        result.message,
+            "details":        result.details,
+            "dispatch_mode":  dispatch_mode,
         },
         status=result.status,
         attempts=1,
@@ -115,7 +117,7 @@ class ControlledDispatchEngine:
         self._tenant_id = tenant_id
         self._settings = settings
 
-    def run(self, job: Any, memory: dict, dry_run: bool = False) -> DispatchResult:
+    def run(self, job: Any, memory: dict, dry_run: bool = False, dispatch_mode: str = "unknown") -> DispatchResult:
         """
         Dispatch job using memory.routing_hints.
 
@@ -190,6 +192,6 @@ class ControlledDispatchEngine:
         # Persist attempt (skip for dry_run and skipped)
         if not dry_run and result.status in ("success", "failed"):
             job_id = str(getattr(job, "job_id", "") or "")
-            _persist_dispatch(self._db, self._tenant_id, job_id, result)
+            _persist_dispatch(self._db, self._tenant_id, job_id, result, dispatch_mode=dispatch_mode)
 
         return result

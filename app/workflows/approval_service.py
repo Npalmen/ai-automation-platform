@@ -367,7 +367,7 @@ def resolve_dispatch_approval(
     from app.main import _get_memory
     memory = _get_memory(s)
 
-    result = engine.run(job=job_record, memory=memory, dry_run=False)
+    result = engine.run(job=job_record, memory=memory, dry_run=False, dispatch_mode="approval_required")
 
     create_audit_event(
         db=db,

@@ -1078,3 +1078,60 @@ Added both. The pipeline hook fires automatically for every new job that complet
 - `TestNoSecretLeakage` (1) — reason field contains class name only
 
 **1427/1427 total tests pass.**
+
+## Completed slice (2026-04-26 — Dispatch Observability + ROI Attribution)
+
+Every dispatch event is now annotated with its automation mode, and operators can view aggregated dispatch statistics directly in the Dashboard.
+
+### What was added
+
+**`app/workflows/dispatchers/engine.py`** — `dispatch_mode` metadata
+- `_persist_dispatch(db, tenant_id, job_id, result, dispatch_mode="unknown")` — new `dispatch_mode` parameter; stored as JSON field in `IntegrationEvent.payload`
+- `ControlledDispatchEngine.run(job, memory, dry_run, dispatch_mode="unknown")` — passes mode through to persist
+
+**Callers updated (3 sites)**
+| Caller | dispatch_mode value |
+|--------|---------------------|
+| `dispatch_job` in `main.py` | `policy.get("policy_mode", "unknown")` |
+| `resolve_dispatch_approval` in `approval_service.py` | `"approval_required"` |
+| `maybe_auto_dispatch_job` in `auto_dispatch.py` | `"full_auto"` |
+
+**`app/workflows/dispatchers/observability.py`** — new module
+- `MINUTES_SAVED_PER_SUCCESS = 5` — deterministic ROI constant
+- `get_dispatch_summary(db, tenant_id, *, job_type=None, system=None, limit_recent=10)`:
+  - Queries `IntegrationEvent` where `integration_type == "controlled_dispatch"` for the tenant
+  - Aggregates: `total_dispatches`, `successful_dispatches`, `failed_dispatches`, `skipped_dispatches`
+  - `by_mode`: `{full_auto, manual, approval_required, unknown}` — counts per dispatch mode
+  - `by_job_type`: `{job_type: count}` — from payload
+  - `by_system`: `{system: count}` — from payload
+  - ROI: `estimated_minutes_saved = successful * 5`; `estimated_hours_saved = round(minutes/60, 2)`
+  - `recent`: last N events with `job_id, job_type, system, status, mode, external_id, message, created_at`
+  - Optional filters: `job_type=` and `system=` reduce the result set in Python (post-query)
+  - No schema change — reads existing `integration_events` rows
+
+**`app/main.py`** — new endpoint
+- `GET /dispatch/summary` — tenant-scoped; optional `job_type` / `system` / `limit` query params; returns `get_dispatch_summary()` dict directly
+
+**`app/ui/index.html`** — Dashboard tab: Dispatchöversikt card
+- 5 stat cards: Totalt skickade / Lyckade / Misslyckade / Överhoppade / Uppskattad tid sparad (minuter)
+- 3 mode cards: Automatiska / Manuella / Via godkännande
+- Recent table: Tid / Typ / System / Status / Läge / Ext-ID
+- `loadDispatchSummary()` async function called from `loadDashboard()`; populates all elements; error displayed in `dispatchSummaryError` div
+
+### Constraints
+- No new DB table or column — reads existing `integration_events` rows
+- ROI is deterministic (5 min fixed constant) — no AI/LLM calls
+- `dispatch_mode` added to payload JSON only — backward compatible; old events without the field show `"unknown"` in the UI (payload.get fallback)
+
+### Tests
+28 new tests in `tests/test_dispatch_observability.py`:
+- `TestEmptySummary` (4) — zero counts, mode keys present, empty job_type/system
+- `TestSuccessAggregation` (4) — single success, minutes saved, failed not counted, mixed statuses
+- `TestByMode` (6) — all four modes; fallback to unknown
+- `TestByJobTypeAndSystem` (4) — counts, unknown fallback
+- `TestOptionalFilters` (3) — job_type, system, both
+- `TestLimitRecent` (3) — default 10, custom limit, fewer than limit
+- `TestRecentShape` (2) — all fields present, missing fields fall back gracefully
+- `TestEndpointShape` (2) — all top-level keys present, tenant isolation structural test
+
+**1455/1455 total tests pass.**
