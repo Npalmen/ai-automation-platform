@@ -984,6 +984,47 @@ pre {
     </div>
   </div>
 
+  <!-- Fortnox Pilotverktyg -->
+  <div class="setup-card" style="margin-bottom:20px;">
+    <h2 style="font-size:14px; font-weight:700; margin-bottom:12px;">Fortnox Pilotverktyg</h2>
+    <p style="color:#666; font-size:12px; margin-bottom:12px;">Slå upp och skapa kunder och fakturor direkt mot Fortnox. Kräver att FORTNOX_ACCESS_TOKEN och FORTNOX_CLIENT_SECRET är konfigurerade.</p>
+
+    <!-- Customer lookup -->
+    <div style="margin-bottom:16px;">
+      <div style="font-weight:600; font-size:13px; margin-bottom:8px;">Slå upp kund</div>
+      <div style="display:flex; gap:8px; margin-bottom:6px;">
+        <input id="fortnoxLookupEmail" type="text" placeholder="E-post" style="flex:1; padding:6px 8px; border:1px solid #ccc; border-radius:3px; font-family:monospace; font-size:12px;">
+        <input id="fortnoxLookupName" type="text" placeholder="Namn (alternativ)" style="flex:1; padding:6px 8px; border:1px solid #ccc; border-radius:3px; font-family:monospace; font-size:12px;">
+        <button class="btn btn-primary btn-sm" onclick="fortnoxLookupCustomer()">Sök kund</button>
+      </div>
+      <div id="fortnoxLookupResult" style="display:none; background:#f8fafc; border:1px solid #e5e7eb; border-radius:4px; padding:8px; font-size:12px; white-space:pre-wrap; max-height:150px; overflow:auto;"></div>
+    </div>
+
+    <!-- Customer create -->
+    <div style="margin-bottom:16px;">
+      <div style="font-weight:600; font-size:13px; margin-bottom:8px;">Skapa kund</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px;">
+        <input id="fortnoxCreateName"  type="text" placeholder="Namn (obligatoriskt)" style="padding:6px 8px; border:1px solid #ccc; border-radius:3px; font-family:monospace; font-size:12px;">
+        <input id="fortnoxCreateEmail" type="text" placeholder="E-post" style="padding:6px 8px; border:1px solid #ccc; border-radius:3px; font-family:monospace; font-size:12px;">
+        <input id="fortnoxCreateOrg"   type="text" placeholder="Org.nummer" style="padding:6px 8px; border:1px solid #ccc; border-radius:3px; font-family:monospace; font-size:12px;">
+        <input id="fortnoxCreatePhone" type="text" placeholder="Telefon" style="padding:6px 8px; border:1px solid #ccc; border-radius:3px; font-family:monospace; font-size:12px;">
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="fortnoxCreateCustomer()">Skapa kund</button>
+      <div id="fortnoxCreateResult" style="display:none; background:#f8fafc; border:1px solid #e5e7eb; border-radius:4px; padding:8px; font-size:12px; white-space:pre-wrap; max-height:150px; overflow:auto; margin-top:6px;"></div>
+    </div>
+
+    <!-- Invoice lookup -->
+    <div>
+      <div style="font-weight:600; font-size:13px; margin-bottom:8px;">Slå upp faktura</div>
+      <div style="display:flex; gap:8px; margin-bottom:6px;">
+        <input id="fortnoxInvoiceDoc"  type="text" placeholder="Fakturanummer" style="flex:1; padding:6px 8px; border:1px solid #ccc; border-radius:3px; font-family:monospace; font-size:12px;">
+        <input id="fortnoxInvoiceCust" type="text" placeholder="Kundnummer (alternativ)" style="flex:1; padding:6px 8px; border:1px solid #ccc; border-radius:3px; font-family:monospace; font-size:12px;">
+        <button class="btn btn-primary btn-sm" onclick="fortnoxLookupInvoice()">Sök faktura</button>
+      </div>
+      <div id="fortnoxInvoiceResult" style="display:none; background:#f8fafc; border:1px solid #e5e7eb; border-radius:4px; padding:8px; font-size:12px; white-space:pre-wrap; max-height:150px; overflow:auto;"></div>
+    </div>
+  </div>
+
   <!-- Företagsprofil -->
   <div class="setup-card" style="margin-bottom:20px;">
     <h2 style="font-size:14px; font-weight:700; margin-bottom:12px;">Företagsprofil</h2>
@@ -3151,6 +3192,78 @@ async function scanWorkflowSystem(system) {
 async function scanGmail()   { return scanWorkflowSystem('gmail');   }
 async function scanMonday()  { return scanWorkflowSystem('monday');  }
 async function scanFortnox() { return scanWorkflowSystem('fortnox'); }
+
+async function fortnoxLookupCustomer() {
+  const email = document.getElementById('fortnoxLookupEmail').value.trim();
+  const name  = document.getElementById('fortnoxLookupName').value.trim();
+  const el    = document.getElementById('fortnoxLookupResult');
+  if (!email && !name) { el.style.display='block'; el.textContent='Ange e-post eller namn.'; return; }
+  el.style.display = 'block';
+  el.textContent = 'Söker…';
+  try {
+    const res = await apiFetch('/integrations/fortnox/customers/lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email || undefined, name: name || undefined }),
+    });
+    el.textContent = res.customer ? JSON.stringify(res.customer, null, 2) : 'Ingen kund hittades.';
+  } catch (e) {
+    el.textContent = 'Fel: ' + e.message;
+  }
+}
+
+async function fortnoxCreateCustomer() {
+  const name  = document.getElementById('fortnoxCreateName').value.trim();
+  const email = document.getElementById('fortnoxCreateEmail').value.trim();
+  const org   = document.getElementById('fortnoxCreateOrg').value.trim();
+  const phone = document.getElementById('fortnoxCreatePhone').value.trim();
+  const el    = document.getElementById('fortnoxCreateResult');
+  if (!name) { el.style.display='block'; el.textContent='Namn är obligatoriskt.'; return; }
+  el.style.display = 'block';
+  el.textContent = 'Skapar…';
+  try {
+    const body = { name };
+    if (email) body.email = email;
+    if (org)   body.organisation_number = org;
+    if (phone) body.phone = phone;
+    const res = await apiFetch('/integrations/fortnox/customers/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    el.textContent = 'Kund skapad:\n' + JSON.stringify(res.customer, null, 2);
+  } catch (e) {
+    el.textContent = 'Fel: ' + e.message;
+  }
+}
+
+async function fortnoxLookupInvoice() {
+  const doc  = document.getElementById('fortnoxInvoiceDoc').value.trim();
+  const cust = document.getElementById('fortnoxInvoiceCust').value.trim();
+  const el   = document.getElementById('fortnoxInvoiceResult');
+  if (!doc && !cust) { el.style.display='block'; el.textContent='Ange fakturanummer eller kundnummer.'; return; }
+  el.style.display = 'block';
+  el.textContent = 'Söker…';
+  try {
+    const body = {};
+    if (doc)  body.document_number  = doc;
+    if (cust) body.customer_number = cust;
+    const res = await apiFetch('/integrations/fortnox/invoices/lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (res.invoice !== undefined) {
+      el.textContent = res.invoice ? JSON.stringify(res.invoice, null, 2) : 'Ingen faktura hittades.';
+    } else {
+      el.textContent = res.invoices && res.invoices.length
+        ? JSON.stringify(res.invoices, null, 2)
+        : 'Inga fakturor hittades.';
+    }
+  } catch (e) {
+    el.textContent = 'Fel: ' + e.message;
+  }
+}
 
 async function proposeRoutingHints() {
   const btn = document.getElementById('proposeHintsBtn');

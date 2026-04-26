@@ -1441,3 +1441,35 @@ Read-only Fortnox scanner integrated into the existing `WorkflowScannerEngine` /
 - Engine registration + persistence (8)
 
 **1748/1748 total tests pass.**
+
+## Completed slice (2026-04-26 — Slice 19: Fortnox Customer + Invoice Actions)
+
+### What was built
+Three operator action endpoints that talk to Fortnox live via `FortnoxClient`. Read-mostly; one write (create_customer).
+
+### Endpoints
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/integrations/fortnox/customers/lookup` | Lookup by email then name; returns first match or null |
+| POST | `/integrations/fortnox/customers/create` | Create customer; name required; email/org/phone optional |
+| POST | `/integrations/fortnox/invoices/lookup` | By document_number → single invoice; by customer_number → list (limit≤50) |
+
+All three:
+- Return 503 when `FORTNOX_ACCESS_TOKEN` or `FORTNOX_CLIENT_SECRET` missing
+- Return 422 on missing required fields
+- Never leak credential values in error responses
+- Require tenant auth (`X-API-Key`)
+
+### Files changed
+- `app/main.py` — `_get_fortnox_client_or_raise()` helper; three new route functions
+- `app/ui/index.html` — "Fortnox Pilotverktyg" section in Kundminne tab; `fortnoxLookupCustomer()`, `fortnoxCreateCustomer()`, `fortnoxLookupInvoice()` JS functions
+- `tests/test_fortnox_actions.py` (new) — 32 tests
+
+### Tests
+32 new tests in `tests/test_fortnox_actions.py`:
+- `_get_fortnox_client_or_raise` (5)
+- Customer lookup (9)
+- Customer create (8)
+- Invoice lookup (10)
+
+**1780/1780 tests pass** (excluding 1 pre-existing env-dependent failure in `test_admin_auth` that fails when `ADMIN_API_KEY` is set in `.env`).

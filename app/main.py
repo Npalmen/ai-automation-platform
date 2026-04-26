@@ -2826,6 +2826,102 @@ def workflow_scan_status(
 
 
 # ---------------------------------------------------------------------------
+# Fortnox Customer + Invoice Actions
+# ---------------------------------------------------------------------------
+
+def _get_fortnox_client_or_raise():
+    """Build a FortnoxClient from settings or raise 503."""
+    from app.integrations.fortnox.client import FortnoxClient
+    s = get_settings()
+    token  = (getattr(s, "FORTNOX_ACCESS_TOKEN",  "") or "").strip()
+    secret = (getattr(s, "FORTNOX_CLIENT_SECRET", "") or "").strip()
+    api_url = (getattr(s, "FORTNOX_API_URL", "") or "https://api.fortnox.se/3").strip()
+    if not token or not secret:
+        raise HTTPException(
+            status_code=503,
+            detail="Fortnox credentials not configured (FORTNOX_ACCESS_TOKEN and FORTNOX_CLIENT_SECRET required).",
+        )
+    return FortnoxClient(access_token=token, client_secret=secret, api_url=api_url)
+
+
+@app.post("/integrations/fortnox/customers/lookup")
+def fortnox_customer_lookup(
+    body: dict,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Look up a Fortnox customer by email or name.
+
+    Body: {"email": "..."} or {"name": "..."} (at least one required).
+    Returns the first matching customer dict, or null when not found.
+    """
+    email = (body.get("email") or "").strip()
+    name  = (body.get("name")  or "").strip()
+    if not email and not name:
+        raise HTTPException(status_code=422, detail="Provide 'email' or 'name' to search.")
+    client = _get_fortnox_client_or_raise()
+    customer = None
+    if email:
+        customer = client.find_customer_by_email(email)
+    if customer is None and name:
+        customer = client.find_customer_by_name(name)
+    return {"customer": customer}
+
+
+@app.post("/integrations/fortnox/customers/create")
+def fortnox_customer_create(
+    body: dict,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Create a Fortnox customer.
+
+    Body fields: name (required), email, organisation_number, phone.
+    Returns the created customer object from Fortnox.
+    """
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="'name' is required to create a customer.")
+    payload: dict = {"Name": name}
+    if body.get("email"):
+        payload["Email"] = body["email"]
+    if body.get("organisation_number"):
+        payload["OrganisationNumber"] = body["organisation_number"]
+    if body.get("phone"):
+        payload["Phone1"] = body["phone"]
+    client = _get_fortnox_client_or_raise()
+    result = client.create_customer(payload)
+    return {"customer": result.get("Customer") or result}
+
+
+@app.post("/integrations/fortnox/invoices/lookup")
+def fortnox_invoice_lookup(
+    body: dict,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Look up Fortnox invoices by document_number or customer_number.
+
+    Body: {"document_number": "..."} or {"customer_number": "...", "limit": 10}.
+    Returns {"invoice": {...}} or {"invoices": [...]} depending on lookup type.
+    """
+    doc_number  = (body.get("document_number")  or "").strip()
+    cust_number = (body.get("customer_number")  or "").strip()
+    if not doc_number and not cust_number:
+        raise HTTPException(status_code=422, detail="Provide 'document_number' or 'customer_number'.")
+    client = _get_fortnox_client_or_raise()
+    if doc_number:
+        invoice = client.find_invoice_by_document_number(doc_number)
+        return {"invoice": invoice}
+    limit = min(int(body.get("limit") or 10), 50)
+    invoices = client.find_recent_invoices_by_customer(cust_number, limit=limit)
+    return {"invoices": invoices}
+
+
+# ---------------------------------------------------------------------------
 # Controlled Dispatch Engine
 # ---------------------------------------------------------------------------
 
