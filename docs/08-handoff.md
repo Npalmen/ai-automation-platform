@@ -899,3 +899,54 @@ The platform had routing hints, routing preview, and readiness scores — but no
 
 ### Tests
 33 new tests in `tests/test_dispatch_engine.py`. All 1297 pre-existing tests still pass. **1330/1330 total.**
+
+## Completed slice (2026-04-26 — Dispatch Control Policy Integration)
+
+Connects the existing `auto_actions` tenant config (Control Panel toggles) to the dispatch endpoints so that operator-set automation levels gate live dispatch.
+
+### What was added
+
+**`app/workflows/dispatchers/policy.py`** — new pure module
+- `resolve_dispatch_policy(tenant_config, job_type)` — maps `auto_actions[job_type]` to normalized policy dict
+- `manual`/`False`/`None`/unknown → `"manual"` (safe default)
+- `"semi"` → `"approval_required"`
+- `"auto"`/`True` → `"full_auto"`
+- Returns `{policy_mode, requires_approval, can_dispatch_now}`
+
+**`app/main.py`** — three additions
+
+| Endpoint / function | Behaviour |
+|---------------------|-----------|
+| `_get_dispatch_policy(db, tenant_id, job_type)` | Internal helper: fetches tenant config + resolves policy |
+| `GET /jobs/{job_id}/dispatch-policy` | Returns `{job_id, job_type, policy_mode, requires_approval, can_dispatch_now}`; 404 on unknown job |
+| `POST /jobs/{job_id}/dispatch-preview` | Merges policy fields (`policy_mode`, `requires_approval`, `can_dispatch_now`) into dry-run response |
+| `POST /jobs/{job_id}/dispatch` | Checks policy before adapter call; returns `{status:"approval_required", policy_mode, message}` when `can_dispatch_now` is False — no adapter called, no DB write |
+
+**`app/ui/index.html`** — case detail additions
+- Fetches `GET /jobs/{job_id}/dispatch-policy` when opening a case
+- Shows "Dispatch-policy: Manuellt / Godkännande krävs / Helautomatisk" label in Swedish
+- `_showDispatchResult()` handles `approval_required` status with ⚠ icon and Swedish message
+
+### Tests
+35 new tests in `tests/test_dispatch_policy.py`:
+- `TestResolveDispatchPolicy` (9) — pure function, all input variants
+- `TestGetDispatchPolicyEndpoint` (5) — shape, modes, 404
+- `TestDispatchPreviewWithPolicy` (8) — policy fields present, dry_run unaffected
+- `TestDispatchLiveWithPolicy` (9) — allow/block by mode, adapter not called on block, tenant isolation
+- `TestExistingBehaviorPreserved` (3) — routing preview, readiness, dispatch-preview 404
+
+**1365/1365 total tests pass.**
+
+### Policy decision table
+
+| `auto_actions[job_type]` value | `policy_mode` | `can_dispatch_now` | Adapter called? |
+|-------------------------------|--------------|-------------------|-----------------|
+| `"manual"` / `False` / `None` / missing | `"manual"` | `True` | Yes |
+| `"semi"` | `"approval_required"` | `False` | No |
+| `"auto"` / `True` | `"full_auto"` | `True` | Yes |
+| Any other value | `"manual"` | `True` | Yes |
+
+### Constraints preserved
+- Policy is read-only from the dispatch side — Control Panel is still the only write path
+- `approval_required` returns a clean JSON response (not an HTTP error) so clients can display a UI prompt
+- Duplicate guard and all existing routing/preview behavior unchanged

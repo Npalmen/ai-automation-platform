@@ -7,7 +7,7 @@
 - [x] DB setup verified (`docker-compose.yml` + `scripts/create_tables.py`)
 
 ## Test
-- [x] Automated tests pass — 1330/1330 (`python -m pytest`)
+- [x] Automated tests pass — 1365/1365 (`python -m pytest`)
 - [x] Official MVP smoke test documented in README (curl commands, step by step)
 - [x] Gmail send_email verified live (real Gmail delivery confirmed)
 - [x] Gmail list_messages verified live (real inbox messages returned)
@@ -40,6 +40,7 @@
 - [x] Routing Hint Drafts — GET /tenant/routing-hint-drafts (read-only draft generation from system_map); POST /tenant/routing-hints/apply (operator-explicit save, validates shape, no-clobber, no external writes); review-first — no auto-routing; 34 tests; Föreslå routing + Spara routing-hints UI in Kundminne tab
 - [x] Routing Preview + Readiness — GET /tenant/routing-preview/{job_type} (ready/missing_hint/invalid_hint; 400 bad type); GET /tenant/routing-readiness (ready/missing/invalid counts + percent score); GET /cases/{job_id} enriched with routing_preview field; preview only — no auto-routing; 30 tests; Testa routing UI in Kundminne + colour-coded Routing Preview card in case detail
 - [x] Generic Controlled Dispatch Engine + Monday Lead Adapter v1 — POST /jobs/{job_id}/dispatch-preview (dry-run, no external call) + POST /jobs/{job_id}/dispatch (live, validated, deduplicated, persisted to integration_events); ControlledDispatchEngine + DISPATCH_REGISTRY (system, job_type); MondayLeadDispatchAdapter (item name derivation, create_item); duplicate guard via idempotency_key; 33 tests; Förhandsvisa dispatch + Skicka till system UI in case detail
+- [x] Dispatch Control Policy Integration — resolve_dispatch_policy() maps auto_actions values to manual/approval_required/full_auto; GET /jobs/{job_id}/dispatch-policy; dispatch blocked with status=approval_required when can_dispatch_now=False (no adapter call); dispatch-preview includes policy fields; case detail UI shows policy label in Swedish; 35 tests
 
 ## Docs
 - [x] current-state updated

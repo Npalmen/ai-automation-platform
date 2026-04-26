@@ -2792,6 +2792,36 @@ def _dispatch_result_to_response(result) -> dict:
     return result.to_dict()
 
 
+def _get_dispatch_policy(db, tenant_id: str, job_type: str) -> dict:
+    """Load tenant config and resolve dispatch policy for job_type."""
+    from app.workflows.dispatchers.policy import resolve_dispatch_policy
+    tenant_cfg = get_tenant_config(tenant_id, db=db)
+    return resolve_dispatch_policy(tenant_cfg, job_type)
+
+
+@app.get("/jobs/{job_id}/dispatch-policy")
+def get_dispatch_policy(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return dispatch policy for this job based on tenant control panel settings."""
+    r = (
+        db.query(JobRecord)
+        .filter(JobRecord.job_id == job_id, JobRecord.tenant_id == tenant_id)
+        .first()
+    )
+    if r is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    policy = _get_dispatch_policy(db, tenant_id, r.job_type or "")
+    return {
+        "job_id":            job_id,
+        "job_type":          r.job_type or "unknown",
+        **policy,
+    }
+
+
 @app.post("/jobs/{job_id}/dispatch-preview")
 def dispatch_preview(
     job_id: str,
@@ -2799,7 +2829,7 @@ def dispatch_preview(
     tenant_id: str = Depends(get_verified_tenant),
 ):
     """
-    Dry-run dispatch preview: resolves routing, returns what would happen.
+    Dry-run dispatch preview: resolves routing + policy, returns what would happen.
     Never writes to external systems.
     """
     from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
@@ -2814,9 +2844,12 @@ def dispatch_preview(
 
     s = TenantConfigRepository.get_settings(db, tenant_id)
     memory = _get_memory(s)
+    policy = _get_dispatch_policy(db, tenant_id, r.job_type or "")
     engine = _make_dispatch_engine(db, tenant_id)
     result = engine.run(job=r, memory=memory, dry_run=True)
-    return _dispatch_result_to_response(result)
+    response = _dispatch_result_to_response(result)
+    response.update(policy)
+    return response
 
 
 @app.post("/jobs/{job_id}/dispatch")
@@ -2826,9 +2859,10 @@ def dispatch_job(
     tenant_id: str = Depends(get_verified_tenant),
 ):
     """
-    Controlled live dispatch for a job.
-    Uses routing_hint for the job type.
-    Returns safe errors — never raises on adapter failure.
+    Controlled live dispatch for a job, policy-aware.
+
+    - manual / full_auto: executes immediately when operator calls this endpoint.
+    - approval_required: blocks external dispatch; returns approval_required response.
     """
     from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
 
@@ -2840,6 +2874,16 @@ def dispatch_job(
     if r is None:
         raise HTTPException(status_code=404, detail="Job not found")
 
+    policy = _get_dispatch_policy(db, tenant_id, r.job_type or "")
+
+    if not policy["can_dispatch_now"]:
+        # approval_required — do not write externally
+        return {
+            "status":       "approval_required",
+            "message":      "Godkännande krävs innan dispatch — Approval required before dispatch",
+            **policy,
+        }
+
     s = TenantConfigRepository.get_settings(db, tenant_id)
     memory = _get_memory(s)
     engine = _make_dispatch_engine(db, tenant_id)
@@ -2848,7 +2892,9 @@ def dispatch_job(
     if result.status == "failed":
         raise HTTPException(status_code=400, detail=result.message)
 
-    return _dispatch_result_to_response(result)
+    response = _dispatch_result_to_response(result)
+    response.update(policy)
+    return response
 
 
 @app.get("/audit-events", response_model=AuditEventListResponse)

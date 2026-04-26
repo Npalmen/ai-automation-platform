@@ -2138,6 +2138,18 @@ async function openCase(jobId) {
       const rpLabel = rp.status === 'ready' ? 'Klar' : rp.status === 'missing_hint' ? 'Saknas' : 'Fel';
       const rpColor = rp.status === 'ready' ? '#065f46' : rp.status === 'missing_hint' ? '#92400e' : '#991b1b';
       const rpBg    = rp.status === 'ready' ? '#ecfdf5' : rp.status === 'missing_hint' ? '#fffbeb' : '#fef2f2';
+      // fetch dispatch policy (best-effort)
+      let policyHtml = '';
+      try {
+        const pol = await apiFetch(`/jobs/${encodeURIComponent(c.job_id)}/dispatch-policy`);
+        const polLabel = pol.policy_mode === 'full_auto' ? 'Full auto' : pol.policy_mode === 'approval_required' ? 'Kräver godkännande' : 'Manuellt läge';
+        const polColor = pol.policy_mode === 'full_auto' ? '#1d4ed8' : pol.policy_mode === 'approval_required' ? '#92400e' : '#374151';
+        const canNow   = pol.can_dispatch_now;
+        policyHtml = `<div style="font-size:12px; color:${polColor}; margin-top:6px; font-weight:600;">
+          Dispatch-policy: ${escapeHtml(polLabel)}${canNow ? ' · Kan skickas nu' : ' · Godkännande krävs innan dispatch'}
+        </div>`;
+      } catch (_) {}
+
       const dispatchBtns = rp.status === 'ready' ? `
         <div style="display:flex; gap:8px; margin-top:10px;">
           <button class="btn btn-neutral btn-sm" onclick="dispatchPreview('${escapeHtml(c.job_id)}')">Förhandsvisa dispatch</button>
@@ -2150,6 +2162,7 @@ async function openCase(jobId) {
         </div>
         <div style="font-size:13px; color:#374151;">${escapeHtml(rp.message || '')}</div>
         ${rp.target ? `<div style="font-size:12px; color:#6b7280; margin-top:6px;">System: ${escapeHtml(rp.system || '–')} · Board: ${escapeHtml((rp.target.board_name || rp.target.board_id) || '–')}</div>` : ''}
+        ${policyHtml}
         ${dispatchBtns}
         <div id="dispatchResult_${escapeHtml(c.job_id)}" style="margin-top:10px; display:none;"></div>
       </div>`;
@@ -2172,9 +2185,9 @@ function _showDispatchResult(jobId, result) {
   const el = document.getElementById('dispatchResult_' + jobId);
   if (!el) return;
   const status = result.status || '';
-  const isOk   = status === 'success' || status === 'dry_run' || status === 'skipped';
-  const icon    = status === 'success' ? '✅' : status === 'dry_run' ? '🔍' : status === 'skipped' ? 'ℹ' : '❌';
-  const label   = status === 'success' ? 'Dispatch lyckades' : status === 'dry_run' ? 'Förhandsgranskning' : status === 'skipped' ? 'Redan skickad' : 'Dispatch misslyckades';
+  const isOk   = status === 'success' || status === 'dry_run' || status === 'skipped' || status === 'approval_required';
+  const icon    = status === 'success' ? '✅' : status === 'dry_run' ? '🔍' : status === 'skipped' ? 'ℹ' : status === 'approval_required' ? '⚠' : '❌';
+  const label   = status === 'success' ? 'Dispatch lyckades' : status === 'dry_run' ? 'Förhandsgranskning' : status === 'skipped' ? 'Redan skickad' : status === 'approval_required' ? 'Godkännande krävs innan dispatch' : 'Dispatch misslyckades';
   const bg      = isOk ? '#ecfdf5' : '#fef2f2';
   const color   = isOk ? '#065f46' : '#991b1b';
   const extId   = result.external_id ? `<div style="font-size:12px; margin-top:4px; color:#6b7280;">ID: ${escapeHtml(result.external_id)}</div>` : '';
