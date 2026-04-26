@@ -7,7 +7,7 @@
 - [x] DB setup verified (`docker-compose.yml` + `scripts/create_tables.py`)
 
 ## Test
-- [x] Automated tests pass — 1297/1297 (`python -m pytest`)
+- [x] Automated tests pass — 1330/1330 (`python -m pytest`)
 - [x] Official MVP smoke test documented in README (curl commands, step by step)
 - [x] Gmail send_email verified live (real Gmail delivery confirmed)
 - [x] Gmail list_messages verified live (real inbox messages returned)
@@ -39,6 +39,7 @@
 - [x] Monday Workflow Scanner v1 — MondayWorkflowScannerAdapter reads board structure via get_boards() read-only GraphQL; detect_board_purpose() deterministic keyword classification (lead/invoice/support/partnership/supplier/internal/unknown); persists system_map.monday; no-clobber; 46 tests; Skanna Monday button + summary card in UI
 - [x] Routing Hint Drafts — GET /tenant/routing-hint-drafts (read-only draft generation from system_map); POST /tenant/routing-hints/apply (operator-explicit save, validates shape, no-clobber, no external writes); review-first — no auto-routing; 34 tests; Föreslå routing + Spara routing-hints UI in Kundminne tab
 - [x] Routing Preview + Readiness — GET /tenant/routing-preview/{job_type} (ready/missing_hint/invalid_hint; 400 bad type); GET /tenant/routing-readiness (ready/missing/invalid counts + percent score); GET /cases/{job_id} enriched with routing_preview field; preview only — no auto-routing; 30 tests; Testa routing UI in Kundminne + colour-coded Routing Preview card in case detail
+- [x] Generic Controlled Dispatch Engine + Monday Lead Adapter v1 — POST /jobs/{job_id}/dispatch-preview (dry-run, no external call) + POST /jobs/{job_id}/dispatch (live, validated, deduplicated, persisted to integration_events); ControlledDispatchEngine + DISPATCH_REGISTRY (system, job_type); MondayLeadDispatchAdapter (item name derivation, create_item); duplicate guard via idempotency_key; 33 tests; Förhandsvisa dispatch + Skicka till system UI in case detail
 
 ## Docs
 - [x] current-state updated

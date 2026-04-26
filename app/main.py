@@ -2778,6 +2778,79 @@ def workflow_scan_status(
     }
 
 
+# ---------------------------------------------------------------------------
+# Controlled Dispatch Engine
+# ---------------------------------------------------------------------------
+
+def _make_dispatch_engine(db: Session, tenant_id: str):
+    """Construct a ControlledDispatchEngine with current app settings."""
+    from app.workflows.dispatchers.engine import ControlledDispatchEngine
+    return ControlledDispatchEngine(db=db, tenant_id=tenant_id, settings=settings)
+
+
+def _dispatch_result_to_response(result) -> dict:
+    return result.to_dict()
+
+
+@app.post("/jobs/{job_id}/dispatch-preview")
+def dispatch_preview(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Dry-run dispatch preview: resolves routing, returns what would happen.
+    Never writes to external systems.
+    """
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    r = (
+        db.query(JobRecord)
+        .filter(JobRecord.job_id == job_id, JobRecord.tenant_id == tenant_id)
+        .first()
+    )
+    if r is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    s = TenantConfigRepository.get_settings(db, tenant_id)
+    memory = _get_memory(s)
+    engine = _make_dispatch_engine(db, tenant_id)
+    result = engine.run(job=r, memory=memory, dry_run=True)
+    return _dispatch_result_to_response(result)
+
+
+@app.post("/jobs/{job_id}/dispatch")
+def dispatch_job(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Controlled live dispatch for a job.
+    Uses routing_hint for the job type.
+    Returns safe errors — never raises on adapter failure.
+    """
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    r = (
+        db.query(JobRecord)
+        .filter(JobRecord.job_id == job_id, JobRecord.tenant_id == tenant_id)
+        .first()
+    )
+    if r is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    s = TenantConfigRepository.get_settings(db, tenant_id)
+    memory = _get_memory(s)
+    engine = _make_dispatch_engine(db, tenant_id)
+    result = engine.run(job=r, memory=memory, dry_run=False)
+
+    if result.status == "failed":
+        raise HTTPException(status_code=400, detail=result.message)
+
+    return _dispatch_result_to_response(result)
+
+
 @app.get("/audit-events", response_model=AuditEventListResponse)
 def list_audit_events(
     db: Session = Depends(get_db),

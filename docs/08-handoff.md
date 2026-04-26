@@ -854,3 +854,48 @@ Validation rules for `ready`:
 
 ### Tests
 30 new tests in `tests/test_routing_preview.py`. All 1267 pre-existing tests still pass. **1297/1297 total.**
+
+## Completed slice (2026-04-26 — Generic Controlled Dispatch Engine + Monday Lead Adapter v1)
+
+### Problem solved
+The platform had routing hints, routing preview, and readiness scores — but no way to actually execute a dispatch. This slice adds the first controlled execution layer: operators can trigger dispatch of a lead job to Monday.com via a dedicated endpoint, with a dry-run preview before committing.
+
+### What was built
+
+**`app/workflows/dispatchers/` package** — new
+
+| File | Role |
+|------|------|
+| `base.py` | `DispatchResult` dataclass + `BaseDispatchAdapter` contract (system_key, job_type_key, dispatch()) |
+| `engine.py` | `ControlledDispatchEngine` — hint validation, duplicate guard, adapter lookup, persist; `DISPATCH_REGISTRY` keyed by (system, job_type) |
+| `monday_lead_adapter.py` | `MondayLeadDispatchAdapter` — derives item name (company→customer→sender→email→subject→"New lead"), builds minimal column_values, calls `MondayClient.create_item()` |
+
+**Duplicate guard**
+- Uses existing `integration_events` table + idempotency key `dispatch:{tenant}:{job_id}:{system}:{job_type}`
+- Successful dispatch persisted as `IntegrationEvent(integration_type="controlled_dispatch", status="success")`
+- Repeated dispatch on same job → `status="skipped"` (not an error)
+
+**`app/main.py`** — two new endpoints
+
+| Endpoint | Behaviour |
+|----------|-----------|
+| `POST /jobs/{job_id}/dispatch-preview` | Dry-run: resolves hint, returns what would happen; never calls external API |
+| `POST /jobs/{job_id}/dispatch` | Live: validates hint → duplicate check → adapter → persist; 400 on failure; 404 if job not found |
+
+**`app/ui/index.html`** — case detail additions
+- "Förhandsvisa dispatch" + "Skicka till system" buttons (shown only when routing status is `ready`)
+- Result shown inline with colour-coded status (success/dry_run/skipped/failed)
+- Confirm dialog before live dispatch
+
+### Adding a future adapter
+1. Create `app/workflows/dispatchers/hubspot_lead_adapter.py` implementing `BaseDispatchAdapter`
+2. Add `("hubspot", "lead"): HubSpotLeadDispatchAdapter()` to `DISPATCH_REGISTRY`
+3. `POST /jobs/{job_id}/dispatch` is immediately available for that system once the tenant saves a hint with `system="hubspot"`
+
+### Constraints preserved
+- No auto-routing — dispatch only via explicit endpoint call
+- No column mapping engine — basic item creation only
+- Dry-run always available before live dispatch
+
+### Tests
+33 new tests in `tests/test_dispatch_engine.py`. All 1297 pre-existing tests still pass. **1330/1330 total.**
