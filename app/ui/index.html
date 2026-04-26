@@ -58,19 +58,44 @@ header input {
 .view-nav {
   display: flex;
   background: #fff;
-  border-bottom: 1px solid #d1d5db;
+  border-bottom: 2px solid #e5e7eb;
   flex-shrink: 0;
+  align-items: stretch;
 }
 .view-tab {
-  padding: 9px 22px;
+  padding: 10px 20px;
   font-size: 13px;
   cursor: pointer;
-  border-right: 1px solid #e5e7eb;
-  color: #555;
+  color: #6b7280;
   user-select: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.1s;
+  white-space: nowrap;
 }
-.view-tab.active { font-weight: bold; color: #1d4ed8; border-bottom: 2px solid #1d4ed8; }
-.view-tab:hover:not(.active) { background: #f9fafb; color: #111; }
+.view-tab.active { font-weight: 700; color: #1d4ed8; border-bottom-color: #1d4ed8; }
+.view-tab:hover:not(.active) { background: #f9fafb; color: #374151; }
+.view-tab.admin-only { color: #7c3aed; }
+.view-tab.admin-only.active { color: #7c3aed; border-bottom-color: #7c3aed; }
+.view-tab.admin-only:hover:not(.active) { background: #f5f3ff; }
+
+/* ── Role badge ── */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  cursor: pointer;
+  user-select: none;
+  letter-spacing: 0.04em;
+  transition: background 0.15s;
+}
+.role-badge.admin    { background: #7c3aed; color: #fff; }
+.role-badge.customer { background: #0891b2; color: #fff; }
+.role-badge:hover { opacity: 0.85; }
 
 /* ── Layout (Operations) ── */
 .layout { display: flex; flex: 1; overflow: hidden; }
@@ -361,6 +386,7 @@ pre {
     <label>API-nyckel</label>
     <input id="apiKeyInput" type="password" placeholder="X-API-Key" oninput="onKeyInput()">
   </div>
+  <span id="roleBadge" class="role-badge admin" onclick="toggleRole()" title="Klicka för att byta vy">&#9670; Admin</span>
   <button class="btn btn-neutral btn-sm" onclick="loadAll()">Uppdatera allt</button>
 </header>
 
@@ -369,15 +395,15 @@ pre {
 </div>
 
 <div class="view-nav">
-  <div class="view-tab"        id="viewTabDash"  onclick="switchView('dash')">Dashboard</div>
-  <div class="view-tab active" id="viewTabOps"   onclick="switchView('ops')">Drift</div>
-  <div class="view-tab"        id="viewTabSetup" onclick="switchView('setup')">Inställningar</div>
-  <div class="view-tab"        id="viewTabCtrl"  onclick="switchView('ctrl')">Kontrollpanel</div>
-  <div class="view-tab"        id="viewTabCases" onclick="switchView('cases')">Ärenden</div>
-  <div class="view-tab"        id="viewTabOnboarding"  onclick="switchView('onboarding')">Onboarding</div>
-  <div class="view-tab"        id="viewTabNotif"       onclick="switchView('notif')">Notifieringar</div>
-  <div class="view-tab"        id="viewTabMemory"      onclick="switchView('memory')">Kundminne</div>
-  <div class="view-tab"        id="viewTabAdmin"       onclick="switchView('admin')">Super Admin</div>
+  <div class="view-tab"        id="viewTabDash"       onclick="switchView('dash')">Dashboard</div>
+  <div class="view-tab"        id="viewTabCases"      onclick="switchView('cases')">Ärenden</div>
+  <div class="view-tab admin-only" id="viewTabOps" onclick="switchView('ops')">Drift</div>
+  <div class="view-tab admin-only" id="viewTabSetup" onclick="switchView('setup')">Inställningar</div>
+  <div class="view-tab admin-only" id="viewTabCtrl"  onclick="switchView('ctrl')">Kontrollpanel</div>
+  <div class="view-tab admin-only" id="viewTabOnboarding"  onclick="switchView('onboarding')">Onboarding</div>
+  <div class="view-tab admin-only" id="viewTabNotif"       onclick="switchView('notif')">Notifieringar</div>
+  <div class="view-tab admin-only" id="viewTabMemory"      onclick="switchView('memory')">Kundminne</div>
+  <div class="view-tab admin-only" id="viewTabAdmin"       onclick="switchView('admin')">Super Admin</div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ DASHBOARD -->
@@ -1226,13 +1252,21 @@ function jobLabel(key)   { return JOB_TYPE_LABELS[key]   || key; }
 function intLabel(key)   { return INTEGRATION_LABELS[key] || key; }
 
 // ---------------------------------------------------------------------------
-// State — single source of truth for active tenant
+// State — single source of truth for active tenant + UI role
 // ---------------------------------------------------------------------------
 let selectedJobId   = null;
 let _activeTenantId = null;   // the tenant whose config is currently loaded
 
-const LS_KEY       = 'ui_api_key';
-const LS_ADMIN_KEY = 'ui_admin_api_key';
+const LS_KEY        = 'ui_api_key';
+const LS_ADMIN_KEY  = 'ui_admin_api_key';
+const LS_ROLE_KEY   = 'ui_role_mode';    // 'admin' | 'customer'
+
+let _uiMode = 'admin';   // current role; initialised in initApiKey()
+
+// Admin-only tab names — hidden in customer mode
+const ADMIN_ONLY_VIEWS = ['ops', 'setup', 'ctrl', 'onboarding', 'notif', 'memory', 'admin'];
+// Views visible to customers
+const CUSTOMER_VIEWS   = ['dash', 'cases'];
 
 function apiKey() {
   return document.getElementById('apiKeyInput').value.trim();
@@ -1280,30 +1314,67 @@ function initApiKey() {
   const savedAdmin = localStorage.getItem(LS_ADMIN_KEY) || '';
   const adminEl = document.getElementById('adminKeyInput');
   if (adminEl) adminEl.value = savedAdmin;
+
+  // Restore role mode
+  const savedRole = localStorage.getItem(LS_ROLE_KEY) || 'admin';
+  _uiMode = (savedRole === 'customer') ? 'customer' : 'admin';
+  _applyRoleMode();
 }
 
 // ---------------------------------------------------------------------------
-// View switcher (Dashboard / Drift / Inställningar)
+// Role mode
 // ---------------------------------------------------------------------------
+function _applyRoleMode() {
+  const isAdmin = (_uiMode === 'admin');
+  // Badge
+  const badge = document.getElementById('roleBadge');
+  if (badge) {
+    badge.className = 'role-badge ' + (isAdmin ? 'admin' : 'customer');
+    badge.textContent = isAdmin ? '⬧ Admin' : '⬧ Kund';
+    badge.title = 'Klicka för att byta vy (' + (isAdmin ? 'Admin → Kundvy' : 'Kundvy → Admin') + ')';
+  }
+  // Show/hide admin-only tabs
+  ADMIN_ONLY_VIEWS.forEach(v => {
+    const tab = document.getElementById('viewTab' + v.charAt(0).toUpperCase() + v.slice(1));
+    if (tab) tab.style.display = isAdmin ? '' : 'none';
+  });
+}
+
+function toggleRole() {
+  _uiMode = (_uiMode === 'admin') ? 'customer' : 'admin';
+  localStorage.setItem(LS_ROLE_KEY, _uiMode);
+  _applyRoleMode();
+  // If current view is admin-only and we switched to customer — redirect to dash
+  if (_uiMode === 'customer') {
+    const activeTab = document.querySelector('.view-tab.active');
+    if (activeTab) {
+      const isAdminTab = ADMIN_ONLY_VIEWS.some(v => {
+        const el = document.getElementById('viewTab' + v.charAt(0).toUpperCase() + v.slice(1));
+        return el && el === activeTab;
+      });
+      if (isAdminTab) switchView('dash');
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// View switcher
+// ---------------------------------------------------------------------------
+const _VIEW_DISPLAY = {
+  dash: 'block', ops: 'flex', setup: 'block', ctrl: 'block',
+  cases: 'block', onboarding: 'block', notif: 'block', memory: 'block', admin: 'block',
+};
+
 function switchView(name) {
-  document.getElementById('viewDash').style.display  = name === 'dash'  ? 'block' : 'none';
-  document.getElementById('viewOps').style.display   = name === 'ops'   ? 'flex'  : 'none';
-  document.getElementById('viewSetup').style.display = name === 'setup' ? 'block' : 'none';
-  document.getElementById('viewCtrl').style.display  = name === 'ctrl'  ? 'block' : 'none';
-  document.getElementById('viewCases').style.display      = name === 'cases'      ? 'block' : 'none';
-  document.getElementById('viewOnboarding').style.display = name === 'onboarding' ? 'block' : 'none';
-  document.getElementById('viewNotif').style.display      = name === 'notif'      ? 'block' : 'none';
-  document.getElementById('viewMemory').style.display     = name === 'memory'     ? 'block' : 'none';
-  document.getElementById('viewAdmin').style.display      = name === 'admin'      ? 'block' : 'none';
-  document.getElementById('viewTabDash').classList.toggle('active',       name === 'dash');
-  document.getElementById('viewTabOps').classList.toggle('active',        name === 'ops');
-  document.getElementById('viewTabSetup').classList.toggle('active',      name === 'setup');
-  document.getElementById('viewTabCtrl').classList.toggle('active',       name === 'ctrl');
-  document.getElementById('viewTabCases').classList.toggle('active',      name === 'cases');
-  document.getElementById('viewTabOnboarding').classList.toggle('active', name === 'onboarding');
-  document.getElementById('viewTabNotif').classList.toggle('active',      name === 'notif');
-  document.getElementById('viewTabMemory').classList.toggle('active',     name === 'memory');
-  document.getElementById('viewTabAdmin').classList.toggle('active',      name === 'admin');
+  // In customer mode, block admin-only navigation
+  if (_uiMode === 'customer' && ADMIN_ONLY_VIEWS.includes(name)) return;
+
+  Object.keys(_VIEW_DISPLAY).forEach(v => {
+    const el = document.getElementById('view' + v.charAt(0).toUpperCase() + v.slice(1));
+    if (el) el.style.display = (v === name) ? _VIEW_DISPLAY[v] : 'none';
+    const tab = document.getElementById('viewTab' + v.charAt(0).toUpperCase() + v.slice(1));
+    if (tab) tab.classList.toggle('active', v === name);
+  });
   if (name === 'setup')      loadSetup();
   if (name === 'dash')       loadDashboard();
   if (name === 'ctrl')       loadControl();
@@ -1668,16 +1739,16 @@ async function loadAdminOverview() {
   }
 }
 
-function openTenant(tenantId) {
-  // Switch to Inställningar and select the given tenant
+async function openTenant(tenantId) {
+  // Pre-set the active tenant so loadSetup() picks it up correctly.
+  _activeTenantId = tenantId;
+  // Switch to admin mode so Inställningar tab is visible
+  if (_uiMode !== 'admin') { _uiMode = 'admin'; _applyRoleMode(); }
   switchView('setup');
-  loadTenants().then(() => {
-    const sel = document.getElementById('switchTenantSelect');
-    if (sel) {
-      sel.value = tenantId;
-      switchTenant();
-    }
-  });
+  // After loadSetup() has run (called by switchView), sync the dropdown.
+  await loadTenants();
+  const sel = document.getElementById('switchTenantSelect');
+  if (sel) sel.value = tenantId;
 }
 
 
@@ -3392,6 +3463,8 @@ async function saveMemory() {
 // Init
 // ---------------------------------------------------------------------------
 initApiKey();
+// Default view: dashboard for customers, ops for admin
+switchView(_uiMode === 'admin' ? 'ops' : 'dash');
 if (apiKey()) loadAll();
 </script>
 </body>

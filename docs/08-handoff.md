@@ -1473,3 +1473,31 @@ All three:
 - Invoice lookup (10)
 
 **1780/1780 tests pass** (excluding 1 pre-existing env-dependent failure in `test_admin_auth` that fails when `ADMIN_API_KEY` is set in `.env`).
+
+## Completed slice (2026-04-27 — Slice 20: UI Role Separation + Fix Tenant Open)
+
+### Root cause of openTenant bug
+`openTenant()` called `switchView('setup')` which synchronously triggered `loadSetup()`. `loadSetup()` reads `_activeTenantId` at that moment (still the admin's own tenant), loads the wrong tenant's config, then the `.then()` callback ran `switchTenant()` against the correct tenant — but only after `loadSetup()` had already rendered the wrong data. Race between switchView auto-load and the explicit tenant override.
+
+### Fix
+`openTenant(tenantId)` now pre-sets `_activeTenantId = tenantId` before calling `switchView('setup')`, so when `loadSetup()` runs it picks up the correct tenant ID. The dropdown is synced via `loadTenants()` after.
+
+### Role separation
+- `_uiMode`: `'admin'` | `'customer'`, stored in `localStorage` as `ui_role_mode`
+- Admin mode: all tabs visible (purple-tinted admin-only tabs)
+- Customer mode: only Dashboard + Ärenden visible; admin-only tabs hidden
+- Role badge in header (purple for admin, teal for customer); click to toggle
+- Switching to customer mode while on admin-only view auto-redirects to Dashboard
+- `openTenant()` switches back to admin mode automatically
+- Default view on boot: ops for admin, dash for customer
+
+### Nav improvements
+- Bottom-border underline indicator (3px) replaces border-right separator
+- Admin-only tabs styled in purple to distinguish from customer tabs
+- Hover states improved; tabs no longer have right-border dividers
+
+### Files changed
+- `app/ui/index.html` — role state, `_applyRoleMode()`, `toggleRole()`, `switchView()` refactored, `openTenant()` fixed, nav CSS updated, header role badge, init boot logic
+
+### Tests
+No backend changes. 1780/1780 tests pass (same as before).
