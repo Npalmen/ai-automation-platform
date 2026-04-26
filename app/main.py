@@ -2976,6 +2976,7 @@ def dispatch_job(
 def dispatch_summary(
     db: Session = Depends(get_db),
     tenant_id: str = Depends(get_verified_tenant),
+    range: str | None    = None,
     job_type: str | None = None,
     system: str | None   = None,
     limit_recent: int    = 10,
@@ -2983,16 +2984,43 @@ def dispatch_summary(
     """
     Tenant-scoped dispatch observability summary.
 
-    Returns counts (total/successful/failed/skipped), breakdown by mode/job_type/system,
-    ROI estimate (5 min per successful dispatch), and recent dispatch list.
+    range preset: today | 7d | 30d | all  (default: 30d)
+    Returns counts, breakdown by mode/job_type/system, ROI estimate, recent list,
+    and range metadata (range, from, to).
     """
     from app.workflows.dispatchers.observability import get_dispatch_summary
     return get_dispatch_summary(
         db=db,
         tenant_id=tenant_id,
+        range_=range,
         job_type=job_type,
         system=system,
         limit_recent=limit_recent,
+    )
+
+
+@app.get("/dispatch/report")
+def dispatch_report(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+    range: str | None = None,
+):
+    """
+    Tenant-scoped executive ROI report (customer-facing).
+
+    range preset: today | 7d | 30d | all  (default: 30d)
+    Returns headline metrics: dispatches_completed, time_saved_hours,
+    success_rate_percent, automation_share_percent, breakdown by mode/system/job_type,
+    and a human-readable message.
+
+    automation_share = (approval_required + full_auto) / (total - skipped) * 100
+    success_rate     = successful / (total - skipped) * 100
+    """
+    from app.workflows.dispatchers.observability import get_dispatch_report
+    return get_dispatch_report(
+        db=db,
+        tenant_id=tenant_id,
+        range_=range,
     )
 
 

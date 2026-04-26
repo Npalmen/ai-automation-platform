@@ -1135,3 +1135,53 @@ Every dispatch event is now annotated with its automation mode, and operators ca
 - `TestEndpointShape` (2) — all top-level keys present, tenant isolation structural test
 
 **1455/1455 total tests pass.**
+
+## Completed slice (2026-04-26 — Time-Range Filters + Customer ROI Report)
+
+Turns dispatch observability into customer-facing proof of value with selectable time windows and an executive summary card.
+
+### What was added
+
+**`app/workflows/dispatchers/observability.py`** — extended
+
+| Symbol | Role |
+|--------|------|
+| `_VALID_RANGES` | `{"today", "7d", "30d", "all"}` |
+| `_normalise_range(range_)` | Coerces unknown/None to `"30d"`; safe for all callers |
+| `_range_bounds(range_)` | Returns `(from_dt, to_dt)` UTC datetimes for each preset |
+| `_range_label(range_)` | Swedish human label for message strings |
+| `_fetch_records(db, tenant_id, range_, *, job_type, system)` | Shared DB query with optional `created_at >= from_dt` filter |
+| `get_dispatch_summary(…, range_=None, …)` | Extended with `range_` param; response now includes `range`, `from`, `to` metadata; backward-compatible |
+| `get_dispatch_report(db, tenant_id, *, range_=None)` | New function; returns executive headline: `dispatches_completed`, `time_saved_hours`, `success_rate_percent`, `automation_share_percent`, `breakdown`, `systems`, `job_types`, `message` |
+
+**automation_share definition** (documented in module docstring):
+- `(approval_required + full_auto) / (total - skipped) * 100`
+- Skipped events never reached an external system, so they are excluded from the denominator
+- `success_rate = successful / (total - skipped) * 100` by the same logic
+- Both return `0` when no actionable events exist (safe division)
+
+**`app/main.py`** — endpoints updated
+
+| Endpoint | Change |
+|----------|--------|
+| `GET /dispatch/summary` | Added `range` query param; passes to `get_dispatch_summary(range_=range)` |
+| `GET /dispatch/report` | New endpoint; accepts `range` query param; returns `get_dispatch_report()` dict |
+
+**`app/ui/index.html`** — Dashboard tab updates
+- Range selector buttons (Idag / 7 dagar / 30 dagar / All tid) above Dispatchöversikt heading
+- Active button highlighted via `btn-primary`; `_dsRange` JS variable tracks selection (default `30d`)
+- `setDispatchRange(range)` — updates button state, reloads both `loadDispatchSummary()` and `loadDispatchReport()`
+- `loadDispatchSummary()` now appends `?range=` to the fetch URL; shows range label next to heading
+- `loadDispatchReport()` — new async function; populates ROI Rapport card
+- ROI Rapport card: Slutförda dispatches / Sparad tid / Lyckandegrad / Automationsgrad + headline message
+
+### Tests
+38 new tests in `tests/test_dispatch_time_range.py`:
+- `TestNormaliseRange` (7) — valid presets, None, invalid string, empty string
+- `TestSummaryRangeFiltering` (6) — today/7d/30d/all/invalid/None range params
+- `TestSummaryMetadata` (4) — range/from/to keys present, from=None for "all"
+- `TestSummaryBackwardCompat` (2) — all original keys still present, by_mode shape unchanged
+- `TestDispatchReport` (17) — headline values, success_rate, automation_share, zeros, only-skipped, breakdown/systems/job_types, message, range metadata, invalid range
+- `TestTenantIsolation` (2) — summary and report are tenant-scoped
+
+**1493/1493 total tests pass.**

@@ -416,7 +416,16 @@ pre {
   </details>
 
   <!-- Dispatch observability -->
-  <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Dispatchöversikt</h2>
+  <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px;">
+    <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin:0;">Dispatchöversikt</h2>
+    <div style="display:flex; gap:6px; flex-wrap:wrap;" id="dsRangeButtons">
+      <button class="btn btn-sm" id="dsBtn-today" onclick="setDispatchRange('today')">Idag</button>
+      <button class="btn btn-sm" id="dsBtn-7d"    onclick="setDispatchRange('7d')">7 dagar</button>
+      <button class="btn btn-sm btn-primary" id="dsBtn-30d" onclick="setDispatchRange('30d')">30 dagar</button>
+      <button class="btn btn-sm" id="dsBtn-all"   onclick="setDispatchRange('all')">All tid</button>
+    </div>
+    <span id="dsRangeLabel" style="font-size:11px; color:#6b7280;"></span>
+  </div>
   <div id="dispatchSummaryError" class="msg msg-error" style="display:none;"></div>
   <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; margin-bottom:12px;">
     <div class="dash-card"><div class="dash-label">Totalt skickade</div><div class="dash-value" id="dsTotal">–</div></div>
@@ -431,6 +440,17 @@ pre {
     <div class="dash-card"><div class="dash-label">Via godkännande</div><div class="dash-value" id="dsModeApproval" style="font-size:16px;">–</div></div>
   </div>
   <div id="dsRecent" style="margin-bottom:24px;"><span class="empty">Laddar…</span></div>
+
+  <!-- ROI Report (customer-facing) -->
+  <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">ROI Rapport</h2>
+  <div id="reportError" class="msg msg-error" style="display:none;"></div>
+  <div id="reportMessage" style="font-size:13px; color:#374151; background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:10px 14px; margin-bottom:12px; display:none;"></div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin-bottom:24px;">
+    <div class="dash-card roi-highlight"><div class="dash-label">Slutförda dispatches</div><div class="dash-value" id="rpTotal">–</div></div>
+    <div class="dash-card roi-highlight"><div class="dash-label">Sparad tid</div><div class="dash-value" id="rpHours">–</div><div class="dash-sublabel">timmar</div></div>
+    <div class="dash-card"><div class="dash-label">Lyckandegrad</div><div class="dash-value" id="rpSuccess" style="color:#16a34a;">–</div><div class="dash-sublabel">%</div></div>
+    <div class="dash-card"><div class="dash-label">Automationsgrad</div><div class="dash-value" id="rpAuto" style="color:#2563eb;">–</div><div class="dash-sublabel">%</div></div>
+  </div>
 
   <!-- Recent activity table -->
   <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Senaste aktivitet</h2>
@@ -1080,8 +1100,9 @@ async function loadDashboard() {
   // ROI
   loadRoi();
 
-  // Dispatch observability
+  // Dispatch observability + report
   loadDispatchSummary();
+  loadDispatchReport();
 
   // Summary
   try {
@@ -1163,10 +1184,26 @@ async function loadRoi() {
 }
 
 
+let _dsRange = '30d';
+
+function setDispatchRange(range) {
+  _dsRange = range;
+  ['today','7d','30d','all'].forEach(r => {
+    const btn = document.getElementById('dsBtn-' + r);
+    if (btn) btn.className = 'btn btn-sm' + (r === range ? ' btn-primary' : '');
+  });
+  loadDispatchSummary();
+  loadDispatchReport();
+}
+
 async function loadDispatchSummary() {
   document.getElementById('dispatchSummaryError').style.display = 'none';
   try {
-    const d = await apiFetch('/dispatch/summary');
+    const d = await apiFetch('/dispatch/summary?range=' + encodeURIComponent(_dsRange));
+    const RANGE_LABELS = {today:'Idag', '7d':'Senaste 7 dagarna', '30d':'Senaste 30 dagarna', all:'All tid'};
+    const lbl = document.getElementById('dsRangeLabel');
+    if (lbl) lbl.textContent = RANGE_LABELS[d.range] || d.range || '';
+
     document.getElementById('dsTotal').textContent   = d.total_dispatches       ?? '–';
     document.getElementById('dsSuccess').textContent = d.successful_dispatches  ?? '–';
     document.getElementById('dsFailed').textContent  = d.failed_dispatches      ?? '–';
@@ -1203,6 +1240,25 @@ async function loadDispatchSummary() {
   } catch (e) {
     const el = document.getElementById('dispatchSummaryError');
     el.textContent = 'Kunde inte ladda dispatchöversikt: ' + e.message;
+    el.style.display = 'block';
+  }
+}
+
+async function loadDispatchReport() {
+  document.getElementById('reportError').style.display = 'none';
+  try {
+    const r = await apiFetch('/dispatch/report?range=' + encodeURIComponent(_dsRange));
+    const h = r.headline || {};
+    document.getElementById('rpTotal').textContent   = h.dispatches_completed    ?? '–';
+    document.getElementById('rpHours').textContent   = h.time_saved_hours        ?? '–';
+    document.getElementById('rpSuccess').textContent = h.success_rate_percent    != null ? h.success_rate_percent + ' %' : '–';
+    document.getElementById('rpAuto').textContent    = h.automation_share_percent != null ? h.automation_share_percent + ' %' : '–';
+    const msgEl = document.getElementById('reportMessage');
+    if (r.message) { msgEl.textContent = r.message; msgEl.style.display = 'block'; }
+    else            { msgEl.style.display = 'none'; }
+  } catch (e) {
+    const el = document.getElementById('reportError');
+    el.textContent = 'Kunde inte ladda ROI-rapport: ' + e.message;
     el.style.display = 'block';
   }
 }
