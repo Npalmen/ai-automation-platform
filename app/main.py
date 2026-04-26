@@ -3111,6 +3111,23 @@ def onboarding_test_lead(
     }
 
 
+@app.get("/integrations/health")
+def integration_health(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Tenant-scoped integration health report.
+
+    Returns health status for Gmail and Monday based on internal signals only
+    (env config, scanner results, dispatch events, audit events).
+    No external API calls are made. No secret values appear in the response.
+    """
+    from app.health.integration_health import get_integration_health
+    s = get_settings()
+    return get_integration_health(db=db, tenant_id=tenant_id, app_settings=s)
+
+
 @app.post("/jobs/{job_id}/auto-dispatch")
 def trigger_auto_dispatch(
     job_id: str,

@@ -1257,3 +1257,33 @@ Makes first customer onboarding fast, visible, and repeatable from the existing 
 - `TestOnboardingTestLead` (6) — job_id, tenant_id, job_type, status, custom company, None request default
 
 **1542/1542 total tests pass.**
+
+## Completed slice (2026-04-26 — Slice 14: Integration Health Center)
+
+### Problem solved
+Operators had no way to see whether Gmail and Monday integrations were actually working without making external API calls or reading raw environment variables.
+
+### What was built
+
+**`app/health/integration_health.py`** — new module
+
+`get_integration_health(db, tenant_id, *, app_settings)` returns per-system health from internal signals only. No external API calls. No secrets in response.
+
+Per-system checks:
+
+| Check key | Gmail | Monday |
+|-----------|-------|--------|
+| `config_present` | `GOOGLE_MAIL_ACCESS_TOKEN` set | `MONDAY_API_KEY` set |
+| `scanner_ran` | `workflow_scan.summary.gmail.status == "success"` | `workflow_scan.summary.monday.status == "success"` |
+| `inbox_sync` / `dispatch_success` | Latest `AuditEventRecord` with `action="gmail_inbox_sync"` | Latest `IntegrationEvent` with `integration_type="controlled_dispatch"` |
+
+System statuses: `healthy | warning | error | not_configured`. Overall status: `error` if any error, `warning` if any warning/not_configured, else `healthy`.
+
+**`app/main.py`** — `GET /integrations/health` (tenant-authenticated)
+
+**`app/ui/index.html`** — Integrationshälsa card in Dashboard tab; `loadIntegrationHealth()` called on dashboard load.
+
+### Tests
+47 new tests in `tests/test_integration_health.py`.
+
+**1589/1589 total tests pass.**

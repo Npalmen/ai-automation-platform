@@ -452,6 +452,27 @@ pre {
     <div class="dash-card"><div class="dash-label">Automationsgrad</div><div class="dash-value" id="rpAuto" style="color:#2563eb;">–</div><div class="dash-sublabel">%</div></div>
   </div>
 
+  <!-- Integration health -->
+  <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Integrationshälsa</h2>
+  <div id="healthError" class="msg msg-error" style="display:none;"></div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; margin-bottom:24px;" id="healthCards">
+    <div class="dash-card">
+      <div class="dash-label">Övergripande status</div>
+      <div class="dash-value" id="healthOverall" style="font-size:16px;">–</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-label">Gmail</div>
+      <div class="dash-value" id="healthGmail" style="font-size:15px;">–</div>
+      <div class="dash-sublabel" id="healthGmailAction" style="color:#6b7280; margin-top:4px;"></div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-label">Monday</div>
+      <div class="dash-value" id="healthMonday" style="font-size:15px;">–</div>
+      <div class="dash-sublabel" id="healthMondayAction" style="color:#6b7280; margin-top:4px;"></div>
+    </div>
+  </div>
+  <div id="healthRecentErrors" style="margin-bottom:24px;"></div>
+
   <!-- Recent activity table -->
   <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Senaste aktivitet</h2>
   <div id="dashActivity">
@@ -1151,6 +1172,9 @@ async function loadDashboard() {
   loadDispatchSummary();
   loadDispatchReport();
 
+  // Integration health
+  loadIntegrationHealth();
+
   // Summary
   try {
     const s = await apiFetch('/dashboard/summary');
@@ -1306,6 +1330,55 @@ async function loadDispatchReport() {
   } catch (e) {
     const el = document.getElementById('reportError');
     el.textContent = 'Kunde inte ladda ROI-rapport: ' + e.message;
+    el.style.display = 'block';
+  }
+}
+
+
+async function loadIntegrationHealth() {
+  document.getElementById('healthError').style.display = 'none';
+  const _STATUS_ICON = { healthy: '✅ Frisk', warning: '⚠️ Varning', error: '❌ Fel', not_configured: '⚫ Ej konfigurerad' };
+  const _STATUS_COLOR = { healthy: '#16a34a', warning: '#d97706', error: '#dc2626', not_configured: '#9ca3af' };
+  try {
+    const h = await apiFetch('/integrations/health');
+
+    const ov = h.overall_status || 'warning';
+    const ovEl = document.getElementById('healthOverall');
+    ovEl.textContent = _STATUS_ICON[ov] || ov;
+    ovEl.style.color = _STATUS_COLOR[ov] || '#6b7280';
+
+    const sys = h.systems || {};
+    for (const [name, idSuffix] of [['gmail', 'Gmail'], ['monday', 'Monday']]) {
+      const s = sys[name] || {};
+      const el = document.getElementById('health' + idSuffix);
+      const act = document.getElementById('health' + idSuffix + 'Action');
+      if (el) {
+        el.textContent = _STATUS_ICON[s.status] || s.status || '–';
+        el.style.color = _STATUS_COLOR[s.status] || '#6b7280';
+      }
+      if (act) act.textContent = s.recommended_action || '';
+    }
+
+    const errEl = document.getElementById('healthRecentErrors');
+    const errors = h.recent_errors || [];
+    if (errors.length === 0) {
+      errEl.innerHTML = '';
+    } else {
+      const rows = errors.map(e => {
+        const ts = e.created_at ? new Date(e.created_at).toLocaleString('sv-SE') : '–';
+        return `<tr>
+          <td style="color:#888; font-size:11px; white-space:nowrap;">${ts}</td>
+          <td>${escapeHtml(e.category || '')}</td>
+          <td>${escapeHtml(e.action || '')}</td>
+        </tr>`;
+      }).join('');
+      errEl.innerHTML = `<div style="font-size:11px; font-weight:600; color:#dc2626; margin-bottom:6px;">Senaste fel (${errors.length})</div>
+        <table class="act-table"><thead><tr><th>Tid</th><th>Kategori</th><th>Händelse</th></tr></thead>
+        <tbody>${rows}</tbody></table>`;
+    }
+  } catch (e) {
+    const el = document.getElementById('healthError');
+    el.textContent = 'Kunde inte ladda integrationshälsa: ' + e.message;
     el.style.display = 'block';
   }
 }
