@@ -950,3 +950,75 @@ Connects the existing `auto_actions` tenant config (Control Panel toggles) to th
 - Policy is read-only from the dispatch side — Control Panel is still the only write path
 - `approval_required` returns a clean JSON response (not an HTTP error) so clients can display a UI prompt
 - Duplicate guard and all existing routing/preview behavior unchanged
+
+## Completed slice (2026-04-26 — Dispatch Approval Queue)
+
+Completes the semi-automatic dispatch flow. When an operator triggers dispatch on a job with `approval_required` policy, a real approval record is created and must be approved before any external system is written.
+
+### What was added
+
+**`app/repositories/postgres/approval_repository.py`**
+- `ApprovalRequestRepository.find_pending_dispatch_approval(db, tenant_id, job_id, system, job_type)` — returns existing pending dispatch approval for same job/system/job_type, enabling deduplication
+
+**`app/workflows/approval_service.py`**
+- Module-level `from app.core.settings import get_settings as _get_settings` — patchable in tests
+- `build_dispatch_approval_request(job_id, tenant_id, job_type, system, routing_hint, dry_run_result)` — builds approval dict with `next_on_approve="controlled_dispatch"`, `dispatch_context` containing job_id/tenant_id/job_type/system/target, and Swedish title/summary
+- `resolve_dispatch_approval(db, tenant_id, approval_id, actor, channel, note, approved)` — on approve: runs `ControlledDispatchEngine.run(dry_run=False)`, persists audit event, returns dispatch result + approval_id; on reject: marks approval rejected, returns `{status:"rejected"}` without calling any adapter
+
+**`app/main.py`** — updated `dispatch_job`, `approve_request`, `reject_request`
+- `dispatch_job` (approval_required path):
+  1. Runs dry-run to identify system/job_type
+  2. Calls `find_pending_dispatch_approval` — returns existing approval_id if already queued
+  3. Builds and upserts new approval record via `build_dispatch_approval_request`
+  4. Returns `{status, approval_id, policy_mode, message}`
+- `approve_request`: detects `next_on_approve=="controlled_dispatch"` → routes to `resolve_dispatch_approval` instead of `resolve_approval`
+- `reject_request`: same detection → routes to `resolve_dispatch_approval(approved=False)`
+
+**`app/ui/index.html`** — `renderApprovalCards()` updated
+- Detects dispatch approvals via `next_on_approve === "controlled_dispatch"`
+- Shows "Dispatch-godkännande" badge with job_type / system / board_name
+- Button label: "Godkänn dispatch" instead of "Godkänn"
+
+### Approval flow (end to end)
+
+```
+Operator: POST /jobs/{id}/dispatch  (with semi policy)
+  → dry run to identify system/target
+  → find_pending_dispatch_approval → none
+  → build_dispatch_approval_request → upsert to approval_requests
+  → return {status:"approval_required", approval_id:"..."}
+
+Operator sees approval in Väntande godkännanden tab (badge: Dispatch-godkännande)
+
+Operator: POST /approvals/{approval_id}/approve
+  → get_by_approval_id → next_on_approve=="controlled_dispatch"
+  → resolve_dispatch_approval(approved=True)
+      → marks approval "approved" in DB
+      → ControlledDispatchEngine.run(job, memory, dry_run=False)
+          → existing duplicate guard (integration_events idempotency_key)
+          → MondayLeadDispatchAdapter.dispatch() → real Monday item
+          → _persist_dispatch → integration_events row
+      → create_audit_event
+      → return {status:"success", approval_id, policy_mode, ...}
+
+Repeated dispatch call → find_pending_dispatch_approval returns existing → same approval_id returned
+Repeated approve after success → engine sees existing dispatch → returns {status:"skipped"}
+```
+
+### Key design decisions
+- Reuses existing `approval_requests` table and `ApprovalRequestRepository` — no new schema
+- Discriminated by `next_on_approve="controlled_dispatch"` (vs pipeline's `"action_dispatch"`)
+- Dispatch approval resolution does NOT call `orchestrator.resume_after_approval()` — runs engine directly
+- Approve/reject endpoints remain untyped (no `response_model=JobResponse`) since dispatch approvals return a different shape
+
+### Tests
+33 new tests in `tests/test_dispatch_approval.py`:
+- `TestBuildDispatchApprovalRequest` (9) — shape, context fields, title, summary
+- `TestDispatchApprovalCreation` (11) — creates approval, does not live-dispatch, upserts with controlled_dispatch marker, duplicate reuse
+- `TestImmediateDispatchPolicies` (2) — manual/auto still execute immediately
+- `TestApproveDispatchApproval` (7) — engine called, live (not dry run), returns result, failure/skip pass-through
+- `TestRejectDispatchApproval` (2) — returns rejected, engine not called
+- `TestExistingPipelineApprovals` (1) — pipeline approve still uses resolve_approval
+- `TestTenantIsolation` (1) — cross-tenant 404
+
+**1398/1398 total tests pass.**

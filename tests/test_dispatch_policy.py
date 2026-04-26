@@ -254,6 +254,10 @@ def _call_dispatch_live(auto_actions=None, settings_data=None, mock_adapter_resu
         patch("app.workflows.dispatchers.engine.DISPATCH_REGISTRY", {("monday", "lead"): mock_adapter}),
         patch("app.workflows.dispatchers.engine._persist_dispatch"),
         patch("app.workflows.dispatchers.engine._find_existing_dispatch", return_value=None),
+        patch("app.repositories.postgres.approval_repository.ApprovalRequestRepository.find_pending_dispatch_approval",
+              return_value=None),
+        patch("app.repositories.postgres.approval_repository.ApprovalRequestRepository.upsert_from_payload",
+              return_value=MagicMock()),
     ):
         return dispatch_job(job_id="job-1", db=db, tenant_id="T1"), mock_adapter
 
@@ -273,9 +277,12 @@ class TestDispatchLiveWithPolicy:
         result, adapter = _call_dispatch_live(auto_actions={"lead": "semi"})
         assert result["status"] == "approval_required"
 
-    def test_approval_required_does_not_call_adapter(self):
+    def test_approval_required_does_not_call_adapter_live(self):
+        # dry_run is called to resolve system/target for the approval record,
+        # but no live (dry_run=False) dispatch should be made.
         _, adapter = _call_dispatch_live(auto_actions={"lead": "semi"})
-        adapter.dispatch.assert_not_called()
+        for call in adapter.dispatch.call_args_list:
+            assert call.kwargs.get("dry_run") is True, "Live dispatch must not happen on approval_required"
 
     def test_approval_required_response_has_policy_mode(self):
         result, _ = _call_dispatch_live(auto_actions={"lead": "semi"})

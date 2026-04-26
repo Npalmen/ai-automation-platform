@@ -1301,10 +1301,21 @@ function renderApprovalCards(approvals, fromJobDetail) {
   if (!approvals.length) return '<span class="empty">Inga godkännanden.</span>';
   return approvals.map(a => {
     const isPending = a.state === 'pending';
+    const isDispatch = (a.next_on_approve === 'controlled_dispatch') ||
+                       ((a.request_payload || {}).next_on_approve === 'controlled_dispatch');
+    const btnLabel = isDispatch ? 'Godkänn dispatch' : 'Godkänn';
     const btns = isPending ? `
       <div class="approval-actions">
-        <button class="btn btn-success btn-sm" onclick="doApprove('${a.approval_id}', ${fromJobDetail})">Godkänn</button>
+        <button class="btn btn-success btn-sm" onclick="doApprove('${a.approval_id}', ${fromJobDetail})">${btnLabel}</button>
         <button class="btn btn-danger  btn-sm" onclick="doReject('${a.approval_id}',  ${fromJobDetail})">Avslå</button>
+      </div>` : '';
+    const ctx = (a.request_payload || {}).dispatch_context || {};
+    const dispatchBadge = isDispatch ? `
+      <div style="font-size:11px;color:#1d4ed8;margin:4px 0;">
+        <strong>Dispatch-godkännande</strong>
+        &nbsp;·&nbsp; Jobb-typ: ${escapeHtml(ctx.job_type || a.job_type || '—')}
+        &nbsp;·&nbsp; Skickas till: ${escapeHtml(ctx.system || '—')}
+        ${ctx.target && ctx.target.board_name ? '&nbsp;·&nbsp; ' + escapeHtml(ctx.target.board_name) : ''}
       </div>` : '';
     return `<div class="approval-card">
       <div class="approval-meta">
@@ -1313,6 +1324,7 @@ function renderApprovalCards(approvals, fromJobDetail) {
         &nbsp;|&nbsp; jobb: ${escapeHtml(a.job_id || '—')}
         ${a.created_at ? '&nbsp;|&nbsp; ' + a.created_at.slice(0,19).replace('T',' ') : ''}
       </div>
+      ${dispatchBadge}
       ${a.summary         ? `<div style="font-size:12px;color:#555;">${escapeHtml(a.summary)}</div>` : ''}
       ${a.resolution_note ? `<div style="font-size:12px;color:#555;">Notering: ${escapeHtml(a.resolution_note)}</div>` : ''}
       ${btns}

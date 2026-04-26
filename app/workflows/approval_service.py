@@ -7,6 +7,7 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from app.core.audit_service import create_audit_event
+from app.core.settings import get_settings as _get_settings
 from app.domain.workflows.models import Job
 from app.domain.workflows.statuses import JobStatus
 from app.repositories.postgres.approval_repository import ApprovalRequestRepository
@@ -242,6 +243,153 @@ def resolve_approval(
     )
 
     return job
+
+
+def build_dispatch_approval_request(
+    *,
+    job_id: str,
+    tenant_id: str,
+    job_type: str,
+    system: str,
+    routing_hint: dict[str, Any],
+    dry_run_result: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Build an approval request dict for a controlled-dispatch action.
+
+    next_on_approve is set to "controlled_dispatch" so the approve endpoint
+    can distinguish this from pipeline approval requests and run the
+    ControlledDispatchEngine instead of the pipeline orchestrator.
+    """
+    now = _utcnow()
+    target = routing_hint.get("target") or {}
+    board_name = target.get("board_name") or target.get("board_id") or system
+
+    return {
+        "approval_id": str(uuid4()),
+        "job_id": job_id,
+        "tenant_id": tenant_id,
+        "job_type": job_type,
+        "state": "pending",
+        "channel": "dashboard",
+        "title": f"Dispatch-godkännande: {job_type} → {board_name}",
+        "summary": (
+            f"Jobb-typ: {job_type}. "
+            f"Skickas till: {system} / {board_name}. "
+            "Kräver godkännande innan extern skrivning."
+        ),
+        "requested_by": "system",
+        "requested_at": _isoformat(now),
+        "expires_at": _isoformat(now + timedelta(days=7)),
+        "dispatch_context": {
+            "job_id": job_id,
+            "tenant_id": tenant_id,
+            "job_type": job_type,
+            "system": system,
+            "target": target,
+            "dry_run_result": dry_run_result,
+        },
+        "allowed_actions": ["approve", "reject"],
+        "next_on_approve": "controlled_dispatch",
+        "next_on_reject": "manual_review",
+    }
+
+
+def resolve_dispatch_approval(
+    *,
+    db: Session,
+    tenant_id: str,
+    approval_id: str,
+    actor: str,
+    channel: str,
+    note: str | None,
+    approved: bool,
+) -> dict[str, Any]:
+    """
+    Execute or reject a dispatch approval.
+
+    On approve  → runs ControlledDispatchEngine and returns dispatch result.
+    On reject   → marks approval rejected; no external write.
+
+    Returns a response dict (not a Job — dispatch approvals are not pipeline jobs).
+    """
+    from app.repositories.postgres.approval_repository import ApprovalRequestRepository
+    from datetime import datetime, timezone
+
+    record = ApprovalRequestRepository.get_by_approval_id(
+        db=db, tenant_id=tenant_id, approval_id=approval_id,
+    )
+    if record is None:
+        raise ValueError(f"Dispatch approval '{approval_id}' not found.")
+    if record.state != "pending":
+        raise ValueError(f"Approval '{approval_id}' is already {record.state}.")
+
+    now = datetime.now(timezone.utc).isoformat()
+    payload = record.request_payload or {}
+    ctx = payload.get("dispatch_context") or {}
+
+    resolved_payload = {
+        **payload,
+        "state": "approved" if approved else "rejected",
+        "resolved_at": now,
+        "resolved_by": actor,
+        "resolved_via": channel,
+        "resolution_note": note,
+    }
+
+    ApprovalRequestRepository.upsert_from_payload(
+        db=db,
+        tenant_id=tenant_id,
+        job_id=record.job_id,
+        job_type=record.job_type,
+        approval_request=resolved_payload,
+    )
+
+    if not approved:
+        return {
+            "status": "rejected",
+            "approval_id": approval_id,
+            "message": "Dispatch avslaget av operatören.",
+        }
+
+    from app.workflows.dispatchers.engine import ControlledDispatchEngine
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    from app.repositories.postgres.job_repository import JobRepository
+
+    job_record = JobRepository.get_job_by_id(db, tenant_id, ctx["job_id"])
+    if job_record is None:
+        raise ValueError(f"Job '{ctx['job_id']}' not found for tenant '{tenant_id}'.")
+
+    app_settings = _get_settings()
+    engine = ControlledDispatchEngine(db=db, tenant_id=tenant_id, settings=app_settings)
+    s = TenantConfigRepository.get_settings(db, tenant_id)
+
+    from app.main import _get_memory
+    memory = _get_memory(s)
+
+    result = engine.run(job=job_record, memory=memory, dry_run=False)
+
+    create_audit_event(
+        db=db,
+        tenant_id=tenant_id,
+        category="workflow",
+        action="dispatch_approval_resolved",
+        status="success" if result.status in ("success", "skipped") else "failed",
+        details={
+            "approval_id": approval_id,
+            "job_id": ctx["job_id"],
+            "system": ctx.get("system"),
+            "job_type": ctx.get("job_type"),
+            "dispatch_status": result.status,
+            "actor": actor,
+        },
+    )
+
+    return {
+        **result.to_dict(),
+        "approval_id": approval_id,
+        "policy_mode": "approval_required",
+    }
 
 
 def get_approval_status(job: Job) -> dict[str, Any]:

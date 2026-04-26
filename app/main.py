@@ -47,7 +47,11 @@ from app.repositories.postgres.job_models import JobRecord
 from app.repositories.postgres.job_repository import JobRepository
 from app.repositories.postgres.session import engine
 from app.workflows.action_executor import execute_action as dispatch_action
-from app.workflows.approval_service import resolve_approval
+from app.workflows.approval_service import (
+    build_dispatch_approval_request,
+    resolve_approval,
+    resolve_dispatch_approval,
+)
 from app.workflows.pipeline_runner import run_pipeline
 from app.workflows.policies import is_job_type_enabled_for_tenant
 from app.workflows.processor_metadata import PROCESSOR_METADATA
@@ -735,14 +739,13 @@ def list_pending_approvals(
     )
 
 
-@app.post("/approvals/{approval_id}/approve", response_model=JobResponse)
+@app.post("/approvals/{approval_id}/approve")
 def approve_request(
     approval_id: str,
     request: ApprovalDecisionRequest,
     db: Session = Depends(get_db),
     tenant_id: str = Depends(get_verified_tenant),
 ):
-
     approval = ApprovalRequestRepository.get_by_approval_id(
         db=db,
         tenant_id=tenant_id,
@@ -750,6 +753,21 @@ def approve_request(
     )
     if approval is None:
         raise HTTPException(status_code=404, detail=f"Approval '{approval_id}' not found.")
+
+    # Dispatch approvals use a separate execution path (ControlledDispatchEngine)
+    if (approval.next_on_approve == "controlled_dispatch"):
+        try:
+            return resolve_dispatch_approval(
+                db=db,
+                tenant_id=tenant_id,
+                approval_id=approval_id,
+                actor=request.actor,
+                channel=request.channel,
+                note=request.note,
+                approved=True,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
 
     job = resolve_approval(
         db=db,
@@ -764,7 +782,7 @@ def approve_request(
     return JobResponse(**job.model_dump())
 
 
-@app.post("/approvals/{approval_id}/reject", response_model=JobResponse)
+@app.post("/approvals/{approval_id}/reject")
 def reject_request(
     approval_id: str,
     request: ApprovalDecisionRequest,
@@ -779,6 +797,21 @@ def reject_request(
     )
     if approval is None:
         raise HTTPException(status_code=404, detail=f"Approval '{approval_id}' not found.")
+
+    # Dispatch approvals use a separate rejection path (no pipeline resume needed)
+    if approval.next_on_approve == "controlled_dispatch":
+        try:
+            return resolve_dispatch_approval(
+                db=db,
+                tenant_id=tenant_id,
+                approval_id=approval_id,
+                actor=request.actor,
+                channel=request.channel,
+                note=request.note,
+                approved=False,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
 
     job = resolve_approval(
         db=db,
@@ -2877,11 +2910,51 @@ def dispatch_job(
     policy = _get_dispatch_policy(db, tenant_id, r.job_type or "")
 
     if not policy["can_dispatch_now"]:
-        # approval_required — do not write externally
+        # approval_required — create (or reuse) a dispatch approval record
+        from app.repositories.postgres.approval_repository import ApprovalRequestRepository
+        s = TenantConfigRepository.get_settings(db, tenant_id)
+        memory = _get_memory(s)
+
+        # Resolve which system/target we'd dispatch to (dry-run preview)
+        engine = _make_dispatch_engine(db, tenant_id)
+        dry = engine.run(job=r, memory=memory, dry_run=True)
+        system   = dry.system   or "monday"
+        job_type = dry.job_type or (r.job_type or "")
+
+        # Duplicate-approval guard
+        existing = ApprovalRequestRepository.find_pending_dispatch_approval(
+            db=db, tenant_id=tenant_id, job_id=job_id,
+            system=system, job_type=job_type,
+        )
+        if existing is not None:
+            return {
+                "status":      "approval_required",
+                "approval_id": existing.approval_id,
+                "policy_mode": "approval_required",
+                "message":     "Redan väntande godkännande för detta jobb.",
+            }
+
+        routing_hint = memory.get("routing_hints", {}).get(job_type) or {}
+        approval_req = build_dispatch_approval_request(
+            job_id=job_id,
+            tenant_id=tenant_id,
+            job_type=job_type,
+            system=system,
+            routing_hint=routing_hint,
+            dry_run_result=dry.to_dict(),
+        )
+        ApprovalRequestRepository.upsert_from_payload(
+            db=db,
+            tenant_id=tenant_id,
+            job_id=job_id,
+            job_type=job_type,
+            approval_request=approval_req,
+        )
         return {
-            "status":       "approval_required",
-            "message":      "Godkännande krävs innan dispatch — Approval required before dispatch",
-            **policy,
+            "status":      "approval_required",
+            "approval_id": approval_req["approval_id"],
+            "policy_mode": "approval_required",
+            "message":     "Godkännande krävs innan dispatch.",
         }
 
     s = TenantConfigRepository.get_settings(db, tenant_id)

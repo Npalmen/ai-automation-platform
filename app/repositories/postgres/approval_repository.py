@@ -180,6 +180,33 @@ class ApprovalRequestRepository:
         return record
 
     @staticmethod
+    def find_pending_dispatch_approval(
+        db: Session,
+        tenant_id: str,
+        job_id: str,
+        system: str,
+        job_type: str,
+    ) -> ApprovalRequestRecord | None:
+        """Return the first pending dispatch approval for this job/system/job_type, if any."""
+        records = (
+            db.query(ApprovalRequestRecord)
+            .filter(
+                ApprovalRequestRecord.tenant_id == tenant_id,
+                ApprovalRequestRecord.job_id == job_id,
+                ApprovalRequestRecord.state == "pending",
+                ApprovalRequestRecord.next_on_approve == "controlled_dispatch",
+            )
+            .order_by(ApprovalRequestRecord.created_at.desc())
+            .all()
+        )
+        for rec in records:
+            payload = rec.request_payload or {}
+            ctx = payload.get("dispatch_context") or {}
+            if ctx.get("system") == system and ctx.get("job_type") == job_type:
+                return rec
+        return None
+
+    @staticmethod
     def to_dict(record: ApprovalRequestRecord) -> dict[str, Any]:
         return {
             "approval_id": record.approval_id,
