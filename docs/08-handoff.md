@@ -1534,3 +1534,68 @@ No backend changes. 1780/1780 tests pass (same as before).
 
 ### Tests
 No backend changes. 1780/1780 tests pass.
+
+## Completed slice (2026-04-26 — Slice 22: Dark Premium SaaS Shell)
+
+### What was built
+Full dark-theme redesign of `app/ui/index.html`. No backend changes.
+
+### CSS design system
+CSS custom properties replacing all hardcoded colors:
+- `--bg`, `--surface`, `--surface-2`, `--surface-3`, `--surface-hover`
+- `--border`, `--border-med`, `--border-hi`
+- `--text`, `--text-muted`, `--text-dim`
+- `--purple` / `--purple-light` / `--purple-glow`, `--blue` / `--blue-light` / `--blue-glow`, `--cyan`
+- `--success/warning/danger` with `-bg` variants
+- `--radius`, `--radius-sm`, `--radius-lg`, `--shadow`, `--shadow-sm`, `--glow-purple`, `--glow-blue`
+- `--sidebar-w: 220px`
+
+### Layout change
+Old layout: `<header>` + horizontal `.view-nav` tab strip + `.layout` content area.
+New layout: `#sidebar` (220px fixed left) + `#mainContent` (flex column: topbar → auth banner → `#viewWrap`).
+
+### Sidebar structure
+```
+#sidebar
+  .sidebar-logo (icon + "AI Automation / Platform")
+  .sidebar-nav
+    .sidebar-section "Översikt"          (always visible)
+    .nav-item #viewTabDash               (always visible)
+    .nav-item #viewTabCases              (always visible)
+    .sidebar-section.admin-only "Drift"  (#sideSecOps)
+    .nav-item.admin-only #viewTabOps
+    .nav-item.admin-only #viewTabCtrl
+    .nav-item.admin-only #viewTabNotif
+    .sidebar-section.admin-only "Konfiguration" (#sideSecConfig)
+    .nav-item.admin-only #viewTabSetup
+    .nav-item.admin-only #viewTabOnboarding
+    .nav-item.admin-only #viewTabMemory
+    .sidebar-section.admin-only "Super Admin" (#sideSecAdmin)
+    .nav-item.admin-only #viewTabAdmin
+  .sidebar-footer → #roleBadge (click to toggle role)
+```
+
+### Topbar
+`#topbar` (52px): `#topbarTitle` (current view name, flex:1) + API-key group + refresh button.
+
+### JS changes
+- `_VIEW_TITLE` map added: `{dash: 'Dashboard', ops: 'Drift', ...}`
+- `switchView()` sets `#topbarTitle` from `_VIEW_TITLE` on each navigation
+- `_applyRoleMode()` now also hides/shows `#sideSecOps`, `#sideSecConfig`, `#sideSecAdmin` in addition to per-item hiding
+- `toggleRole()` selector updated from `.view-tab.active` → `.nav-item.active`
+- Badge text corrected: `◈ Admin` / `◈ Kund`
+
+### CSS overrides
+`[id^="view"] h1 { color: var(--text) !important; }` and two other targeted overrides to neutralize legacy hardcoded light-theme colors in static panel HTML.
+
+### What did NOT change
+- All view panel IDs (`#viewDash`, `#viewOps`, etc.) — preserved
+- All view tab IDs (`#viewTabDash`, `#viewTabOps`, etc.) — preserved on `.nav-item` elements
+- All JS business logic (data loading, API calls, approval flow, dispatch, etc.)
+- All existing backend endpoints
+
+### Files changed
+- `app/ui/index.html` — `<style>` block replaced, HTML shell replaced, 4 JS functions updated, closing divs added
+
+### Tests
+No backend changes. 1779/1779 tests pass (1 pre-existing env-dependent failure unchanged).
