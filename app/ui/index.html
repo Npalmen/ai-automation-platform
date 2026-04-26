@@ -943,6 +943,7 @@ pre {
       <div style="display:flex; gap:8px;">
         <button class="btn btn-primary btn-sm" id="scanGmailBtn" onclick="scanGmail()">Skanna Gmail</button>
         <button class="btn btn-primary btn-sm" id="scanMondayBtn" onclick="scanMonday()">Skanna Monday</button>
+        <button class="btn btn-primary btn-sm" id="scanFortnoxBtn" onclick="scanFortnox()">Skanna Fortnox</button>
       </div>
     </div>
     <div id="scanRunning" style="display:none; font-size:12px; color:#6b7280; margin-bottom:8px;">Skannar…</div>
@@ -969,6 +970,16 @@ pre {
         <div><span style="color:#888;">Grupper hittade:</span> <span id="scanGroupsCount">–</span></div>
         <div><span style="color:#888;">Kolumner hittade:</span> <span id="scanColumnsCount">–</span></div>
         <div><span style="color:#888;">Identifierade användningsområden:</span> <span id="scanMondayPurposes">–</span></div>
+      </div>
+    </div>
+    <!-- Fortnox scan summary (shown after first Fortnox scan) -->
+    <div id="scanFortnoxSummary" style="display:none; border-top:1px solid #e5e7eb; padding-top:12px; margin-top:8px;">
+      <div style="font-size:12px; font-weight:700; color:#374151; margin-bottom:8px;">Fortnox</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px;">
+        <div><span style="color:#888;">Kunder hittade:</span> <span id="scanFortnoxCustomers">–</span></div>
+        <div><span style="color:#888;">Artiklar hittade:</span> <span id="scanFortnoxArticles">–</span></div>
+        <div><span style="color:#888;">Fakturor hittade:</span> <span id="scanFortnoxInvoices">–</span></div>
+        <div><span style="color:#888;">Fakturastatusar:</span> <span id="scanFortnoxStatuses">–</span></div>
       </div>
     </div>
   </div>
@@ -3044,6 +3055,20 @@ function _renderScanStatus(scan) {
   } else {
     mondayEl.style.display = 'none';
   }
+
+  const fortnoxSummary = (scan.summary || {}).fortnox;
+  const fortnoxEl = document.getElementById('scanFortnoxSummary');
+  if (fortnoxEl) {
+    if (fortnoxSummary && !fortnoxSummary.error) {
+      fortnoxEl.style.display = 'block';
+      document.getElementById('scanFortnoxCustomers').textContent = fortnoxSummary.customers_scanned ?? '–';
+      document.getElementById('scanFortnoxArticles').textContent  = fortnoxSummary.articles_scanned  ?? '–';
+      document.getElementById('scanFortnoxInvoices').textContent  = fortnoxSummary.invoices_scanned  ?? '–';
+      document.getElementById('scanFortnoxStatuses').textContent  = (fortnoxSummary.invoice_statuses_detected || []).join(', ') || '–';
+    } else {
+      fortnoxEl.style.display = 'none';
+    }
+  }
 }
 
 async function loadMemory() {
@@ -3082,13 +3107,15 @@ async function loadMemory() {
 }
 
 async function scanWorkflowSystem(system) {
-  const gmailBtn  = document.getElementById('scanGmailBtn');
-  const mondayBtn = document.getElementById('scanMondayBtn');
-  const running   = document.getElementById('scanRunning');
+  const gmailBtn   = document.getElementById('scanGmailBtn');
+  const mondayBtn  = document.getElementById('scanMondayBtn');
+  const fortnoxBtn = document.getElementById('scanFortnoxBtn');
+  const running    = document.getElementById('scanRunning');
   const msg = document.getElementById('memoryMsg');
   msg.style.display = 'none';
-  if (gmailBtn)  gmailBtn.disabled  = true;
-  if (mondayBtn) mondayBtn.disabled = true;
+  if (gmailBtn)   gmailBtn.disabled   = true;
+  if (mondayBtn)  mondayBtn.disabled  = true;
+  if (fortnoxBtn) fortnoxBtn.disabled = true;
   running.style.display = 'block';
   try {
     const result = await apiFetch(`/workflow-scan/${system}`, { method: 'POST' });
@@ -3099,7 +3126,9 @@ async function scanWorkflowSystem(system) {
       ? `${s.messages_scanned ?? 0} meddelanden skannade`
       : system === 'monday'
         ? `${s.boards_scanned ?? 0} boards skannade`
-        : 'klart';
+        : system === 'fortnox'
+          ? `${s.customers_scanned ?? 0} kunder skannade`
+          : 'klart';
     msg.className = 'msg msg-success';
     msg.textContent = `Scanning klar (${system}). ${detail}.`;
     msg.style.display = 'block';
@@ -3112,14 +3141,16 @@ async function scanWorkflowSystem(system) {
       _renderScanStatus(status);
     } catch (_) {}
   } finally {
-    if (gmailBtn)  gmailBtn.disabled  = false;
-    if (mondayBtn) mondayBtn.disabled = false;
+    if (gmailBtn)   gmailBtn.disabled   = false;
+    if (mondayBtn)  mondayBtn.disabled  = false;
+    if (fortnoxBtn) fortnoxBtn.disabled = false;
     running.style.display = 'none';
   }
 }
 
-async function scanGmail()  { return scanWorkflowSystem('gmail');  }
-async function scanMonday() { return scanWorkflowSystem('monday'); }
+async function scanGmail()   { return scanWorkflowSystem('gmail');   }
+async function scanMonday()  { return scanWorkflowSystem('monday');  }
+async function scanFortnox() { return scanWorkflowSystem('fortnox'); }
 
 async function proposeRoutingHints() {
   const btn = document.getElementById('proposeHintsBtn');

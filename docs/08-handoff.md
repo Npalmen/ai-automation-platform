@@ -1410,3 +1410,34 @@ Future admin endpoints must use `Depends(require_admin_api_key)`.
 - `TestAdminEndpointAuth` (8) — no key 401, wrong key 401, correct key passes, unconfigured fails closed, tenant key rejected, secret not exposed, dependency importable, tenant auth not broken
 
 **1706/1706 total tests pass.**
+
+## Completed slice (2026-04-26 — Slice 18: Fortnox Workflow Scanner)
+
+### What was built
+Read-only Fortnox scanner integrated into the existing `WorkflowScannerEngine` / `ADAPTER_REGISTRY` pattern.
+
+### Files changed
+- `app/integrations/fortnox/client.py` — added `params` arg to `_get()`; added read-only methods: `get_customers(limit)`, `get_articles(limit)`, `get_invoices(limit)`, `find_customer_by_email(email)`, `find_customer_by_name(name)`, `find_recent_invoices_by_customer(customer_number, limit)`, `find_invoice_by_document_number(document_number)`
+- `app/workflows/scanners/fortnox_adapter.py` (new) — `_normalise_customer/article/invoice()`, `analyse_fortnox_data()` pure function, `FortnoxWorkflowScannerAdapter` with `system_key = "fortnox"`
+- `app/workflows/scanners/engine.py` — imported + registered `FortnoxWorkflowScannerAdapter` under `"fortnox"` in `ADAPTER_REGISTRY`
+- `app/main.py` — added `"fortnox"` slot to `_DEFAULT_MEMORY["system_map"]`
+- `app/ui/index.html` — "Skanna Fortnox" button + summary card; `scanFortnox()` wrapper; `scanWorkflowSystem()` handles fortnox button disable/enable and detail message; `_renderScanStatus()` renders fortnox summary card
+- `tests/test_fortnox_scanner.py` (new) — 42 tests
+
+### Credential safety
+- `FORTNOX_ACCESS_TOKEN` + `FORTNOX_CLIENT_SECRET` never appear in `ScanResult`, API responses, or error messages
+- Missing credentials → failed `ScanResult` (no exception raised to caller)
+
+### No-clobber guarantee
+- Fortnox scan only writes to `settings.memory.system_map.fortnox` — gmail and monday slots are untouched
+- Failed scan preserves all existing memory
+
+### Tests
+42 new tests in `tests/test_fortnox_scanner.py`:
+- Normalisation helpers (16)
+- `analyse_fortnox_data` pure function (7)
+- Adapter missing config (5)
+- Adapter successful scan (6)
+- Engine registration + persistence (8)
+
+**1748/1748 total tests pass.**

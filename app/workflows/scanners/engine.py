@@ -17,17 +17,18 @@ from typing import Any
 from app.workflows.scanners.base import BaseWorkflowScannerAdapter, ScanResult
 from app.workflows.scanners.gmail_adapter import GmailWorkflowScannerAdapter
 from app.workflows.scanners.monday_adapter import MondayWorkflowScannerAdapter
+from app.workflows.scanners.fortnox_adapter import FortnoxWorkflowScannerAdapter
 
 # ---------------------------------------------------------------------------
 # Registry — add new adapters here
 # ---------------------------------------------------------------------------
 
 ADAPTER_REGISTRY: dict[str, BaseWorkflowScannerAdapter] = {
-    "gmail":  GmailWorkflowScannerAdapter(),
-    "monday": MondayWorkflowScannerAdapter(),
+    "gmail":   GmailWorkflowScannerAdapter(),
+    "monday":  MondayWorkflowScannerAdapter(),
+    "fortnox": FortnoxWorkflowScannerAdapter(),
     # "microsoft_mail": MicrosoftMailScannerAdapter(),      # future
     # "visma":          VismaScannerAdapter(),               # future
-    # "fortnox":        FortnoxScannerAdapter(),             # future
 }
 
 

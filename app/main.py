@@ -2531,6 +2531,18 @@ _DEFAULT_MEMORY: dict = {
             "groups": [],
             "columns": [],
         },
+        "fortnox": {
+            "customers": [],
+            "articles": [],
+            "invoices": [],
+            "summary": {
+                "customers_scanned": 0,
+                "articles_scanned": 0,
+                "invoices_scanned": 0,
+                "customer_emails_detected": 0,
+                "invoice_statuses_detected": [],
+            },
+        },
     },
     "routing_hints": {
         "lead": None,
