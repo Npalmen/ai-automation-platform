@@ -182,6 +182,63 @@ header input {
 .dash-value { font-size:28px; font-weight:700; color:#111; }
 .dash-sublabel { font-size:11px; color:#9ca3af; margin-top:2px; }
 
+/* ── Customer dashboard ── */
+.cust-hero {
+  background: linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 100%);
+  border-radius: 12px;
+  padding: 28px 32px;
+  color: #fff;
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.cust-hero h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+.cust-hero p  { font-size: 13px; opacity: 0.8; margin: 0; }
+.cust-hero .hero-date { font-size: 12px; opacity: 0.6; }
+.cust-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+.cust-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.cust-card.accent-green  { border-left: 4px solid #16a34a; }
+.cust-card.accent-blue   { border-left: 4px solid #2563eb; }
+.cust-card.accent-amber  { border-left: 4px solid #d97706; }
+.cust-card.accent-purple { border-left: 4px solid #7c3aed; }
+.cust-big-num { font-size: 36px; font-weight: 800; color: #111; line-height: 1; margin: 6px 0 4px; }
+.cust-num-label { font-size: 12px; color: #6b7280; }
+.cust-num-sub   { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+.cust-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 700;
+}
+.cust-pill.green  { background: #dcfce7; color: #166534; }
+.cust-pill.red    { background: #fee2e2; color: #991b1b; }
+.cust-pill.amber  { background: #fef9c3; color: #854d0e; }
+.cust-pill.gray   { background: #f3f4f6; color: #374151; }
+.cust-pill.blue   { background: #dbeafe; color: #1e40af; }
+.cust-activity-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 0; border-bottom: 1px solid #f3f4f6;
+  font-size: 12px;
+}
+.cust-activity-row:last-child { border-bottom: none; }
+.cust-activity-type { font-weight: 600; color: #374151; min-width: 90px; }
+.cust-activity-time { font-size: 11px; color: #9ca3af; margin-left: auto; white-space: nowrap; }
+
 /* ── Activity table ── */
 .act-table { width:100%; border-collapse:collapse; font-size:12px; }
 .act-table th { text-align:left; padding:6px 8px; border-bottom:2px solid #e5e7eb; color:#6b7280; font-weight:600; font-size:11px; }
@@ -407,7 +464,85 @@ pre {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ DASHBOARD -->
-<div id="viewDash" style="display:none; padding:24px; overflow-y:auto; flex:1;">
+<div id="viewDash" style="display:none; overflow-y:auto; flex:1;">
+
+  <!-- ─── CUSTOMER DASHBOARD ─── -->
+  <div id="custDash" style="display:none; padding:28px 32px; max-width:900px; margin:0 auto;">
+
+    <!-- Hero -->
+    <div class="cust-hero">
+      <div>
+        <h1>Välkommen tillbaka 👋</h1>
+        <p>Din automation hanterar ärenden i bakgrunden – här är läget just nu.</p>
+      </div>
+      <div style="text-align:right;">
+        <div class="hero-date" id="custHeroDate"></div>
+        <button class="btn btn-sm" style="margin-top:8px; background:rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.3);" onclick="loadDashboard()">↻ Uppdatera</button>
+      </div>
+    </div>
+
+    <!-- ROI highlight row -->
+    <div class="cust-section-label">Sparad tid &amp; värde — idag</div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; margin-bottom:32px;">
+      <div class="cust-card accent-blue">
+        <div class="cust-num-label">Sparad tid</div>
+        <div class="cust-big-num" id="cRoiHours">–</div>
+        <div class="cust-num-sub">timmar automatiserat idag</div>
+      </div>
+      <div class="cust-card accent-green">
+        <div class="cust-num-label">Uppskattat värde</div>
+        <div class="cust-big-num" style="font-size:26px;" id="cRoiValue">–</div>
+        <div class="cust-num-sub">SEK sparad tid</div>
+      </div>
+      <div class="cust-card accent-purple">
+        <div class="cust-num-label">Ärenden klara idag</div>
+        <div class="cust-big-num" id="cCompleted">–</div>
+        <div class="cust-num-sub">slutförda automatiskt</div>
+      </div>
+      <div class="cust-card accent-amber">
+        <div class="cust-num-label">Väntar på åtgärd</div>
+        <div class="cust-big-num" id="cWaiting">–</div>
+        <div class="cust-num-sub">kräver uppmärksamhet</div>
+      </div>
+    </div>
+
+    <!-- Automation + cases summary row -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:32px;">
+      <!-- Automation health -->
+      <div class="cust-card">
+        <div class="cust-num-label" style="margin-bottom:12px;">Automationsstatus</div>
+        <div id="custHealthContent"><span style="color:#9ca3af; font-size:12px;">Laddar…</span></div>
+      </div>
+      <!-- Cases summary -->
+      <div class="cust-card">
+        <div class="cust-num-label" style="margin-bottom:12px;">Ärendeöversikt — idag</div>
+        <div style="display:flex; flex-direction:column; gap:8px;" id="custCasesSummary">
+          <div style="display:flex; justify-content:space-between; font-size:13px;">
+            <span style="color:#6b7280;">Leads</span><span id="cLeads" style="font-weight:700;">–</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:13px;">
+            <span style="color:#6b7280;">Supportärenden</span><span id="cInquiries" style="font-weight:700;">–</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:13px;">
+            <span style="color:#6b7280;">Fakturor</span><span id="cInvoices" style="font-weight:700;">–</span>
+          </div>
+          <div style="border-top:1px solid #f3f4f6; padding-top:8px; display:flex; justify-content:space-between; font-size:13px;">
+            <span style="color:#374151; font-weight:600;">Redo att hantera</span><span id="cReady" style="font-weight:700; color:#16a34a;">–</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent activity -->
+    <div class="cust-section-label">Senaste aktivitet</div>
+    <div class="cust-card" style="margin-bottom:0;">
+      <div id="custActivity"><span style="color:#9ca3af; font-size:12px;">Laddar…</span></div>
+    </div>
+
+  </div>
+
+  <!-- ─── ADMIN DASHBOARD ─── -->
+  <div id="adminDash" style="display:none; padding:24px;">
 
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
     <h1 style="font-size:18px; font-weight:700; color:#111; margin:0;">Dashboard</h1>
@@ -522,7 +657,9 @@ pre {
     <span class="empty">Laddar…</span>
   </div>
 
-</div>
+  </div><!-- /#adminDash -->
+
+</div><!-- /#viewDash -->
 
 <!-- ═══════════════════════════════════════════════════════════════ DRIFT -->
 <div class="layout" id="viewOps">
@@ -1344,16 +1481,23 @@ function toggleRole() {
   _uiMode = (_uiMode === 'admin') ? 'customer' : 'admin';
   localStorage.setItem(LS_ROLE_KEY, _uiMode);
   _applyRoleMode();
-  // If current view is admin-only and we switched to customer — redirect to dash
+
+  const activeTab = document.querySelector('.view-tab.active');
+  const activeView = activeTab ? Object.keys(_VIEW_DISPLAY).find(v => {
+    const el = document.getElementById('viewTab' + v.charAt(0).toUpperCase() + v.slice(1));
+    return el && el === activeTab;
+  }) : null;
+
   if (_uiMode === 'customer') {
-    const activeTab = document.querySelector('.view-tab.active');
-    if (activeTab) {
-      const isAdminTab = ADMIN_ONLY_VIEWS.some(v => {
-        const el = document.getElementById('viewTab' + v.charAt(0).toUpperCase() + v.slice(1));
-        return el && el === activeTab;
-      });
-      if (isAdminTab) switchView('dash');
+    // Redirect away from admin-only views, or reload dash with customer layout
+    if (!activeView || ADMIN_ONLY_VIEWS.includes(activeView)) {
+      switchView('dash');
+    } else if (activeView === 'dash') {
+      loadDashboard();
     }
+  } else {
+    // Switched to admin — reload dash if currently on it
+    if (activeView === 'dash') loadDashboard();
   }
 }
 
@@ -1386,9 +1530,100 @@ function switchView(name) {
 }
 
 // ---------------------------------------------------------------------------
-// Dashboard
+// Dashboard — branches on _uiMode
 // ---------------------------------------------------------------------------
 async function loadDashboard() {
+  if (_uiMode === 'customer') {
+    document.getElementById('custDash').style.display  = 'block';
+    document.getElementById('adminDash').style.display = 'none';
+    await _loadCustomerDashboard();
+  } else {
+    document.getElementById('custDash').style.display  = 'none';
+    document.getElementById('adminDash').style.display = 'block';
+    await _loadAdminDashboard();
+  }
+}
+
+async function _loadCustomerDashboard() {
+  // Hero date
+  const dateEl = document.getElementById('custHeroDate');
+  if (dateEl) dateEl.textContent = new Date().toLocaleDateString('sv-SE', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  // ROI
+  try {
+    const r = await apiFetch('/dashboard/roi');
+    document.getElementById('cRoiHours').textContent = r.estimated_hours_saved ?? '–';
+    document.getElementById('cRoiValue').textContent = r.estimated_value_sek != null
+      ? r.estimated_value_sek.toLocaleString('sv-SE') : '–';
+  } catch (_) {}
+
+  // Summary counts
+  try {
+    const s = await apiFetch('/dashboard/summary');
+    document.getElementById('cLeads').textContent     = s.leads_today     ?? '–';
+    document.getElementById('cInquiries').textContent = s.inquiries_today  ?? '–';
+    document.getElementById('cInvoices').textContent  = s.invoices_today   ?? '–';
+    document.getElementById('cReady').textContent     = s.ready_cases      ?? '–';
+    document.getElementById('cCompleted').textContent = s.completed_today  ?? '–';
+    document.getElementById('cWaiting').textContent   = s.waiting_customer ?? '–';
+  } catch (_) {}
+
+  // Integration health → automation status card
+  try {
+    const h = await apiFetch('/integrations/health');
+    const statusMap = { healthy: ['green','Aktiv'], warning: ['amber','Varning'], error: ['red','Fel'], not_configured: ['gray','Ej konfigurerad'] };
+    const systems = Object.entries(h.systems || {});
+    const rows = systems.map(([key, info]) => {
+      const [cls, label] = statusMap[info.status] || ['gray', info.status];
+      const name = { gmail: 'Gmail', monday: 'Monday', fortnox: 'Fortnox' }[key] || key;
+      return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f3f4f6;">
+        <span style="font-size:13px; color:#374151; font-weight:500;">${escapeHtml(name)}</span>
+        <span class="cust-pill ${cls}">${escapeHtml(label)}</span>
+      </div>`;
+    }).join('');
+    const overall = h.overall_status || 'unknown';
+    const [oCls, oLabel] = statusMap[overall] || ['gray', overall];
+    document.getElementById('custHealthContent').innerHTML =
+      `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <span style="font-size:12px; font-weight:600; color:#374151;">Övergripande</span>
+        <span class="cust-pill ${oCls}">${escapeHtml(oLabel)}</span>
+      </div>
+      ${rows || '<span style="color:#9ca3af; font-size:12px;">Inga integrationer konfigurerade.</span>'}`;
+  } catch (_) {
+    document.getElementById('custHealthContent').innerHTML = '<span style="color:#9ca3af; font-size:12px;">Kunde inte ladda status.</span>';
+  }
+
+  // Recent activity
+  const actEl = document.getElementById('custActivity');
+  try {
+    const r = await apiFetch('/dashboard/activity?limit=8');
+    if (!r.items || r.items.length === 0) {
+      actEl.innerHTML = '<span style="color:#9ca3af; font-size:12px;">Ingen aktivitet ännu.</span>';
+      return;
+    }
+    const TYPE_LABELS = { lead:'Lead', customer_inquiry:'Supportärende', invoice:'Faktura', unknown:'Okänd' };
+    const STATUS_PILLS = {
+      completed: ['green','Klar'], failed: ['red','Misslyckad'],
+      awaiting_approval: ['amber','Inväntar'], processing: ['blue','Bearbetar'],
+    };
+    actEl.innerHTML = r.items.map(item => {
+      const type = TYPE_LABELS[item.type] || (item.type || '–');
+      const ts   = item.created_at ? new Date(item.created_at).toLocaleString('sv-SE', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '–';
+      const [pillCls, pillLabel] = STATUS_PILLS[item.status] || ['gray', item.status || '–'];
+      const subject = item.subject ? escapeHtml(item.subject).substring(0,48) : '';
+      return `<div class="cust-activity-row">
+        <span class="cust-activity-type">${escapeHtml(type)}</span>
+        ${subject ? `<span style="color:#6b7280; font-size:12px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${subject}</span>` : '<span style="flex:1;"></span>'}
+        <span class="cust-pill ${pillCls}" style="flex-shrink:0;">${escapeHtml(pillLabel)}</span>
+        <span class="cust-activity-time">${ts}</span>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    actEl.innerHTML = '<span style="color:#9ca3af; font-size:12px;">Kunde inte ladda aktivitet.</span>';
+  }
+}
+
+async function _loadAdminDashboard() {
   document.getElementById('dashError').style.display = 'none';
 
   // ROI

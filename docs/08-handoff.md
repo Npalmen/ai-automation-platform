@@ -1501,3 +1501,36 @@ All three:
 
 ### Tests
 No backend changes. 1780/1780 tests pass (same as before).
+
+## Completed slice (2026-04-27 — Slice 21: Customer Dashboard Product Experience)
+
+### What was built
+`loadDashboard()` now branches on `_uiMode`:
+- **customer** → renders `#custDash` (new SaaS-style layout)
+- **admin** → renders `#adminDash` (existing dense layout, unchanged)
+
+### Customer dashboard layout
+1. **Hero** — gradient card (blue), welcome message, current date, refresh button
+2. **ROI row** — 4 accent cards: sparad tid (timmar), uppskattat värde (SEK), ärenden klara idag, väntar på åtgärd; data from `/dashboard/roi` + `/dashboard/summary`
+3. **Two-column middle** — Automationsstatus card (integration health per-system with colored pills from `/integrations/health`) + Ärendeöversikt card (leads/support/fakturor/redo from `/dashboard/summary`)
+4. **Recent activity feed** — last 8 items, each row: type + subject snippet + status pill + timestamp; from `/dashboard/activity`
+
+### What is hidden in customer mode
+- Dispatch observability section (by_mode, recent dispatches, range buttons)
+- ROI rapport section (rpTotal, rpHours, rpSuccess, rpAuto)
+- Pilot readiness section (11 checks, score)
+- ROI assumptions details element
+- All 6 admin summary cards
+
+### Toggling between roles
+- `toggleRole()` live-reloads `loadDashboard()` when already on the dash view
+- Switching to customer while on an admin-only view navigates to dash with customer layout
+
+### CSS added
+`.cust-hero`, `.cust-card`, `.cust-big-num`, `.cust-pill` (green/red/amber/gray/blue), `.cust-activity-row`, `.cust-section-label`, `.cust-num-label/sub`
+
+### Files changed
+- `app/ui/index.html` — HTML structure, CSS classes, `loadDashboard()` → `_loadCustomerDashboard()` + `_loadAdminDashboard()`, `toggleRole()` updated
+
+### Tests
+No backend changes. 1780/1780 tests pass.
