@@ -7,7 +7,7 @@
 - [x] DB setup verified (`docker-compose.yml` + `scripts/create_tables.py`)
 
 ## Test
-- [x] Automated tests pass — 1398/1398 (`python -m pytest`)
+- [x] Automated tests pass — 1427/1427 (`python -m pytest`)
 - [x] Official MVP smoke test documented in README (curl commands, step by step)
 - [x] Gmail send_email verified live (real Gmail delivery confirmed)
 - [x] Gmail list_messages verified live (real inbox messages returned)
@@ -42,6 +42,7 @@
 - [x] Generic Controlled Dispatch Engine + Monday Lead Adapter v1 — POST /jobs/{job_id}/dispatch-preview (dry-run, no external call) + POST /jobs/{job_id}/dispatch (live, validated, deduplicated, persisted to integration_events); ControlledDispatchEngine + DISPATCH_REGISTRY (system, job_type); MondayLeadDispatchAdapter (item name derivation, create_item); duplicate guard via idempotency_key; 33 tests; Förhandsvisa dispatch + Skicka till system UI in case detail
 - [x] Dispatch Control Policy Integration — resolve_dispatch_policy() maps auto_actions values to manual/approval_required/full_auto; GET /jobs/{job_id}/dispatch-policy; dispatch blocked with status=approval_required when can_dispatch_now=False (no adapter call); dispatch-preview includes policy fields; case detail UI shows policy label in Swedish; 35 tests
 - [x] Dispatch Approval Queue — approval_required dispatch creates real approval_requests record with dispatch_context; approval_id returned; duplicate-approval guard; POST /approvals/{id}/approve triggers ControlledDispatchEngine (not pipeline); reject closes without external write; existing idempotency guard prevents double write; UI dispatch badge + "Godkänn dispatch" button; 33 tests
+- [x] Auto Dispatch Pipeline Hook v1 — maybe_auto_dispatch_job() checks job_type/policy/routing/system/adapter before external write; hooked into WorkflowOrchestrator._finalize_success after COMPLETED; failure never crashes pipeline; POST /jobs/{job_id}/auto-dispatch endpoint; "Testa auto-dispatch" UI button; only lead→monday+full_auto; 29 tests
 
 ## Docs
 - [x] current-state updated

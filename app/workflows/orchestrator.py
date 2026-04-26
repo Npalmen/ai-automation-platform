@@ -6,6 +6,8 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.core.audit_service import create_audit_event
+from app.core.settings import get_settings as _get_settings
+from app.workflows.dispatchers.auto_dispatch import maybe_auto_dispatch_job
 from app.domain.workflows.enums import JobType
 from app.domain.workflows.models import Job
 from app.domain.workflows.statuses import JobStatus
@@ -211,6 +213,9 @@ class WorkflowOrchestrator:
         if final_job.status == JobStatus.AWAITING_APPROVAL:
             final_job = dispatch_approval_request(self.db, final_job)
 
+        if final_job.status == JobStatus.COMPLETED:
+            self._maybe_auto_dispatch(final_job)
+
         self._audit(
             final_job,
             action="workflow_completed",
@@ -222,6 +227,32 @@ class WorkflowOrchestrator:
         )
 
         return final_job
+
+    def _maybe_auto_dispatch(self, job: Job) -> None:
+        """
+        Attempt auto-dispatch after pipeline completes with COMPLETED status.
+        Never raises — failures are recorded in audit but do not affect job status.
+        """
+        if self.db is None:
+            return
+        try:
+            result = maybe_auto_dispatch_job(
+                db=self.db,
+                tenant_id=job.tenant_id,
+                job=job,
+                settings=_get_settings(),
+            )
+            if result.status in ("success", "skipped"):
+                return
+            # failed — record in audit without touching job status
+            self._audit(
+                job,
+                action="auto_dispatch_failed",
+                status="failed",
+                details={"reason": result.reason},
+            )
+        except Exception:
+            pass  # auto-dispatch must never crash pipeline
 
     def _finalize_failure(
         self,

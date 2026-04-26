@@ -2163,9 +2163,10 @@ async function openCase(jobId) {
       } catch (_) {}
 
       const dispatchBtns = rp.status === 'ready' ? `
-        <div style="display:flex; gap:8px; margin-top:10px;">
+        <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
           <button class="btn btn-neutral btn-sm" onclick="dispatchPreview('${escapeHtml(c.job_id)}')">Förhandsvisa dispatch</button>
           <button class="btn btn-primary btn-sm" onclick="dispatchJob('${escapeHtml(c.job_id)}')">Skicka till system</button>
+          <button class="btn btn-neutral btn-sm" onclick="autoDispatch('${escapeHtml(c.job_id)}')">Testa auto-dispatch</button>
         </div>` : '';
       rpHtml = `<div class="setup-card" style="margin-bottom:14px;" id="dispatchCard_${escapeHtml(c.job_id)}">
         <h3 style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; margin:0 0 10px;">Routing Preview</h3>
@@ -2217,6 +2218,33 @@ async function dispatchPreview(jobId) {
   try {
     const result = await apiFetch(`/jobs/${encodeURIComponent(jobId)}/dispatch-preview`, { method: 'POST' });
     _showDispatchResult(jobId, result);
+  } catch (e) {
+    if (el) {
+      el.innerHTML = `<div class="msg msg-error" style="font-size:12px;">${escapeHtml(e.message)}</div>`;
+      el.style.display = 'block';
+    }
+  }
+}
+
+async function autoDispatch(jobId) {
+  const el = document.getElementById('dispatchResult_' + jobId);
+  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+  try {
+    const result = await apiFetch(`/jobs/${encodeURIComponent(jobId)}/auto-dispatch`, { method: 'POST' });
+    const status = result.status || '';
+    const icon  = status === 'success' ? '✅' : status === 'skipped' ? 'ℹ' : '❌';
+    const label = status === 'success' ? 'Auto-dispatch kördes' : status === 'skipped' ? 'Auto-dispatch hoppades över' : 'Auto-dispatch misslyckades';
+    const isOk  = status === 'success' || status === 'skipped';
+    const bg    = isOk ? '#ecfdf5' : '#fef2f2';
+    const color = isOk ? '#065f46' : '#991b1b';
+    if (el) {
+      el.innerHTML = `<div style="background:${bg}; color:${color}; border-radius:6px; padding:10px 14px;">
+        <div style="font-weight:700; margin-bottom:4px;">${icon} ${label}</div>
+        <div style="font-size:13px;">${escapeHtml(result.reason || '')}</div>
+        ${result.dispatch_result && result.dispatch_result.external_id ? '<div style="font-size:12px; margin-top:4px; color:#6b7280;">ID: ' + escapeHtml(result.dispatch_result.external_id) + '</div>' : ''}
+      </div>`;
+      el.style.display = 'block';
+    }
   } catch (e) {
     if (el) {
       el.innerHTML = `<div class="msg msg-error" style="font-size:12px;">${escapeHtml(e.message)}</div>`;

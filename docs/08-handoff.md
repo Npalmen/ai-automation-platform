@@ -1022,3 +1022,59 @@ Repeated approve after success → engine sees existing dispatch → returns {st
 - `TestTenantIsolation` (1) — cross-tenant 404
 
 **1398/1398 total tests pass.**
+
+## Completed slice (2026-04-26 — Auto Dispatch Pipeline Hook v1)
+
+Adds the first real automatic dispatch trigger. When a lead job completes with full_auto policy, it is automatically dispatched to Monday without any operator action.
+
+### What was added
+
+**`app/workflows/dispatchers/auto_dispatch.py`** — new module
+- `AutoDispatchResult` dataclass: `status` / `reason` / `dispatch_result`
+- `maybe_auto_dispatch_job(db, tenant_id, job, settings)` — pure-function guard chain:
+  1. job_type must be "lead" (only supported type)
+  2. policy_mode must be "full_auto" (manual/semi → skipped)
+  3. routing_preview status must be "ready" (missing/invalid → skipped)
+  4. routing_hint system must be "monday" (other systems → skipped)
+  5. DISPATCH_REGISTRY must have (monday, lead) adapter
+  6. Calls `ControlledDispatchEngine.run(dry_run=False)` — engine handles duplicate guard
+  7. Returns `AutoDispatchResult` — **never raises**; exceptions caught and returned as `status="failed"`
+
+**`app/workflows/orchestrator.py`** — pipeline hook
+- Module-level import of `maybe_auto_dispatch_job` (patchable in tests)
+- `_finalize_success` calls `self._maybe_auto_dispatch(final_job)` when `status == COMPLETED`
+- `_maybe_auto_dispatch(job)` — short-circuits when `self.db is None`; swallows all exceptions; audit-records failures
+
+**`app/main.py`** — endpoint
+- `POST /jobs/{job_id}/auto-dispatch` — calls `maybe_auto_dispatch_job` with the same logic; 404 if job not found; returns `{status, reason, dispatch_result}`
+
+**`app/ui/index.html`** — case detail
+- "Testa auto-dispatch" button (shown when routing is ready)
+- `autoDispatch(jobId)` JS function; shows ✅/ℹ/❌ result with Swedish labels
+
+### Decision: pipeline hook vs endpoint-only
+
+Added both. The pipeline hook fires automatically for every new job that completes with `status=COMPLETED` when conditions are met. The endpoint provides a manual trigger for existing jobs and testing.
+
+### Supported auto-dispatch matrix
+
+| job_type | system | policy needed | Notes |
+|----------|--------|---------------|-------|
+| lead     | monday | full_auto     | ✅ Implemented |
+| any other | any   | any           | skipped — not implemented |
+
+### Safety guarantees
+- No external write unless ALL 5 conditions pass
+- Duplicate guard via `ControlledDispatchEngine` (integration_events idempotency_key)
+- `_maybe_auto_dispatch` swallows all exceptions — pipeline jobs retain COMPLETED status even if auto-dispatch fails
+- Failure recorded in audit only, not in job status
+
+### Tests
+29 new tests in `tests/test_auto_dispatch.py`:
+- `TestMaybeAutoDispatch` (16) — all skip/pass conditions, engine called live, duplicate handled, exception safety
+- `TestAutoDispatchEndpoint` (6) — endpoint shape, 404, manual policy, calls maybe_auto_dispatch
+- `TestPipelineHook` (4) — _maybe_auto_dispatch called, tenant_id passed, exception safety, db=None guard
+- `TestTenantIsolation` (2) — isolation structural tests
+- `TestNoSecretLeakage` (1) — reason field contains class name only
+
+**1427/1427 total tests pass.**

@@ -52,6 +52,7 @@ from app.workflows.approval_service import (
     resolve_approval,
     resolve_dispatch_approval,
 )
+from app.workflows.dispatchers.auto_dispatch import maybe_auto_dispatch_job
 from app.workflows.pipeline_runner import run_pipeline
 from app.workflows.policies import is_job_type_enabled_for_tenant
 from app.workflows.processor_metadata import PROCESSOR_METADATA
@@ -2968,6 +2969,40 @@ def dispatch_job(
     response = _dispatch_result_to_response(result)
     response.update(policy)
     return response
+
+
+@app.post("/jobs/{job_id}/auto-dispatch")
+def trigger_auto_dispatch(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Manually trigger the auto-dispatch check for a specific job.
+
+    Uses the same logic as the pipeline hook (maybe_auto_dispatch_job).
+    Useful for testing and re-running auto-dispatch on existing jobs.
+
+    Returns:
+      status: "success" | "skipped" | "failed"
+      reason: human-readable explanation
+      dispatch_result: dispatch payload when status=success, else null
+    """
+    r = (
+        db.query(JobRecord)
+        .filter(JobRecord.job_id == job_id, JobRecord.tenant_id == tenant_id)
+        .first()
+    )
+    if r is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    result = maybe_auto_dispatch_job(
+        db=db,
+        tenant_id=tenant_id,
+        job=r,
+        settings=settings,
+    )
+    return result.to_dict()
 
 
 @app.get("/audit-events", response_model=AuditEventListResponse)
