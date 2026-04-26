@@ -377,6 +377,7 @@ pre {
   <div class="view-tab"        id="viewTabOnboarding"  onclick="switchView('onboarding')">Onboarding</div>
   <div class="view-tab"        id="viewTabNotif"       onclick="switchView('notif')">Notifieringar</div>
   <div class="view-tab"        id="viewTabMemory"      onclick="switchView('memory')">Kundminne</div>
+  <div class="view-tab"        id="viewTabAdmin"       onclick="switchView('admin')">Super Admin</div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ DASHBOARD -->
@@ -1056,6 +1057,52 @@ pre {
 
 </div><!-- /viewMemory -->
 
+<!-- ══════════════════════════════════════════════════════════ SUPER ADMIN -->
+<div id="viewAdmin" style="display:none; padding:24px; overflow-y:auto; flex:1;">
+
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+    <div>
+      <h1 style="font-size:18px; font-weight:700; color:#111; margin:0;">Super Admin — Kunder</h1>
+      <p style="font-size:12px; color:#9ca3af; margin:4px 0 0;">Läsvy. Visar alla tenants i databasen. Känslig vy — kräver stärkt autentisering i produktion.</p>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="loadAdminOverview()">Uppdatera</button>
+  </div>
+
+  <div id="adminError" class="msg msg-error" style="display:none;"></div>
+
+  <!-- Summary cards -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; margin-bottom:24px;">
+    <div class="dash-card">
+      <div class="dash-label">Totalt kunder</div>
+      <div class="dash-value" id="adminTotal">–</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-label">Friska</div>
+      <div class="dash-value" id="adminHealthy" style="color:#16a34a;">–</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-label">Varning</div>
+      <div class="dash-value" id="adminWarning" style="color:#d97706;">–</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-label">Fel</div>
+      <div class="dash-value" id="adminError2" style="color:#dc2626;">–</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-label">Ej redo</div>
+      <div class="dash-value" id="adminNotReady" style="color:#6b7280;">–</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-label">Sparade timmar 30d</div>
+      <div class="dash-value" id="adminHours">–</div>
+    </div>
+  </div>
+
+  <!-- Tenant table -->
+  <div id="adminTable"><span class="empty">Tryck på "Uppdatera" för att ladda.</span></div>
+
+</div><!-- /viewAdmin -->
+
 <script>
 // ---------------------------------------------------------------------------
 // Label maps — presentationslager (ändrar inte backend-nycklar)
@@ -1158,6 +1205,7 @@ function switchView(name) {
   document.getElementById('viewOnboarding').style.display = name === 'onboarding' ? 'block' : 'none';
   document.getElementById('viewNotif').style.display      = name === 'notif'      ? 'block' : 'none';
   document.getElementById('viewMemory').style.display     = name === 'memory'     ? 'block' : 'none';
+  document.getElementById('viewAdmin').style.display      = name === 'admin'      ? 'block' : 'none';
   document.getElementById('viewTabDash').classList.toggle('active',       name === 'dash');
   document.getElementById('viewTabOps').classList.toggle('active',        name === 'ops');
   document.getElementById('viewTabSetup').classList.toggle('active',      name === 'setup');
@@ -1166,6 +1214,7 @@ function switchView(name) {
   document.getElementById('viewTabOnboarding').classList.toggle('active', name === 'onboarding');
   document.getElementById('viewTabNotif').classList.toggle('active',      name === 'notif');
   document.getElementById('viewTabMemory').classList.toggle('active',     name === 'memory');
+  document.getElementById('viewTabAdmin').classList.toggle('active',      name === 'admin');
   if (name === 'setup')      loadSetup();
   if (name === 'dash')       loadDashboard();
   if (name === 'ctrl')       loadControl();
@@ -1173,6 +1222,7 @@ function switchView(name) {
   if (name === 'onboarding') { loadOnboarding(); loadWizardStatus(); }
   if (name === 'notif')      loadNotifSettings();
   if (name === 'memory')     loadMemory();
+  if (name === 'admin')      loadAdminOverview();
 }
 
 // ---------------------------------------------------------------------------
@@ -1440,6 +1490,91 @@ async function loadPilotReadiness() {
     el.textContent = 'Kunde inte ladda pilotberedskap: ' + e.message;
     el.style.display = 'block';
   }
+}
+
+
+// ---------------------------------------------------------------------------
+// Super Admin overview
+// ---------------------------------------------------------------------------
+const _ADMIN_STATUS_ICON  = { healthy: '✅', warning: '⚠️', error: '❌', not_ready: '⚫' };
+const _ADMIN_STATUS_COLOR = { healthy: '#16a34a', warning: '#d97706', error: '#dc2626', not_ready: '#9ca3af' };
+const _ADMIN_INT_ICON     = { healthy: '✅', warning: '⚠️', error: '❌', not_configured: '⚫' };
+
+async function loadAdminOverview() {
+  document.getElementById('adminError').style.display = 'none';
+  document.getElementById('adminTable').innerHTML = '<span class="empty">Laddar…</span>';
+  try {
+    const r = await apiFetch('/admin/tenants/overview');
+
+    document.getElementById('adminTotal').textContent    = r.total_tenants    ?? '–';
+    document.getElementById('adminHealthy').textContent  = r.healthy          ?? '–';
+    document.getElementById('adminWarning').textContent  = r.warning          ?? '–';
+    document.getElementById('adminError2').textContent   = r.error            ?? '–';
+    document.getElementById('adminNotReady').textContent = r.not_ready        ?? '–';
+    document.getElementById('adminHours').textContent    = r.total_hours_saved_30d != null
+      ? r.total_hours_saved_30d + ' h' : '–';
+
+    const items = r.items || [];
+    if (items.length === 0) {
+      document.getElementById('adminTable').innerHTML = '<span class="empty">Inga kunder i databasen.</span>';
+      return;
+    }
+
+    const rows = items.map(t => {
+      const statusIcon  = _ADMIN_STATUS_ICON[t.status]  || t.status;
+      const statusColor = _ADMIN_STATUS_COLOR[t.status] || '#6b7280';
+      const onb = t.onboarding || {};
+      const pilot = t.pilot_readiness || {};
+      const integ = t.integrations || {};
+      const disp = t.dispatch || {};
+      const gmailIcon  = _ADMIN_INT_ICON[integ.gmail]  || integ.gmail  || '–';
+      const mondayIcon = _ADMIN_INT_ICON[integ.monday] || integ.monday || '–';
+      const actAt = t.latest_activity_at
+        ? new Date(t.latest_activity_at).toLocaleString('sv-SE')
+        : '–';
+      return `<tr>
+        <td style="font-weight:600;">${escapeHtml(t.name || t.tenant_id)}</td>
+        <td style="font-size:11px; color:#9ca3af;">${escapeHtml(t.tenant_id)}</td>
+        <td style="color:${statusColor}; font-size:13px;">${statusIcon} ${escapeHtml(t.status)}</td>
+        <td>${onb.percent ?? 0} %</td>
+        <td>${pilot.percent ?? 0} %</td>
+        <td title="Gmail: ${integ.gmail || '–'}, Monday: ${integ.monday || '–'}">${gmailIcon} ${mondayIcon}</td>
+        <td>${disp.total_30d ?? 0}</td>
+        <td>${disp.hours_saved_30d != null ? disp.hours_saved_30d + ' h' : '–'}</td>
+        <td style="color:${(t.recent_error_count || 0) > 0 ? '#dc2626' : '#6b7280'};">${t.recent_error_count ?? 0}</td>
+        <td style="font-size:11px; color:#9ca3af;">${actAt}</td>
+        <td><button class="btn btn-neutral btn-sm" onclick="openTenant(${JSON.stringify(t.tenant_id)})">Öppna kund</button></td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('adminTable').innerHTML = `
+      <table class="act-table" style="width:100%;">
+        <thead><tr>
+          <th>Kund</th><th>Tenant ID</th><th>Status</th>
+          <th>Onboarding %</th><th>Pilotberedskap %</th><th>Integrationshälsa</th>
+          <th>Dispatch 30d</th><th>Sparad tid 30d</th><th>Fel</th>
+          <th>Senaste aktivitet</th><th>Åtgärd</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  } catch (e) {
+    const el = document.getElementById('adminError');
+    el.textContent = 'Kunde inte ladda kunders status: ' + e.message;
+    el.style.display = 'block';
+    document.getElementById('adminTable').innerHTML = '';
+  }
+}
+
+function openTenant(tenantId) {
+  // Switch to Inställningar and select the given tenant
+  switchView('setup');
+  loadTenants().then(() => {
+    const sel = document.getElementById('switchTenantSelect');
+    if (sel) {
+      sel.value = tenantId;
+      switchTenant();
+    }
+  });
 }
 
 

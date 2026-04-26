@@ -1323,3 +1323,43 @@ Overall status: `not_ready` if any fail, `almost_ready` if any warning, `ready` 
 49 new tests in `tests/test_production_readiness.py`.
 
 **1638/1638 total tests pass.**
+
+## Completed slice (2026-04-26 — Slice 16: Super Admin Panel v1)
+
+### Problem solved
+The platform had no way to get a cross-tenant view: "how are ALL customers doing?" The existing UI only answered "how is this selected tenant doing?"
+
+### What was built
+
+**`app/admin/super_admin.py`** — new module
+
+`get_super_admin_overview(db, *, app_settings)` aggregates health for all DB tenants. One failing tenant does not abort the rest. No external API calls. No secrets in response.
+
+Per-tenant shape:
+```json
+{
+  "tenant_id": "...", "name": "...", "status": "healthy|warning|error|not_ready",
+  "onboarding": {"status": "...", "percent": 0},
+  "pilot_readiness": {"status": "...", "percent": 0},
+  "integrations": {"overall_status": "...", "gmail": "...", "monday": "..."},
+  "dispatch": {"total_30d": 0, "success_30d": 0, "failed_30d": 0, "hours_saved_30d": 0.0, "automation_share_percent_30d": 0},
+  "latest_activity_at": null,
+  "recent_error_count": 0
+}
+```
+
+Top-level: `{total_tenants, healthy, warning, error, not_ready, total_hours_saved_30d, items}`.
+
+Top-level status derivation per tenant: `error` if integration_health==error; `not_ready` if pilot==not_ready; `warning` if integration warning, onboarding not complete, or pilot almost_ready; else `healthy`.
+
+**`app/main.py`** — `GET /admin/tenants/overview` (protected by existing API key auth)
+
+**`app/ui/index.html`** — "Super Admin" tab added to top nav; summary cards (Totalt kunder / Friska / Varning / Fel / Ej redo / Sparade timmar 30d); tenant table (Kund, Tenant ID, Status, Onboarding %, Pilotberedskap %, Integrationshälsa, Dispatch 30d, Sparad tid, Fel, Senaste aktivitet, Åtgärd); "Öppna kund" button switches to Inställningar tab and loads that tenant's config.
+
+### Auth note
+`GET /admin/tenants/overview` currently uses the same per-tenant API key auth as other endpoints. This is sufficient for single-operator MVP use. Before exposing in a production multi-customer context, implement a dedicated `ADMIN_API_KEY` env var so individual tenant operators cannot view other tenants' data.
+
+### Tests
+44 new tests in `tests/test_super_admin.py`.
+
+**1682/1682 total tests pass.**

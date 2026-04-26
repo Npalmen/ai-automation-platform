@@ -3145,6 +3145,27 @@ def pilot_readiness(
     return get_pilot_readiness(db=db, tenant_id=tenant_id, app_settings=s)
 
 
+@app.get("/admin/tenants/overview")
+def admin_tenants_overview(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),  # noqa: ARG001
+):
+    """
+    Super Admin: aggregate health overview for ALL tenants in the DB.
+
+    Read-only. No external API calls. No secrets in response.
+
+    IMPORTANT: This endpoint returns multi-tenant data and is therefore
+    sensitive. Currently protected by the same per-tenant API key auth as
+    other endpoints. Before exposing in a multi-customer production context,
+    implement a dedicated owner/admin API key (e.g. ADMIN_API_KEY env var)
+    so that individual tenant operators cannot view other tenants' data.
+    """
+    from app.admin.super_admin import get_super_admin_overview
+    s = get_settings()
+    return get_super_admin_overview(db=db, app_settings=s)
+
+
 @app.post("/jobs/{job_id}/auto-dispatch")
 def trigger_auto_dispatch(
     job_id: str,
