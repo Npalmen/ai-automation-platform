@@ -473,6 +473,22 @@ pre {
   </div>
   <div id="healthRecentErrors" style="margin-bottom:24px;"></div>
 
+  <!-- Pilot readiness -->
+  <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Pilotberedskap</h2>
+  <div id="pilotError" class="msg msg-error" style="display:none;"></div>
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+    <div class="dash-card" style="flex:0 0 auto; min-width:160px;">
+      <div class="dash-label">Status</div>
+      <div class="dash-value" id="pilotOverall" style="font-size:16px;">–</div>
+    </div>
+    <div class="dash-card" style="flex:0 0 auto; min-width:160px;">
+      <div class="dash-label">Godkänt / Varningar / Fel</div>
+      <div class="dash-value" id="pilotScore" style="font-size:14px;">–</div>
+    </div>
+    <button class="btn btn-neutral btn-sm" onclick="loadPilotReadiness()" style="align-self:flex-start;">Uppdatera</button>
+  </div>
+  <div id="pilotChecks" style="margin-bottom:24px;"></div>
+
   <!-- Recent activity table -->
   <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Senaste aktivitet</h2>
   <div id="dashActivity">
@@ -1175,6 +1191,9 @@ async function loadDashboard() {
   // Integration health
   loadIntegrationHealth();
 
+  // Pilot readiness
+  loadPilotReadiness();
+
   // Summary
   try {
     const s = await apiFetch('/dashboard/summary');
@@ -1379,6 +1398,46 @@ async function loadIntegrationHealth() {
   } catch (e) {
     const el = document.getElementById('healthError');
     el.textContent = 'Kunde inte ladda integrationshälsa: ' + e.message;
+    el.style.display = 'block';
+  }
+}
+
+
+async function loadPilotReadiness() {
+  document.getElementById('pilotError').style.display = 'none';
+  const _OVERALL = { ready: '✅ Redo för pilot', almost_ready: '⚠️ Nästan klar', not_ready: '❌ Ej redo' };
+  const _OVERALL_COLOR = { ready: '#16a34a', almost_ready: '#d97706', not_ready: '#dc2626' };
+  const _CHECK_ICON = { pass: '✅', warning: '⚠️', fail: '❌' };
+  const _CHECK_COLOR = { pass: '#16a34a', warning: '#d97706', fail: '#dc2626' };
+  try {
+    const r = await apiFetch('/pilot/readiness');
+
+    const ov = r.overall_status || 'not_ready';
+    const ovEl = document.getElementById('pilotOverall');
+    ovEl.textContent = _OVERALL[ov] || ov;
+    ovEl.style.color = _OVERALL_COLOR[ov] || '#6b7280';
+
+    const sc = r.score || {};
+    const scEl = document.getElementById('pilotScore');
+    scEl.textContent = `${sc.passed ?? 0} / ${sc.warnings ?? 0} / ${sc.failures ?? 0}`;
+
+    const checksEl = document.getElementById('pilotChecks');
+    const checks = r.checks || [];
+    if (checks.length === 0) { checksEl.innerHTML = ''; return; }
+    const rows = checks.map(c => {
+      const icon = _CHECK_ICON[c.status] || '?';
+      const color = _CHECK_COLOR[c.status] || '#6b7280';
+      return `<tr>
+        <td style="color:${color}; font-size:13px; white-space:nowrap;">${icon}</td>
+        <td style="font-size:12px; font-weight:600;">${escapeHtml(c.key)}</td>
+        <td style="font-size:12px; color:#374151;">${escapeHtml(c.message)}</td>
+      </tr>`;
+    }).join('');
+    checksEl.innerHTML = `<table class="act-table"><thead><tr><th></th><th>Check</th><th>Meddelande</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+  } catch (e) {
+    const el = document.getElementById('pilotError');
+    el.textContent = 'Kunde inte ladda pilotberedskap: ' + e.message;
     el.style.display = 'block';
   }
 }

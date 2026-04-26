@@ -3128,6 +3128,23 @@ def integration_health(
     return get_integration_health(db=db, tenant_id=tenant_id, app_settings=s)
 
 
+@app.get("/pilot/readiness")
+def pilot_readiness(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Tenant-scoped pilot/production readiness report.
+
+    Evaluates 11 deterministic checks from existing platform state.
+    No external API calls. No secrets in response.
+    Returns overall_status: ready | almost_ready | not_ready.
+    """
+    from app.health.production_readiness import get_pilot_readiness
+    s = get_settings()
+    return get_pilot_readiness(db=db, tenant_id=tenant_id, app_settings=s)
+
+
 @app.post("/jobs/{job_id}/auto-dispatch")
 def trigger_auto_dispatch(
     job_id: str,

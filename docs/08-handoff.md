@@ -1287,3 +1287,39 @@ System statuses: `healthy | warning | error | not_configured`. Overall status: `
 47 new tests in `tests/test_integration_health.py`.
 
 **1589/1589 total tests pass.**
+
+## Completed slice (2026-04-26 — Slice 15: Pilot Readiness Hardening)
+
+### Problem solved
+Operators had no single view to determine whether the platform was ready for a live pilot run. Individual signals existed (onboarding wizard, integration health, routing readiness) but were scattered across tabs.
+
+### What was built
+
+**`app/health/production_readiness.py`** — new module
+
+`get_pilot_readiness(db, tenant_id, *, app_settings)` returns 11 deterministic checks aggregated from existing platform state. No external API calls. No secrets in response.
+
+| Check key | Source | Pass / Warning / Fail |
+|-----------|--------|----------------------|
+| `auth_configured` | `TENANT_API_KEYS` env | pass if set, warning if empty |
+| `tenant_exists` | `TenantConfigRepository.list_all` | pass if ≥1 tenant, fail if 0 |
+| `onboarding_ready` | `get_onboarding_status` | pass=ready, warning=in_progress, fail=not_started |
+| `integrations_health_not_error` | `get_integration_health` | pass=healthy, warning=warning, fail=error |
+| `routing_ready_for_lead` | `resolve_routing_preview("lead")` | pass=ready, warning=missing/invalid |
+| `dispatch_duplicate_protection` | idempotency_key column query | pass if accessible, fail if exception |
+| `dispatch_observability` | integration_events count | pass if >0, warning if 0 |
+| `scheduler_safe` | scheduler.run_mode + gmail env | warning if scheduled+no gmail, warning if paused |
+| `required_env_present` | APP_NAME + integration envs | fail if no APP_NAME, warning if no integrations |
+| `ui_available` | `_UI_PATH.exists()` | pass if file on disk, fail if missing |
+| `test_lead_exists` | `JobRepository.count_jobs_for_tenant` | pass if >0, warning if 0 |
+
+Overall status: `not_ready` if any fail, `almost_ready` if any warning, `ready` if all pass.
+
+**`app/main.py`** — `GET /pilot/readiness` (tenant-authenticated)
+
+**`app/ui/index.html`** — Pilotberedskap card in Dashboard tab (checklist table with pass/warning/fail icons + messages); `loadPilotReadiness()` called on dashboard load.
+
+### Tests
+49 new tests in `tests/test_production_readiness.py`.
+
+**1638/1638 total tests pass.**
