@@ -1363,3 +1363,50 @@ Top-level status derivation per tenant: `error` if integration_health==error; `n
 44 new tests in `tests/test_super_admin.py`.
 
 **1682/1682 total tests pass.**
+
+## Completed slice (2026-04-26 — Slice 17: Admin Auth Hardening)
+
+### Problem solved
+`GET /admin/tenants/overview` returned cross-tenant data but was only protected by a per-tenant API key. Any tenant with a valid API key could read all other tenants' health data — not acceptable before production multi-customer use.
+
+### What was built
+
+**`app/core/settings.py`** — `ADMIN_API_KEY: str = ""` field added. Set via env var. Defaults to empty (fail-closed behaviour).
+
+**`app/core/admin_auth.py`** — new module
+
+`require_admin_api_key(x_admin_api_key)` FastAPI dependency:
+- Reads `X-Admin-API-Key` header.
+- Compares to `ADMIN_API_KEY` using `hmac.compare_digest` (constant-time).
+- Missing header → 401.
+- Wrong key → 401 (same code — no enumeration).
+- `ADMIN_API_KEY` not configured → 401 (fail closed — admin endpoints disabled until configured).
+- Configured value never appears in responses, logs, or error details.
+
+**`app/main.py`** — `GET /admin/tenants/overview` dependency changed from `get_verified_tenant` to `require_admin_api_key`. Tenant X-API-Key no longer accepted on this endpoint.
+
+**`env.example`** — `ADMIN_API_KEY` documented with usage note.
+
+**`app/ui/index.html`** — Admin API-nyckel input added to Super Admin tab (password field, persisted to `localStorage` as `ui_admin_api_key`). `adminHeaders()` helper sends `X-Admin-API-Key` header. `loadAdminOverview()` gates on key presence and shows "Åtkomst nekad" on 401/403.
+
+### Auth model going forward
+
+| Layer | Header | Protects |
+|-------|--------|---------|
+| Tenant operator | `X-API-Key` | Per-tenant endpoints |
+| Super admin | `X-Admin-API-Key` | Cross-tenant admin endpoints |
+
+Future admin endpoints must use `Depends(require_admin_api_key)`.
+
+### Remaining future work
+- User accounts / RBAC (not in MVP scope).
+- OAuth admin login (not in MVP scope).
+- Per-IP rate limiting on admin endpoints (not in MVP scope).
+
+### Tests
+24 new tests in `tests/test_admin_auth.py`:
+- `TestSettingsField` (3) — field exists, defaults empty, can be set
+- `TestRequireAdminApiKey` (13) — passes correct key, 401 on missing/wrong/unconfigured, secret not in detail, whitespace handling, tenant key rejected, WWW-Authenticate header, reusable
+- `TestAdminEndpointAuth` (8) — no key 401, wrong key 401, correct key passes, unconfigured fails closed, tenant key rejected, secret not exposed, dependency importable, tenant auth not broken
+
+**1706/1706 total tests pass.**

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import get_db
 from app.core.audit_list_response_schemas import AuditEventListResponse
 from app.core.audit_service import create_audit_event
+from app.core.admin_auth import require_admin_api_key
 from app.core.auth import get_verified_tenant
 from app.core.config import get_tenant_config
 from app.core.logging import setup_logging
@@ -3148,18 +3149,16 @@ def pilot_readiness(
 @app.get("/admin/tenants/overview")
 def admin_tenants_overview(
     db: Session = Depends(get_db),
-    tenant_id: str = Depends(get_verified_tenant),  # noqa: ARG001
+    _: None = Depends(require_admin_api_key),
 ):
     """
     Super Admin: aggregate health overview for ALL tenants in the DB.
 
     Read-only. No external API calls. No secrets in response.
 
-    IMPORTANT: This endpoint returns multi-tenant data and is therefore
-    sensitive. Currently protected by the same per-tenant API key auth as
-    other endpoints. Before exposing in a multi-customer production context,
-    implement a dedicated owner/admin API key (e.g. ADMIN_API_KEY env var)
-    so that individual tenant operators cannot view other tenants' data.
+    Requires X-Admin-API-Key header matching ADMIN_API_KEY env var.
+    Tenant X-API-Key keys are NOT accepted. Returns 401 if key is
+    missing, wrong, or ADMIN_API_KEY is not configured.
     """
     from app.admin.super_admin import get_super_admin_overview
     s = get_settings()

@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     # Set via TENANT_API_KEYS env var. If empty, auth is disabled (dev mode only).
     TENANT_API_KEYS: str = ""
 
+    # Super-admin API key — protects cross-tenant admin endpoints.
+    # Set via ADMIN_API_KEY env var. If empty, admin endpoints fail closed (401).
+    # Use X-Admin-API-Key header. Tenant X-API-Key keys are NOT accepted.
+    ADMIN_API_KEY: str = ""
+
     EMAIL_PROVIDER: str = "google_mail"
 
     CRM_WEBHOOK_URL: str = ""

@@ -1060,12 +1060,24 @@ pre {
 <!-- ══════════════════════════════════════════════════════════ SUPER ADMIN -->
 <div id="viewAdmin" style="display:none; padding:24px; overflow-y:auto; flex:1;">
 
-  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
     <div>
       <h1 style="font-size:18px; font-weight:700; color:#111; margin:0;">Super Admin — Kunder</h1>
-      <p style="font-size:12px; color:#9ca3af; margin:4px 0 0;">Läsvy. Visar alla tenants i databasen. Känslig vy — kräver stärkt autentisering i produktion.</p>
+      <p style="font-size:12px; color:#9ca3af; margin:4px 0 0;">Läsvy. Visar alla tenants i databasen. Kräver Admin API-nyckel (X-Admin-API-Key).</p>
     </div>
     <button class="btn btn-primary btn-sm" onclick="loadAdminOverview()">Uppdatera</button>
+  </div>
+
+  <!-- Admin key input -->
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px; padding:12px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px;">
+    <label style="font-size:12px; font-weight:600; color:#374151; white-space:nowrap;">Admin API-nyckel</label>
+    <input id="adminKeyInput" type="password" placeholder="admin-key-…"
+      style="flex:1; padding:6px 10px; border:1px solid #d1d5db; border-radius:4px; font-size:13px; font-family:monospace;"
+      oninput="onAdminKeyInput()" />
+    <button class="btn btn-neutral btn-sm" onclick="onAdminKeyInput(); loadAdminOverview()">Spara &amp; ladda</button>
+  </div>
+  <div id="adminKeyBanner" class="msg msg-error" style="display:none; margin-bottom:12px;">
+    Super Admin kräver adminnyckel. Ange ADMIN_API_KEY-värdet ovan.
   </div>
 
   <div id="adminError" class="msg msg-error" style="display:none;"></div>
@@ -1167,16 +1179,29 @@ function intLabel(key)   { return INTEGRATION_LABELS[key] || key; }
 let selectedJobId   = null;
 let _activeTenantId = null;   // the tenant whose config is currently loaded
 
-const LS_KEY = 'ui_api_key';
+const LS_KEY       = 'ui_api_key';
+const LS_ADMIN_KEY = 'ui_admin_api_key';
 
 function apiKey() {
   return document.getElementById('apiKeyInput').value.trim();
+}
+
+function adminKey() {
+  const el = document.getElementById('adminKeyInput');
+  return el ? el.value.trim() : '';
 }
 
 function headers() {
   const h = { 'Content-Type': 'application/json' };
   const key = apiKey();
   if (key) h['X-API-Key'] = key;
+  return h;
+}
+
+function adminHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  const key = adminKey();
+  if (key) h['X-Admin-API-Key'] = key;
   return h;
 }
 
@@ -1187,10 +1212,22 @@ function onKeyInput() {
   document.getElementById('authBanner').style.display = key ? 'none' : 'block';
 }
 
+function onAdminKeyInput() {
+  const key = adminKey();
+  if (key) localStorage.setItem(LS_ADMIN_KEY, key);
+  else     localStorage.removeItem(LS_ADMIN_KEY);
+  const banner = document.getElementById('adminKeyBanner');
+  if (banner) banner.style.display = key ? 'none' : 'block';
+}
+
 function initApiKey() {
   const saved = localStorage.getItem(LS_KEY) || '';
   document.getElementById('apiKeyInput').value = saved;
   document.getElementById('authBanner').style.display = saved ? 'none' : 'block';
+
+  const savedAdmin = localStorage.getItem(LS_ADMIN_KEY) || '';
+  const adminEl = document.getElementById('adminKeyInput');
+  if (adminEl) adminEl.value = savedAdmin;
 }
 
 // ---------------------------------------------------------------------------
@@ -1503,8 +1540,17 @@ const _ADMIN_INT_ICON     = { healthy: '✅', warning: '⚠️', error: '❌', n
 async function loadAdminOverview() {
   document.getElementById('adminError').style.display = 'none';
   document.getElementById('adminTable').innerHTML = '<span class="empty">Laddar…</span>';
+  const aKey = adminKey();
+  if (!aKey) {
+    const banner = document.getElementById('adminKeyBanner');
+    if (banner) banner.style.display = 'block';
+    document.getElementById('adminTable').innerHTML = '';
+    return;
+  }
+  const banner = document.getElementById('adminKeyBanner');
+  if (banner) banner.style.display = 'none';
   try {
-    const r = await apiFetch('/admin/tenants/overview');
+    const r = await apiFetch('/admin/tenants/overview', { headers: adminHeaders() });
 
     document.getElementById('adminTotal').textContent    = r.total_tenants    ?? '–';
     document.getElementById('adminHealthy').textContent  = r.healthy          ?? '–';
@@ -1559,7 +1605,12 @@ async function loadAdminOverview() {
       </table>`;
   } catch (e) {
     const el = document.getElementById('adminError');
-    el.textContent = 'Kunde inte ladda kunders status: ' + e.message;
+    const msg = e.message || '';
+    if (msg.includes('401') || msg.includes('403')) {
+      el.textContent = 'Åtkomst nekad. Kontrollera Admin API-nyckeln (X-Admin-API-Key).';
+    } else {
+      el.textContent = 'Kunde inte ladda kunders status: ' + msg;
+    }
     el.style.display = 'block';
     document.getElementById('adminTable').innerHTML = '';
   }
