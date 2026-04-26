@@ -786,6 +786,53 @@ pre {
   </div>
   <div id="obVerifyResult" style="margin-top:12px;"></div>
 
+  <!-- F. Kunduppsättning wizard checklist -->
+  <div style="margin-top:28px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+      <h2 style="font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin:0;">Kunduppsättning</h2>
+      <button class="btn btn-sm btn-primary" onclick="loadWizardStatus()">Uppdatera status</button>
+    </div>
+    <div id="wizardError" class="msg msg-error" style="display:none;"></div>
+
+    <!-- Progress bar -->
+    <div style="margin-bottom:14px;">
+      <div style="display:flex; justify-content:space-between; font-size:12px; color:#6b7280; margin-bottom:4px;">
+        <span id="wizardStatusLabel">–</span>
+        <span id="wizardScoreLabel">–</span>
+      </div>
+      <div style="background:#e5e7eb; border-radius:4px; height:8px; overflow:hidden;">
+        <div id="wizardProgressBar" style="background:#2563eb; height:8px; width:0%; border-radius:4px; transition:width 0.3s;"></div>
+      </div>
+    </div>
+
+    <!-- Checklist -->
+    <div id="wizardChecklist" style="display:flex; flex-direction:column; gap:6px; margin-bottom:16px;">
+      <span class="empty">Klicka på "Uppdatera status" för att ladda.</span>
+    </div>
+
+    <!-- Action buttons -->
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+      <button class="btn btn-sm" onclick="scanWorkflowSystem('gmail')">Skanna Gmail</button>
+      <button class="btn btn-sm" onclick="scanWorkflowSystem('monday')">Skanna Monday</button>
+      <button class="btn btn-sm" onclick="suggestRouting()">Föreslå routing</button>
+      <button class="btn btn-sm" onclick="applyRoutingHints()">Spara routing-hints</button>
+    </div>
+
+    <!-- Test lead -->
+    <div class="setup-card" style="margin-bottom:0;">
+      <h3 style="font-size:12px; font-weight:600; margin:0 0 10px; color:#374151;">Skapa testlead</h3>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
+        <input id="wlCompany"  class="setup-input" type="text" placeholder="Företagsnamn (t.ex. Testbolag AB)" value="Testbolag AB" style="font-family:monospace; font-size:13px; padding:6px 10px; border:1px solid #d1d5db; border-radius:4px;">
+        <input id="wlName"     class="setup-input" type="text" placeholder="Kontaktnamn" value="Test Lead">
+        <input id="wlEmail"    class="setup-input" type="email" placeholder="E-postadress" value="test@onboarding.example.com">
+        <textarea id="wlMsg"   class="setup-input" rows="2" placeholder="Meddelande" style="font-family:monospace; font-size:12px; padding:6px 10px; border:1px solid #d1d5db; border-radius:4px; resize:vertical;">Testlead skapad via onboarding-fliken för att verifiera pipelineflödet.</textarea>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="createTestLead()">Skapa testlead</button>
+      <span id="wlMsg2" style="margin-left:10px; font-size:12px; color:#6b7280;"></span>
+      <div id="wlResult" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
 </div><!-- /viewOnboarding -->
 
 <!-- ══════════════════════════════════════════════════════ NOTIFIERINGAR -->
@@ -1086,7 +1133,7 @@ function switchView(name) {
   if (name === 'dash')       loadDashboard();
   if (name === 'ctrl')       loadControl();
   if (name === 'cases')      loadCases();
-  if (name === 'onboarding') loadOnboarding();
+  if (name === 'onboarding') { loadOnboarding(); loadWizardStatus(); }
   if (name === 'notif')      loadNotifSettings();
   if (name === 'memory')     loadMemory();
 }
@@ -2497,6 +2544,92 @@ async function runOnboardingVerify() {
       </div>`;
   } catch (e) {
     resultEl.innerHTML = `<div class="msg msg-error">Fel: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding wizard (Kunduppsättning)
+// ---------------------------------------------------------------------------
+
+const _WIZARD_STATUS_LABELS = {
+  not_started: 'Ej startad',
+  in_progress:  'Pågår',
+  ready:        'Redo för pilot',
+};
+const _WIZARD_STATUS_COLORS = {
+  not_started: '#9ca3af',
+  in_progress:  '#d97706',
+  ready:        '#16a34a',
+};
+const _STEP_STATUS_ICONS = { complete: '✅', incomplete: '⬜', warning: '⚠️' };
+const _STEP_STATUS_COLORS = { complete: '#16a34a', incomplete: '#6b7280', warning: '#d97706' };
+
+async function loadWizardStatus() {
+  const errEl = document.getElementById('wizardError');
+  errEl.style.display = 'none';
+  try {
+    const r = await apiFetch('/onboarding/status');
+    const score   = r.score || {};
+    const overall = r.status || 'not_started';
+
+    document.getElementById('wizardStatusLabel').textContent =
+      _WIZARD_STATUS_LABELS[overall] || overall;
+    document.getElementById('wizardStatusLabel').style.color =
+      _WIZARD_STATUS_COLORS[overall] || '#6b7280';
+    document.getElementById('wizardScoreLabel').textContent =
+      `${score.completed ?? 0} / ${score.total ?? 8} steg (${score.percent ?? 0} %)`;
+    document.getElementById('wizardProgressBar').style.width = (score.percent ?? 0) + '%';
+    document.getElementById('wizardProgressBar').style.background =
+      overall === 'ready' ? '#16a34a' : overall === 'in_progress' ? '#2563eb' : '#9ca3af';
+
+    const steps = r.steps || [];
+    const listEl = document.getElementById('wizardChecklist');
+    if (!steps.length) {
+      listEl.innerHTML = '<span class="empty">Inga steg tillgängliga.</span>';
+      return;
+    }
+    listEl.innerHTML = steps.map(step => {
+      const icon  = _STEP_STATUS_ICONS[step.status]  || '⬜';
+      const color = _STEP_STATUS_COLORS[step.status] || '#6b7280';
+      const msg   = step.message ? ` <span style="color:#9ca3af; font-size:11px;">— ${escapeHtml(step.message)}</span>` : '';
+      return `<div style="display:flex; align-items:baseline; gap:8px; padding:6px 0; border-bottom:1px solid #f3f4f6;">
+        <span style="font-size:14px; flex-shrink:0;">${icon}</span>
+        <span style="font-size:13px; font-weight:500; color:${color};">${escapeHtml(step.label)}</span>
+        ${msg}
+      </div>`;
+    }).join('');
+  } catch (e) {
+    const errEl2 = document.getElementById('wizardError');
+    errEl2.textContent = 'Kunde inte ladda kunduppsättning: ' + escapeHtml(e.message);
+    errEl2.style.display = 'block';
+  }
+}
+
+async function createTestLead() {
+  const msgEl   = document.getElementById('wlMsg2');
+  const resultEl = document.getElementById('wlResult');
+  msgEl.textContent   = 'Skapar…';
+  msgEl.style.color   = '#6b7280';
+  resultEl.innerHTML  = '';
+  try {
+    const body = {
+      company_name:  document.getElementById('wlCompany').value  || 'Testbolag AB',
+      customer_name: document.getElementById('wlName').value     || 'Test Lead',
+      email:         document.getElementById('wlEmail').value    || 'test@onboarding.example.com',
+      message:       document.getElementById('wlMsg').value      || '',
+    };
+    const r = await apiFetch('/onboarding/test-lead', { method: 'POST', body: JSON.stringify(body) });
+    msgEl.textContent = 'Testlead skapat!';
+    msgEl.style.color = '#16a34a';
+    resultEl.innerHTML = `<div class="setup-card" style="margin-top:8px; font-size:12px;">
+      <div><strong>Job-ID:</strong> ${escapeHtml(r.job_id)}</div>
+      <div><strong>Status:</strong> ${statusBadge(r.status)}</div>
+      <div style="color:#6b7280; margin-top:4px;">${escapeHtml(r.message || '')}</div>
+    </div>`;
+    loadWizardStatus();
+  } catch (e) {
+    msgEl.textContent = 'Fel: ' + escapeHtml(e.message);
+    msgEl.style.color = '#dc2626';
   }
 }
 

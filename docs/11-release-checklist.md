@@ -7,7 +7,7 @@
 - [x] DB setup verified (`docker-compose.yml` + `scripts/create_tables.py`)
 
 ## Test
-- [x] Automated tests pass — 1493/1493 (`python -m pytest`)
+- [x] Automated tests pass — 1542/1542 (`python -m pytest`)
 - [x] Official MVP smoke test documented in README (curl commands, step by step)
 - [x] Gmail send_email verified live (real Gmail delivery confirmed)
 - [x] Gmail list_messages verified live (real inbox messages returned)
@@ -44,6 +44,7 @@
 - [x] Dispatch Approval Queue — approval_required dispatch creates real approval_requests record with dispatch_context; approval_id returned; duplicate-approval guard; POST /approvals/{id}/approve triggers ControlledDispatchEngine (not pipeline); reject closes without external write; existing idempotency guard prevents double write; UI dispatch badge + "Godkänn dispatch" button; 33 tests
 - [x] Auto Dispatch Pipeline Hook v1 — maybe_auto_dispatch_job() checks job_type/policy/routing/system/adapter before external write; hooked into WorkflowOrchestrator._finalize_success after COMPLETED; failure never crashes pipeline; POST /jobs/{job_id}/auto-dispatch endpoint; "Testa auto-dispatch" UI button; only lead→monday+full_auto; 29 tests
 - [x] Time-Range Filters + Customer ROI Report — GET /dispatch/summary?range= (today/7d/30d/all, default 30d) + GET /dispatch/report?range= (executive summary: dispatches_completed, time_saved_hours, success_rate_percent, automation_share_percent); range selector buttons in Dashboard UI; ROI Rapport card with Swedish labels; tenant-scoped reporting; automation_share = (approval+full_auto)/actionable; 38 tests; 1493 total pass
+- [x] Customer Onboarding Wizard — GET /onboarding/status (8-step deterministic checklist: tenant_created/gmail_ready/monday_ready/systems_scanned/routing_hints_saved/automation_policy_set/test_lead_created/dispatch_verified; no external API calls; not_started/in_progress/ready status) + POST /onboarding/test-lead (synthetic lead via deterministic pipeline, no LLM, no external email); Kunduppsättning wizard section in Onboarding UI (progress bar, checklist, action buttons, test lead form); 49 tests; 1542 total pass
 
 ## Docs
 - [x] current-state updated

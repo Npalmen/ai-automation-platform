@@ -1185,3 +1185,75 @@ Turns dispatch observability into customer-facing proof of value with selectable
 - `TestTenantIsolation` (2) — summary and report are tenant-scoped
 
 **1493/1493 total tests pass.**
+
+## Completed slice (2026-04-26 — Customer Onboarding Wizard)
+
+Makes first customer onboarding fast, visible, and repeatable from the existing UI.
+
+### What was added
+
+**`app/onboarding/` package** — new
+
+| File | Role |
+|------|------|
+| `__init__.py` | Package marker |
+| `readiness.py` | `get_onboarding_status()` + 8 individual step evaluators |
+
+**Step evaluators** (all deterministic, no external API calls):
+
+| Step key | Complete when |
+|----------|--------------|
+| `tenant_created` | Tenant row exists in `tenant_configs` |
+| `gmail_ready` | `GOOGLE_MAIL_ACCESS_TOKEN` set OR Gmail scan succeeded in `workflow_scan.summary.gmail` |
+| `monday_ready` | `MONDAY_API_KEY` set OR Monday scan succeeded in `workflow_scan.summary.monday` |
+| `systems_scanned` | `workflow_scan.systems_scanned` contains `"gmail"` or `"monday"` |
+| `routing_hints_saved` | At least one hint with non-empty `system` + `target.board_id` |
+| `automation_policy_set` | `auto_actions` has at least one truthy value |
+| `test_lead_created` | `JobRepository.count_jobs_for_tenant(…, job_type="lead") > 0` |
+| `dispatch_verified` | `IntegrationEvent` exists with `integration_type="controlled_dispatch"` + `status="success"` |
+
+**Overall status:**
+- `not_started`: 0 steps complete
+- `in_progress`: 1–7 steps complete
+- `ready`: all 8 steps complete
+
+**`app/main.py`** — two new endpoints
+
+| Endpoint | Behaviour |
+|----------|-----------|
+| `GET /onboarding/status` | Returns full checklist; tenant-scoped; no external API calls |
+| `POST /onboarding/test-lead` | Optional JSON body `{company_name, customer_name, email, message}`; creates lead job via `_run_verification_pipeline` (deterministic, no LLM, no external email); returns `{job_id, tenant_id, job_type, status, message}`; creates audit event |
+
+**`app/ui/index.html`** — Onboarding tab extended (existing setup sections preserved)
+
+- "Kunduppsättning" section added below existing Setup/Verify content
+- Progress bar (0–100%) + step count + overall status label (Ej startad / Pågår / Redo för pilot)
+- Checklist rows: ✅/⬜/⚠️ icon + label + message per step
+- Action buttons: Uppdatera status / Skanna Gmail / Skanna Monday / Föreslå routing / Spara routing-hints
+- "Skapa testlead" form: company_name, customer_name, email, message inputs + result card
+- `loadWizardStatus()` fetches `GET /onboarding/status` and renders checklist
+- `createTestLead()` POSTs to `POST /onboarding/test-lead` and reloads checklist
+- Both `loadOnboarding()` and `loadWizardStatus()` called when Onboarding tab is opened
+
+### Constraints respected
+- No external API calls from readiness status endpoint
+- No new integrations or adapters
+- No React rewrite — existing single-file UI only
+- Test lead uses deterministic pipeline (same as `POST /verify/{tenant_id}`)
+- Existing Onboarding/Setup sections preserved unchanged
+
+### Tests
+49 new tests in `tests/test_onboarding.py`:
+- `TestCheckTenantCreated` (2) — complete/incomplete
+- `TestCheckGmailReady` (4) — env token, scanner summary, scanner top-level, nothing
+- `TestCheckMondayReady` (3) — env key, scanner summary, nothing
+- `TestCheckSystemsScanned` (6) — gmail, monday, both, empty, none, unknown only
+- `TestCheckRoutingHintsSaved` (6) — valid hint, empty, missing board_id, missing system, None hint, no memory
+- `TestCheckAutomationPolicy` (6) — configured, full_auto, False, None, empty, no key
+- `TestCheckTestLead` (2) — complete, incomplete
+- `TestCheckDispatchVerified` (2) — event exists, no event
+- `TestGetOnboardingStatus` (9) — keys, 8 steps, all step keys, not_started, in_progress, ready, percent, tenant_id, field shapes
+- `TestTenantIsolation` (2) — scoped, cross-tenant isolation
+- `TestOnboardingTestLead` (6) — job_id, tenant_id, job_type, status, custom company, None request default
+
+**1542/1542 total tests pass.**

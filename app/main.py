@@ -3024,6 +3024,93 @@ def dispatch_report(
     )
 
 
+@app.get("/onboarding/status")
+def onboarding_status(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Tenant-scoped onboarding readiness checklist.
+
+    Returns 8 deterministic steps (complete/incomplete/warning), an overall status
+    (not_started/in_progress/ready), and a completion score.
+    No external API calls are made.
+    """
+    from app.onboarding.readiness import get_onboarding_status
+    s = get_settings()
+    return get_onboarding_status(db=db, tenant_id=tenant_id, app_settings=s)
+
+
+class _OnboardingTestLeadRequest(_BaseModel):
+    company_name: str = "Testbolag AB"
+    customer_name: str = "Test Lead"
+    email: str = "test@onboarding.example.com"
+    message: str = "Testlead skapad via onboarding-fliken för att verifiera pipelineflödet."
+
+
+@app.post("/onboarding/test-lead", status_code=201)
+def onboarding_test_lead(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+    request: _OnboardingTestLeadRequest | None = None,
+):
+    """
+    Create a safe synthetic lead job for the tenant to verify the pipeline.
+
+    Uses the same deterministic pipeline as POST /verify/{tenant_id}.
+    Does not send external email; respects the tenant's dispatch policy.
+    Response includes job_id and final status.
+    """
+    from app.domain.workflows.enums import JobType
+
+    if request is None:
+        request = _OnboardingTestLeadRequest()
+    job_type_value = "lead"
+
+    try:
+        job_type_enum = JobType(job_type_value)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="lead is not a recognised job type.")
+
+    input_data = {
+        "subject": f"Testlead – {request.company_name}",
+        "message_text": request.message,
+        "sender": {
+            "name":  request.customer_name,
+            "email": request.email,
+            "phone": None,
+        },
+        "onboarding_test": True,
+    }
+
+    job = Job(
+        tenant_id=tenant_id,
+        job_type=job_type_enum,
+        input_data=input_data,
+    )
+
+    set_current_tenant(tenant_id)
+    saved_job = JobRepository.create_job(db, job)
+    processed_job = _run_verification_pipeline(saved_job, job_type_value, db)
+
+    create_audit_event(
+        db=db,
+        tenant_id=tenant_id,
+        category="workflow",
+        action="onboarding_test_lead_created",
+        status="success",
+        details={"job_id": processed_job.job_id, "job_type": job_type_value},
+    )
+
+    return {
+        "job_id":   processed_job.job_id,
+        "tenant_id": processed_job.tenant_id,
+        "job_type": job_type_value,
+        "status":   processed_job.status.value if hasattr(processed_job.status, "value") else str(processed_job.status),
+        "message":  "Testlead skapad och processad via deterministisk pipeline.",
+    }
+
+
 @app.post("/jobs/{job_id}/auto-dispatch")
 def trigger_auto_dispatch(
     job_id: str,
