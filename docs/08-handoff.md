@@ -1705,3 +1705,28 @@ No backend changes. Pure UI polish of the dashboard view.
 
 ### Tests
 No backend changes. 1779/1779 tests pass (1 pre-existing env-dependent failure unchanged).
+
+
+## Completed slice (2026-04-27 — Slice 25: Real Login Screen)
+
+### What was built
+Full-screen login overlay that intercepts the app before the dashboard is shown. No backend changes.
+
+### User experience
+1. On first load: `#sidebar` and `#mainContent` are hidden. A fullscreen `#loginScreen` overlay is shown.
+2. User selects **Admin** or **Kund** tab, enters API key, clicks **Logga in**.
+3. Key validated: admin → `GET /admin/tenants/overview` with `X-Admin-API-Key`; customer → `GET /tenant` with `X-API-Key`.
+4. On success: session stored in `localStorage` (`ui_session`), login screen hidden, app shell shown.
+5. **Page reload**: `initSession()` detects existing `ui_session` → skips login entirely.
+6. **Logout**: sidebar footer button clears `ui_session`, returns to login screen.
+7. **Dev mode**: `_checkDevMode()` probes `/tenant` with empty key; shows notice and allows empty-key login if backend accepts it.
+
+### New JS: `_loginSwitchTab`, `doLogin`, `_launchApp`, `logout`, `initSession` IIFE, `_checkDevMode`
+### New LS key: `LS_SESSION = 'ui_session'`
+### New CSS: `#loginScreen`, `.login-card`, `.login-logo*`, `.login-tabs`, `.login-tab`, `.login-field`, `.login-input`, `.login-hint`, `.login-btn`, `.login-error`, `.login-dev-note`, `.login-spinner`, `.btn-logout`
+
+### Files changed
+- `app/ui/index.html` — CSS, HTML, JS (login functions + updated init)
+
+### Tests
+No backend changes. 1756/1756 tests pass (1 pre-existing env-dependent failure unchanged).

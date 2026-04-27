@@ -777,14 +777,159 @@ label { color: var(--text-muted); }
 [id^="view"] h1 { color: var(--text) !important; }
 #reportMessage { background: var(--surface-2) !important; border-color: var(--border-med) !important; color: var(--text-muted) !important; }
 #schedStatusWrap { color: var(--text-muted) !important; }
+
+/* ═══════════════════════════════════════════════════════
+   LOGIN SCREEN
+═══════════════════════════════════════════════════════ */
+#loginScreen {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 50% 40%, #1a1040 0%, #0d0f17 70%);
+}
+.login-card {
+  width: 100%; max-width: 420px;
+  background: var(--surface);
+  border: 1px solid var(--border-med);
+  border-radius: var(--radius-lg);
+  padding: 36px 36px 32px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.6), var(--glow-purple);
+}
+.login-logo {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 28px;
+}
+.login-logo-icon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, var(--purple), var(--blue));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  box-shadow: var(--glow-purple);
+  flex-shrink: 0;
+}
+.login-logo-text { font-size: 17px; font-weight: 700; color: var(--text); }
+.login-logo-sub  { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.login-tabs {
+  display: flex; gap: 4px;
+  background: var(--bg); border-radius: var(--radius-sm);
+  padding: 3px; margin-bottom: 24px;
+}
+.login-tab {
+  flex: 1; padding: 7px 0; text-align: center;
+  border-radius: 6px; font-size: 12px; font-weight: 600;
+  cursor: pointer; color: var(--text-muted);
+  transition: all 0.15s; user-select: none; border: none;
+  background: transparent;
+}
+.login-tab.active {
+  background: var(--surface-2); color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+.login-field { margin-bottom: 16px; }
+.login-field label {
+  display: block; font-size: 11px; font-weight: 600;
+  color: var(--text-dim); text-transform: uppercase;
+  letter-spacing: 0.07em; margin-bottom: 6px;
+}
+.login-input {
+  width: 100%; padding: 10px 14px;
+  background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border-med);
+  border-radius: var(--radius-sm);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  transition: border-color 0.15s;
+}
+.login-input:focus {
+  outline: none; border-color: var(--purple);
+  box-shadow: 0 0 0 2px var(--purple-glow);
+}
+.login-hint {
+  font-size: 11px; color: var(--text-dim); margin-top: 5px; line-height: 1.5;
+}
+.login-btn {
+  width: 100%; padding: 11px 0; margin-top: 4px;
+  background: linear-gradient(135deg, var(--purple), #6d28d9);
+  color: #fff; border: none; border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: all 0.15s; letter-spacing: 0.02em;
+}
+.login-btn:hover { filter: brightness(1.1); box-shadow: var(--glow-purple); }
+.login-btn:disabled { opacity: 0.4; cursor: not-allowed; filter: none; box-shadow: none; }
+.login-error {
+  display: none; margin-top: 12px; padding: 9px 12px;
+  background: var(--danger-bg); color: #fca5a5;
+  border: 1px solid rgba(239,68,68,.3); border-radius: var(--radius-sm);
+  font-size: 12px; text-align: center;
+}
+.login-dev-note {
+  margin-top: 20px; padding: 10px 12px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 11px;
+  color: var(--text-dim); text-align: center; line-height: 1.5;
+}
+.login-spinner {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle; margin-right: 6px;
+}
+
+/* Logout button */
+.btn-logout {
+  width: 100%; padding: 7px 0; background: transparent;
+  color: var(--text-dim); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all 0.12s; text-align: center;
+}
+.btn-logout:hover { border-color: var(--danger); color: #fca5a5; background: var(--danger-bg); }
 </style>
 </head>
 <body>
 
 <!-- ═══════════════════════════════════════════════════════
+     LOGIN SCREEN
+═══════════════════════════════════════════════════════ -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">⚡</div>
+      <div>
+        <div class="login-logo-text">AI Automation</div>
+        <div class="login-logo-sub">Platform</div>
+      </div>
+    </div>
+
+    <div class="login-tabs">
+      <button class="login-tab active" id="loginTabAdmin"    onclick="_loginSwitchTab('admin')">Admin</button>
+      <button class="login-tab"        id="loginTabCustomer" onclick="_loginSwitchTab('customer')">Kund</button>
+    </div>
+
+    <div class="login-field">
+      <label id="loginKeyLabel">Admin API-nyckel</label>
+      <input id="loginKeyInput" type="password" class="login-input"
+             placeholder="Klistra in din API-nyckel"
+             onkeydown="if(event.key==='Enter')doLogin()"
+             autocomplete="current-password">
+      <div class="login-hint" id="loginHintText">Krävs för admin-åtkomst. Kontakta systemadministratören om du saknar nyckel.</div>
+    </div>
+
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Logga in</button>
+
+    <div class="login-error" id="loginError"></div>
+
+    <div class="login-dev-note" id="loginDevNote" style="display:none;">
+      Dev-läge — servern accepterar valfri nyckel. Du kan lämna fältet tomt.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
      APP SHELL: SIDEBAR + MAIN
 ═══════════════════════════════════════════════════════ -->
-<div id="sidebar">
+<div id="sidebar" style="display:none;">
 
   <!-- Logo -->
   <div class="sidebar-logo">
@@ -841,18 +986,19 @@ label { color: var(--text-muted); }
 
   </nav>
 
-  <!-- Footer: role toggle -->
+  <!-- Footer: role toggle + logout -->
   <div class="sidebar-footer">
     <div style="display:flex; flex-direction:column; gap:8px;">
       <span id="roleBadge" class="role-badge admin" onclick="toggleRole()" title="Klicka för att byta vy">
         ◈ Admin
       </span>
+      <button class="btn-logout" onclick="logout()">⎋ Logga ut</button>
     </div>
   </div>
 
 </div><!-- /#sidebar -->
 
-<div id="mainContent">
+<div id="mainContent" style="display:none;">
 
   <!-- Topbar -->
   <div id="topbar">
@@ -1995,6 +2141,7 @@ let _activeTenantId = null;   // the tenant whose config is currently loaded
 const LS_KEY        = 'ui_api_key';
 const LS_ADMIN_KEY  = 'ui_admin_api_key';
 const LS_ROLE_KEY   = 'ui_role_mode';    // 'admin' | 'customer'
+const LS_SESSION    = 'ui_session';      // 'admin' | 'customer' — set after successful login
 
 let _uiMode = 'admin';   // current role; initialised in initApiKey()
 
@@ -2039,6 +2186,118 @@ function onAdminKeyInput() {
   else     localStorage.removeItem(LS_ADMIN_KEY);
   const banner = document.getElementById('adminKeyBanner');
   if (banner) banner.style.display = key ? 'none' : 'block';
+}
+
+// ---------------------------------------------------------------------------
+// Login / session
+// ---------------------------------------------------------------------------
+
+let _loginMode = 'admin'; // which tab is active on login screen
+
+function _loginSwitchTab(mode) {
+  _loginMode = mode;
+  document.getElementById('loginTabAdmin').classList.toggle('active', mode === 'admin');
+  document.getElementById('loginTabCustomer').classList.toggle('active', mode === 'customer');
+  document.getElementById('loginKeyLabel').textContent   = mode === 'admin' ? 'Admin API-nyckel' : 'Tenant API-nyckel';
+  document.getElementById('loginHintText').textContent   = mode === 'admin'
+    ? 'Krävs för admin-åtkomst. Kontakta systemadministratören om du saknar nyckel.'
+    : 'Din tenant-nyckel för kundåtkomst. Kontakta oss om du saknar nyckel.';
+  document.getElementById('loginError').style.display   = 'none';
+  document.getElementById('loginKeyInput').value        = '';
+  document.getElementById('loginKeyInput').focus();
+}
+
+async function doLogin() {
+  const key = document.getElementById('loginKeyInput').value.trim();
+  const btn = document.getElementById('loginBtn');
+  const errEl = document.getElementById('loginError');
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="login-spinner"></span>Loggar in…';
+
+  try {
+    const isAdmin = (_loginMode === 'admin');
+    const headers = isAdmin
+      ? { 'X-Admin-API-Key': key }
+      : { 'X-API-Key': key };
+    const endpoint = isAdmin ? '/admin/tenants/overview' : '/tenant';
+    const res = await fetch(endpoint, { headers });
+
+    if (res.ok || res.status === 200) {
+      // Success — store session
+      if (isAdmin) {
+        localStorage.setItem(LS_ADMIN_KEY, key);
+        localStorage.setItem(LS_ROLE_KEY, 'admin');
+      } else {
+        localStorage.setItem(LS_KEY, key);
+        localStorage.setItem(LS_ROLE_KEY, 'customer');
+      }
+      localStorage.setItem(LS_SESSION, _loginMode);
+      _launchApp(_loginMode, key);
+    } else if (res.status === 401 || res.status === 403) {
+      // Try dev-mode: if server accepted empty key, allow login
+      if (!key) {
+        // Dev mode — no key needed
+        localStorage.setItem(LS_SESSION, _loginMode);
+        _launchApp(_loginMode, key);
+      } else {
+        errEl.textContent = 'Fel API-nyckel. Kontrollera och försök igen.';
+        errEl.style.display = 'block';
+      }
+    } else {
+      errEl.textContent = 'Serverfel (' + res.status + '). Försök igen senare.';
+      errEl.style.display = 'block';
+    }
+  } catch (e) {
+    // Network error — could be dev mode without server, allow empty-key login
+    if (!key) {
+      localStorage.setItem(LS_SESSION, _loginMode);
+      _launchApp(_loginMode, key);
+    } else {
+      errEl.textContent = 'Kunde inte nå servern. Kontrollera anslutningen.';
+      errEl.style.display = 'block';
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Logga in';
+  }
+}
+
+function _launchApp(mode, key) {
+  // Hide login, show app
+  document.getElementById('loginScreen').style.display  = 'none';
+  document.getElementById('sidebar').style.display      = '';
+  document.getElementById('mainContent').style.display  = '';
+
+  // Apply role
+  _uiMode = mode;
+  localStorage.setItem(LS_ROLE_KEY, mode);
+  _applyRoleMode();
+
+  // Restore keys into topbar inputs
+  const apiKey = mode === 'customer' ? key : (localStorage.getItem(LS_KEY) || '');
+  const adminKey = mode === 'admin'  ? key : (localStorage.getItem(LS_ADMIN_KEY) || '');
+  const keyEl = document.getElementById('apiKeyInput');
+  if (keyEl) keyEl.value = apiKey;
+  const adminEl = document.getElementById('adminKeyInput');
+  if (adminEl) adminEl.value = adminKey;
+  document.getElementById('authBanner').style.display = apiKey ? 'none' : 'block';
+
+  switchView(_uiMode === 'admin' ? 'ops' : 'dash');
+  if (apiKey || _uiMode === 'admin') loadAll();
+}
+
+function logout() {
+  localStorage.removeItem(LS_SESSION);
+  // Keep stored keys so user doesn't have to re-enter them (just clear session flag)
+  document.getElementById('sidebar').style.display      = 'none';
+  document.getElementById('mainContent').style.display  = 'none';
+  const loginScreen = document.getElementById('loginScreen');
+  loginScreen.style.display = 'flex';
+  // Reset login form
+  document.getElementById('loginKeyInput').value = '';
+  document.getElementById('loginError').style.display = 'none';
+  document.getElementById('loginBtn').textContent = 'Logga in';
 }
 
 function initApiKey() {
@@ -4653,10 +4912,31 @@ async function saveMemory() {
 // ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
-initApiKey();
-// Default view: dashboard for customers, ops for admin
-switchView(_uiMode === 'admin' ? 'ops' : 'dash');
-if (apiKey()) loadAll();
+(function initSession() {
+  const session = localStorage.getItem(LS_SESSION); // 'admin' | 'customer' | null
+  if (session) {
+    // Restore previous session — skip login screen
+    initApiKey();
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('sidebar').style.display     = '';
+    document.getElementById('mainContent').style.display = '';
+    switchView(_uiMode === 'admin' ? 'ops' : 'dash');
+    if (apiKey() || _uiMode === 'admin') loadAll();
+  } else {
+    // No session — show login, detect dev mode
+    initApiKey(); // still restore keys/role in background
+    _checkDevMode();
+  }
+})();
+
+async function _checkDevMode() {
+  try {
+    const res = await fetch('/tenant', { headers: { 'X-API-Key': '' } });
+    if (res.ok) {
+      document.getElementById('loginDevNote').style.display = 'block';
+    }
+  } catch (_) { /* server not reachable — normal */ }
+}
 </script>
 </body>
 </html>
