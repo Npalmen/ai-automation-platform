@@ -1599,3 +1599,51 @@ New layout: `#sidebar` (220px fixed left) + `#mainContent` (flex column: topbar 
 
 ### Tests
 No backend changes. 1779/1779 tests pass (1 pre-existing env-dependent failure unchanged).
+
+## Completed slice (2026-04-27 — Slice 23: Dashboard Composition Polish)
+
+### What was built
+No backend changes. Pure UI polish of the dashboard view.
+
+### New CSS classes
+- `.kpi-card` — card with top-border accent + icon badge area; variants: `accent-blue/green/purple/amber/cyan`, `roi-card`
+- `.kpi-icon` — 32×32 icon badge with colored background; variants: `blue/green/purple/amber/cyan`
+- `.kpi-trend` — small pill for trend indicators; variants: `up/down/flat`
+- `.kpi-label`, `.kpi-value`, `.kpi-helper`, `.kpi-top` — KPI card typography
+- `.dash-page-hdr`, `.dash-page-title`, `.dash-page-sub`, `.dash-quick-actions` — dashboard page header
+- `.dash-section-hdr`, `.dash-section-title` — section dividers within a view
+- `.status-pill` — pulsing status indicator pill; variants: `ok/warn/err/gray`; has `::before` dot
+- `.empty-state`, `.empty-state-icon`, `.empty-state-title`, `.empty-state-sub` — polished empty state blocks
+- `.dash-two-col` — responsive two-column grid (collapses at 800px)
+- `.range-chip`, `.range-chip.active` — pill-style range selector replacing old `.btn` buttons
+
+### Admin dashboard changes
+- Page header: title "Driftöversikt" + dynamic date subtitle + integration health `.status-pill` + refresh button
+- KPI top row: 4 `kpi-card` (leads/support/klara/väntar) with icon badges
+- ROI section: single `roi-card` with sparad tid grid + breakdown row + collapsible assumptions; side-by-side with ROI rapport 2×2 grid
+- Dispatch range buttons replaced with `.range-chip` pills; `setDispatchRange()` updated
+- 5-column dispatch KPI row (totalt/lyckade/misslyckade/överhoppade/tid)
+- Integration health + pilot readiness in `.dash-two-col` layout
+- All hardcoded inline colors (`#888`, `#6b7280`, `#374151`, `#16a34a`, `#dc2626`) replaced with CSS vars
+- Polished empty states for dispatches and activity
+
+### Customer dashboard changes
+- Hero: status pill (`.status-pill`) driven by integration health overall_status; right-aligned
+- KPI row: 4 `kpi-card` with icon badges
+- Integration health card: dark-safe inline colors; empty state when no systems configured
+- Cases summary: CSS var colors, stronger font weights
+- "Visa alla →" link in activity section header to navigate to Ärenden view
+- Activity feed: dark-safe inline colors; polished empty state
+
+### JS changes
+- `_loadCustomerDashboard()`: sets `#custOverallStatus` pill class+text from integration health overall_status; uses `var(--*)` in all generated HTML
+- `_loadAdminDashboard()`: sets `#adminDashSubtitle` with today's date; activity table uses CSS vars; empty state for no-data
+- `loadIntegrationHealth()`: updates `#adminHealthPill` class+text in addition to health cards
+- `setDispatchRange()`: switches `.range-chip`/`.range-chip.active` instead of `.btn-primary`
+- `loadPilotReadiness()`, `loadAdminOverview()`: CSS var colors in generated rows
+
+### Files changed
+- `app/ui/index.html` — CSS, both dashboard HTML blocks, five JS functions
+
+### Tests
+No backend changes. 1779/1779 tests pass (1 pre-existing env-dependent failure unchanged).

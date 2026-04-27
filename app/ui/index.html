@@ -320,6 +320,104 @@ body {
 .dash-value   { font-size: 26px; font-weight: 800; color: var(--text); line-height: 1.1; }
 .dash-sublabel{ font-size: 11px; color: var(--text-dim); margin-top: 3px; }
 
+/* ── KPI cards with icon badge ── */
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.kpi-card:hover { border-color: var(--border-med); box-shadow: var(--shadow-sm); }
+.kpi-card.accent-blue   { border-top: 2px solid var(--blue); }
+.kpi-card.accent-green  { border-top: 2px solid var(--success); }
+.kpi-card.accent-purple { border-top: 2px solid var(--purple); }
+.kpi-card.accent-amber  { border-top: 2px solid var(--warning); }
+.kpi-card.accent-cyan   { border-top: 2px solid var(--cyan); }
+.kpi-card.roi-card      { border-top: 2px solid var(--purple); background: linear-gradient(135deg, var(--surface) 0%, rgba(124,58,237,.07) 100%); }
+.kpi-top {
+  display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px;
+}
+.kpi-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; flex-shrink: 0;
+}
+.kpi-icon.blue   { background: rgba(59,130,246,.15); }
+.kpi-icon.green  { background: rgba(16,185,129,.15); }
+.kpi-icon.purple { background: rgba(124,58,237,.18); }
+.kpi-icon.amber  { background: rgba(245,158,11,.15); }
+.kpi-icon.cyan   { background: rgba(6,182,212,.15); }
+.kpi-trend {
+  font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 20px;
+}
+.kpi-trend.up    { background: var(--success-bg); color: #6ee7b7; }
+.kpi-trend.down  { background: var(--danger-bg);  color: #fca5a5; }
+.kpi-trend.flat  { background: var(--surface-3);  color: var(--text-dim); }
+.kpi-label  { font-size: 11px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+.kpi-value  { font-size: 30px; font-weight: 800; color: var(--text); line-height: 1.1; }
+.kpi-helper { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+/* ── Dashboard section header ── */
+.dash-section-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; margin-top: 24px;
+}
+.dash-section-hdr:first-child { margin-top: 0; }
+.dash-section-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--text-dim);
+}
+
+/* ── Dashboard page header ── */
+.dash-page-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px; gap: 12px; flex-wrap: wrap;
+}
+.dash-page-title { font-size: 18px; font-weight: 700; color: var(--text); }
+.dash-page-sub   { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.dash-quick-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+}
+.status-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.7; }
+.status-pill.ok      { background: var(--success-bg); color: #6ee7b7; }
+.status-pill.warn    { background: var(--warning-bg); color: #fcd34d; }
+.status-pill.err     { background: var(--danger-bg);  color: #fca5a5; }
+.status-pill.gray    { background: var(--surface-3);  color: var(--text-muted); }
+
+/* ── Empty state ── */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 36px 20px; gap: 10px; text-align: center;
+}
+.empty-state-icon  { font-size: 28px; opacity: 0.35; }
+.empty-state-title { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.empty-state-sub   { font-size: 12px; color: var(--text-dim); max-width: 260px; line-height: 1.5; }
+
+/* ── Dashboard two-column layout ── */
+.dash-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 800px) { .dash-two-col { grid-template-columns: 1fr; } }
+
+/* ── Dispatch range chip group ── */
+.range-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.range-chip {
+  padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  cursor: pointer; border: 1px solid var(--border-med);
+  color: var(--text-muted); background: var(--surface-2);
+  transition: all 0.12s; user-select: none;
+}
+.range-chip:hover { background: var(--surface-3); color: var(--text); }
+.range-chip.active { background: var(--purple-glow); border-color: rgba(124,58,237,.4); color: #c084fc; }
+
 /* ── Customer dashboard ── */
 .cust-hero {
   background: linear-gradient(135deg, #1a1040 0%, #2d1b69 50%, #1e3a80 100%);
@@ -351,12 +449,8 @@ body {
   transition: border-color 0.15s;
 }
 .cust-card:hover { border-color: var(--border-med); }
-.cust-card.accent-green  { border-left: 3px solid var(--success); }
-.cust-card.accent-blue   { border-left: 3px solid var(--blue); }
-.cust-card.accent-amber  { border-left: 3px solid var(--warning); }
-.cust-card.accent-purple { border-left: 3px solid var(--purple); }
 .cust-big-num   { font-size: 34px; font-weight: 800; color: var(--text); line-height: 1; margin: 6px 0 4px; }
-.cust-num-label { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+.cust-num-label { font-size: 11px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
 .cust-num-sub   { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
 .cust-pill {
   display: inline-flex; align-items: center; gap: 4px;
@@ -369,12 +463,12 @@ body {
 .cust-pill.blue   { background: var(--blue-glow);  color: var(--blue-light); }
 .cust-activity-row {
   display: flex; align-items: center; gap: 10px;
-  padding: 8px 0; border-bottom: 1px solid var(--border);
+  padding: 9px 0; border-bottom: 1px solid var(--border);
   font-size: 12px;
 }
 .cust-activity-row:last-child { border-bottom: none; }
-.cust-activity-type { font-weight: 600; color: var(--text); min-width: 100px; }
-.cust-activity-time { font-size: 11px; color: var(--text-dim); margin-left: auto; white-space: nowrap; }
+.cust-activity-type { font-weight: 600; color: var(--text); min-width: 110px; }
+.cust-activity-time { font-size: 11px; color: var(--text-dim); margin-left: auto; white-space: nowrap; flex-shrink: 0; }
 
 /* ═══════════════════════════════════════════════════════
    TABLES
@@ -652,194 +746,310 @@ label { color: var(--text-muted); }
 <div id="viewDash" style="display:none; overflow-y:auto; flex:1;">
 
   <!-- ─── CUSTOMER DASHBOARD ─── -->
-  <div id="custDash" style="display:none; padding:28px 32px; max-width:900px; margin:0 auto;">
+  <div id="custDash" style="display:none; padding:28px 32px; max-width:960px; margin:0 auto;">
 
     <!-- Hero -->
     <div class="cust-hero">
       <div>
-        <h1>Välkommen tillbaka 👋</h1>
-        <p>Din automation hanterar ärenden i bakgrunden – här är läget just nu.</p>
-      </div>
-      <div style="text-align:right;">
+        <h1>Välkommen tillbaka</h1>
+        <p>Din automation arbetar i bakgrunden – här är läget just nu.</p>
         <div class="hero-date" id="custHeroDate"></div>
-        <button class="btn btn-sm" style="margin-top:8px; background:rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.3);" onclick="loadDashboard()">↻ Uppdatera</button>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+        <span id="custOverallStatus" class="status-pill gray">Laddar…</span>
+        <button class="btn btn-sm" style="background:rgba(255,255,255,.12); color:rgba(255,255,255,.85); border:1px solid rgba(255,255,255,.2);" onclick="loadDashboard()">↻ Uppdatera</button>
       </div>
     </div>
 
-    <!-- ROI highlight row -->
-    <div class="cust-section-label">Sparad tid &amp; värde — idag</div>
-    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; margin-bottom:32px;">
-      <div class="cust-card accent-blue">
-        <div class="cust-num-label">Sparad tid</div>
-        <div class="cust-big-num" id="cRoiHours">–</div>
-        <div class="cust-num-sub">timmar automatiserat idag</div>
+    <!-- KPI row -->
+    <div class="dash-section-hdr">
+      <span class="dash-section-title">Idag</span>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:28px;">
+      <div class="kpi-card accent-blue">
+        <div class="kpi-top">
+          <div class="kpi-icon blue">⏱</div>
+        </div>
+        <div class="kpi-label">Sparad tid</div>
+        <div class="kpi-value" id="cRoiHours">–</div>
+        <div class="kpi-helper">timmar automatiserade idag</div>
       </div>
-      <div class="cust-card accent-green">
-        <div class="cust-num-label">Uppskattat värde</div>
-        <div class="cust-big-num" style="font-size:26px;" id="cRoiValue">–</div>
-        <div class="cust-num-sub">SEK sparad tid</div>
+      <div class="kpi-card accent-green">
+        <div class="kpi-top">
+          <div class="kpi-icon green">✦</div>
+        </div>
+        <div class="kpi-label">Uppskattat värde</div>
+        <div class="kpi-value" style="font-size:22px;" id="cRoiValue">–</div>
+        <div class="kpi-helper">SEK sparad tid</div>
       </div>
-      <div class="cust-card accent-purple">
-        <div class="cust-num-label">Ärenden klara idag</div>
-        <div class="cust-big-num" id="cCompleted">–</div>
-        <div class="cust-num-sub">slutförda automatiskt</div>
+      <div class="kpi-card accent-purple">
+        <div class="kpi-top">
+          <div class="kpi-icon purple">◎</div>
+        </div>
+        <div class="kpi-label">Ärenden klara</div>
+        <div class="kpi-value" id="cCompleted">–</div>
+        <div class="kpi-helper">slutförda automatiskt</div>
       </div>
-      <div class="cust-card accent-amber">
-        <div class="cust-num-label">Väntar på åtgärd</div>
-        <div class="cust-big-num" id="cWaiting">–</div>
-        <div class="cust-num-sub">kräver uppmärksamhet</div>
+      <div class="kpi-card accent-amber">
+        <div class="kpi-top">
+          <div class="kpi-icon amber">⚑</div>
+        </div>
+        <div class="kpi-label">Väntar på åtgärd</div>
+        <div class="kpi-value" id="cWaiting">–</div>
+        <div class="kpi-helper">kräver uppmärksamhet</div>
       </div>
     </div>
 
-    <!-- Automation + cases summary row -->
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:32px;">
-      <!-- Automation health -->
+    <!-- Middle row: health + cases summary -->
+    <div class="dash-two-col" style="margin-bottom:28px;">
+      <!-- Integration health -->
       <div class="cust-card">
-        <div class="cust-num-label" style="margin-bottom:12px;">Automationsstatus</div>
-        <div id="custHealthContent"><span style="color:#9ca3af; font-size:12px;">Laddar…</span></div>
+        <div class="cust-section-label" style="margin-bottom:14px;">Integrationsstatus</div>
+        <div id="custHealthContent">
+          <div class="empty-state" style="padding:16px 0;">
+            <div class="empty-state-icon">◌</div>
+            <div class="empty-state-title">Laddar…</div>
+          </div>
+        </div>
       </div>
       <!-- Cases summary -->
       <div class="cust-card">
-        <div class="cust-num-label" style="margin-bottom:12px;">Ärendeöversikt — idag</div>
-        <div style="display:flex; flex-direction:column; gap:8px;" id="custCasesSummary">
-          <div style="display:flex; justify-content:space-between; font-size:13px;">
-            <span style="color:#6b7280;">Leads</span><span id="cLeads" style="font-weight:700;">–</span>
+        <div class="cust-section-label" style="margin-bottom:14px;">Ärendeöversikt — idag</div>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);">
+            <span style="font-size:12px; color:var(--text-muted);">Leads</span>
+            <span id="cLeads" style="font-weight:700; font-size:14px; color:var(--text);">–</span>
           </div>
-          <div style="display:flex; justify-content:space-between; font-size:13px;">
-            <span style="color:#6b7280;">Supportärenden</span><span id="cInquiries" style="font-weight:700;">–</span>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);">
+            <span style="font-size:12px; color:var(--text-muted);">Supportärenden</span>
+            <span id="cInquiries" style="font-weight:700; font-size:14px; color:var(--text);">–</span>
           </div>
-          <div style="display:flex; justify-content:space-between; font-size:13px;">
-            <span style="color:#6b7280;">Fakturor</span><span id="cInvoices" style="font-weight:700;">–</span>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);">
+            <span style="font-size:12px; color:var(--text-muted);">Fakturor</span>
+            <span id="cInvoices" style="font-weight:700; font-size:14px; color:var(--text);">–</span>
           </div>
-          <div style="border-top:1px solid #f3f4f6; padding-top:8px; display:flex; justify-content:space-between; font-size:13px;">
-            <span style="color:#374151; font-weight:600;">Redo att hantera</span><span id="cReady" style="font-weight:700; color:#16a34a;">–</span>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0;">
+            <span style="font-size:12px; font-weight:600; color:var(--text);">Redo att hantera</span>
+            <span id="cReady" style="font-weight:800; font-size:15px; color:var(--success);">–</span>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Recent activity -->
-    <div class="cust-section-label">Senaste aktivitet</div>
+    <div class="dash-section-hdr">
+      <span class="dash-section-title">Senaste aktivitet</span>
+      <a href="#" onclick="switchView('cases'); return false;" style="font-size:11px; color:var(--purple-light); text-decoration:none;">Visa alla →</a>
+    </div>
     <div class="cust-card" style="margin-bottom:0;">
-      <div id="custActivity"><span style="color:#9ca3af; font-size:12px;">Laddar…</span></div>
+      <div id="custActivity">
+        <div class="empty-state" style="padding:16px 0;">
+          <div class="empty-state-icon">◌</div>
+          <div class="empty-state-title">Laddar…</div>
+        </div>
+      </div>
     </div>
 
   </div>
 
   <!-- ─── ADMIN DASHBOARD ─── -->
-  <div id="adminDash" style="display:none; padding:24px;">
+  <div id="adminDash" style="display:none; padding:24px; max-width:1200px;">
 
-  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
-    <h1 style="font-size:18px; font-weight:700; color:#111; margin:0;">Dashboard</h1>
-    <button class="btn btn-primary btn-sm" onclick="loadDashboard()">Uppdatera</button>
+  <!-- Page header -->
+  <div class="dash-page-hdr">
+    <div>
+      <div class="dash-page-title">Driftöversikt</div>
+      <div class="dash-page-sub" id="adminDashSubtitle">Idag</div>
+    </div>
+    <div class="dash-quick-actions">
+      <span id="adminHealthPill" class="status-pill gray">–</span>
+      <button class="btn btn-neutral btn-sm" onclick="loadDashboard()">↻ Uppdatera</button>
+    </div>
   </div>
 
   <div id="dashError" class="msg msg-error" style="display:none;"></div>
 
-  <!-- Summary cards -->
-  <div id="dashCards" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin-bottom:28px;">
-    <div class="dash-card"><div class="dash-label">Leads idag</div><div class="dash-value" id="dLeadsToday">–</div></div>
-    <div class="dash-card"><div class="dash-label">Supportärenden idag</div><div class="dash-value" id="dInquiriesToday">–</div></div>
-    <div class="dash-card"><div class="dash-label">Fakturor idag</div><div class="dash-value" id="dInvoicesToday">–</div></div>
-    <div class="dash-card"><div class="dash-label">Väntar på kund</div><div class="dash-value" id="dWaiting">–</div></div>
-    <div class="dash-card"><div class="dash-label">Redo</div><div class="dash-value" id="dReady">–</div></div>
-    <div class="dash-card"><div class="dash-label">Klara idag</div><div class="dash-value" id="dCompleted">–</div></div>
+  <!-- Top KPI row: 4 cards -->
+  <div class="dash-section-hdr">
+    <span class="dash-section-title">Jobb idag</span>
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:28px;">
+    <div class="kpi-card accent-blue">
+      <div class="kpi-top"><div class="kpi-icon blue">◈</div></div>
+      <div class="kpi-label">Leads</div>
+      <div class="kpi-value" id="dLeadsToday">–</div>
+      <div class="kpi-helper">inkommer idag</div>
+    </div>
+    <div class="kpi-card accent-cyan">
+      <div class="kpi-top"><div class="kpi-icon cyan">◫</div></div>
+      <div class="kpi-label">Supportärenden</div>
+      <div class="kpi-value" id="dInquiriesToday">–</div>
+      <div class="kpi-helper">inkommer idag</div>
+    </div>
+    <div class="kpi-card accent-purple">
+      <div class="kpi-top"><div class="kpi-icon purple">◎</div></div>
+      <div class="kpi-label">Klara idag</div>
+      <div class="kpi-value" id="dCompleted">–</div>
+      <div class="kpi-helper">slutförda automatiskt</div>
+    </div>
+    <div class="kpi-card accent-amber">
+      <div class="kpi-top"><div class="kpi-icon amber">⚑</div></div>
+      <div class="kpi-label">Inväntar åtgärd</div>
+      <div class="kpi-value" id="dWaiting">–</div>
+      <div class="kpi-helper">väntar på kund</div>
+    </div>
   </div>
 
-  <!-- ROI section -->
-  <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Sparad tid &amp; värde (idag)</h2>
-  <div id="roiError" class="msg msg-error" style="display:none;"></div>
-  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin-bottom:16px;">
-    <div class="dash-card roi-highlight"><div class="dash-label">Sparad tid</div><div class="dash-value" id="rHours">–</div><div class="dash-sublabel">timmar</div></div>
-    <div class="dash-card roi-highlight"><div class="dash-label">Uppskattat värde</div><div class="dash-value" id="rValue">–</div><div class="dash-sublabel">SEK</div></div>
-    <div class="dash-card"><div class="dash-label">Leads skapade</div><div class="dash-value" id="rLeads">–</div></div>
-    <div class="dash-card"><div class="dash-label">Supportärenden hanterade</div><div class="dash-value" id="rSupport">–</div></div>
-    <div class="dash-card"><div class="dash-label">Fakturor sorterade</div><div class="dash-value" id="rInvoices">–</div></div>
-    <div class="dash-card"><div class="dash-label">Uppföljningar skickade</div><div class="dash-value" id="rFollowups">–</div></div>
+  <!-- ROI + dispatch in two-col -->
+  <div class="dash-section-hdr">
+    <span class="dash-section-title">ROI &amp; Automation</span>
   </div>
-  <details style="margin-bottom:24px;">
-    <summary style="font-size:11px; color:#9ca3af; cursor:pointer;">Antaganden</summary>
-    <div id="roiAssumptions" style="font-size:11px; color:#6b7280; margin-top:6px; line-height:1.8;"></div>
-  </details>
+  <div class="dash-two-col" style="margin-bottom:28px;">
+    <!-- ROI panel -->
+    <div class="kpi-card roi-card">
+      <div class="kpi-label" style="margin-bottom:12px;">Sparad tid &amp; värde — idag</div>
+      <div id="roiError" class="msg msg-error" style="display:none; margin-bottom:8px;"></div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+        <div>
+          <div class="kpi-label">Sparad tid</div>
+          <div style="font-size:28px; font-weight:800; color:var(--text);" id="rHours">–</div>
+          <div class="kpi-helper">timmar</div>
+        </div>
+        <div>
+          <div class="kpi-label">Värde</div>
+          <div style="font-size:20px; font-weight:800; color:var(--purple-light);" id="rValue">–</div>
+          <div class="kpi-helper">SEK</div>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding-top:12px; border-top:1px solid var(--border);">
+        <div style="text-align:center;">
+          <div class="kpi-label">Leads</div>
+          <div style="font-size:16px; font-weight:700; color:var(--text);" id="rLeads">–</div>
+        </div>
+        <div style="text-align:center;">
+          <div class="kpi-label">Support</div>
+          <div style="font-size:16px; font-weight:700; color:var(--text);" id="rSupport">–</div>
+        </div>
+        <div style="text-align:center;">
+          <div class="kpi-label">Fakturor</div>
+          <div style="font-size:16px; font-weight:700; color:var(--text);" id="rInvoices">–</div>
+        </div>
+      </div>
+      <details style="margin-top:12px;">
+        <summary style="font-size:11px; color:var(--text-dim); cursor:pointer;">Antaganden</summary>
+        <div id="roiAssumptions" style="font-size:11px; color:var(--text-dim); margin-top:6px; line-height:1.8;"></div>
+      </details>
+    </div>
+
+    <!-- ROI report -->
+    <div class="dash-card" style="display:flex; flex-direction:column; gap:14px;">
+      <div class="kpi-label">ROI Rapport</div>
+      <div id="reportError" class="msg msg-error" style="display:none;"></div>
+      <div id="reportMessage" style="font-size:12px; color:var(--text-muted); background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; display:none;"></div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div class="dash-card" style="padding:12px 14px;">
+          <div class="dash-label">Slutförda</div>
+          <div class="dash-value" id="rpTotal">–</div>
+        </div>
+        <div class="dash-card" style="padding:12px 14px;">
+          <div class="dash-label">Sparad tid</div>
+          <div class="dash-value" id="rpHours">–</div>
+          <div class="dash-sublabel">timmar</div>
+        </div>
+        <div class="dash-card" style="padding:12px 14px;">
+          <div class="dash-label">Lyckandegrad</div>
+          <div class="dash-value" id="rpSuccess" style="color:var(--success);">–</div>
+          <div class="dash-sublabel">%</div>
+        </div>
+        <div class="dash-card" style="padding:12px 14px;">
+          <div class="dash-label">Automationsgrad</div>
+          <div class="dash-value" id="rpAuto" style="color:var(--blue-light);">–</div>
+          <div class="dash-sublabel">%</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Dispatch observability -->
-  <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px;">
-    <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin:0;">Dispatchöversikt</h2>
-    <div style="display:flex; gap:6px; flex-wrap:wrap;" id="dsRangeButtons">
-      <button class="btn btn-sm" id="dsBtn-today" onclick="setDispatchRange('today')">Idag</button>
-      <button class="btn btn-sm" id="dsBtn-7d"    onclick="setDispatchRange('7d')">7 dagar</button>
-      <button class="btn btn-sm btn-primary" id="dsBtn-30d" onclick="setDispatchRange('30d')">30 dagar</button>
-      <button class="btn btn-sm" id="dsBtn-all"   onclick="setDispatchRange('all')">All tid</button>
+  <div class="dash-section-hdr">
+    <span class="dash-section-title">Dispatchöversikt</span>
+    <div class="range-chips" id="dsRangeButtons">
+      <span class="range-chip" id="dsBtn-today" onclick="setDispatchRange('today')">Idag</span>
+      <span class="range-chip" id="dsBtn-7d"    onclick="setDispatchRange('7d')">7 dagar</span>
+      <span class="range-chip active" id="dsBtn-30d" onclick="setDispatchRange('30d')">30 dagar</span>
+      <span class="range-chip" id="dsBtn-all"   onclick="setDispatchRange('all')">All tid</span>
     </div>
-    <span id="dsRangeLabel" style="font-size:11px; color:#6b7280;"></span>
   </div>
   <div id="dispatchSummaryError" class="msg msg-error" style="display:none;"></div>
-  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; margin-bottom:12px;">
-    <div class="dash-card"><div class="dash-label">Totalt skickade</div><div class="dash-value" id="dsTotal">–</div></div>
-    <div class="dash-card"><div class="dash-label">Lyckade</div><div class="dash-value" id="dsSuccess" style="color:#16a34a;">–</div></div>
-    <div class="dash-card"><div class="dash-label">Misslyckade</div><div class="dash-value" id="dsFailed" style="color:#dc2626;">–</div></div>
-    <div class="dash-card"><div class="dash-label">Överhoppade</div><div class="dash-value" id="dsSkipped" style="color:#92400e;">–</div></div>
-    <div class="dash-card roi-highlight"><div class="dash-label">Uppskattad tid sparad</div><div class="dash-value" id="dsMinutes">–</div><div class="dash-sublabel">minuter</div></div>
+  <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:12px;">
+    <div class="kpi-card"><div class="kpi-label">Totalt</div><div class="kpi-value" style="font-size:22px;" id="dsTotal">–</div></div>
+    <div class="kpi-card accent-green"><div class="kpi-label">Lyckade</div><div class="kpi-value" style="font-size:22px; color:var(--success);" id="dsSuccess">–</div></div>
+    <div class="kpi-card accent-amber"><div class="kpi-label">Misslyckade</div><div class="kpi-value" style="font-size:22px; color:var(--danger);" id="dsFailed">–</div></div>
+    <div class="kpi-card"><div class="kpi-label">Överhoppade</div><div class="kpi-value" style="font-size:22px; color:var(--text-muted);" id="dsSkipped">–</div></div>
+    <div class="kpi-card roi-card"><div class="kpi-label">Tid sparad</div><div class="kpi-value" style="font-size:22px;" id="dsMinutes">–</div><div class="kpi-helper">minuter</div></div>
   </div>
-  <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:12px; font-size:12px;">
-    <div class="dash-card"><div class="dash-label">Automatiska</div><div class="dash-value" id="dsModeAuto" style="font-size:16px;">–</div></div>
-    <div class="dash-card"><div class="dash-label">Manuella</div><div class="dash-value" id="dsModeManual" style="font-size:16px;">–</div></div>
-    <div class="dash-card"><div class="dash-label">Via godkännande</div><div class="dash-value" id="dsModeApproval" style="font-size:16px;">–</div></div>
+  <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:14px;">
+    <div class="dash-card" style="padding:12px 14px;"><div class="dash-label">Automatiska</div><div class="dash-value" id="dsModeAuto" style="font-size:18px;">–</div></div>
+    <div class="dash-card" style="padding:12px 14px;"><div class="dash-label">Manuella</div><div class="dash-value" id="dsModeManual" style="font-size:18px;">–</div></div>
+    <div class="dash-card" style="padding:12px 14px;"><div class="dash-label">Via godkännande</div><div class="dash-value" id="dsModeApproval" style="font-size:18px;">–</div></div>
   </div>
-  <div id="dsRecent" style="margin-bottom:24px;"><span class="empty">Laddar…</span></div>
+  <div id="dsRecent" style="margin-bottom:28px;"></div>
 
-  <!-- ROI Report (customer-facing) -->
-  <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">ROI Rapport</h2>
-  <div id="reportError" class="msg msg-error" style="display:none;"></div>
-  <div id="reportMessage" style="font-size:13px; color:#374151; background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:10px 14px; margin-bottom:12px; display:none;"></div>
-  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin-bottom:24px;">
-    <div class="dash-card roi-highlight"><div class="dash-label">Slutförda dispatches</div><div class="dash-value" id="rpTotal">–</div></div>
-    <div class="dash-card roi-highlight"><div class="dash-label">Sparad tid</div><div class="dash-value" id="rpHours">–</div><div class="dash-sublabel">timmar</div></div>
-    <div class="dash-card"><div class="dash-label">Lyckandegrad</div><div class="dash-value" id="rpSuccess" style="color:#16a34a;">–</div><div class="dash-sublabel">%</div></div>
-    <div class="dash-card"><div class="dash-label">Automationsgrad</div><div class="dash-value" id="rpAuto" style="color:#2563eb;">–</div><div class="dash-sublabel">%</div></div>
+  <!-- Integration health + Pilot readiness -->
+  <div class="dash-two-col" style="margin-bottom:28px;">
+    <!-- Integration health -->
+    <div>
+      <div class="dash-section-hdr"><span class="dash-section-title">Integrationshälsa</span></div>
+      <div id="healthError" class="msg msg-error" style="display:none; margin-bottom:8px;"></div>
+      <div style="display:flex; flex-direction:column; gap:10px;" id="healthCards">
+        <div class="dash-card" style="padding:12px 16px;">
+          <div class="dash-label">Övergripande status</div>
+          <div class="dash-value" id="healthOverall" style="font-size:16px;">–</div>
+        </div>
+        <div class="dash-card" style="padding:12px 16px;">
+          <div class="dash-label">Gmail</div>
+          <div class="dash-value" id="healthGmail" style="font-size:15px;">–</div>
+          <div class="dash-sublabel" id="healthGmailAction"></div>
+        </div>
+        <div class="dash-card" style="padding:12px 16px;">
+          <div class="dash-label">Monday</div>
+          <div class="dash-value" id="healthMonday" style="font-size:15px;">–</div>
+          <div class="dash-sublabel" id="healthMondayAction"></div>
+        </div>
+      </div>
+      <div id="healthRecentErrors" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- Pilot readiness -->
+    <div>
+      <div class="dash-section-hdr">
+        <span class="dash-section-title">Pilotberedskap</span>
+        <button class="btn btn-neutral btn-sm" onclick="loadPilotReadiness()">↻</button>
+      </div>
+      <div id="pilotError" class="msg msg-error" style="display:none; margin-bottom:8px;"></div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+        <div class="dash-card" style="padding:12px 16px;">
+          <div class="dash-label">Status</div>
+          <div class="dash-value" id="pilotOverall" style="font-size:16px;">–</div>
+        </div>
+        <div class="dash-card" style="padding:12px 16px;">
+          <div class="dash-label">Godkänt / Varningar / Fel</div>
+          <div class="dash-value" id="pilotScore" style="font-size:14px;">–</div>
+        </div>
+      </div>
+      <div id="pilotChecks"></div>
+    </div>
   </div>
 
-  <!-- Integration health -->
-  <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Integrationshälsa</h2>
-  <div id="healthError" class="msg msg-error" style="display:none;"></div>
-  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; margin-bottom:24px;" id="healthCards">
-    <div class="dash-card">
-      <div class="dash-label">Övergripande status</div>
-      <div class="dash-value" id="healthOverall" style="font-size:16px;">–</div>
-    </div>
-    <div class="dash-card">
-      <div class="dash-label">Gmail</div>
-      <div class="dash-value" id="healthGmail" style="font-size:15px;">–</div>
-      <div class="dash-sublabel" id="healthGmailAction" style="color:#6b7280; margin-top:4px;"></div>
-    </div>
-    <div class="dash-card">
-      <div class="dash-label">Monday</div>
-      <div class="dash-value" id="healthMonday" style="font-size:15px;">–</div>
-      <div class="dash-sublabel" id="healthMondayAction" style="color:#6b7280; margin-top:4px;"></div>
-    </div>
+  <!-- Recent activity -->
+  <div class="dash-section-hdr">
+    <span class="dash-section-title">Senaste aktivitet</span>
   </div>
-  <div id="healthRecentErrors" style="margin-bottom:24px;"></div>
-
-  <!-- Pilot readiness -->
-  <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Pilotberedskap</h2>
-  <div id="pilotError" class="msg msg-error" style="display:none;"></div>
-  <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-    <div class="dash-card" style="flex:0 0 auto; min-width:160px;">
-      <div class="dash-label">Status</div>
-      <div class="dash-value" id="pilotOverall" style="font-size:16px;">–</div>
-    </div>
-    <div class="dash-card" style="flex:0 0 auto; min-width:160px;">
-      <div class="dash-label">Godkänt / Varningar / Fel</div>
-      <div class="dash-value" id="pilotScore" style="font-size:14px;">–</div>
-    </div>
-    <button class="btn btn-neutral btn-sm" onclick="loadPilotReadiness()" style="align-self:flex-start;">Uppdatera</button>
-  </div>
-  <div id="pilotChecks" style="margin-bottom:24px;"></div>
-
-  <!-- Recent activity table -->
-  <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6b7280; margin-bottom:10px;">Senaste aktivitet</h2>
   <div id="dashActivity">
-    <span class="empty">Laddar…</span>
+    <div class="empty-state">
+      <div class="empty-state-icon">◌</div>
+      <div class="empty-state-title">Laddar aktivitet…</div>
+    </div>
   </div>
 
   </div><!-- /#adminDash -->
@@ -1746,6 +1956,13 @@ async function loadDashboard() {
 }
 
 async function _loadCustomerDashboard() {
+  const HEALTH_MAP  = { healthy: ['green','Aktiv'], warning: ['amber','Varning'], error: ['red','Fel'], not_configured: ['gray','Ej konfigurerad'] };
+  const STATUS_PILLS = {
+    completed: ['green','Klar'], failed: ['red','Misslyckad'],
+    awaiting_approval: ['amber','Inväntar'], processing: ['blue','Bearbetar'],
+  };
+  const TYPE_LABELS = { lead:'Lead', customer_inquiry:'Supportärende', invoice:'Faktura', unknown:'Okänd' };
+
   // Hero date
   const dateEl = document.getElementById('custHeroDate');
   if (dateEl) dateEl.textContent = new Date().toLocaleDateString('sv-SE', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
@@ -1769,29 +1986,49 @@ async function _loadCustomerDashboard() {
     document.getElementById('cWaiting').textContent   = s.waiting_customer ?? '–';
   } catch (_) {}
 
-  // Integration health → automation status card
+  // Integration health → status card + hero pill
   try {
     const h = await apiFetch('/integrations/health');
-    const statusMap = { healthy: ['green','Aktiv'], warning: ['amber','Varning'], error: ['red','Fel'], not_configured: ['gray','Ej konfigurerad'] };
     const systems = Object.entries(h.systems || {});
-    const rows = systems.map(([key, info]) => {
-      const [cls, label] = statusMap[info.status] || ['gray', info.status];
-      const name = { gmail: 'Gmail', monday: 'Monday', fortnox: 'Fortnox' }[key] || key;
-      return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f3f4f6;">
-        <span style="font-size:13px; color:#374151; font-weight:500;">${escapeHtml(name)}</span>
-        <span class="cust-pill ${cls}">${escapeHtml(label)}</span>
-      </div>`;
-    }).join('');
     const overall = h.overall_status || 'unknown';
-    const [oCls, oLabel] = statusMap[overall] || ['gray', overall];
-    document.getElementById('custHealthContent').innerHTML =
-      `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <span style="font-size:12px; font-weight:600; color:#374151;">Övergripande</span>
-        <span class="cust-pill ${oCls}">${escapeHtml(oLabel)}</span>
-      </div>
-      ${rows || '<span style="color:#9ca3af; font-size:12px;">Inga integrationer konfigurerade.</span>'}`;
+    const [oCls, oLabel] = HEALTH_MAP[overall] || ['gray', overall];
+
+    // Hero status pill
+    const pill = document.getElementById('custOverallStatus');
+    if (pill) {
+      const pillClass = { healthy:'ok', warning:'warn', error:'err', not_configured:'gray' }[overall] || 'gray';
+      pill.className = `status-pill ${pillClass}`;
+      pill.textContent = oLabel;
+    }
+
+    if (systems.length === 0) {
+      document.getElementById('custHealthContent').innerHTML =
+        `<div class="empty-state" style="padding:16px 0;">
+          <div class="empty-state-icon">◌</div>
+          <div class="empty-state-title">Inga integrationer konfigurerade</div>
+          <div class="empty-state-sub">Konfigurera Gmail eller Monday i inställningarna.</div>
+        </div>`;
+    } else {
+      const rows = systems.map(([key, info]) => {
+        const [cls, label] = HEALTH_MAP[info.status] || ['gray', info.status];
+        const name = { gmail: 'Gmail', monday: 'Monday', fortnox: 'Fortnox' }[key] || key;
+        return `<div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border);">
+          <span style="font-size:13px; color:var(--text); font-weight:500;">${escapeHtml(name)}</span>
+          <span class="cust-pill ${cls}">${escapeHtml(label)}</span>
+        </div>`;
+      }).join('');
+      document.getElementById('custHealthContent').innerHTML =
+        `<div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:10px; margin-bottom:4px; border-bottom:1px solid var(--border-med);">
+          <span style="font-size:12px; font-weight:600; color:var(--text-muted);">Övergripande</span>
+          <span class="cust-pill ${oCls}">${escapeHtml(oLabel)}</span>
+        </div>${rows}`;
+    }
   } catch (_) {
-    document.getElementById('custHealthContent').innerHTML = '<span style="color:#9ca3af; font-size:12px;">Kunde inte ladda status.</span>';
+    document.getElementById('custHealthContent').innerHTML =
+      `<div class="empty-state" style="padding:16px 0;">
+        <div class="empty-state-icon">⚠</div>
+        <div class="empty-state-title">Kunde inte ladda status</div>
+      </div>`;
   }
 
   // Recent activity
@@ -1799,33 +2036,41 @@ async function _loadCustomerDashboard() {
   try {
     const r = await apiFetch('/dashboard/activity?limit=8');
     if (!r.items || r.items.length === 0) {
-      actEl.innerHTML = '<span style="color:#9ca3af; font-size:12px;">Ingen aktivitet ännu.</span>';
+      actEl.innerHTML =
+        `<div class="empty-state">
+          <div class="empty-state-icon">◌</div>
+          <div class="empty-state-title">Ingen aktivitet ännu</div>
+          <div class="empty-state-sub">Jobb du skickar in visas här när de behandlas.</div>
+        </div>`;
       return;
     }
-    const TYPE_LABELS = { lead:'Lead', customer_inquiry:'Supportärende', invoice:'Faktura', unknown:'Okänd' };
-    const STATUS_PILLS = {
-      completed: ['green','Klar'], failed: ['red','Misslyckad'],
-      awaiting_approval: ['amber','Inväntar'], processing: ['blue','Bearbetar'],
-    };
     actEl.innerHTML = r.items.map(item => {
       const type = TYPE_LABELS[item.type] || (item.type || '–');
       const ts   = item.created_at ? new Date(item.created_at).toLocaleString('sv-SE', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '–';
       const [pillCls, pillLabel] = STATUS_PILLS[item.status] || ['gray', item.status || '–'];
-      const subject = item.subject ? escapeHtml(item.subject).substring(0,48) : '';
+      const subject = item.subject ? escapeHtml(item.subject).substring(0,50) : '';
       return `<div class="cust-activity-row">
         <span class="cust-activity-type">${escapeHtml(type)}</span>
-        ${subject ? `<span style="color:#6b7280; font-size:12px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${subject}</span>` : '<span style="flex:1;"></span>'}
+        ${subject ? `<span style="color:var(--text-muted); font-size:12px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${subject}</span>` : '<span style="flex:1;"></span>'}
         <span class="cust-pill ${pillCls}" style="flex-shrink:0;">${escapeHtml(pillLabel)}</span>
         <span class="cust-activity-time">${ts}</span>
       </div>`;
     }).join('');
-  } catch (e) {
-    actEl.innerHTML = '<span style="color:#9ca3af; font-size:12px;">Kunde inte ladda aktivitet.</span>';
+  } catch (_) {
+    actEl.innerHTML =
+      `<div class="empty-state">
+        <div class="empty-state-icon">⚠</div>
+        <div class="empty-state-title">Kunde inte ladda aktivitet</div>
+      </div>`;
   }
 }
 
 async function _loadAdminDashboard() {
   document.getElementById('dashError').style.display = 'none';
+
+  // Update subtitle with today's date
+  const subEl = document.getElementById('adminDashSubtitle');
+  if (subEl) subEl.textContent = new Date().toLocaleDateString('sv-SE', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
   // ROI
   loadRoi();
@@ -1834,7 +2079,7 @@ async function _loadAdminDashboard() {
   loadDispatchSummary();
   loadDispatchReport();
 
-  // Integration health
+  // Integration health (also updates hero pill)
   loadIntegrationHealth();
 
   // Pilot readiness
@@ -1860,24 +2105,29 @@ async function _loadAdminDashboard() {
   try {
     const r = await apiFetch('/dashboard/activity?limit=50');
     if (!r.items || r.items.length === 0) {
-      actEl.innerHTML = '<span class="empty">Ingen aktivitet ännu.</span>';
+      actEl.innerHTML =
+        `<div class="empty-state">
+          <div class="empty-state-icon">◌</div>
+          <div class="empty-state-title">Ingen aktivitet ännu</div>
+          <div class="empty-state-sub">Jobb dyker upp här när de behandlas av plattformen.</div>
+        </div>`;
       return;
     }
     const TYPE_LABELS = {
       lead: 'Lead', customer_inquiry: 'Supportärende', invoice: 'Faktura', unknown: 'Okänd',
     };
     const rows = r.items.map(item => {
-      const type    = TYPE_LABELS[item.type] || escapeHtml(item.type);
-      const status  = item.status ? statusBadge(item.status) : '–';
-      const action  = item.latest_action ? escapeHtml(item.latest_action) : '–';
-      const prio    = item.priority ? escapeHtml(item.priority.toUpperCase()) : '–';
-      const ts      = item.created_at ? new Date(item.created_at).toLocaleString('sv-SE') : '–';
+      const type   = TYPE_LABELS[item.type] || escapeHtml(item.type);
+      const status = item.status ? statusBadge(item.status) : '–';
+      const action = item.latest_action ? escapeHtml(item.latest_action) : '–';
+      const prio   = item.priority ? escapeHtml(item.priority.toUpperCase()) : '–';
+      const ts     = item.created_at ? new Date(item.created_at).toLocaleString('sv-SE') : '–';
       return `<tr>
-        <td style="color:#888; white-space:nowrap">${ts}</td>
+        <td style="white-space:nowrap; color:var(--text-dim);">${ts}</td>
         <td>${escapeHtml(type)}</td>
         <td>${status}</td>
-        <td>${action}</td>
-        <td>${prio}</td>
+        <td style="color:var(--text-muted);">${action}</td>
+        <td style="color:var(--text-dim);">${prio}</td>
       </tr>`;
     }).join('');
     actEl.innerHTML = `
@@ -1887,9 +2137,14 @@ async function _loadAdminDashboard() {
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div style="font-size:11px; color:#9ca3af; margin-top:8px;">Visar ${r.items.length} av ${r.total} poster</div>`;
+      <div style="font-size:11px; color:var(--text-dim); margin-top:8px; padding:4px 10px;">Visar ${r.items.length} av ${r.total} poster</div>`;
   } catch (e) {
-    actEl.innerHTML = '<span class="empty" style="color:#991b1b;">Fel: ' + escapeHtml(e.message) + '</span>';
+    actEl.innerHTML =
+      `<div class="empty-state">
+        <div class="empty-state-icon">⚠</div>
+        <div class="empty-state-title">Kunde inte ladda aktivitet</div>
+        <div class="empty-state-sub">${escapeHtml(e.message)}</div>
+      </div>`;
   }
 }
 
@@ -1926,7 +2181,7 @@ function setDispatchRange(range) {
   _dsRange = range;
   ['today','7d','30d','all'].forEach(r => {
     const btn = document.getElementById('dsBtn-' + r);
-    if (btn) btn.className = 'btn btn-sm' + (r === range ? ' btn-primary' : '');
+    if (btn) btn.className = 'range-chip' + (r === range ? ' active' : '');
   });
   loadDispatchSummary();
   loadDispatchReport();
@@ -1952,18 +2207,23 @@ async function loadDispatchSummary() {
 
     const el = document.getElementById('dsRecent');
     if (!d.recent || d.recent.length === 0) {
-      el.innerHTML = '<span class="empty">Inga dispatches ännu.</span>';
+      el.innerHTML =
+        `<div class="empty-state">
+          <div class="empty-state-icon">◌</div>
+          <div class="empty-state-title">Inga dispatches ännu</div>
+          <div class="empty-state-sub">Dispatches visas när jobb skickas till externa system.</div>
+        </div>`;
       return;
     }
     const rows = d.recent.map(r => {
       const ts = r.created_at ? new Date(r.created_at).toLocaleString('sv-SE') : '–';
-      const extId = r.external_id ? `<span style="color:#6b7280; font-size:11px;">#${escapeHtml(String(r.external_id))}</span>` : '';
+      const extId = r.external_id ? `<span style="color:var(--text-dim); font-size:11px;">#${escapeHtml(String(r.external_id))}</span>` : '';
       return `<tr>
-        <td style="color:#888; white-space:nowrap; font-size:11px;">${ts}</td>
+        <td style="color:var(--text-dim); white-space:nowrap; font-size:11px;">${ts}</td>
         <td>${escapeHtml(r.job_type)}</td>
         <td>${escapeHtml(r.system)}</td>
         <td>${statusBadge(r.status)}</td>
-        <td style="font-size:11px; color:#6b7280;">${escapeHtml(r.mode)}</td>
+        <td style="font-size:11px; color:var(--text-muted);">${escapeHtml(r.mode)}</td>
         <td>${extId}</td>
       </tr>`;
     }).join('');
@@ -2002,25 +2262,31 @@ async function loadDispatchReport() {
 
 async function loadIntegrationHealth() {
   document.getElementById('healthError').style.display = 'none';
-  const _STATUS_ICON = { healthy: '✅ Frisk', warning: '⚠️ Varning', error: '❌ Fel', not_configured: '⚫ Ej konfigurerad' };
-  const _STATUS_COLOR = { healthy: '#16a34a', warning: '#d97706', error: '#dc2626', not_configured: '#9ca3af' };
+  const _STATUS_ICON  = { healthy: '✅ Frisk', warning: '⚠ Varning', error: '✕ Fel', not_configured: '○ Ej konfigurerad' };
+  const _STATUS_CSS   = { healthy: 'var(--success)', warning: 'var(--warning)', error: 'var(--danger)', not_configured: 'var(--text-dim)' };
+  const _PILL_CLASS   = { healthy: 'ok', warning: 'warn', error: 'err', not_configured: 'gray' };
   try {
     const h = await apiFetch('/integrations/health');
 
     const ov = h.overall_status || 'warning';
     const ovEl = document.getElementById('healthOverall');
-    ovEl.textContent = _STATUS_ICON[ov] || ov;
-    ovEl.style.color = _STATUS_COLOR[ov] || '#6b7280';
+    if (ovEl) { ovEl.textContent = _STATUS_ICON[ov] || ov; ovEl.style.color = _STATUS_CSS[ov] || 'var(--text-muted)'; }
+
+    // Update admin header health pill
+    const adminPill = document.getElementById('adminHealthPill');
+    if (adminPill) {
+      const pillMap = { healthy:'ok', warning:'warn', error:'err', not_configured:'gray' };
+      adminPill.className = 'status-pill ' + (pillMap[ov] || 'gray');
+      const labelMap = { healthy:'Aktiv', warning:'Varning', error:'Fel', not_configured:'Ej konfigurerad' };
+      adminPill.textContent = labelMap[ov] || ov;
+    }
 
     const sys = h.systems || {};
     for (const [name, idSuffix] of [['gmail', 'Gmail'], ['monday', 'Monday']]) {
       const s = sys[name] || {};
       const el = document.getElementById('health' + idSuffix);
       const act = document.getElementById('health' + idSuffix + 'Action');
-      if (el) {
-        el.textContent = _STATUS_ICON[s.status] || s.status || '–';
-        el.style.color = _STATUS_COLOR[s.status] || '#6b7280';
-      }
+      if (el) { el.textContent = _STATUS_ICON[s.status] || s.status || '–'; el.style.color = _STATUS_CSS[s.status] || 'var(--text-muted)'; }
       if (act) act.textContent = s.recommended_action || '';
     }
 
@@ -2032,12 +2298,13 @@ async function loadIntegrationHealth() {
       const rows = errors.map(e => {
         const ts = e.created_at ? new Date(e.created_at).toLocaleString('sv-SE') : '–';
         return `<tr>
-          <td style="color:#888; font-size:11px; white-space:nowrap;">${ts}</td>
+          <td style="color:var(--text-dim); font-size:11px; white-space:nowrap;">${ts}</td>
           <td>${escapeHtml(e.category || '')}</td>
           <td>${escapeHtml(e.action || '')}</td>
         </tr>`;
       }).join('');
-      errEl.innerHTML = `<div style="font-size:11px; font-weight:600; color:#dc2626; margin-bottom:6px;">Senaste fel (${errors.length})</div>
+      errEl.innerHTML =
+        `<div style="font-size:11px; font-weight:600; color:var(--danger); margin-bottom:6px;">Senaste fel (${errors.length})</div>
         <table class="act-table"><thead><tr><th>Tid</th><th>Kategori</th><th>Händelse</th></tr></thead>
         <tbody>${rows}</tbody></table>`;
     }
@@ -2061,7 +2328,7 @@ async function loadPilotReadiness() {
     const ov = r.overall_status || 'not_ready';
     const ovEl = document.getElementById('pilotOverall');
     ovEl.textContent = _OVERALL[ov] || ov;
-    ovEl.style.color = _OVERALL_COLOR[ov] || '#6b7280';
+    ovEl.style.color = _OVERALL_COLOR[ov] || 'var(--text-muted)';
 
     const sc = r.score || {};
     const scEl = document.getElementById('pilotScore');
@@ -2071,12 +2338,12 @@ async function loadPilotReadiness() {
     const checks = r.checks || [];
     if (checks.length === 0) { checksEl.innerHTML = ''; return; }
     const rows = checks.map(c => {
-      const icon = _CHECK_ICON[c.status] || '?';
-      const color = _CHECK_COLOR[c.status] || '#6b7280';
+      const icon  = _CHECK_ICON[c.status] || '?';
+      const color = _CHECK_COLOR[c.status] || 'var(--text-muted)';
       return `<tr>
         <td style="color:${color}; font-size:13px; white-space:nowrap;">${icon}</td>
-        <td style="font-size:12px; font-weight:600;">${escapeHtml(c.key)}</td>
-        <td style="font-size:12px; color:#374151;">${escapeHtml(c.message)}</td>
+        <td style="font-size:12px; font-weight:600; color:var(--text);">${escapeHtml(c.key)}</td>
+        <td style="font-size:12px; color:var(--text-muted);">${escapeHtml(c.message)}</td>
       </tr>`;
     }).join('');
     checksEl.innerHTML = `<table class="act-table"><thead><tr><th></th><th>Check</th><th>Meddelande</th></tr></thead>
@@ -2092,9 +2359,9 @@ async function loadPilotReadiness() {
 // ---------------------------------------------------------------------------
 // Super Admin overview
 // ---------------------------------------------------------------------------
-const _ADMIN_STATUS_ICON  = { healthy: '✅', warning: '⚠️', error: '❌', not_ready: '⚫' };
-const _ADMIN_STATUS_COLOR = { healthy: '#16a34a', warning: '#d97706', error: '#dc2626', not_ready: '#9ca3af' };
-const _ADMIN_INT_ICON     = { healthy: '✅', warning: '⚠️', error: '❌', not_configured: '⚫' };
+const _ADMIN_STATUS_ICON  = { healthy: '✅', warning: '⚠', error: '✕', not_ready: '○' };
+const _ADMIN_STATUS_COLOR = { healthy: 'var(--success)', warning: 'var(--warning)', error: 'var(--danger)', not_ready: 'var(--text-dim)' };
+const _ADMIN_INT_ICON     = { healthy: '✅', warning: '⚠', error: '✕', not_configured: '○' };
 
 async function loadAdminOverview() {
   document.getElementById('adminError').style.display = 'none';
@@ -2138,16 +2405,16 @@ async function loadAdminOverview() {
         ? new Date(t.latest_activity_at).toLocaleString('sv-SE')
         : '–';
       return `<tr>
-        <td style="font-weight:600;">${escapeHtml(t.name || t.tenant_id)}</td>
-        <td style="font-size:11px; color:#9ca3af;">${escapeHtml(t.tenant_id)}</td>
+        <td style="font-weight:600; color:var(--text);">${escapeHtml(t.name || t.tenant_id)}</td>
+        <td style="font-size:11px; color:var(--text-dim);">${escapeHtml(t.tenant_id)}</td>
         <td style="color:${statusColor}; font-size:13px;">${statusIcon} ${escapeHtml(t.status)}</td>
         <td>${onb.percent ?? 0} %</td>
         <td>${pilot.percent ?? 0} %</td>
         <td title="Gmail: ${integ.gmail || '–'}, Monday: ${integ.monday || '–'}">${gmailIcon} ${mondayIcon}</td>
         <td>${disp.total_30d ?? 0}</td>
         <td>${disp.hours_saved_30d != null ? disp.hours_saved_30d + ' h' : '–'}</td>
-        <td style="color:${(t.recent_error_count || 0) > 0 ? '#dc2626' : '#6b7280'};">${t.recent_error_count ?? 0}</td>
-        <td style="font-size:11px; color:#9ca3af;">${actAt}</td>
+        <td style="color:${(t.recent_error_count || 0) > 0 ? 'var(--danger)' : 'var(--text-dim)'};">${t.recent_error_count ?? 0}</td>
+        <td style="font-size:11px; color:var(--text-dim);">${actAt}</td>
         <td><button class="btn btn-neutral btn-sm" onclick="openTenant(${JSON.stringify(t.tenant_id)})">Öppna kund</button></td>
       </tr>`;
     }).join('');
