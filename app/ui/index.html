@@ -552,6 +552,135 @@ pre {
 }
 .action-card .action-meta { font-size: 11px; color: var(--text-dim); display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
 
+/* ═══════════════════════════════════════════════════════
+   CASES VIEW
+═══════════════════════════════════════════════════════ */
+
+/* ── Case card (customer mode) ── */
+.case-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.case-card:hover { border-color: var(--border-med); background: var(--surface-2); }
+.case-card-header {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.case-card-subject {
+  font-size: 13px; font-weight: 600; color: var(--text); flex: 1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.case-card-footer {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 11px; color: var(--text-dim);
+}
+.case-card-customer { font-size: 12px; color: var(--text-muted); }
+.case-card-snippet  { font-size: 12px; color: var(--text-dim); line-height: 1.4;
+                      overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+/* ── Type badge ── */
+.type-badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700;
+  flex-shrink: 0;
+}
+.type-badge.lead         { background: rgba(59,130,246,.15); color: var(--blue-light); }
+.type-badge.support      { background: rgba(16,185,129,.12); color: #6ee7b7; }
+.type-badge.invoice      { background: rgba(124,58,237,.15); color: #c084fc; }
+.type-badge.partnership  { background: rgba(6,182,212,.12);  color: #67e8f9; }
+.type-badge.supplier     { background: rgba(245,158,11,.12); color: #fcd34d; }
+.type-badge.other        { background: var(--surface-3);     color: var(--text-muted); }
+
+/* ── Priority badge ── */
+.prio-badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 7px; border-radius: 20px; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.prio-badge.HIGH   { background: var(--danger-bg);  color: #fca5a5; }
+.prio-badge.NORMAL { background: var(--surface-3);  color: var(--text-dim); }
+.prio-badge.LOW    { background: var(--surface-3);  color: var(--text-dim); }
+
+/* ── Cases filter bar ── */
+.cases-filter-bar {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 16px; align-items: center;
+}
+.cases-filter-bar input,
+.cases-filter-bar select {
+  padding: 6px 10px; font-size: 12px;
+  border: 1px solid var(--border-med); border-radius: var(--radius-sm);
+  background: var(--surface-2); color: var(--text);
+}
+.cases-filter-bar input { flex: 1; min-width: 160px; }
+
+/* ── Detail panel ── */
+.detail-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 14px;
+}
+.detail-section-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--text-dim); margin-bottom: 12px;
+}
+.detail-msg-body {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+  font-size: 12px; color: var(--text-muted); white-space: pre-wrap;
+  word-break: break-word; max-height: 220px; overflow-y: auto;
+  line-height: 1.6;
+}
+.thread-message {
+  border-left: 3px solid var(--border-med);
+  padding: 8px 12px; margin-bottom: 8px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--surface-2);
+}
+.thread-message.outgoing { border-left-color: var(--blue); }
+.thread-message.incoming { border-left-color: var(--success); }
+.thread-dir { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+.thread-subj { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.thread-body { font-size: 12px; color: var(--text-muted); white-space: pre-wrap; line-height: 1.5; }
+
+/* ── Timeline (customer detail) ── */
+.timeline { display: flex; flex-direction: column; gap: 0; }
+.timeline-item {
+  display: flex; gap: 12px; padding: 10px 0;
+  border-bottom: 1px solid var(--border); position: relative;
+}
+.timeline-item:last-child { border-bottom: none; }
+.timeline-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  margin-top: 5px; background: var(--border-med);
+}
+.timeline-dot.ok     { background: var(--success); }
+.timeline-dot.warn   { background: var(--warning); }
+.timeline-dot.err    { background: var(--danger); }
+.timeline-dot.info   { background: var(--blue); }
+.timeline-label  { font-size: 12px; font-weight: 600; color: var(--text); }
+.timeline-meta   { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+/* ── Next step card ── */
+.next-step-card {
+  background: linear-gradient(135deg, var(--surface) 0%, rgba(124,58,237,.06) 100%);
+  border: 1px solid rgba(124,58,237,.25); border-radius: var(--radius);
+  padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start;
+}
+.next-step-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.next-step-label { font-size: 11px; color: var(--purple-light); font-weight: 700;
+                   text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+.next-step-text  { font-size: 13px; color: var(--text); font-weight: 500; }
+
 /* ── Setup / forms ── */
 .setup-panel {
   flex: 1; overflow-y: auto; padding: 24px;
@@ -1248,73 +1377,144 @@ label { color: var(--text-muted); }
 </div><!-- /viewCtrl -->
 
 <!-- ══════════════════════════════════════════════════════════════ ÄRENDEN -->
-<div id="viewCases" style="display:none; padding:24px; overflow-y:auto; flex:1;">
+<div id="viewCases" style="display:none; overflow-y:auto; flex:1;">
 
-  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-    <h1 style="font-size:18px; font-weight:700; color:#111; margin:0;">Ärenden</h1>
-    <button class="btn btn-primary btn-sm" onclick="loadCases()">Uppdatera</button>
-  </div>
+  <!-- ─── CUSTOMER CASES ─── -->
+  <div id="custCasesWrap" style="display:none; padding:28px 32px; max-width:860px; margin:0 auto;">
 
-  <!-- Search + filter bar -->
-  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; align-items:center;">
-    <input id="casesQ" type="text" placeholder="Sök ämne, kund, job-id…"
-      style="flex:1; min-width:160px; padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;"
-      onkeydown="if(event.key==='Enter') loadCases()">
-    <select id="casesType" style="padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;" onchange="loadCases()">
-      <option value="">Filtrera typ</option>
-      <option value="lead">Lead</option>
-      <option value="customer_inquiry">Supportärende</option>
-      <option value="invoice">Faktura</option>
-      <option value="partnership">Samarbete</option>
-      <option value="supplier">Leverantör</option>
-      <option value="newsletter">Nyhetsbrev</option>
-      <option value="internal">Internt</option>
-      <option value="spam">Spam</option>
-      <option value="unknown">Okänd</option>
-    </select>
-    <select id="casesStatus" style="padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;" onchange="loadCases()">
-      <option value="">Filtrera status</option>
-      <option value="pending">Pending</option>
-      <option value="processing">Processing</option>
-      <option value="completed">Completed</option>
-      <option value="failed">Failed</option>
-      <option value="awaiting_approval">Awaiting approval</option>
-      <option value="manual_review">Manual review</option>
-    </select>
-    <select id="casesSortBy" style="padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;" onchange="loadCases()">
-      <option value="received_at">Mottaget</option>
-      <option value="created_at">Behandlat</option>
-      <option value="status">Status</option>
-      <option value="type">Typ</option>
-    </select>
-    <select id="casesSortDir" style="padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;" onchange="loadCases()">
-      <option value="desc">Nyast först</option>
-      <option value="asc">Äldst först</option>
-    </select>
-  </div>
+    <div class="dash-page-hdr">
+      <div>
+        <div class="dash-page-title">Mina ärenden</div>
+        <div class="dash-page-sub">Automatiserade och pågående ärenden</div>
+      </div>
+      <div class="dash-quick-actions">
+        <button class="btn btn-neutral btn-sm" onclick="loadCases()">↻ Uppdatera</button>
+      </div>
+    </div>
 
-  <div id="casesError" class="msg msg-error" style="display:none;"></div>
+    <!-- Customer filter: just search + status -->
+    <div class="cases-filter-bar">
+      <input id="custCasesQ" type="text" placeholder="Sök ämne, kund…"
+        onkeydown="if(event.key==='Enter') loadCases()">
+      <select id="custCasesStatus" onchange="loadCases()">
+        <option value="">Alla statusar</option>
+        <option value="completed">Klara</option>
+        <option value="awaiting_approval">Inväntar godkännande</option>
+        <option value="processing">Bearbetar</option>
+        <option value="failed">Misslyckade</option>
+      </select>
+    </div>
 
-  <!-- Cases list -->
-  <div id="casesListWrap" style="margin-bottom:28px;">
-    <div id="casesList"><span class="empty">Laddar…</span></div>
+    <div id="custCasesError" class="msg msg-error" style="display:none;"></div>
+
+    <!-- Card list -->
+    <div id="custCasesList">
+      <div class="empty-state">
+        <div class="empty-state-icon">◌</div>
+        <div class="empty-state-title">Laddar…</div>
+      </div>
+    </div>
+
     <!-- Pagination -->
-    <div id="casesPagination" style="display:none; margin-top:10px; display:flex; align-items:center; gap:10px; font-size:13px;">
-      <button id="casesPrev" class="btn btn-neutral btn-sm" onclick="casesPrevPage()" disabled>Föregående</button>
-      <span id="casesPageInfo" style="color:#6b7280;">–</span>
-      <button id="casesNext" class="btn btn-neutral btn-sm" onclick="casesNextPage()" disabled>Nästa</button>
+    <div id="custCasesPagination" style="display:none; margin-top:14px; display:flex; align-items:center; gap:10px;">
+      <button id="custCasesPrev" class="btn btn-neutral btn-sm" onclick="casesPrevPage()" disabled>← Föregående</button>
+      <span id="custCasesPageInfo" style="font-size:12px; color:var(--text-dim); flex:1; text-align:center;">–</span>
+      <button id="custCasesNext" class="btn btn-neutral btn-sm" onclick="casesNextPage()" disabled>Nästa →</button>
     </div>
-  </div>
 
-  <!-- Case detail panel -->
-  <div id="caseDetailWrap" style="display:none;">
-    <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
-      <button class="btn btn-neutral btn-sm" onclick="closeCaseDetail()">← Tillbaka</button>
-      <h2 style="font-size:14px; font-weight:600; color:#111; margin:0;" id="caseDetailTitle">Detaljer</h2>
+    <!-- Customer detail panel -->
+    <div id="custCaseDetailWrap" style="display:none; margin-top:24px;">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px;">
+        <button class="btn btn-neutral btn-sm" onclick="closeCaseDetail()">← Tillbaka</button>
+        <div>
+          <div style="font-size:14px; font-weight:700; color:var(--text);" id="custCaseDetailTitle">Detaljer</div>
+          <div style="font-size:11px; color:var(--text-dim);" id="custCaseDetailMeta"></div>
+        </div>
+      </div>
+      <div id="custCaseDetailError" class="msg msg-error" style="display:none;"></div>
+      <div id="custCaseDetail"></div>
     </div>
-    <div id="caseDetailError" class="msg msg-error" style="display:none;"></div>
-    <div id="caseDetail"></div>
-  </div>
+
+  </div><!-- /#custCasesWrap -->
+
+  <!-- ─── ADMIN CASES ─── -->
+  <div id="adminCasesWrap" style="display:none; padding:24px;">
+
+    <div class="dash-page-hdr">
+      <div>
+        <div class="dash-page-title">Ärenden</div>
+        <div class="dash-page-sub" id="adminCasesSubtitle">–</div>
+      </div>
+      <div class="dash-quick-actions">
+        <button class="btn btn-primary btn-sm" onclick="loadCases()">↻ Uppdatera</button>
+      </div>
+    </div>
+
+    <!-- Admin filter bar -->
+    <div class="cases-filter-bar">
+      <input id="casesQ" type="text" placeholder="Sök ämne, kund, job-id…"
+        onkeydown="if(event.key==='Enter') loadCases()">
+      <select id="casesType" onchange="loadCases()">
+        <option value="">Alla typer</option>
+        <option value="lead">Lead</option>
+        <option value="customer_inquiry">Supportärende</option>
+        <option value="invoice">Faktura</option>
+        <option value="partnership">Samarbete</option>
+        <option value="supplier">Leverantör</option>
+        <option value="newsletter">Nyhetsbrev</option>
+        <option value="internal">Internt</option>
+        <option value="spam">Spam</option>
+        <option value="unknown">Okänd</option>
+      </select>
+      <select id="casesStatus" onchange="loadCases()">
+        <option value="">Alla statusar</option>
+        <option value="pending">Pending</option>
+        <option value="processing">Bearbetar</option>
+        <option value="completed">Klara</option>
+        <option value="failed">Misslyckade</option>
+        <option value="awaiting_approval">Inväntar godkännande</option>
+        <option value="manual_review">Manuell granskning</option>
+      </select>
+      <select id="casesSortBy" onchange="loadCases()">
+        <option value="received_at">Mottaget</option>
+        <option value="created_at">Behandlat</option>
+        <option value="status">Status</option>
+        <option value="type">Typ</option>
+      </select>
+      <select id="casesSortDir" onchange="loadCases()">
+        <option value="desc">Nyast först</option>
+        <option value="asc">Äldst först</option>
+      </select>
+    </div>
+
+    <div id="casesError" class="msg msg-error" style="display:none;"></div>
+
+    <!-- Admin list -->
+    <div id="casesListWrap" style="margin-bottom:20px;">
+      <div id="casesList">
+        <div class="empty-state">
+          <div class="empty-state-icon">◌</div>
+          <div class="empty-state-title">Laddar…</div>
+        </div>
+      </div>
+      <div id="casesPagination" style="display:none; margin-top:10px; display:flex; align-items:center; gap:10px;">
+        <button id="casesPrev" class="btn btn-neutral btn-sm" onclick="casesPrevPage()" disabled>← Föregående</button>
+        <span id="casesPageInfo" style="font-size:12px; color:var(--text-dim); flex:1; text-align:center;">–</span>
+        <button id="casesNext" class="btn btn-neutral btn-sm" onclick="casesNextPage()" disabled>Nästa →</button>
+      </div>
+    </div>
+
+    <!-- Admin detail panel -->
+    <div id="caseDetailWrap" style="display:none;">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+        <button class="btn btn-neutral btn-sm" onclick="closeCaseDetail()">← Tillbaka</button>
+        <div style="font-size:14px; font-weight:600; color:var(--text);" id="caseDetailTitle">Detaljer</div>
+      </div>
+      <div id="caseDetailError" class="msg msg-error" style="display:none;"></div>
+      <div id="caseDetail"></div>
+    </div>
+
+  </div><!-- /#adminCasesWrap -->
 
 </div><!-- /viewCases -->
 
@@ -3272,82 +3472,122 @@ const CASE_TYPE_LABELS = {
 let _casesOffset = 0;
 const _casesLimit = 50;
 
+// ---------------------------------------------------------------------------
+// Cases — helper maps
+// ---------------------------------------------------------------------------
+const _CASE_TYPE_BADGE = {
+  lead:             ['lead',        'Lead'],
+  customer_inquiry: ['support',     'Support'],
+  invoice:          ['invoice',     'Faktura'],
+  partnership:      ['partnership', 'Samarbete'],
+  supplier:         ['supplier',    'Leverantör'],
+  newsletter:       ['other',       'Nyhetsbrev'],
+  internal:         ['other',       'Internt'],
+  spam:             ['other',       'Spam'],
+  unknown:          ['other',       'Okänd'],
+};
+
+function _typeBadge(type) {
+  const [cls, label] = _CASE_TYPE_BADGE[type] || ['other', escapeHtml(type || '–')];
+  return `<span class="type-badge ${cls}">${escapeHtml(label)}</span>`;
+}
+function _prioBadge(prio) {
+  if (!prio) return '';
+  const p = prio.toUpperCase();
+  return `<span class="prio-badge ${p}">${p}</span>`;
+}
+
+// ---------------------------------------------------------------------------
+// Cases — routing
+// ---------------------------------------------------------------------------
+async function loadCases(resetOffset) {
+  if (resetOffset !== false) _casesOffset = 0;
+  if (_uiMode === 'customer') {
+    _showCasesPanels('customer');
+    await _loadCustomerCases();
+  } else {
+    _showCasesPanels('admin');
+    await _loadAdminCases();
+  }
+}
+
+function _showCasesPanels(mode) {
+  document.getElementById('custCasesWrap').style.display  = mode === 'customer' ? 'block' : 'none';
+  document.getElementById('adminCasesWrap').style.display = mode === 'admin'    ? 'block' : 'none';
+}
+
 function _getCasesParams(offset) {
-  const q       = (document.getElementById('casesQ')       || {}).value || '';
-  const type    = (document.getElementById('casesType')    || {}).value || '';
-  const status  = (document.getElementById('casesStatus')  || {}).value || '';
-  const sortBy  = (document.getElementById('casesSortBy')  || {}).value || 'received_at';
-  const sortDir = (document.getElementById('casesSortDir') || {}).value || 'desc';
-  const params = new URLSearchParams({
-    limit: _casesLimit,
-    offset: offset,
-    sort_by: sortBy,
-    sort_dir: sortDir,
-  });
-  if (q.trim())     params.set('q', q.trim());
-  if (type.trim())  params.set('type', type.trim());
+  const isCustomer = (_uiMode === 'customer');
+  const q       = ((document.getElementById(isCustomer ? 'custCasesQ' : 'casesQ'))       || {}).value || '';
+  const status  = ((document.getElementById(isCustomer ? 'custCasesStatus' : 'casesStatus')) || {}).value || '';
+  const type    = isCustomer ? '' : ((document.getElementById('casesType')    || {}).value || '');
+  const sortBy  = isCustomer ? 'received_at' : ((document.getElementById('casesSortBy')  || {}).value || 'received_at');
+  const sortDir = isCustomer ? 'desc'        : ((document.getElementById('casesSortDir') || {}).value || 'desc');
+  const params  = new URLSearchParams({ limit: _casesLimit, offset, sort_by: sortBy, sort_dir: sortDir });
+  if (q.trim())      params.set('q', q.trim());
+  if (type.trim())   params.set('type', type.trim());
   if (status.trim()) params.set('status', status.trim());
   return params.toString();
 }
 
-async function loadCases(resetOffset) {
-  if (resetOffset !== false) _casesOffset = 0;
-  const listEl  = document.getElementById('casesList');
-  const errEl   = document.getElementById('casesError');
-  const detailW = document.getElementById('caseDetailWrap');
-  const listW   = document.getElementById('casesListWrap');
-  const pagEl   = document.getElementById('casesPagination');
+// ---------------------------------------------------------------------------
+// Customer cases list
+// ---------------------------------------------------------------------------
+async function _loadCustomerCases() {
+  const listEl = document.getElementById('custCasesList');
+  const errEl  = document.getElementById('custCasesError');
+  const pagEl  = document.getElementById('custCasesPagination');
+  document.getElementById('custCaseDetailWrap').style.display = 'none';
   errEl.style.display = 'none';
-  detailW.style.display = 'none';
-  listW.style.display   = 'block';
-  listEl.innerHTML = '<span class="empty">Laddar…</span>';
+  listEl.innerHTML = `<div class="empty-state"><div class="empty-state-icon">◌</div><div class="empty-state-title">Laddar…</div></div>`;
 
   try {
-    const r = await apiFetch('/cases?' + _getCasesParams(_casesOffset));
-    const total  = r.total || 0;
-    const offset = r.offset || 0;
-    const limit  = r.limit  || _casesLimit;
-    const end    = Math.min(offset + limit, total);
+    const r     = await apiFetch('/cases?' + _getCasesParams(_casesOffset));
+    const total = r.total || 0;
+    const offset= r.offset || 0;
+    const limit = r.limit  || _casesLimit;
+    const end   = Math.min(offset + limit, total);
 
     if (!r.items || r.items.length === 0) {
-      listEl.innerHTML = '<span class="empty">Inga ärenden matchar filtret.</span>';
+      listEl.innerHTML =
+        `<div class="empty-state">
+          <div class="empty-state-icon">◌</div>
+          <div class="empty-state-title">Inga ärenden hittades</div>
+          <div class="empty-state-sub">Prova att ändra filter eller vänta på att nya ärenden inkommer.</div>
+        </div>`;
       if (pagEl) pagEl.style.display = 'none';
       return;
     }
-    const rows = r.items.map(item => {
-      const type    = CASE_TYPE_LABELS[item.type] || escapeHtml(item.type);
-      const status  = item.status ? statusBadge(item.status) : '–';
-      const subject = item.subject ? escapeHtml(item.subject) : '<span style="color:#9ca3af">–</span>';
-      const cust    = item.customer_name ? escapeHtml(item.customer_name) : '<span style="color:#9ca3af">–</span>';
-      // Prefer received_at (original email time), fall back to processed_at/created_at
-      const rawTs   = item.received_at || item.processed_at || item.created_at;
-      const ts      = rawTs ? new Date(rawTs).toLocaleString('sv-SE') : '–';
-      const tsTitle = item.received_at
-        ? `Mottaget: ${new Date(item.received_at).toLocaleString('sv-SE')}\nBehandlat: ${item.processed_at ? new Date(item.processed_at).toLocaleString('sv-SE') : '–'}`
-        : '';
-      return `<tr style="cursor:pointer;" onclick="openCase('${escapeHtml(item.job_id)}')">
-        <td style="color:#888; white-space:nowrap" title="${escapeHtml(tsTitle)}">${ts}</td>
-        <td>${escapeHtml(type)}</td>
-        <td>${subject}</td>
-        <td>${status}</td>
-        <td>${cust}</td>
-      </tr>`;
-    }).join('');
-    listEl.innerHTML = `
-      <table class="act-table">
-        <thead><tr>
-          <th>Mottaget</th><th>Typ</th><th>Ämne</th><th>Status</th><th>Kund</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>`;
 
-    // Pagination
+    listEl.innerHTML = r.items.map(item => {
+      const typeBadge = _typeBadge(item.type);
+      const statBadge = item.status ? statusBadge(item.status) : '';
+      const prioBadge = _prioBadge(item.priority);
+      const subject   = item.subject ? escapeHtml(item.subject) : 'Ärende utan ämne';
+      const cust      = item.customer_name ? escapeHtml(item.customer_name) : '';
+      const rawTs     = item.received_at || item.processed_at || item.created_at;
+      const ts        = rawTs ? new Date(rawTs).toLocaleString('sv-SE', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '–';
+      return `<div class="case-card" onclick="openCase('${escapeHtml(item.job_id)}')">
+        <div class="case-card-header">
+          ${typeBadge}
+          <span class="case-card-subject">${subject}</span>
+          ${statBadge}
+          ${prioBadge}
+        </div>
+        ${cust ? `<div class="case-card-customer">${cust}</div>` : ''}
+        <div class="case-card-footer">
+          <span>${ts}</span>
+          <span style="margin-left:auto; color:var(--purple-light); font-weight:600; font-size:11px;">Visa detaljer →</span>
+        </div>
+      </div>`;
+    }).join('');
+
     if (pagEl) {
       pagEl.style.display = 'flex';
-      const infoEl = document.getElementById('casesPageInfo');
-      const prevBtn = document.getElementById('casesPrev');
-      const nextBtn = document.getElementById('casesNext');
+      const infoEl = document.getElementById('custCasesPageInfo');
       if (infoEl) infoEl.textContent = `Visar ${offset + 1}–${end} av ${total}`;
+      const prevBtn = document.getElementById('custCasesPrev');
+      const nextBtn = document.getElementById('custCasesNext');
       if (prevBtn) prevBtn.disabled = offset === 0;
       if (nextBtn) nextBtn.disabled = end >= total;
     }
@@ -3358,6 +3598,84 @@ async function loadCases(resetOffset) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Admin cases list
+// ---------------------------------------------------------------------------
+async function _loadAdminCases() {
+  const listEl = document.getElementById('casesList');
+  const errEl  = document.getElementById('casesError');
+  const pagEl  = document.getElementById('casesPagination');
+  document.getElementById('caseDetailWrap').style.display = 'none';
+  document.getElementById('casesListWrap').style.display  = 'block';
+  errEl.style.display = 'none';
+  listEl.innerHTML = `<div class="empty-state" style="padding:24px;"><div class="empty-state-icon">◌</div><div class="empty-state-title">Laddar…</div></div>`;
+
+  try {
+    const r     = await apiFetch('/cases?' + _getCasesParams(_casesOffset));
+    const total = r.total || 0;
+    const offset= r.offset || 0;
+    const limit = r.limit  || _casesLimit;
+    const end   = Math.min(offset + limit, total);
+
+    const subtitleEl = document.getElementById('adminCasesSubtitle');
+    if (subtitleEl) subtitleEl.textContent = `${total} ärenden totalt`;
+
+    if (!r.items || r.items.length === 0) {
+      listEl.innerHTML =
+        `<div class="empty-state">
+          <div class="empty-state-icon">◌</div>
+          <div class="empty-state-title">Inga ärenden matchar filtret</div>
+          <div class="empty-state-sub">Ändra filter eller vänta på att nya ärenden inkommer.</div>
+        </div>`;
+      if (pagEl) pagEl.style.display = 'none';
+      return;
+    }
+
+    const rows = r.items.map(item => {
+      const rawTs   = item.received_at || item.processed_at || item.created_at;
+      const ts      = rawTs ? new Date(rawTs).toLocaleString('sv-SE') : '–';
+      const tsTitle = item.received_at
+        ? `Mottaget: ${new Date(item.received_at).toLocaleString('sv-SE')}\nBehandlat: ${item.processed_at ? new Date(item.processed_at).toLocaleString('sv-SE') : '–'}`
+        : '';
+      const subject = item.subject ? escapeHtml(item.subject) : `<span style="color:var(--text-dim)">–</span>`;
+      const cust    = item.customer_name ? escapeHtml(item.customer_name) : `<span style="color:var(--text-dim)">–</span>`;
+      return `<tr style="cursor:pointer;" onclick="openCase('${escapeHtml(item.job_id)}')">
+        <td style="color:var(--text-dim); white-space:nowrap;" title="${escapeHtml(tsTitle)}">${ts}</td>
+        <td>${_typeBadge(item.type)}</td>
+        <td style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${subject}</td>
+        <td>${item.status ? statusBadge(item.status) : '–'}</td>
+        <td>${cust}</td>
+        <td>${_prioBadge(item.priority)}</td>
+      </tr>`;
+    }).join('');
+
+    listEl.innerHTML = `
+      <table class="act-table">
+        <thead><tr>
+          <th>Mottaget</th><th>Typ</th><th>Ämne</th><th>Status</th><th>Kund</th><th>Prio</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+
+    if (pagEl) {
+      pagEl.style.display = 'flex';
+      const infoEl  = document.getElementById('casesPageInfo');
+      const prevBtn = document.getElementById('casesPrev');
+      const nextBtn = document.getElementById('casesNext');
+      if (infoEl)  infoEl.textContent  = `Visar ${offset + 1}–${end} av ${total}`;
+      if (prevBtn) prevBtn.disabled = offset === 0;
+      if (nextBtn) nextBtn.disabled = end >= total;
+    }
+  } catch (e) {
+    errEl.textContent = 'Kunde inte ladda ärenden: ' + escapeHtml(e.message);
+    errEl.style.display = 'block';
+    listEl.innerHTML = '';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pagination (shared)
+// ---------------------------------------------------------------------------
 function casesPrevPage() {
   _casesOffset = Math.max(0, _casesOffset - _casesLimit);
   loadCases(false);
@@ -3368,7 +3686,153 @@ function casesNextPage() {
   loadCases(false);
 }
 
+// ---------------------------------------------------------------------------
+// Open case detail — branches by role
+// ---------------------------------------------------------------------------
 async function openCase(jobId) {
+  if (_uiMode === 'customer') {
+    await _openCustomerCase(jobId);
+  } else {
+    await _openAdminCase(jobId);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Customer case detail
+// ---------------------------------------------------------------------------
+async function _openCustomerCase(jobId) {
+  const listEl   = document.getElementById('custCasesList');
+  const pagEl    = document.getElementById('custCasesPagination');
+  const detailW  = document.getElementById('custCaseDetailWrap');
+  const detailEl = document.getElementById('custCaseDetail');
+  const titleEl  = document.getElementById('custCaseDetailTitle');
+  const metaEl   = document.getElementById('custCaseDetailMeta');
+  const errEl    = document.getElementById('custCaseDetailError');
+
+  listEl.style.display   = 'none';
+  if (pagEl) pagEl.style.display = 'none';
+  detailW.style.display  = 'block';
+  errEl.style.display    = 'none';
+  detailEl.innerHTML     =
+    `<div class="empty-state"><div class="empty-state-icon">◌</div><div class="empty-state-title">Laddar…</div></div>`;
+  titleEl.textContent    = 'Laddar…';
+
+  try {
+    const c = await apiFetch('/cases/' + encodeURIComponent(jobId));
+    const typeLabel   = (CASE_TYPE_LABELS[c.type] || c.type || '–');
+    const receivedTs  = c.received_at  ? new Date(c.received_at).toLocaleString('sv-SE')  : '–';
+    const processedTs = c.processed_at ? new Date(c.processed_at).toLocaleString('sv-SE') : '–';
+
+    titleEl.textContent = c.subject || `${typeLabel} – ${c.job_id}`;
+    metaEl.textContent  = `${typeLabel} · Mottaget ${receivedTs}`;
+
+    // Next step card
+    const STATUS_NEXT = {
+      completed:         ['✓', 'Klart', 'Ärendet är automatiskt hanterat och avslutat.'],
+      awaiting_approval: ['⏳', 'Väntar på godkännande', 'En handläggare behöver godkänna nästa steg.'],
+      failed:            ['⚠', 'Misslyckades', 'Något gick fel. Kontakta supporten om problemet kvarstår.'],
+      processing:        ['⟳', 'Bearbetar', 'Ärendet behandlas automatiskt just nu.'],
+      manual_review:     ['👤', 'Manuell granskning', 'En handläggare granskar ärendet.'],
+      pending:           ['○', 'Väntar', 'Ärendet väntar på behandling.'],
+    };
+    const [nsIcon, nsLabel, nsText] = STATUS_NEXT[c.status] || ['○', c.status || '–', ''];
+    const nextStepHtml =
+      `<div class="next-step-card" style="margin-bottom:16px;">
+        <div class="next-step-icon">${nsIcon}</div>
+        <div>
+          <div class="next-step-label">Nuläge</div>
+          <div class="next-step-text">${escapeHtml(nsLabel)}</div>
+          ${nsText ? `<div style="font-size:12px; color:var(--text-muted); margin-top:4px;">${escapeHtml(nsText)}</div>` : ''}
+        </div>
+      </div>`;
+
+    // Original message (customer-friendly)
+    const om = c.original_message || {};
+    const msgHtml =
+      `<div class="detail-section" style="margin-bottom:14px;">
+        <div class="detail-section-title">Ditt meddelande</div>
+        <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">
+          Från: <strong style="color:var(--text);">${escapeHtml(om.from || '–')}</strong>
+          &nbsp;·&nbsp; Ämne: <strong style="color:var(--text);">${escapeHtml(c.subject || '–')}</strong>
+        </div>
+        <div style="font-size:11px; color:var(--text-dim); margin-bottom:8px;">Mottaget: ${receivedTs} · Behandlat: ${processedTs}</div>
+        ${om.body ? `<div class="detail-msg-body">${escapeHtml(om.body)}</div>` : ''}
+      </div>`;
+
+    // Timeline from actions (simplified)
+    const ACT_FRIENDLY = {
+      send_email:              ['✉', 'Svar skickat', 'info'],
+      send_customer_auto_reply:['✉', 'Bekräftelse skickad', 'ok'],
+      send_internal_handoff:   ['📋', 'Vidarebefordrat till team', 'info'],
+      create_monday_item:      ['◎', 'Ärende skapat i systemet', 'ok'],
+      create_item:             ['◎', 'Ärende skapat i systemet', 'ok'],
+      create_internal_task:    ['📋', 'Intern uppgift skapad', 'info'],
+    };
+    const actions = c.actions || [];
+    const timelineItems = actions.map(a => {
+      const [icon, label, dotCls] = ACT_FRIENDLY[a.type] || ['⚙', escapeHtml(a.type || '–'), 'info'];
+      const ts = a.created_at ? new Date(a.created_at).toLocaleString('sv-SE', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+      const statusOk = a.status === 'success' || a.status === 'completed';
+      const statusFail = a.status === 'failed';
+      const dotClass = statusFail ? 'err' : (statusOk ? dotCls : 'flat');
+      return `<div class="timeline-item">
+        <div class="timeline-dot ${dotClass}"></div>
+        <div>
+          <div class="timeline-label">${icon} ${escapeHtml(label)}</div>
+          ${ts ? `<div class="timeline-meta">${ts}</div>` : ''}
+        </div>
+      </div>`;
+    });
+
+    // Add received and processed as first/last timeline entries
+    const timelineHtml =
+      `<div class="detail-section" style="margin-bottom:14px;">
+        <div class="detail-section-title">Aktivitetslogg</div>
+        ${timelineItems.length === 0
+          ? `<div class="empty-state" style="padding:12px 0;"><div class="empty-state-icon">◌</div><div class="empty-state-title">Ingen aktivitet ännu</div></div>`
+          : `<div class="timeline">${timelineItems.join('')}</div>`
+        }
+      </div>`;
+
+    // Thread messages (customer-friendly)
+    const thread = c.thread_messages || [];
+    const threadHtml = thread.length === 0 ? '' :
+      `<div class="detail-section" style="margin-bottom:14px;">
+        <div class="detail-section-title">Konversation</div>
+        ${thread.map(m => {
+          const dir = m.direction === 'outgoing' ? 'outgoing' : 'incoming';
+          const dirLabel = m.direction === 'outgoing' ? '→ Från oss' : '← Från dig';
+          const ts = m.created_at ? new Date(m.created_at).toLocaleString('sv-SE', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+          const subj = m.subject ? `<div class="thread-subj">${escapeHtml(m.subject)}</div>` : '';
+          return `<div class="thread-message ${dir}">
+            <div class="thread-dir">${dirLabel}${ts ? ' · ' + ts : ''}</div>
+            ${subj}
+            <div class="thread-body">${escapeHtml((m.body || '').substring(0, 400))}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+
+    // Errors (simplified)
+    const errors = c.errors || [];
+    const errHtml = errors.length === 0 ? '' :
+      `<div class="detail-section" style="margin-bottom:14px; border-color:rgba(239,68,68,.25);">
+        <div class="detail-section-title" style="color:var(--danger);">Problem</div>
+        ${errors.map(e => `<div class="msg msg-error" style="margin-bottom:6px; font-size:12px;">${escapeHtml(e.message)}</div>`).join('')}
+      </div>`;
+
+    detailEl.innerHTML = nextStepHtml + msgHtml + timelineHtml + threadHtml + errHtml;
+
+  } catch (e) {
+    errEl.textContent = 'Kunde inte ladda ärendedetaljer: ' + escapeHtml(e.message);
+    errEl.style.display = 'block';
+    detailEl.innerHTML = '';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Admin case detail
+// ---------------------------------------------------------------------------
+async function _openAdminCase(jobId) {
   const listW   = document.getElementById('casesListWrap');
   const detailW = document.getElementById('caseDetailWrap');
   const detailEl= document.getElementById('caseDetail');
@@ -3378,122 +3842,132 @@ async function openCase(jobId) {
   listW.style.display   = 'none';
   detailW.style.display = 'block';
   errEl.style.display   = 'none';
-  detailEl.innerHTML    = '<span class="empty">Laddar…</span>';
-  titleEl.textContent   = 'Detaljer – ' + jobId;
+  detailEl.innerHTML    =
+    `<div class="empty-state" style="padding:24px;"><div class="empty-state-icon">◌</div><div class="empty-state-title">Laddar…</div></div>`;
+  titleEl.textContent   = 'Laddar…';
 
   try {
     const c = await apiFetch('/cases/' + encodeURIComponent(jobId));
-    titleEl.textContent = `Ärende ${c.job_id} · ${CASE_TYPE_LABELS[c.type] || c.type} · ${c.status}`;
+    titleEl.textContent = `${CASE_TYPE_LABELS[c.type] || c.type} · ${c.job_id} · ${c.status}`;
 
-    // timestamps
     const receivedTs  = c.received_at  ? new Date(c.received_at).toLocaleString('sv-SE')  : '–';
     const processedTs = c.processed_at ? new Date(c.processed_at).toLocaleString('sv-SE') : '–';
 
-    // original message
+    // Original message
     const om = c.original_message || {};
-    const omHtml = `
-      <div class="setup-card" style="margin-bottom:14px;">
-        <h3 style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; margin:0 0 10px;">Ursprungligt mail</h3>
-        <div style="font-size:13px; margin-bottom:4px;"><strong>Från:</strong> ${escapeHtml(om.from || '–')} &lt;${escapeHtml(om.email || '–')}&gt;</div>
-        <div style="font-size:13px; margin-bottom:4px;"><strong>Ämne:</strong> ${escapeHtml(c.subject || '–')}</div>
-        <div style="font-size:12px; color:#6b7280; margin-bottom:4px;">Mottaget: ${receivedTs} · Behandlat: ${processedTs}</div>
-        <pre style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:10px; font-size:12px; white-space:pre-wrap; margin:8px 0 0;">${escapeHtml(om.body || '–')}</pre>
+    const omHtml =
+      `<div class="detail-section" style="margin-bottom:14px;">
+        <div class="detail-section-title">Ursprungligt mail</div>
+        <div style="font-size:13px; margin-bottom:4px; color:var(--text);">
+          <strong>Från:</strong> ${escapeHtml(om.from || '–')} &lt;${escapeHtml(om.email || '–')}&gt;
+        </div>
+        <div style="font-size:13px; margin-bottom:4px; color:var(--text);">
+          <strong>Ämne:</strong> ${escapeHtml(c.subject || '–')}
+        </div>
+        <div style="font-size:12px; color:var(--text-dim); margin-bottom:8px;">
+          Mottaget: ${receivedTs} · Behandlat: ${processedTs}
+        </div>
+        ${om.body ? `<div class="detail-msg-body">${escapeHtml(om.body)}</div>` : ''}
       </div>`;
 
-    // extracted data
+    // Extracted data
     const extHtml = c.extracted_data
-      ? `<div class="setup-card" style="margin-bottom:14px;">
-           <h3 style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; margin:0 0 10px;">Extraherad data</h3>
-           <pre style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:10px; font-size:12px; white-space:pre-wrap; margin:0;">${escapeHtml(JSON.stringify(c.extracted_data, null, 2))}</pre>
+      ? `<div class="detail-section" style="margin-bottom:14px;">
+           <div class="detail-section-title">Extraherad data</div>
+           <pre>${escapeHtml(JSON.stringify(c.extracted_data, null, 2))}</pre>
          </div>`
       : '';
 
-    // thread messages
-    const threadRows = (c.thread_messages || []).map(m => {
-      const dir  = m.direction === 'outgoing' ? '→ Utgående' : '← Inkommande';
-      const ts   = m.created_at ? new Date(m.created_at).toLocaleString('sv-SE') : '–';
-      const subj = m.subject ? `<div style="font-size:12px; color:#374151; margin-bottom:4px;"><strong>${escapeHtml(m.subject)}</strong></div>` : '';
-      return `<div style="border-left:3px solid ${m.direction==='outgoing'?'#2563eb':'#10b981'}; padding:8px 12px; margin-bottom:8px; background:#f9fafb; border-radius:0 6px 6px 0;">
-        <div style="font-size:11px; color:#9ca3af; margin-bottom:4px;">${dir} · ${ts}</div>
-        ${subj}
-        <div style="font-size:12px; white-space:pre-wrap;">${escapeHtml(m.body || '–')}</div>
-      </div>`;
-    }).join('');
-    const threadHtml = `
-      <div class="setup-card" style="margin-bottom:14px;">
-        <h3 style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; margin:0 0 10px;">Trådhistorik</h3>
-        ${threadRows || '<span class="empty">Ingen trådhistorik.</span>'}
+    // Thread
+    const thread = c.thread_messages || [];
+    const threadHtml =
+      `<div class="detail-section" style="margin-bottom:14px;">
+        <div class="detail-section-title">Trådhistorik</div>
+        ${thread.length === 0
+          ? `<div class="empty-state" style="padding:12px 0;"><div class="empty-state-icon">◌</div><div class="empty-state-title">Ingen trådhistorik</div></div>`
+          : thread.map(m => {
+              const dir = m.direction === 'outgoing' ? 'outgoing' : 'incoming';
+              const dirLabel = m.direction === 'outgoing' ? '→ Utgående' : '← Inkommande';
+              const ts = m.created_at ? new Date(m.created_at).toLocaleString('sv-SE') : '';
+              const subj = m.subject ? `<div class="thread-subj">${escapeHtml(m.subject)}</div>` : '';
+              return `<div class="thread-message ${dir}">
+                <div class="thread-dir">${dirLabel}${ts ? ' · ' + ts : ''}</div>
+                ${subj}
+                <div class="thread-body">${escapeHtml(m.body || '–')}</div>
+              </div>`;
+            }).join('')
+        }
       </div>`;
 
-    // actions
+    // Actions
     const actRows = (c.actions || []).map(a => {
       const ts = a.created_at ? new Date(a.created_at).toLocaleString('sv-SE') : '–';
       return `<tr>
-        <td style="color:#888; white-space:nowrap; font-size:12px;">${ts}</td>
-        <td style="font-size:12px;">${escapeHtml(a.type || '–')}</td>
+        <td style="color:var(--text-dim); white-space:nowrap; font-size:12px;">${ts}</td>
+        <td style="color:var(--text);">${escapeHtml(a.type || '–')}</td>
         <td>${statusBadge(a.status)}</td>
       </tr>`;
     }).join('');
-    const actHtml = `
-      <div class="setup-card" style="margin-bottom:14px;">
-        <h3 style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; margin:0 0 10px;">Åtgärder</h3>
+    const actHtml =
+      `<div class="detail-section" style="margin-bottom:14px;">
+        <div class="detail-section-title">Åtgärder</div>
         ${actRows
           ? `<table class="act-table"><thead><tr><th>Tid</th><th>Typ</th><th>Status</th></tr></thead><tbody>${actRows}</tbody></table>`
-          : '<span class="empty">Inga åtgärder.</span>'}
+          : `<div class="empty-state" style="padding:12px 0;"><div class="empty-state-icon">◌</div><div class="empty-state-title">Inga åtgärder</div></div>`
+        }
       </div>`;
 
-    // errors
+    // Errors
     const errRows = (c.errors || []).map(e => {
-      const ts = e.created_at ? new Date(e.created_at).toLocaleString('sv-SE') : '–';
+      const ts = e.created_at ? new Date(e.created_at).toLocaleString('sv-SE') : '';
       return `<div class="msg msg-error" style="margin-bottom:6px; font-size:12px;">${ts ? ts + ' — ' : ''}${escapeHtml(e.message)}</div>`;
     }).join('');
-    const errHtml = c.errors && c.errors.length
-      ? `<div class="setup-card" style="margin-bottom:14px;">
-           <h3 style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; margin:0 0 10px;">Fel</h3>
+    const errSectionHtml = errRows
+      ? `<div class="detail-section" style="margin-bottom:14px; border-color:rgba(239,68,68,.25);">
+           <div class="detail-section-title" style="color:var(--danger);">Fel</div>
            ${errRows}
          </div>`
       : '';
 
-    // routing preview + dispatch buttons
+    // Routing preview + dispatch
     const rp = c.routing_preview;
     let rpHtml = '';
     if (rp) {
-      const rpIcon  = rp.status === 'ready' ? '✅' : rp.status === 'missing_hint' ? '⚠' : '❌';
-      const rpLabel = rp.status === 'ready' ? 'Klar' : rp.status === 'missing_hint' ? 'Saknas' : 'Fel';
-      const rpColor = rp.status === 'ready' ? '#065f46' : rp.status === 'missing_hint' ? '#92400e' : '#991b1b';
-      const rpBg    = rp.status === 'ready' ? '#ecfdf5' : rp.status === 'missing_hint' ? '#fffbeb' : '#fef2f2';
-      // fetch dispatch policy (best-effort)
+      const rpStatusCss  = { ready: 'var(--success)', missing_hint: 'var(--warning)', invalid_hint: 'var(--danger)' };
+      const rpStatusText = { ready: 'Klar', missing_hint: 'Routing saknas', invalid_hint: 'Ogiltig routing' };
+      const rpColor = rpStatusCss[rp.status] || 'var(--text-muted)';
+      const rpLabel = rpStatusText[rp.status] || rp.status;
+
       let policyHtml = '';
       try {
         const pol = await apiFetch(`/jobs/${encodeURIComponent(c.job_id)}/dispatch-policy`);
         const polLabel = pol.policy_mode === 'full_auto' ? 'Full auto' : pol.policy_mode === 'approval_required' ? 'Kräver godkännande' : 'Manuellt läge';
-        const polColor = pol.policy_mode === 'full_auto' ? '#1d4ed8' : pol.policy_mode === 'approval_required' ? '#92400e' : '#374151';
-        const canNow   = pol.can_dispatch_now;
-        policyHtml = `<div style="font-size:12px; color:${polColor}; margin-top:6px; font-weight:600;">
-          Dispatch-policy: ${escapeHtml(polLabel)}${canNow ? ' · Kan skickas nu' : ' · Godkännande krävs innan dispatch'}
+        const polCss   = { full_auto: 'var(--blue-light)', approval_required: 'var(--warning)', manual: 'var(--text-muted)' };
+        policyHtml = `<div style="font-size:12px; color:${polCss[pol.policy_mode] || 'var(--text-muted)'}; margin-top:6px; font-weight:600;">
+          Dispatch-policy: ${escapeHtml(polLabel)}${pol.can_dispatch_now ? ' · Kan skickas nu' : ' · Godkännande krävs'}
         </div>`;
       } catch (_) {}
 
       const dispatchBtns = rp.status === 'ready' ? `
-        <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
-          <button class="btn btn-neutral btn-sm" onclick="dispatchPreview('${escapeHtml(c.job_id)}')">Förhandsvisa dispatch</button>
+        <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+          <button class="btn btn-neutral btn-sm" onclick="dispatchPreview('${escapeHtml(c.job_id)}')">Förhandsvisa</button>
           <button class="btn btn-primary btn-sm" onclick="dispatchJob('${escapeHtml(c.job_id)}')">Skicka till system</button>
-          <button class="btn btn-neutral btn-sm" onclick="autoDispatch('${escapeHtml(c.job_id)}')">Testa auto-dispatch</button>
+          <button class="btn btn-neutral btn-sm" onclick="autoDispatch('${escapeHtml(c.job_id)}')">Auto-dispatch</button>
         </div>` : '';
-      rpHtml = `<div class="setup-card" style="margin-bottom:14px;" id="dispatchCard_${escapeHtml(c.job_id)}">
-        <h3 style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; margin:0 0 10px;">Routing Preview</h3>
-        <div style="display:inline-block; background:${rpBg}; color:${rpColor}; border-radius:4px; padding:6px 12px; font-size:13px; font-weight:600; margin-bottom:8px;">
-          ${rpIcon} ${rpLabel}
-        </div>
-        <div style="font-size:13px; color:#374151;">${escapeHtml(rp.message || '')}</div>
-        ${rp.target ? `<div style="font-size:12px; color:#6b7280; margin-top:6px;">System: ${escapeHtml(rp.system || '–')} · Board: ${escapeHtml((rp.target.board_name || rp.target.board_id) || '–')}</div>` : ''}
-        ${policyHtml}
-        ${dispatchBtns}
-        <div id="dispatchResult_${escapeHtml(c.job_id)}" style="margin-top:10px; display:none;"></div>
-      </div>`;
+
+      rpHtml =
+        `<div class="detail-section" style="margin-bottom:14px;" id="dispatchCard_${escapeHtml(c.job_id)}">
+          <div class="detail-section-title">Routing &amp; Dispatch</div>
+          <div style="font-size:13px; font-weight:700; color:${rpColor}; margin-bottom:6px;">${escapeHtml(rpLabel)}</div>
+          <div style="font-size:12px; color:var(--text-muted);">${escapeHtml(rp.message || '')}</div>
+          ${rp.target ? `<div style="font-size:12px; color:var(--text-dim); margin-top:4px;">System: ${escapeHtml(rp.system || '–')} · Board: ${escapeHtml((rp.target.board_name || rp.target.board_id) || '–')}</div>` : ''}
+          ${policyHtml}
+          ${dispatchBtns}
+          <div id="dispatchResult_${escapeHtml(c.job_id)}" style="margin-top:10px; display:none;"></div>
+        </div>`;
     }
 
-    detailEl.innerHTML = rpHtml + omHtml + extHtml + threadHtml + actHtml + errHtml;
+    detailEl.innerHTML = rpHtml + omHtml + extHtml + threadHtml + actHtml + errSectionHtml;
   } catch (e) {
     errEl.textContent = 'Kunde inte ladda ärendedetaljer: ' + escapeHtml(e.message);
     errEl.style.display = 'block';
@@ -3501,26 +3975,39 @@ async function openCase(jobId) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Close detail
+// ---------------------------------------------------------------------------
 function closeCaseDetail() {
-  document.getElementById('caseDetailWrap').style.display = 'none';
-  document.getElementById('casesListWrap').style.display  = 'block';
+  if (_uiMode === 'customer') {
+    document.getElementById('custCaseDetailWrap').style.display = 'none';
+    document.getElementById('custCasesList').style.display      = 'block';
+    const pagEl = document.getElementById('custCasesPagination');
+    if (pagEl) pagEl.style.display = 'flex';
+  } else {
+    document.getElementById('caseDetailWrap').style.display = 'none';
+    document.getElementById('casesListWrap').style.display  = 'block';
+  }
 }
 
 function _showDispatchResult(jobId, result) {
   const el = document.getElementById('dispatchResult_' + jobId);
   if (!el) return;
   const status = result.status || '';
-  const isOk   = status === 'success' || status === 'dry_run' || status === 'skipped' || status === 'approval_required';
-  const icon    = status === 'success' ? '✅' : status === 'dry_run' ? '🔍' : status === 'skipped' ? 'ℹ' : status === 'approval_required' ? '⚠' : '❌';
-  const label   = status === 'success' ? 'Dispatch lyckades' : status === 'dry_run' ? 'Förhandsgranskning' : status === 'skipped' ? 'Redan skickad' : status === 'approval_required' ? 'Godkännande krävs innan dispatch' : 'Dispatch misslyckades';
-  const bg      = isOk ? '#ecfdf5' : '#fef2f2';
-  const color   = isOk ? '#065f46' : '#991b1b';
-  const extId   = result.external_id ? `<div style="font-size:12px; margin-top:4px; color:#6b7280;">ID: ${escapeHtml(result.external_id)}</div>` : '';
-  el.innerHTML = `<div style="background:${bg}; color:${color}; border-radius:6px; padding:10px 14px;">
-    <div style="font-weight:700; margin-bottom:4px;">${icon} ${label}</div>
-    <div style="font-size:13px;">${escapeHtml(result.message || '')}</div>
-    ${extId}
-  </div>`;
+  const isOk   = ['success','dry_run','skipped','approval_required'].includes(status);
+  const icon   = { success:'✅', dry_run:'◎', skipped:'ℹ', approval_required:'⚠' }[status] || '✕';
+  const label  = { success:'Dispatch lyckades', dry_run:'Förhandsgranskning', skipped:'Redan skickad',
+                   approval_required:'Godkännande krävs' }[status] || 'Dispatch misslyckades';
+  const css    = isOk ? 'var(--success-bg)' : 'var(--danger-bg)';
+  const col    = isOk ? 'var(--success)' : 'var(--danger)';
+  const extId  = result.external_id
+    ? `<div style="font-size:12px; margin-top:4px; color:var(--text-dim);">ID: ${escapeHtml(result.external_id)}</div>` : '';
+  el.innerHTML =
+    `<div style="background:${css}; color:${col}; border-radius:var(--radius-sm); padding:10px 14px; border:1px solid rgba(255,255,255,.06);">
+      <div style="font-weight:700; margin-bottom:4px;">${icon} ${label}</div>
+      <div style="font-size:13px; color:var(--text-muted);">${escapeHtml(result.message || '')}</div>
+      ${extId}
+    </div>`;
   el.style.display = 'block';
 }
 
@@ -3547,14 +4034,15 @@ async function autoDispatch(jobId) {
     const icon  = status === 'success' ? '✅' : status === 'skipped' ? 'ℹ' : '❌';
     const label = status === 'success' ? 'Auto-dispatch kördes' : status === 'skipped' ? 'Auto-dispatch hoppades över' : 'Auto-dispatch misslyckades';
     const isOk  = status === 'success' || status === 'skipped';
-    const bg    = isOk ? '#ecfdf5' : '#fef2f2';
-    const color = isOk ? '#065f46' : '#991b1b';
+    const bg    = isOk ? 'var(--success-bg)' : 'var(--danger-bg)';
+    const color = isOk ? 'var(--success)' : 'var(--danger)';
     if (el) {
-      el.innerHTML = `<div style="background:${bg}; color:${color}; border-radius:6px; padding:10px 14px;">
-        <div style="font-weight:700; margin-bottom:4px;">${icon} ${label}</div>
-        <div style="font-size:13px;">${escapeHtml(result.reason || '')}</div>
-        ${result.dispatch_result && result.dispatch_result.external_id ? '<div style="font-size:12px; margin-top:4px; color:#6b7280;">ID: ' + escapeHtml(result.dispatch_result.external_id) + '</div>' : ''}
-      </div>`;
+      el.innerHTML =
+        `<div style="background:${bg}; color:${color}; border-radius:var(--radius-sm); padding:10px 14px; border:1px solid rgba(255,255,255,.06);">
+          <div style="font-weight:700; margin-bottom:4px;">${icon} ${label}</div>
+          <div style="font-size:13px; color:var(--text-muted);">${escapeHtml(result.reason || '')}</div>
+          ${result.dispatch_result && result.dispatch_result.external_id ? '<div style="font-size:12px; margin-top:4px; color:var(--text-dim);">ID: ' + escapeHtml(result.dispatch_result.external_id) + '</div>' : ''}
+        </div>`;
       el.style.display = 'block';
     }
   } catch (e) {

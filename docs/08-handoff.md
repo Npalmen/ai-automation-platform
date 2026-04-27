@@ -1600,6 +1600,64 @@ New layout: `#sidebar` (220px fixed left) + `#mainContent` (flex column: topbar 
 ### Tests
 No backend changes. 1779/1779 tests pass (1 pre-existing env-dependent failure unchanged).
 
+## Completed slice (2026-04-27 — Slice 24: Ärenden / Cases View Polish)
+
+### What was built
+No backend changes. Full UI overhaul of the cases (`/ärenden`) view, branched by role mode.
+
+### Role branching
+`loadCases()` → checks `_uiMode` → calls `_loadCustomerCases()` or `_loadAdminCases()`.
+`openCase(jobId)` → calls `_openCustomerCase()` or `_openAdminCase()`.
+`_showCasesPanels(mode)` toggles `#custCasesWrap` / `#adminCasesWrap`.
+`closeCaseDetail()` handles both modes' DOM state.
+`_getCasesParams(offset)` reads from the correct filter element IDs per mode.
+
+### Customer cases list
+- Card-based layout (`.case-card`) — no table
+- Each card: type badge, subject, status badge, priority badge, customer name, timestamp, "Visa detaljer →"
+- Filter bar: search + status only (no type/sort controls)
+- Separate pagination IDs (`custCasesPrev/Next/PageInfo`)
+- Polished empty state when no results
+
+### Customer case detail
+- `#custCasesWrap` stays visible; `#custCaseDetailWrap` overlaid inside it
+- Title = subject; subtitle = type + received date
+- **Next step card** (`.next-step-card`) — status-driven friendly icon + label + explanation, no raw status strings
+- **Ditt meddelande** — from/subject/received/processed + body in `detail-msg-body`
+- **Aktivitetslogg** — timeline from `c.actions`; action types mapped to friendly Swedish labels (`.timeline-item`, `.timeline-dot` colored by status)
+- **Konversation** — thread messages with outgoing/incoming styling
+- **Problem** — errors only when present, styled as `msg-error`
+- Hidden from customer: extracted_data JSON, routing_preview, dispatch buttons, policy fields, job IDs in title
+
+### Admin cases list
+- Table preserved; type column uses `.type-badge` pills; new priority column with `.prio-badge`
+- CSS vars replace all inline light-mode colors
+- Filter bar with all controls (type, status, sort_by, sort_dir) using `.cases-filter-bar` styles
+- Subtitle shows total count
+
+### Admin case detail
+- All existing sections preserved: routing+dispatch, original message, extracted data, thread, actions, errors
+- Restyled with `.detail-section` / `.detail-section-title` replacing `setup-card` + light-mode `h3`
+- Thread messages use `.thread-message.outgoing/.incoming` CSS
+- Dispatch result panel uses CSS vars (`var(--success-bg)`, `var(--danger)`, etc.)
+- `_showDispatchResult()` and `autoDispatch()` updated to dark-safe colors
+
+### New CSS classes
+`.case-card`, `.case-card-header`, `.case-card-subject`, `.case-card-footer`, `.case-card-customer`,
+`.type-badge` (lead/support/invoice/partnership/supplier/other),
+`.prio-badge` (HIGH/NORMAL/LOW),
+`.cases-filter-bar`,
+`.detail-section`, `.detail-section-title`, `.detail-msg-body`,
+`.thread-message` (outgoing/incoming), `.thread-dir`, `.thread-subj`, `.thread-body`,
+`.timeline`, `.timeline-item`, `.timeline-dot` (ok/warn/err/info), `.timeline-label`, `.timeline-meta`,
+`.next-step-card`, `.next-step-icon`, `.next-step-label`, `.next-step-text`
+
+### Files changed
+- `app/ui/index.html` — CSS, HTML (cases view entirely replaced), JS (cases functions replaced)
+
+### Tests
+No backend changes. 1779/1779 tests pass (1 pre-existing env-dependent failure unchanged).
+
 ## Completed slice (2026-04-27 — Slice 23: Dashboard Composition Polish)
 
 ### What was built
