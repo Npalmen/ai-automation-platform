@@ -1730,3 +1730,72 @@ Full-screen login overlay that intercepts the app before the dashboard is shown.
 
 ### Tests
 No backend changes. 1756/1756 tests pass (1 pre-existing env-dependent failure unchanged).
+
+## Completed slice (2026-05-01 — Slice 26: Instellningar + Onboarding Polish)
+
+### What was built
+No backend changes. Pure UI polish of the Instaellningar and Onboarding views.
+
+### Instaellningar (viewSetup)
+Old layout: flat list of .setup-card divs with h2 headings, light-mode inline colors.
+New layout: premium .cfg-section cards each with icon badge + title + subtitle header.
+
+Sections:
+1. Tenant-hantering — active tenant display + dropdown switcher + create tenant form; all messages use .cfg-save-msg (ok/err classes)
+2. Konfigurationsstatus — progress bar fill + per-check colored dots + cfg-overall pill; updates topbar status pill (#setupReadinessPill)
+3. Aktiva arbetsfloden — check-grid unchanged (already dark)
+4. Anslutna system — check-grid unchanged
+5. Automationsniva — auto-grid unchanged
+6. Spara — cfg-save-row with .cfg-save-msg#msgSetupSave replacing old setMsg call
+7. Systemverifiering — cfg-section with dark status pills in verify result
+
+renderReadiness() rewritten: uses #setupReadinessBody inside the existing #setupReadiness section element; updates #setupReadinessPill status-pill in page header.
+
+### Onboarding (viewOnboarding)
+Role-branched with two wrappers: #adminOnboardingWrap and #custOnboardingWrap.
+loadOnboarding() checks _uiMode and delegates to _loadAdminOnboarding() or _loadCustomerOnboarding().
+
+Admin mode:
+- ob-progress-card: score ring (colored border by status: ready/almost/not) + score number + progress bar fill + missing items
+- Modules: .ob-module-row with .toggle-switch (CSS-only, no JS library); _syncToggle() + _clickToggle() helpers
+- Integrations: .ob-integration-grid of .ob-int-card (connected = green top border; disconnected = muted)
+- Automation: .cfg-row key-value display
+- Verify: status-pill result cards
+- Wizard: ob-step-list with .ob-step + .ob-step-dot (complete/incomplete/warning) + progress bar
+- Test lead: .ob-test-card with .ob-input/.ob-textarea dark inputs
+
+Customer mode (no admin internals):
+- ob-cust-hero gradient card
+- Read-only connection status (.ob-status-row per integration)
+- Automation mode + followups display
+- Active modules list
+
+### All hardcoded colors replaced
+#16a34a -> var(--success), #dc2626 -> var(--danger), #d97706 -> var(--warning),
+#9ca3af -> var(--text-dim), #6b7280 -> var(--text-muted), #f3f4f6 -> var(--border)
+
+### New CSS classes
+.cfg-section, .cfg-section-hdr, .cfg-section-icon (purple/blue/green/amber),
+.cfg-section-title/sub, .cfg-section-body,
+.cfg-readiness-bar/fill, .cfg-check-item, .cfg-check-dot (ok/warn/fail/dim),
+.cfg-overall (ok/fail), .cfg-row, .cfg-row-label/value, .cfg-save-row, .cfg-save-msg (ok/err),
+.ob-page-hdr, .ob-progress-card, .ob-progress-top, .ob-score-ring (ready/almost/not),
+.ob-progress-bar/fill, .ob-step-list, .ob-step, .ob-step-dot (complete/incomplete/warning),
+.ob-step-label/msg, .ob-integration-grid, .ob-int-card (connected/disconnected),
+.ob-int-name/badge (ok/off), .ob-module-grid, .ob-module-row, .ob-module-info/name/desc,
+.toggle-wrap, .toggle-switch (on), .toggle-input, .ob-action-grid,
+.ob-test-card, .ob-input, .ob-textarea,
+.ob-cust-wrap, .ob-cust-hero, .ob-status-card, .ob-status-title, .ob-status-row
+
+### New JS
+_syncToggle(checkbox) -- syncs toggle-switch div class to checkbox state
+_clickToggle(checkboxId) -- toggles checkbox + syncs visual
+_loadAdminOnboarding() -- admin branch of loadOnboarding()
+_loadCustomerOnboarding() -- customer branch of loadOnboarding()
+loadOnboarding() -- role-branches and delegates
+
+### Files changed
+- app/ui/index.html -- CSS, HTML (both views replaced), JS (onboarding + setup functions updated)
+
+### Tests
+No backend changes. 1756/1756 tests pass (1 pre-existing env-dependent failure unchanged).
