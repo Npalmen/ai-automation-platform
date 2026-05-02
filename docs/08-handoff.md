@@ -1799,3 +1799,74 @@ loadOnboarding() -- role-branches and delegates
 
 ### Tests
 No backend changes. 1756/1756 tests pass (1 pre-existing env-dependent failure unchanged).
+
+## Completed slice (2026-05-01 — Slice 27: Tenant Creation Wizard)
+
+### Problem solved
+Admins had no UI flow for creating a new customer — had to manually POST to API and then separately configure job types and auto actions. Now a polished 4-step wizard handles the full creation workflow.
+
+### What was built
+No backend changes. Pure UI addition.
+
+**Wizard overlay** (`#wizardOverlay`) — fullscreen modal, fixed z-index 8000, backdrop-click to dismiss.
+Admin-only: `openWizard()` returns immediately if `_uiMode !== 'admin'`.
+
+**Step 1 — Kunduppgifter:**
+- Company name (required) → auto-generates tenant-ID slug via `wizAutoSlug()`
+- Tenant-ID (required, regex `^[A-Z0-9_]{1,40}$`) — shown in purple monospace
+- Contact name, email (validated), phone (optional)
+- All validation in `_wizValidateBasics()` — field-level errors + footer error
+
+**Step 2 — Moduler & system:**
+- Job type chips: lead (default on), customer_inquiry (on), invoice, partnership, supplier
+- Integration chips: Gmail, Monday, Fortnox, Slack (all toggleable); Visma (coming soon, disabled)
+- Chip state: `.on` class = selected, purple glow
+
+**Step 3 — Automationsnivå:**
+- Renders only selected job types from Step 2 via `_wizRenderAuto()`
+- Per-job radio: Manuellt / Semi-auto / Fullt automatiskt
+- Safe defaults: lead=semi, all others=manual
+
+**Step 4 — Granska & skapa:**
+- Summary cards: basics, modules+systems, auto levels
+- Warning box: credentials still need manual config
+- "Skapa kund →" triggers `_wizCreate()`
+
+**Creation flow (`_wizCreate`):**
+1. `POST /tenant` `{tenant_id, name}`
+2. `PUT /tenant/config/{id}` `{enabled_job_types, allowed_integrations, auto_actions}` (only if any selected)
+3. On success: show success state, reload admin overview in background
+
+**Success state:**
+- Checkmark icon, tenant name, tenant-ID
+- "Öppna kund" → `wizOpenCustomer()` closes wizard + calls `openTenant(id)` (switches to Inställningar with tenant pre-selected)
+- "Till Super Admin" → closes wizard, navigates to admin view
+
+**Super Admin view restyled:**
+- `dash-page-hdr` with "+ Ny kund" + "↻ Uppdatera" buttons
+- Admin key input moved into `.cfg-section` card (dark-safe)
+- Summary cards upgraded from `.dash-card` to `.kpi-card` with icon badges and colored values
+- All `#16a34a`, `#d97706`, `#dc2626`, `#6b7280`, `#9ca3af`, `#f9fafb`, `#e5e7eb`, `#374151` replaced with CSS vars
+
+### New JS
+`openWizard()`, `closeWizard()`, `_wizGoTo(step)`, `wizBack()`, `wizNext()`,
+`wizAutoSlug()`, `wizValidateSlug()`, `_wizValidateBasics()`,
+`_wizBuildChips()`, `_wizSelectedJobTypes()`, `_wizSelectedIntegrations()`,
+`_wizRenderAuto()`, `_wizGetAutoActions()`, `_wizBuildReview()`,
+`_wizCreate()`, `_wizShowSuccess()`, `wizOpenCustomer()`
+
+### New CSS classes
+`#wizardOverlay`, `.wiz-panel`, `.wiz-header`, `.wiz-header-icon`, `.wiz-title/sub`,
+`.wiz-close`, `.wiz-stepper`, `.wiz-step` (active/done), `.wiz-step-num/label`, `.wiz-step-sep`,
+`.wiz-body`, `.wiz-field`, `.wiz-input` (err/wiz-input-slug), `.wiz-input-hint`, `.wiz-field-error`,
+`.wiz-chip-grid`, `.wiz-chip` (on/coming), `.wiz-chip-dot`,
+`.wiz-auto-table`, `.wiz-auto-opts`, `.wiz-auto-opt`,
+`.wiz-review-section/title/row/key/val`, `.wiz-warning-box`,
+`.wiz-footer`, `.wiz-footer-back`, `.wiz-err`,
+`.wiz-success`, `.wiz-success-icon/title/sub/actions`
+
+### Files changed
+- `app/ui/index.html` — CSS, HTML (Super Admin view + wizard overlay), JS (wizard functions)
+
+### Tests
+No backend changes. 1756/1756 tests pass (1 pre-existing env-dependent failure unchanged).

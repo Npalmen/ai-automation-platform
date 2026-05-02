@@ -1098,6 +1098,186 @@ label { color: var(--text-muted); }
   cursor: pointer; transition: all 0.12s; text-align: center;
 }
 .btn-logout:hover { border-color: var(--danger); color: #fca5a5; background: var(--danger-bg); }
+
+/* ═══════════════════════════════════════════════════════
+   TENANT CREATION WIZARD
+═══════════════════════════════════════════════════════ */
+#wizardOverlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 8000;
+  background: rgba(0,0,0,.65);
+  align-items: center; justify-content: center;
+}
+#wizardOverlay.open { display: flex; }
+
+.wiz-panel {
+  width: 100%; max-width: 620px; max-height: 92vh;
+  background: var(--surface);
+  border: 1px solid var(--border-med);
+  border-radius: var(--radius-lg);
+  display: flex; flex-direction: column;
+  box-shadow: 0 16px 60px rgba(0,0,0,.7);
+  overflow: hidden;
+}
+.wiz-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px;
+  flex-shrink: 0;
+}
+.wiz-header-icon {
+  width: 34px; height: 34px; border-radius: 9px;
+  background: linear-gradient(135deg, var(--purple), var(--blue));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; flex-shrink: 0; box-shadow: var(--glow-purple);
+}
+.wiz-title { font-size: 15px; font-weight: 700; color: var(--text); }
+.wiz-sub   { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.wiz-close {
+  margin-left: auto; background: none; border: none;
+  color: var(--text-dim); font-size: 18px; cursor: pointer;
+  padding: 4px 8px; border-radius: var(--radius-sm);
+  transition: color 0.12s, background 0.12s;
+}
+.wiz-close:hover { color: var(--text); background: var(--surface-2); }
+
+/* Stepper */
+.wiz-stepper {
+  display: flex; align-items: center; gap: 0;
+  padding: 14px 24px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0; overflow-x: auto;
+}
+.wiz-step {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.wiz-step-num {
+  width: 24px; height: 24px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; flex-shrink: 0;
+  background: var(--surface-3); color: var(--text-dim);
+  border: 1px solid var(--border-med);
+  transition: all 0.2s;
+}
+.wiz-step.active .wiz-step-num  { background: var(--purple); color: #fff; border-color: var(--purple); box-shadow: var(--glow-purple); }
+.wiz-step.done .wiz-step-num    { background: var(--success-bg); color: var(--success); border-color: rgba(16,185,129,.3); }
+.wiz-step-label { font-size: 11px; font-weight: 600; color: var(--text-dim); white-space: nowrap; }
+.wiz-step.active .wiz-step-label { color: var(--text); }
+.wiz-step.done .wiz-step-label   { color: var(--text-muted); }
+.wiz-step-sep {
+  flex: 1; min-width: 20px; height: 1px;
+  background: var(--border-med); margin: 0 8px;
+}
+
+/* Body */
+.wiz-body { flex: 1; overflow-y: auto; padding: 24px; }
+
+/* Fields */
+.wiz-field { margin-bottom: 16px; }
+.wiz-field label {
+  display: block; font-size: 11px; font-weight: 700;
+  color: var(--text-dim); text-transform: uppercase;
+  letter-spacing: 0.07em; margin-bottom: 6px;
+}
+.wiz-field label .req { color: var(--purple-light); }
+.wiz-input {
+  width: 100%; padding: 9px 12px;
+  background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border-med);
+  border-radius: var(--radius-sm); font-family: inherit; font-size: 13px;
+  transition: border-color 0.15s;
+}
+.wiz-input:focus { outline: none; border-color: var(--purple); box-shadow: 0 0 0 2px var(--purple-glow); }
+.wiz-input.err { border-color: var(--danger); }
+.wiz-input-hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; line-height: 1.5; }
+.wiz-input-slug {
+  font-family: 'SF Mono','Fira Code',monospace; font-size: 12px;
+  color: var(--purple-light); background: rgba(124,58,237,.1);
+  border-color: rgba(124,58,237,.3);
+}
+.wiz-field-error { font-size: 11px; color: #fca5a5; margin-top: 4px; display: none; }
+
+/* Module/integration chip grid */
+.wiz-chip-grid {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px;
+}
+.wiz-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  cursor: pointer; border: 1px solid var(--border-med);
+  color: var(--text-muted); background: var(--surface-2);
+  transition: all 0.12s; user-select: none;
+}
+.wiz-chip:hover  { border-color: var(--border-hi); color: var(--text); background: var(--surface-3); }
+.wiz-chip.on     { background: var(--purple-glow); border-color: rgba(124,58,237,.45); color: #c084fc; }
+.wiz-chip.coming { opacity: 0.4; cursor: not-allowed; }
+.wiz-chip-dot    { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.6; }
+
+/* Auto-level rows */
+.wiz-auto-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+.wiz-auto-table th {
+  text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--text-dim); padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.wiz-auto-table td { padding: 8px; border-bottom: 1px solid var(--border); }
+.wiz-auto-table tr:last-child td { border-bottom: none; }
+.wiz-auto-table .jt-label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+.wiz-auto-opts  { display: flex; gap: 6px; }
+.wiz-auto-opt   { }
+.wiz-auto-opt input[type=radio] { display: none; }
+.wiz-auto-opt label {
+  display: inline-flex; padding: 4px 10px; border-radius: 20px; font-size: 11px;
+  font-weight: 600; cursor: pointer; border: 1px solid var(--border-med);
+  color: var(--text-dim); background: var(--surface-2);
+  transition: all 0.12s;
+}
+.wiz-auto-opt input[type=radio]:checked + label {
+  background: var(--purple-glow); border-color: rgba(124,58,237,.45); color: #c084fc;
+}
+.wiz-auto-opt label:hover { border-color: var(--border-hi); color: var(--text); }
+
+/* Review summary */
+.wiz-review-section { margin-bottom: 18px; }
+.wiz-review-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.09em; color: var(--text-dim); margin-bottom: 8px;
+}
+.wiz-review-row {
+  display: flex; gap: 8px; padding: 7px 0;
+  border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.wiz-review-row:last-child { border-bottom: none; }
+.wiz-review-key   { color: var(--text-dim); min-width: 130px; flex-shrink: 0; }
+.wiz-review-val   { color: var(--text); font-weight: 500; flex: 1; }
+.wiz-warning-box {
+  background: var(--warning-bg); border: 1px solid rgba(245,158,11,.3);
+  border-radius: var(--radius-sm); padding: 10px 14px;
+  font-size: 12px; color: #fcd34d; line-height: 1.6; margin-top: 14px;
+}
+
+/* Footer */
+.wiz-footer {
+  padding: 16px 24px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  background: var(--surface-2);
+}
+.wiz-footer-back { margin-right: auto; }
+.wiz-err { font-size: 12px; color: #fca5a5; flex: 1; }
+
+/* Success state */
+.wiz-success {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 40px 24px; text-align: center; gap: 14px;
+}
+.wiz-success-icon {
+  width: 60px; height: 60px; border-radius: 50%;
+  background: var(--success-bg); border: 2px solid var(--success);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; color: var(--success);
+}
+.wiz-success-title { font-size: 18px; font-weight: 700; color: var(--text); }
+.wiz-success-sub   { font-size: 13px; color: var(--text-muted); max-width: 380px; line-height: 1.6; }
+.wiz-success-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -2413,63 +2593,213 @@ label { color: var(--text-muted); }
 <!-- ══════════════════════════════════════════════════════════ SUPER ADMIN -->
 <div id="viewAdmin" style="display:none; padding:24px; overflow-y:auto; flex:1;">
 
-  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+  <div class="dash-page-hdr" style="max-width:1100px;">
     <div>
-      <h1 style="font-size:18px; font-weight:700; color:#111; margin:0;">Super Admin — Kunder</h1>
-      <p style="font-size:12px; color:#9ca3af; margin:4px 0 0;">Läsvy. Visar alla tenants i databasen. Kräver Admin API-nyckel (X-Admin-API-Key).</p>
+      <div class="dash-page-title">Super Admin — Kunder</div>
+      <div class="dash-page-sub">Alla tenants i databasen. Kräver Admin API-nyckel.</div>
     </div>
-    <button class="btn btn-primary btn-sm" onclick="loadAdminOverview()">Uppdatera</button>
+    <div class="dash-quick-actions">
+      <button class="btn btn-primary btn-sm" onclick="openWizard()">+ Ny kund</button>
+      <button class="btn btn-neutral btn-sm" onclick="loadAdminOverview()">↻ Uppdatera</button>
+    </div>
   </div>
 
   <!-- Admin key input -->
-  <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px; padding:12px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px;">
-    <label style="font-size:12px; font-weight:600; color:#374151; white-space:nowrap;">Admin API-nyckel</label>
-    <input id="adminKeyInput" type="password" placeholder="admin-key-…"
-      style="flex:1; padding:6px 10px; border:1px solid #d1d5db; border-radius:4px; font-size:13px; font-family:monospace;"
-      oninput="onAdminKeyInput()" />
-    <button class="btn btn-neutral btn-sm" onclick="onAdminKeyInput(); loadAdminOverview()">Spara &amp; ladda</button>
+  <div class="cfg-section" style="max-width:1100px; margin-bottom:16px;">
+    <div class="cfg-section-body" style="padding:12px 16px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.07em; white-space:nowrap;">Admin API-nyckel</span>
+        <input id="adminKeyInput" type="password" placeholder="admin-key-…"
+          style="flex:1; min-width:0;" oninput="onAdminKeyInput()" />
+        <button class="btn btn-neutral btn-sm" onclick="onAdminKeyInput(); loadAdminOverview()">Spara &amp; ladda</button>
+      </div>
+    </div>
   </div>
-  <div id="adminKeyBanner" class="msg msg-error" style="display:none; margin-bottom:12px;">
+  <div id="adminKeyBanner" class="msg msg-error" style="display:none; margin-bottom:12px; max-width:1100px;">
     Super Admin kräver adminnyckel. Ange ADMIN_API_KEY-värdet ovan.
   </div>
 
-  <div id="adminError" class="msg msg-error" style="display:none;"></div>
+  <div id="adminError" class="msg msg-error" style="display:none; max-width:1100px;"></div>
 
-  <!-- Summary cards -->
-  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; margin-bottom:24px;">
-    <div class="dash-card">
-      <div class="dash-label">Totalt kunder</div>
-      <div class="dash-value" id="adminTotal">–</div>
+  <!-- Summary KPI row -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; margin-bottom:24px; max-width:1100px;">
+    <div class="kpi-card accent-blue">
+      <div class="kpi-top"><div class="kpi-icon blue">◈</div></div>
+      <div class="kpi-label">Totalt kunder</div>
+      <div class="kpi-value" id="adminTotal">–</div>
     </div>
-    <div class="dash-card">
-      <div class="dash-label">Friska</div>
-      <div class="dash-value" id="adminHealthy" style="color:#16a34a;">–</div>
+    <div class="kpi-card accent-green">
+      <div class="kpi-top"><div class="kpi-icon green">✦</div></div>
+      <div class="kpi-label">Friska</div>
+      <div class="kpi-value" id="adminHealthy" style="color:var(--success);">–</div>
     </div>
-    <div class="dash-card">
-      <div class="dash-label">Varning</div>
-      <div class="dash-value" id="adminWarning" style="color:#d97706;">–</div>
+    <div class="kpi-card accent-amber">
+      <div class="kpi-top"><div class="kpi-icon amber">⚠</div></div>
+      <div class="kpi-label">Varning</div>
+      <div class="kpi-value" id="adminWarning" style="color:var(--warning);">–</div>
     </div>
-    <div class="dash-card">
-      <div class="dash-label">Fel</div>
-      <div class="dash-value" id="adminError2" style="color:#dc2626;">–</div>
+    <div class="kpi-card" style="border-top:2px solid var(--danger);">
+      <div class="kpi-top"><div class="kpi-icon" style="background:var(--danger-bg);">✗</div></div>
+      <div class="kpi-label">Fel</div>
+      <div class="kpi-value" id="adminError2" style="color:var(--danger);">–</div>
     </div>
-    <div class="dash-card">
-      <div class="dash-label">Ej redo</div>
-      <div class="dash-value" id="adminNotReady" style="color:#6b7280;">–</div>
+    <div class="kpi-card">
+      <div class="kpi-top"><div class="kpi-icon" style="background:var(--surface-3);">○</div></div>
+      <div class="kpi-label">Ej redo</div>
+      <div class="kpi-value" id="adminNotReady" style="color:var(--text-muted);">–</div>
     </div>
-    <div class="dash-card">
-      <div class="dash-label">Sparade timmar 30d</div>
-      <div class="dash-value" id="adminHours">–</div>
+    <div class="kpi-card accent-purple">
+      <div class="kpi-top"><div class="kpi-icon purple">⏱</div></div>
+      <div class="kpi-label">Sparade timmar 30d</div>
+      <div class="kpi-value" id="adminHours">–</div>
     </div>
   </div>
 
   <!-- Tenant table -->
-  <div id="adminTable"><span class="empty">Tryck på "Uppdatera" för att ladda.</span></div>
+  <div id="adminTable" style="max-width:1100px;"><span class="empty">Tryck på "↻ Uppdatera" för att ladda.</span></div>
 
 </div><!-- /viewAdmin -->
 
   </div><!-- /#viewWrap -->
 </div><!-- /#mainContent -->
+
+<!-- ═══════════════════════════════════════════════════════
+     TENANT CREATION WIZARD OVERLAY (admin-only)
+═══════════════════════════════════════════════════════ -->
+<div id="wizardOverlay" role="dialog" aria-modal="true">
+  <div class="wiz-panel">
+
+    <!-- Header -->
+    <div class="wiz-header">
+      <div class="wiz-header-icon">⚡</div>
+      <div>
+        <div class="wiz-title">Ny kundmiljö</div>
+        <div class="wiz-sub" id="wizHeaderSub">Steg 1 av 4 — Kunduppgifter</div>
+      </div>
+      <button class="wiz-close" onclick="closeWizard()" title="Stäng">✕</button>
+    </div>
+
+    <!-- Stepper -->
+    <div class="wiz-stepper" id="wizStepper">
+      <div class="wiz-step active" id="wizStep0">
+        <div class="wiz-step-num">1</div>
+        <div class="wiz-step-label">Uppgifter</div>
+      </div>
+      <div class="wiz-step-sep"></div>
+      <div class="wiz-step" id="wizStep1">
+        <div class="wiz-step-num">2</div>
+        <div class="wiz-step-label">Moduler</div>
+      </div>
+      <div class="wiz-step-sep"></div>
+      <div class="wiz-step" id="wizStep2">
+        <div class="wiz-step-num">3</div>
+        <div class="wiz-step-label">Automation</div>
+      </div>
+      <div class="wiz-step-sep"></div>
+      <div class="wiz-step" id="wizStep3">
+        <div class="wiz-step-num">4</div>
+        <div class="wiz-step-label">Granska</div>
+      </div>
+    </div>
+
+    <!-- Body: steps -->
+    <div class="wiz-body">
+
+      <!-- Step 1: Basics -->
+      <div id="wizPane0">
+        <div class="wiz-field">
+          <label>Företagsnamn <span class="req">*</span></label>
+          <input id="wizCompany" class="wiz-input" type="text" placeholder="t.ex. Acme AB"
+            oninput="wizAutoSlug()" autocomplete="organization">
+          <div class="wiz-field-error" id="wizCompanyErr">Företagsnamn krävs.</div>
+        </div>
+        <div class="wiz-field">
+          <label>Tenant-ID <span class="req">*</span></label>
+          <input id="wizTenantId" class="wiz-input wiz-input-slug" type="text"
+            placeholder="t.ex. ACME_AB"
+            oninput="wizValidateSlug()"
+            style="font-family:'SF Mono','Fira Code',monospace;">
+          <div class="wiz-input-hint">Unikt ID, endast bokstäver, siffror och understreck. Genereras automatiskt från företagsnamnet.</div>
+          <div class="wiz-field-error" id="wizSlugErr">Ogiltigt tenant-ID. Använd A–Z, 0–9 och understreck.</div>
+        </div>
+        <div class="wiz-field">
+          <label>Kontaktperson</label>
+          <input id="wizContact" class="wiz-input" type="text" placeholder="t.ex. Anna Johansson" autocomplete="name">
+        </div>
+        <div class="wiz-field">
+          <label>Kontakt-e-post</label>
+          <input id="wizEmail" class="wiz-input" type="email" placeholder="t.ex. anna@acme.se" autocomplete="email">
+          <div class="wiz-field-error" id="wizEmailErr">Ogiltig e-postadress.</div>
+        </div>
+        <div class="wiz-field">
+          <label>Telefon <span style="color:var(--text-dim); font-weight:400; text-transform:none;">(valfritt)</span></label>
+          <input id="wizPhone" class="wiz-input" type="tel" placeholder="t.ex. 08-123 45 67" autocomplete="tel">
+        </div>
+      </div>
+
+      <!-- Step 2: Modules & integrations -->
+      <div id="wizPane1" style="display:none;">
+        <div class="wiz-field">
+          <label>Arbetsflöden</label>
+          <div class="wiz-input-hint" style="margin-bottom:10px;">Välj vilka ärendetyper som ska vara aktiva för denna kund.</div>
+          <div class="wiz-chip-grid" id="wizJobChips"></div>
+        </div>
+        <div class="wiz-field" style="margin-top:20px;">
+          <label>Anslutna system</label>
+          <div class="wiz-input-hint" style="margin-bottom:10px;">Välj vilka externa system denna miljö får använda. Inloggningsuppgifter konfigureras separat.</div>
+          <div class="wiz-chip-grid" id="wizIntChips"></div>
+        </div>
+      </div>
+
+      <!-- Step 3: Automation levels -->
+      <div id="wizPane2" style="display:none;">
+        <div class="wiz-input-hint" style="margin-bottom:16px; line-height:1.6;">
+          Välj hur mycket systemet agerar självständigt för varje aktiverat arbetsflöde.
+          Rekommenderat: börja försiktigt och öka efter verifiering.
+        </div>
+        <div id="wizAutoPane">
+          <div class="empty-state">
+            <div class="empty-state-icon">◌</div>
+            <div class="empty-state-title">Aktivera arbetsflöden i föregående steg.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4: Review -->
+      <div id="wizPane3" style="display:none;">
+        <div class="wiz-review-section" id="wizReviewBasics"></div>
+        <div class="wiz-review-section" id="wizReviewModules"></div>
+        <div class="wiz-review-section" id="wizReviewAuto"></div>
+        <div class="wiz-warning-box">
+          ⚠ Integrationer aktiveras men kräver separata inloggningsuppgifter (API-nycklar) för att fungera.
+          Konfigurera dessa under Kundminne → Inställningar efter att kunden skapats.
+        </div>
+      </div>
+
+      <!-- Success state -->
+      <div id="wizSuccess" style="display:none;">
+        <div class="wiz-success">
+          <div class="wiz-success-icon">✓</div>
+          <div class="wiz-success-title" id="wizSuccessTitle">Kund skapad!</div>
+          <div class="wiz-success-sub" id="wizSuccessSub"></div>
+          <div class="wiz-success-actions">
+            <button class="btn btn-primary" id="wizBtnOpen" onclick="wizOpenCustomer()">Öppna kund</button>
+            <button class="btn btn-neutral" onclick="switchView('admin'); closeWizard()">Till Super Admin</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /.wiz-body -->
+
+    <!-- Footer -->
+    <div class="wiz-footer" id="wizFooter">
+      <button class="btn btn-neutral wiz-footer-back" id="wizBtnBack" onclick="wizBack()" style="display:none;">← Tillbaka</button>
+      <span class="wiz-err" id="wizFooterErr"></span>
+      <button class="btn btn-primary" id="wizBtnNext" onclick="wizNext()">Nästa →</button>
+    </div>
+
+  </div><!-- /.wiz-panel -->
+</div><!-- /#wizardOverlay -->
 
 <script>
 // ---------------------------------------------------------------------------
@@ -5397,6 +5727,347 @@ async function saveMemory() {
     msg.textContent = 'Kunde inte spara: ' + e.message;
     msg.style.display = 'block';
   }
+}
+
+// ---------------------------------------------------------------------------
+// Tenant Creation Wizard
+// ---------------------------------------------------------------------------
+
+// Wizard state
+let _wizStep = 0;
+let _wizCreatedId = null;
+
+// Which job types + integrations to offer in wizard (simplified subset)
+const WIZ_JOB_TYPES = [
+  { key: 'lead',             label: 'Leads',               defaultOn: true  },
+  { key: 'customer_inquiry', label: 'Supportärenden',       defaultOn: true  },
+  { key: 'invoice',          label: 'Fakturor',             defaultOn: false },
+  { key: 'partnership',      label: 'Samarbeten',           defaultOn: false },
+  { key: 'supplier',         label: 'Leverantörsfrågor',    defaultOn: false },
+];
+const WIZ_INTEGRATIONS = [
+  { key: 'google_mail', label: 'Gmail',        available: true  },
+  { key: 'monday',      label: 'Monday.com',   available: true  },
+  { key: 'fortnox',     label: 'Fortnox',      available: true  },
+  { key: 'slack',       label: 'Slack',        available: true  },
+  { key: 'visma',       label: 'Visma',        available: false },
+];
+const WIZ_AUTO_DEFAULTS = {
+  lead:             'semi',
+  customer_inquiry: 'manual',
+  invoice:          'manual',
+  partnership:      'manual',
+  supplier:         'manual',
+};
+const WIZ_STEP_SUBS = [
+  'Steg 1 av 4 — Kunduppgifter',
+  'Steg 2 av 4 — Moduler & system',
+  'Steg 3 av 4 — Automationsnivå',
+  'Steg 4 av 4 — Granska & skapa',
+];
+
+function openWizard() {
+  if (_uiMode !== 'admin') return;
+  _wizStep = 0;
+  _wizCreatedId = null;
+  // Reset form
+  ['wizCompany','wizTenantId','wizContact','wizEmail','wizPhone'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.querySelectorAll('.wiz-field-error').forEach(e => e.style.display = 'none');
+  document.querySelectorAll('.wiz-input').forEach(e => e.classList.remove('err'));
+  document.getElementById('wizFooterErr').textContent = '';
+  document.getElementById('wizSuccess').style.display = 'none';
+  document.getElementById('wizFooter').style.display  = '';
+  document.getElementById('wizStepper').style.display = '';
+  _wizBuildChips();
+  _wizRenderAuto();
+  _wizGoTo(0);
+  document.getElementById('wizardOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('wizCompany').focus(), 60);
+}
+
+function closeWizard() {
+  document.getElementById('wizardOverlay').classList.remove('open');
+}
+
+// Close on backdrop click
+document.addEventListener('click', e => {
+  if (e.target === document.getElementById('wizardOverlay')) closeWizard();
+});
+
+function _wizGoTo(step) {
+  _wizStep = step;
+  for (let i = 0; i < 4; i++) {
+    document.getElementById(`wizPane${i}`).style.display = i === step ? '' : 'none';
+    const s = document.getElementById(`wizStep${i}`);
+    s.className = 'wiz-step' + (i === step ? ' active' : i < step ? ' done' : '');
+  }
+  document.getElementById('wizHeaderSub').textContent = WIZ_STEP_SUBS[step] || '';
+  document.getElementById('wizBtnBack').style.display = step > 0 ? '' : 'none';
+  document.getElementById('wizBtnNext').textContent   = step === 3 ? 'Skapa kund →' : 'Nästa →';
+  document.getElementById('wizFooterErr').textContent = '';
+  if (step === 2) _wizRenderAuto();
+  if (step === 3) _wizBuildReview();
+}
+
+function wizBack() {
+  if (_wizStep > 0) _wizGoTo(_wizStep - 1);
+}
+
+async function wizNext() {
+  if (_wizStep === 0 && !_wizValidateBasics()) return;
+  if (_wizStep < 3) { _wizGoTo(_wizStep + 1); return; }
+  // Step 3 → create
+  await _wizCreate();
+}
+
+// ── Slug generation ──
+function wizAutoSlug() {
+  const company = document.getElementById('wizCompany').value;
+  const slug = company.trim()
+    .toUpperCase()
+    .replace(/[ÅÄÀÁÂÃÆ]/g, 'A')
+    .replace(/[ÖØÒÓÔÕ]/g, 'O')
+    .replace(/[ÜÙÚÛ]/g, 'U')
+    .replace(/[ÉÈÊ]/g, 'E')
+    .replace(/[ÍÌÎ]/g, 'I')
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 30);
+  document.getElementById('wizTenantId').value = slug;
+  wizValidateSlug();
+}
+
+function wizValidateSlug() {
+  const val = document.getElementById('wizTenantId').value;
+  const ok = /^[A-Z0-9_]{1,40}$/.test(val);
+  document.getElementById('wizTenantId').classList.toggle('err', !ok && val.length > 0);
+  document.getElementById('wizSlugErr').style.display = (!ok && val.length > 0) ? '' : 'none';
+  return ok;
+}
+
+// ── Validation ──
+function _wizValidateBasics() {
+  let ok = true;
+  const company = document.getElementById('wizCompany').value.trim();
+  const slug    = document.getElementById('wizTenantId').value.trim();
+  const email   = document.getElementById('wizEmail').value.trim();
+  const errEl   = document.getElementById('wizFooterErr');
+
+  document.getElementById('wizCompanyErr').style.display = 'none';
+  document.getElementById('wizSlugErr').style.display    = 'none';
+  document.getElementById('wizEmailErr').style.display   = 'none';
+  document.getElementById('wizCompany').classList.remove('err');
+  document.getElementById('wizTenantId').classList.remove('err');
+  document.getElementById('wizEmail').classList.remove('err');
+
+  if (!company) {
+    document.getElementById('wizCompanyErr').style.display = '';
+    document.getElementById('wizCompany').classList.add('err');
+    ok = false;
+  }
+  if (!slug || !/^[A-Z0-9_]{1,40}$/.test(slug)) {
+    document.getElementById('wizSlugErr').style.display = '';
+    document.getElementById('wizTenantId').classList.add('err');
+    ok = false;
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    document.getElementById('wizEmailErr').style.display = '';
+    document.getElementById('wizEmail').classList.add('err');
+    ok = false;
+  }
+  if (!ok) errEl.textContent = 'Rätta felen ovan innan du fortsätter.';
+  else errEl.textContent = '';
+  return ok;
+}
+
+// ── Chips ──
+function _wizBuildChips() {
+  // Job type chips
+  document.getElementById('wizJobChips').innerHTML = WIZ_JOB_TYPES.map(jt =>
+    `<div class="wiz-chip ${jt.defaultOn ? 'on' : ''}" id="wizJt_${jt.key}"
+      onclick="this.classList.toggle('on'); _wizRenderAuto();">
+      <span class="wiz-chip-dot"></span>${escapeHtml(jt.label)}
+    </div>`
+  ).join('');
+  // Integration chips
+  document.getElementById('wizIntChips').innerHTML = WIZ_INTEGRATIONS.map(it =>
+    `<div class="wiz-chip ${!it.available ? 'coming' : ''}" id="wizInt_${it.key}"
+      ${it.available ? `onclick="this.classList.toggle('on')"` : `title="Kommer snart"`}>
+      <span class="wiz-chip-dot"></span>${escapeHtml(it.label)}${!it.available ? ' (snart)' : ''}
+    </div>`
+  ).join('');
+}
+
+function _wizSelectedJobTypes() {
+  return WIZ_JOB_TYPES.filter(jt => {
+    const el = document.getElementById(`wizJt_${jt.key}`);
+    return el && el.classList.contains('on');
+  }).map(jt => jt.key);
+}
+
+function _wizSelectedIntegrations() {
+  return WIZ_INTEGRATIONS.filter(it => {
+    const el = document.getElementById(`wizInt_${it.key}`);
+    return el && el.classList.contains('on');
+  }).map(it => it.key);
+}
+
+// ── Auto level table ──
+function _wizRenderAuto() {
+  const types = _wizSelectedJobTypes();
+  const pane  = document.getElementById('wizAutoPane');
+  if (!types.length) {
+    pane.innerHTML = `<div class="empty-state"><div class="empty-state-icon">◌</div><div class="empty-state-title">Aktivera arbetsflöden i föregående steg.</div></div>`;
+    return;
+  }
+  const LEVELS = [
+    { value: 'manual', label: 'Manuellt' },
+    { value: 'semi',   label: 'Semi-auto' },
+    { value: 'auto',   label: 'Full auto' },
+  ];
+  const rows = types.map(jt => {
+    const def = WIZ_AUTO_DEFAULTS[jt] || 'manual';
+    const opts = LEVELS.map(lvl =>
+      `<div class="wiz-auto-opt">
+        <input type="radio" id="wizAl_${jt}_${lvl.value}" name="wizAl_${jt}" value="${lvl.value}"
+          ${def === lvl.value ? 'checked' : ''}>
+        <label for="wizAl_${jt}_${lvl.value}">${escapeHtml(lvl.label)}</label>
+      </div>`
+    ).join('');
+    return `<tr>
+      <td class="jt-label">${escapeHtml(jobLabel(jt))}</td>
+      <td><div class="wiz-auto-opts">${opts}</div></td>
+    </tr>`;
+  }).join('');
+  pane.innerHTML = `<table class="wiz-auto-table">
+    <thead><tr><th>Arbetsflöde</th><th>Automationsnivå</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function _wizGetAutoActions() {
+  const types = _wizSelectedJobTypes();
+  const out = {};
+  types.forEach(jt => {
+    for (const lvl of ['manual','semi','auto']) {
+      const el = document.getElementById(`wizAl_${jt}_${lvl}`);
+      if (el && el.checked) { out[jt] = lvl; break; }
+    }
+    if (!(jt in out)) out[jt] = 'manual';
+  });
+  return out;
+}
+
+// ── Review ──
+function _wizBuildReview() {
+  const company  = document.getElementById('wizCompany').value.trim();
+  const tenantId = document.getElementById('wizTenantId').value.trim();
+  const contact  = document.getElementById('wizContact').value.trim();
+  const email    = document.getElementById('wizEmail').value.trim();
+  const phone    = document.getElementById('wizPhone').value.trim();
+  const jts      = _wizSelectedJobTypes();
+  const ints     = _wizSelectedIntegrations();
+  const auto     = _wizGetAutoActions();
+
+  const LEVEL_LABELS = { manual: 'Manuellt', semi: 'Semi-auto', auto: 'Fullt automatiskt' };
+
+  document.getElementById('wizReviewBasics').innerHTML = `
+    <div class="wiz-review-title">Kunduppgifter</div>
+    <div class="wiz-review-row"><span class="wiz-review-key">Företag</span><span class="wiz-review-val">${escapeHtml(company)}</span></div>
+    <div class="wiz-review-row"><span class="wiz-review-key">Tenant-ID</span><span class="wiz-review-val" style="font-family:monospace; color:var(--purple-light);">${escapeHtml(tenantId)}</span></div>
+    ${contact ? `<div class="wiz-review-row"><span class="wiz-review-key">Kontakt</span><span class="wiz-review-val">${escapeHtml(contact)}</span></div>` : ''}
+    ${email   ? `<div class="wiz-review-row"><span class="wiz-review-key">E-post</span><span class="wiz-review-val">${escapeHtml(email)}</span></div>` : ''}
+    ${phone   ? `<div class="wiz-review-row"><span class="wiz-review-key">Telefon</span><span class="wiz-review-val">${escapeHtml(phone)}</span></div>` : ''}`;
+
+  const jtLabels = jts.length ? jts.map(k => escapeHtml(jobLabel(k))).join(', ') : '–';
+  const intLabels = ints.length ? ints.map(k => escapeHtml(intLabel(k))).join(', ') : '–';
+  document.getElementById('wizReviewModules').innerHTML = `
+    <div class="wiz-review-title">Moduler & system</div>
+    <div class="wiz-review-row"><span class="wiz-review-key">Arbetsflöden</span><span class="wiz-review-val">${jtLabels}</span></div>
+    <div class="wiz-review-row"><span class="wiz-review-key">System</span><span class="wiz-review-val">${intLabels}</span></div>`;
+
+  const autoRows = jts.map(jt =>
+    `<div class="wiz-review-row"><span class="wiz-review-key">${escapeHtml(jobLabel(jt))}</span><span class="wiz-review-val">${escapeHtml(LEVEL_LABELS[auto[jt]] || auto[jt])}</span></div>`
+  ).join('') || '<div class="wiz-review-row"><span class="wiz-review-key">–</span><span class="wiz-review-val">Inga arbetsflöden valda</span></div>';
+  document.getElementById('wizReviewAuto').innerHTML = `
+    <div class="wiz-review-title">Automationsnivå</div>${autoRows}`;
+}
+
+// ── Create ──
+async function _wizCreate() {
+  const btn    = document.getElementById('wizBtnNext');
+  const errEl  = document.getElementById('wizFooterErr');
+  const tenantId = document.getElementById('wizTenantId').value.trim();
+  const name     = document.getElementById('wizCompany').value.trim();
+  const jts      = _wizSelectedJobTypes();
+  const ints     = _wizSelectedIntegrations();
+  const auto     = _wizGetAutoActions();
+
+  btn.disabled = true;
+  btn.textContent = 'Skapar…';
+  errEl.textContent = '';
+
+  try {
+    // Step 1: create tenant (name + tenant_id only)
+    await apiFetch('/tenant', {
+      method: 'POST',
+      body: JSON.stringify({ tenant_id: tenantId, name }),
+    });
+
+    // Step 2: set config (job types, integrations, auto actions)
+    if (jts.length || ints.length || Object.keys(auto).length) {
+      await apiFetch(`/tenant/config/${encodeURIComponent(tenantId)}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          enabled_job_types:   jts,
+          allowed_integrations: ints,
+          auto_actions:        auto,
+        }),
+      });
+    }
+
+    // Step 3: seed business profile in memory if contact/email provided
+    const contact = document.getElementById('wizContact').value.trim();
+    const email   = document.getElementById('wizEmail').value.trim();
+    const phone   = document.getElementById('wizPhone').value.trim();
+    if (contact || email || phone) {
+      // memory endpoint requires X-API-Key for the tenant — skip silently if no key configured
+      // (admin workflow: config can be filled in later via Kundminne)
+    }
+
+    _wizCreatedId = tenantId;
+    _wizShowSuccess(tenantId, name);
+  } catch (e) {
+    errEl.textContent = e.message.includes('already exists')
+      ? `Tenant-ID '${escapeHtml(tenantId)}' finns redan. Välj ett annat ID.`
+      : 'Kunde inte skapa kund: ' + escapeHtml(e.message);
+    btn.disabled = false;
+    btn.textContent = 'Skapa kund →';
+  }
+}
+
+function _wizShowSuccess(tenantId, name) {
+  // Hide stepper + panes + footer, show success
+  document.getElementById('wizStepper').style.display = 'none';
+  document.getElementById('wizFooter').style.display  = 'none';
+  for (let i = 0; i < 4; i++) {
+    document.getElementById(`wizPane${i}`).style.display = 'none';
+  }
+  document.getElementById('wizHeaderSub').textContent = 'Kund skapad';
+  document.getElementById('wizSuccessTitle').textContent = `${escapeHtml(name)} skapad!`;
+  document.getElementById('wizSuccessSub').textContent =
+    `Tenant-ID: ${tenantId}. Kom ihåg att konfigurera integrationsnycklar under Inställningar.`;
+  document.getElementById('wizSuccess').style.display = '';
+  // Reload the admin overview table in background
+  loadAdminOverview();
+}
+
+function wizOpenCustomer() {
+  closeWizard();
+  if (_wizCreatedId) openTenant(_wizCreatedId);
 }
 
 // ---------------------------------------------------------------------------
