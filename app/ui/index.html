@@ -2041,71 +2041,137 @@ label { color: var(--text-muted); }
 </div><!-- /setup-panel -->
 
 <!-- ══════════════════════════════════════════════════════ KONTROLLPANEL -->
-<div id="viewCtrl" style="display:none; padding:24px; overflow-y:auto; flex:1; max-width:640px;">
+<div id="viewCtrl" style="display:none; padding:24px; overflow-y:auto; flex:1; max-width:760px;">
 
-  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
-    <h1 style="font-size:18px; font-weight:700; color:#111; margin:0;">Kontrollpanel</h1>
-    <button class="btn btn-primary btn-sm" onclick="loadControl()">Uppdatera</button>
-  </div>
-
-  <div id="ctrlMsg" class="msg" style="display:none;"></div>
-
-  <!-- Automatisering -->
-  <div class="setup-card" style="margin-bottom:16px;">
-    <h2 style="font-size:13px; font-weight:600; margin:0 0 14px;">Automatisering</h2>
-    <div style="display:flex; flex-direction:column; gap:12px;">
-      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-        <input type="checkbox" id="ctrlLeads"> <span>Leads</span>
-      </label>
-      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-        <input type="checkbox" id="ctrlSupport"> <span>Support</span>
-      </label>
-      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-        <input type="checkbox" id="ctrlInvoices"> <span>Fakturor</span>
-      </label>
-      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-        <input type="checkbox" id="ctrlFollowups"> <span>Uppföljningsmail</span>
-      </label>
+  <div class="dash-page-hdr" style="max-width:720px;">
+    <div>
+      <div class="dash-page-title">Kontrollpanel</div>
+      <div class="dash-page-sub">Automationsregler, körläge och scheduler</div>
+    </div>
+    <div class="dash-quick-actions">
+      <button class="btn btn-neutral btn-sm" onclick="loadControl()">↻ Uppdatera</button>
     </div>
   </div>
 
-  <!-- Supportmail + Körläge -->
-  <div class="setup-card" style="margin-bottom:16px;">
-    <h2 style="font-size:13px; font-weight:600; margin:0 0 14px;">Inställningar</h2>
-    <div class="form-field" style="margin-bottom:12px;">
-      <label>Supportmail</label>
-      <input id="ctrlSupportEmail" type="email" placeholder="support@example.com" style="width:100%; box-sizing:border-box;">
+  <div id="ctrlMsg" class="msg" style="display:none; max-width:720px; margin-bottom:14px;"></div>
+
+  <!-- ── AUTOMATISERING ── -->
+  <div class="cfg-section" style="max-width:720px;">
+    <div class="cfg-section-hdr">
+      <div class="cfg-section-icon purple">⚡</div>
+      <div>
+        <div class="cfg-section-title">Automatisering</div>
+        <div class="cfg-section-sub">Slå på/av automatisk behandling per ärendetyp</div>
+      </div>
     </div>
-    <div class="form-field">
-      <label>Körläge</label>
-      <select id="ctrlRunMode" style="width:100%; box-sizing:border-box;">
-        <option value="manual">Manuell</option>
-        <option value="scheduled">Schemalagd</option>
-        <option value="paused">Pausad</option>
-      </select>
+    <div class="cfg-section-body">
+      <div class="cfg-row">
+        <div>
+          <div style="font-size:13px; color:var(--text);">Leads</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Automatisera leadkvalificering och routing</div>
+        </div>
+        <div class="toggle-switch" id="toggleCtrlLeads" onclick="_clickToggle('ctrlLeads')"></div>
+        <input type="checkbox" id="ctrlLeads" style="display:none;" onchange="_syncToggle(this)">
+      </div>
+      <div class="cfg-row">
+        <div>
+          <div style="font-size:13px; color:var(--text);">Support</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Automatisera supportärendetriage och svar</div>
+        </div>
+        <div class="toggle-switch" id="toggleCtrlSupport" onclick="_clickToggle('ctrlSupport')"></div>
+        <input type="checkbox" id="ctrlSupport" style="display:none;" onchange="_syncToggle(this)">
+      </div>
+      <div class="cfg-row">
+        <div>
+          <div style="font-size:13px; color:var(--text);">Fakturor</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Automatisera fakturahantering och uppföljning</div>
+        </div>
+        <div class="toggle-switch" id="toggleCtrlInvoices" onclick="_clickToggle('ctrlInvoices')"></div>
+        <input type="checkbox" id="ctrlInvoices" style="display:none;" onchange="_syncToggle(this)">
+      </div>
+      <div class="cfg-row" style="border-bottom:none;">
+        <div>
+          <div style="font-size:13px; color:var(--text);">Uppföljningsmail</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Skicka automatiska uppföljningar till kunder</div>
+        </div>
+        <div class="toggle-switch" id="toggleCtrlFollowups" onclick="_clickToggle('ctrlFollowups')"></div>
+        <input type="checkbox" id="ctrlFollowups" style="display:none;" onchange="_syncToggle(this)">
+      </div>
     </div>
   </div>
 
-  <!-- Actions -->
-  <div style="display:flex; gap:10px; flex-wrap:wrap;">
-    <button class="btn btn-primary" onclick="saveControl()">Spara inställningar</button>
-    <button class="btn btn-neutral" onclick="triggerInboxSync()" id="btnInboxSync">Kör inbox-sync nu</button>
-  </div>
-  <div id="syncMsg" style="margin-top:8px; font-size:12px; color:#6b7280;"></div>
-
-  <!-- Scheduler status -->
-  <div class="setup-card" style="margin-top:20px;">
-    <h2 style="font-size:13px; font-weight:600; margin:0 0 12px;">Scheduler-status</h2>
-    <div id="schedStatusWrap" style="font-size:13px; display:flex; flex-direction:column; gap:6px; color:#374151;">
-      <div>Status: <strong id="schedLastStatus">–</strong></div>
-      <div>Senaste inbox-sync: <strong id="schedLastInbox">–</strong></div>
-      <div>Senaste daglig rapport: <strong id="schedLastDigest">–</strong></div>
-      <div>Senaste scheduler-körning: <strong id="schedLastRun">–</strong></div>
-      <div id="schedLastError" style="color:#dc2626; display:none;"></div>
+  <!-- ── KÖRLÄGE & SUPPORTMAIL ── -->
+  <div class="cfg-section" style="max-width:720px;">
+    <div class="cfg-section-hdr">
+      <div class="cfg-section-icon blue">◧</div>
+      <div>
+        <div class="cfg-section-title">Körläge &amp; Supportmail</div>
+        <div class="cfg-section-sub">Styr hur schedulern kör och vart internnotifieringar skickas</div>
+      </div>
     </div>
-    <div style="margin-top:14px;">
-      <button class="btn btn-neutral btn-sm" id="btnRunScheduler" onclick="runSchedulerOnce()">Kör scheduler nu</button>
-      <span id="schedRunMsg" style="margin-left:10px; font-size:12px; color:#6b7280;"></span>
+    <div class="cfg-section-body">
+      <div class="cfg-row">
+        <div style="flex:1;">
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-dim); margin-bottom:6px;">Körläge</div>
+          <select id="ctrlRunMode" style="width:100%; max-width:260px;">
+            <option value="manual">Manuell — kör bara på begäran</option>
+            <option value="scheduled">Schemalagd — kör automatiskt</option>
+            <option value="paused">Pausad — ingen automatisk körning</option>
+          </select>
+        </div>
+      </div>
+      <div class="cfg-row" style="border-bottom:none;">
+        <div style="flex:1;">
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-dim); margin-bottom:6px;">Supportmail</div>
+          <input id="ctrlSupportEmail" type="email" placeholder="support@example.com" style="width:100%; max-width:320px;">
+          <div style="font-size:11px; color:var(--text-dim); margin-top:4px;">Interna handoff-notifieringar skickas hit</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SPARA + ÅTGÄRDER ── -->
+  <div style="max-width:720px; margin-bottom:16px;">
+    <div class="cfg-save-row">
+      <button class="btn btn-primary" onclick="saveControl()">Spara inställningar</button>
+      <button class="btn btn-neutral" onclick="triggerInboxSync()" id="btnInboxSync">↓ Kör inbox-sync nu</button>
+      <span class="cfg-save-msg" id="syncMsg"></span>
+    </div>
+  </div>
+
+  <!-- ── SCHEDULER STATUS ── -->
+  <div class="cfg-section" style="max-width:720px;">
+    <div class="cfg-section-hdr">
+      <div class="cfg-section-icon green">◎</div>
+      <div>
+        <div class="cfg-section-title">Scheduler-status</div>
+        <div class="cfg-section-sub">Senaste körningar och eventuella fel</div>
+      </div>
+    </div>
+    <div class="cfg-section-body">
+      <div id="schedStatusWrap" style="display:flex; flex-direction:column; gap:0;">
+        <div class="cfg-row">
+          <span style="color:var(--text-muted); font-size:12px;">Status</span>
+          <strong id="schedLastStatus" style="font-size:12px;">–</strong>
+        </div>
+        <div class="cfg-row">
+          <span style="color:var(--text-muted); font-size:12px;">Senaste inbox-sync</span>
+          <strong id="schedLastInbox" style="font-size:12px; color:var(--text-dim);">–</strong>
+        </div>
+        <div class="cfg-row">
+          <span style="color:var(--text-muted); font-size:12px;">Senaste daglig rapport</span>
+          <strong id="schedLastDigest" style="font-size:12px; color:var(--text-dim);">–</strong>
+        </div>
+        <div class="cfg-row" style="border-bottom:none;">
+          <span style="color:var(--text-muted); font-size:12px;">Senaste scheduler-körning</span>
+          <strong id="schedLastRun" style="font-size:12px; color:var(--text-dim);">–</strong>
+        </div>
+      </div>
+      <div id="schedLastError" style="color:var(--danger); font-size:12px; margin-top:4px; display:none;"></div>
+      <div class="cfg-save-row" style="margin-top:14px;">
+        <button class="btn btn-neutral btn-sm" id="btnRunScheduler" onclick="runSchedulerOnce()">▶ Kör scheduler nu</button>
+        <span class="cfg-save-msg" id="schedRunMsg"></span>
+      </div>
     </div>
   </div>
 
@@ -2491,55 +2557,95 @@ label { color: var(--text-muted); }
 </div><!-- /viewOnboarding -->
 
 <!-- ══════════════════════════════════════════════════════ NOTIFIERINGAR -->
-<div id="viewNotif" style="display:none; padding:24px; overflow-y:auto; flex:1; max-width:600px;">
+<div id="viewNotif" style="display:none; padding:24px; overflow-y:auto; flex:1; max-width:760px;">
 
-  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
-    <h1 style="font-size:18px; font-weight:700; color:#111; margin:0;">Notifieringar</h1>
-    <button class="btn btn-primary btn-sm" onclick="loadNotifSettings()">Uppdatera</button>
+  <div class="dash-page-hdr" style="max-width:720px;">
+    <div>
+      <div class="dash-page-title">Notifieringar</div>
+      <div class="dash-page-sub">Dagliga rapporter och e-postavisering</div>
+    </div>
+    <div class="dash-quick-actions">
+      <button class="btn btn-neutral btn-sm" onclick="loadNotifSettings()">↻ Uppdatera</button>
+    </div>
   </div>
 
-  <div id="notifError" class="msg msg-error" style="display:none;"></div>
+  <div id="notifError" class="msg msg-error" style="display:none; max-width:720px; margin-bottom:14px;"></div>
 
-  <div class="setup-card" style="margin-bottom:16px;">
-    <h2 style="font-size:13px; font-weight:600; margin:0 0 14px;">Daglig rapport</h2>
-
-    <div style="display:flex; flex-direction:column; gap:12px;">
-      <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-        <input type="checkbox" id="notifEnabled"> <span>Aktiv</span>
-      </label>
-
-      <div class="form-field">
-        <label>Mottagare</label>
-        <input id="notifEmail" type="email" placeholder="ops@example.com"
-               style="width:100%; box-sizing:border-box;">
-      </div>
-
-      <div class="form-field">
-        <label>Frekvens</label>
-        <select id="notifFrequency" style="width:100%; box-sizing:border-box;">
-          <option value="daily">Dagligen</option>
-          <option value="weekly">Veckovis</option>
-          <option value="off">Av</option>
-        </select>
-      </div>
-
-      <div class="form-field">
-        <label>Skicka klockan</label>
-        <input id="notifHour" type="number" min="0" max="23" value="8"
-               style="width:80px; box-sizing:border-box;">
+  <!-- ── DAGLIG RAPPORT ── -->
+  <div class="cfg-section" style="max-width:720px;">
+    <div class="cfg-section-hdr">
+      <div class="cfg-section-icon blue">◉</div>
+      <div>
+        <div class="cfg-section-title">Daglig rapport</div>
+        <div class="cfg-section-sub">Skicka automatisk sammanfattning via e-post</div>
       </div>
     </div>
+    <div class="cfg-section-body">
 
-    <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
+      <!-- Aktiv toggle -->
+      <div class="cfg-row">
+        <div>
+          <div style="font-size:13px; color:var(--text);">Aktivera daglig rapport</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Scheduler skickar rapport enligt schema nedan</div>
+        </div>
+        <div class="toggle-switch" id="toggleNotifEnabled" onclick="_clickToggle('notifEnabled')"></div>
+        <input type="checkbox" id="notifEnabled" style="display:none;" onchange="_syncToggle(this)">
+      </div>
+
+      <!-- Mottagare -->
+      <div class="cfg-row">
+        <div style="flex:1;">
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-dim); margin-bottom:6px;">Mottagare</div>
+          <input id="notifEmail" type="email" placeholder="ops@example.com" style="width:100%; max-width:320px;">
+          <div style="font-size:11px; color:var(--text-dim); margin-top:4px;">Rapporten skickas till denna adress</div>
+        </div>
+      </div>
+
+      <!-- Frekvens -->
+      <div class="cfg-row">
+        <div style="flex:1;">
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-dim); margin-bottom:6px;">Frekvens</div>
+          <select id="notifFrequency" style="width:100%; max-width:220px;">
+            <option value="daily">Dagligen</option>
+            <option value="weekly">Veckovis</option>
+            <option value="off">Av</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Sändtid -->
+      <div class="cfg-row" style="border-bottom:none;">
+        <div style="flex:1;">
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-dim); margin-bottom:6px;">Skicka klockan</div>
+          <input id="notifHour" type="number" min="0" max="23" value="8" style="width:80px;">
+          <div style="font-size:11px; color:var(--text-dim); margin-top:4px;">UTC · 0–23 · standard är 08:00</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── ÅTGÄRDER ── -->
+  <div style="max-width:720px; margin-bottom:16px;">
+    <div class="cfg-save-row">
       <button class="btn btn-primary" onclick="saveNotifSettings()">Spara inställningar</button>
-      <button class="btn btn-neutral" id="btnSendDigest" onclick="sendTestDigest()">Skicka testrapport nu</button>
+      <button class="btn btn-neutral" id="btnSendDigest" onclick="sendTestDigest()">✉ Skicka testrapport nu</button>
+      <span class="cfg-save-msg" id="notifSaveMsg"></span>
     </div>
-    <div id="notifSaveMsg" style="margin-top:8px; font-size:12px; color:#6b7280;"></div>
   </div>
 
-  <div id="digestResultWrap" style="display:none;" class="setup-card">
-    <h2 style="font-size:13px; font-weight:600; margin:0 0 10px;">Resultat</h2>
-    <div id="digestResult" style="font-size:13px;"></div>
+  <!-- ── TESTRESULTAT ── -->
+  <div id="digestResultWrap" style="display:none;" class="cfg-section" style="max-width:720px;">
+    <div class="cfg-section-hdr">
+      <div class="cfg-section-icon green">✓</div>
+      <div>
+        <div class="cfg-section-title">Testresultat</div>
+        <div class="cfg-section-sub">Svar från senaste testutskick</div>
+      </div>
+    </div>
+    <div class="cfg-section-body">
+      <div id="digestResult" style="font-size:13px;"></div>
+    </div>
   </div>
 
 </div><!-- /viewNotif -->
@@ -4524,10 +4630,11 @@ async function loadControl() {
   msgEl.style.display = 'none';
   try {
     const r = await apiFetch('/dashboard/control');
-    document.getElementById('ctrlLeads').checked    = !!r.automation?.leads_enabled;
-    document.getElementById('ctrlSupport').checked  = !!r.automation?.support_enabled;
-    document.getElementById('ctrlInvoices').checked = !!r.automation?.invoices_enabled;
-    document.getElementById('ctrlFollowups').checked= !!r.automation?.followups_enabled;
+    ['ctrlLeads', 'ctrlSupport', 'ctrlInvoices', 'ctrlFollowups'].forEach((id, i) => {
+      const vals = [r.automation?.leads_enabled, r.automation?.support_enabled, r.automation?.invoices_enabled, r.automation?.followups_enabled];
+      const cb = document.getElementById(id);
+      if (cb) { cb.checked = !!vals[i]; _syncToggle(cb); }
+    });
     document.getElementById('ctrlSupportEmail').value = r.support_email || '';
     document.getElementById('ctrlRunMode').value    = r.scheduler?.run_mode || 'manual';
   } catch (e) {
@@ -4538,9 +4645,9 @@ async function loadControl() {
   // load scheduler status (best-effort, non-blocking)
   try {
     const st = await apiFetch('/scheduler/status');
-    const statusColors = { success: '#16a34a', failed: '#dc2626', warning: '#d97706', never_run: '#6b7280' };
+    const statusVars = { success: 'var(--success)', failed: 'var(--danger)', warning: 'var(--warning)', never_run: 'var(--text-dim)' };
     document.getElementById('schedLastStatus').textContent = st.last_status || 'never_run';
-    document.getElementById('schedLastStatus').style.color = statusColors[st.last_status] || '#6b7280';
+    document.getElementById('schedLastStatus').style.color = statusVars[st.last_status] || 'var(--text-dim)';
     document.getElementById('schedLastInbox').textContent  = _fmtTs(st.last_inbox_sync_at);
     document.getElementById('schedLastDigest').textContent = _fmtTs(st.last_digest_sent_at);
     document.getElementById('schedLastRun').textContent    = _fmtTs(st.last_scheduler_run_at);
@@ -4558,17 +4665,16 @@ async function runSchedulerOnce() {
   const btn    = document.getElementById('btnRunScheduler');
   const msgEl  = document.getElementById('schedRunMsg');
   btn.disabled = true;
-  msgEl.style.color = '#6b7280';
+  msgEl.className = 'cfg-save-msg';
   msgEl.textContent = 'Kör scheduler…';
   try {
     const r = await apiFetch('/scheduler/run-once', { method: 'POST' });
-    const color = r.status === 'success' ? '#16a34a' : '#d97706';
-    msgEl.style.color = color;
+    msgEl.className = 'cfg-save-msg ' + (r.status === 'success' ? 'ok' : 'err');
     msgEl.textContent = `Klart · Tenants: ${r.tenants_checked} · Inbox: ${r.inbox_syncs_run} · Rapporter: ${r.digests_sent} · Hoppade: ${r.skipped}`;
-    loadControl(); // refresh status fields
+    loadControl();
     if (typeof loadDashboard === 'function') loadDashboard();
   } catch (e) {
-    msgEl.style.color = '#dc2626';
+    msgEl.className = 'cfg-save-msg err';
     msgEl.textContent = 'Fel: ' + escapeHtml(e.message);
   } finally {
     btn.disabled = false;
@@ -4603,12 +4709,12 @@ async function saveControl() {
 async function triggerInboxSync() {
   const btn    = document.getElementById('btnInboxSync');
   const infoEl = document.getElementById('syncMsg');
-  btn.disabled    = true;
-  infoEl.style.color = '#6b7280';
-  infoEl.textContent  = 'Startar inbox-sync…';
+  btn.disabled = true;
+  infoEl.className = 'cfg-save-msg';
+  infoEl.textContent = 'Startar inbox-sync…';
   try {
     const r = await apiFetch('/dashboard/inbox-sync', { method: 'POST' });
-    const color = r.status === 'success' ? '#16a34a' : r.status === 'warning' ? '#d97706' : '#dc2626';
+    const cls = r.status === 'success' ? 'ok' : r.status === 'warning' ? '' : 'err';
     let detail = r.message || '';
     if (r.created_jobs > 0 || r.continued_threads > 0 || r.deduped > 0) {
       detail += ` · Nya jobb: ${r.created_jobs} · Trådar: ${r.continued_threads} · Dubbletter: ${r.deduped}`;
@@ -4616,14 +4722,13 @@ async function triggerInboxSync() {
     if (r.errors && r.errors.length > 0) {
       detail += ` · Fel: ${r.errors.map(e => escapeHtml(e.message)).join(', ')}`;
     }
-    infoEl.style.color = color;
-    infoEl.textContent  = detail;
-    // Refresh dashboard and cases if those tabs exist
+    infoEl.className = 'cfg-save-msg ' + cls;
+    infoEl.textContent = detail;
     if (typeof loadDashboard === 'function') loadDashboard();
     if (typeof loadCases === 'function' && document.getElementById('viewCases').style.display !== 'none') loadCases();
   } catch (e) {
-    infoEl.style.color = '#dc2626';
-    infoEl.textContent  = 'Fel: ' + escapeHtml(e.message);
+    infoEl.className = 'cfg-save-msg err';
+    infoEl.textContent = 'Fel: ' + escapeHtml(e.message);
   } finally {
     btn.disabled = false;
   }
@@ -5523,10 +5628,11 @@ async function loadNotifSettings() {
   errEl.style.display = 'none';
   try {
     const r = await apiFetch('/notifications/settings');
-    document.getElementById('notifEnabled').checked      = !!r.enabled;
-    document.getElementById('notifEmail').value          = r.recipient_email || '';
-    document.getElementById('notifFrequency').value      = r.frequency || 'daily';
-    document.getElementById('notifHour').value           = r.send_hour ?? 8;
+    const notifCb = document.getElementById('notifEnabled');
+    if (notifCb) { notifCb.checked = !!r.enabled; _syncToggle(notifCb); }
+    document.getElementById('notifEmail').value     = r.recipient_email || '';
+    document.getElementById('notifFrequency').value = r.frequency || 'daily';
+    document.getElementById('notifHour').value      = r.send_hour ?? 8;
   } catch (e) {
     errEl.textContent = 'Kunde inte ladda notifieringsinställningar: ' + escapeHtml(e.message);
     errEl.style.display = 'block';
@@ -5535,7 +5641,8 @@ async function loadNotifSettings() {
 
 async function saveNotifSettings() {
   const msgEl = document.getElementById('notifSaveMsg');
-  msgEl.style.color = '#6b7280';
+  msgEl.className = 'cfg-save-msg';
+  msgEl.textContent = 'Sparar…';
   const body = {
     enabled:         document.getElementById('notifEnabled').checked,
     recipient_email: document.getElementById('notifEmail').value.trim() || '',
@@ -5544,11 +5651,11 @@ async function saveNotifSettings() {
   };
   try {
     await apiFetch('/notifications/settings', { method: 'PUT', body: JSON.stringify(body) });
-    msgEl.textContent  = 'Inställningar sparade.';
-    msgEl.style.color  = '#16a34a';
+    msgEl.className = 'cfg-save-msg ok';
+    msgEl.textContent = 'Inställningar sparade.';
   } catch (e) {
-    msgEl.textContent  = 'Fel: ' + escapeHtml(e.message);
-    msgEl.style.color  = '#dc2626';
+    msgEl.className = 'cfg-save-msg err';
+    msgEl.textContent = 'Fel: ' + escapeHtml(e.message);
   }
 }
 
@@ -5563,11 +5670,11 @@ async function sendTestDigest() {
   try {
     const r = await apiFetch('/notifications/daily-digest/send', { method: 'POST' });
     wrapEl.style.display = 'block';
-    const color = r.status === 'success' ? '#16a34a' : '#dc2626';
+    const okCls = r.status === 'success' ? 'var(--success)' : 'var(--danger)';
     resEl.innerHTML = `
-      <div style="color:${color}; font-weight:600; margin-bottom:6px;">${escapeHtml(r.message || r.status)}</div>
-      <div style="font-size:12px; color:#6b7280;">Mottagare: ${escapeHtml(r.recipient || '–')}</div>
-      <div style="font-size:12px; color:#6b7280;">Ämne: ${escapeHtml(r.subject || '–')}</div>`;
+      <div style="color:${okCls}; font-weight:600; margin-bottom:6px;">${escapeHtml(r.message || r.status)}</div>
+      <div style="font-size:12px; color:var(--text-muted);">Mottagare: ${escapeHtml(r.recipient || '–')}</div>
+      <div style="font-size:12px; color:var(--text-muted);">Ämne: ${escapeHtml(r.subject || '–')}</div>`;
   } catch (e) {
     wrapEl.style.display = 'block';
     resEl.innerHTML = `<div class="msg msg-error">${escapeHtml(e.message)}</div>`;

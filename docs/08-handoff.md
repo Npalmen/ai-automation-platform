@@ -1930,3 +1930,41 @@ Customer mode: sees card layout without env var section or action buttons (healt
 
 ### Tests
 No backend changes. 1779/1779 tests pass (1 pre-existing env-dependent failure unchanged).
+
+---
+
+## Slice 29 — Kontrollpanel + Notifieringar Polish
+
+**Status:** COMPLETE  
+**Date:** 2026-05-03
+
+### What was changed
+
+**Kontrollpanel (`#viewCtrl`):**
+- Page header → `dash-page-hdr` with subtitle; removed `color:#111`
+- Automatisering section → `cfg-section` card with `cfg-row` rows; plain `<input type="checkbox">` → `.toggle-switch` + hidden checkbox pattern (same as Inställningar)
+- Körläge & Supportmail → `cfg-section` card; select/input with helper text
+- Save/actions row → `cfg-save-row`; `syncMsg` uses `.cfg-save-msg` class
+- Scheduler-status → `cfg-section` card; rows use `cfg-row`; `schedLastError` uses `var(--danger)`
+- JS `runSchedulerOnce()`: removed `msgEl.style.color = '#...'`; uses `.cfg-save-msg ok/err`
+- JS `triggerInboxSync()`: removed `infoEl.style.color = '#...'`; uses `.cfg-save-msg ok/err`
+- JS `loadControl()`: `_syncToggle()` called after each checkbox update; scheduler status uses `var(--success/danger/warning/text-dim)` instead of raw hex
+
+**Notifieringar (`#viewNotif`):**
+- Page header → `dash-page-hdr` with subtitle; removed `color:#111`
+- Daglig rapport → `cfg-section` card; Aktiv field → `.toggle-switch`; all fields in `cfg-row` rows
+- Actions row → `cfg-save-row`; `notifSaveMsg` → `.cfg-save-msg`
+- Testresultat → `cfg-section` card with `cfg-section-hdr`
+- JS `saveNotifSettings()`: removed `style.color`; uses `.cfg-save-msg ok/err`
+- JS `sendTestDigest()`: removed `color:#16a34a/#dc2626`; uses `var(--success)`/`var(--danger)` in template string; `#6b7280` → `var(--text-muted)`
+- JS `loadNotifSettings()`: `_syncToggle()` called after setting notifEnabled
+
+### Customer mode
+Both `viewCtrl` and `viewNotif` are already in `ADMIN_ONLY_VIEWS` — they are hidden in customer mode by `_applyRoleMode()`. No change needed.
+
+### Files changed
+- `app/ui/index.html` — HTML (both views), JS (loadControl, runSchedulerOnce, triggerInboxSync, saveNotifSettings, sendTestDigest, loadNotifSettings)
+- `docs/05-current-state.md` — Slice 29 row added
+
+### Tests
+No backend changes. 1779/1779 tests pass (1 pre-existing env-dependent failure unchanged).
