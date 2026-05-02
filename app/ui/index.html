@@ -6095,7 +6095,7 @@ async function saveMemory() {
 // Redo för drift — Readiness Checklist (Slice 30)
 // ---------------------------------------------------------------------------
 
-const READINESS_LABELS = {
+const READINESS_CHECK_LABELS = {
   auth_configured:               'Autentisering konfigurerad',
   tenant_exists:                 'Tenant finns i databasen',
   onboarding_ready:              'Onboarding slutförd',
@@ -6186,7 +6186,7 @@ function _renderReadinessView(r) {
     const dotCls = c.status === 'pass' ? 'ok' : c.status === 'warning' ? 'warn' : 'fail';
     const pillCls2 = c.status === 'pass' ? 'healthy' : c.status === 'warning' ? 'warning' : 'error';
     const pillTxt2 = c.status === 'pass' ? '● OK' : c.status === 'warning' ? '⚠ Varning' : '✕ Fel';
-    const label = READINESS_LABELS[c.key] || c.key;
+    const label = READINESS_CHECK_LABELS[c.key] || c.key;
 
     const fix = READINESS_FIX[c.key];
     let fixBtn = '';
