@@ -74,20 +74,10 @@ async def on_startup():
     ensure_runtime_schema(engine)
     print("Startup complete")
 
-    # TEMPORARY: local-debug — verify Google OAuth env vars are loaded from .env
+    # Warn if OAuth refresh credential set is incomplete — prevents silent invalid_grant failures.
     import logging as _logging
     _startup_log = _logging.getLogger("startup")
-
-    def _masked(val: str) -> str:
-        return f"yes (prefix={val[:8]}...)" if val else "no"
-
     _s = get_settings()
-    _startup_log.info("[DEBUG] GOOGLE_MAIL_ACCESS_TOKEN  : %s", _masked(_s.GOOGLE_MAIL_ACCESS_TOKEN))
-    _startup_log.info("[DEBUG] GOOGLE_OAUTH_REFRESH_TOKEN: %s", _masked(_s.GOOGLE_OAUTH_REFRESH_TOKEN))
-    _startup_log.info("[DEBUG] GOOGLE_OAUTH_CLIENT_ID    : %s", _masked(_s.GOOGLE_OAUTH_CLIENT_ID))
-    _startup_log.info("[DEBUG] GOOGLE_OAUTH_CLIENT_SECRET: %s", _masked(_s.GOOGLE_OAUTH_CLIENT_SECRET))
-
-    # Warn if OAuth refresh credential set is incomplete — prevents silent invalid_grant failures.
     _refresh_fields = [_s.GOOGLE_OAUTH_REFRESH_TOKEN, _s.GOOGLE_OAUTH_CLIENT_ID, _s.GOOGLE_OAUTH_CLIENT_SECRET]
     _refresh_set = sum(bool(f) for f in _refresh_fields)
     if 0 < _refresh_set < 3:
@@ -98,7 +88,6 @@ async def on_startup():
             "GOOGLE_OAUTH_CLIENT_SECRET) or none.",
             _refresh_set,
         )
-    # END TEMPORARY
 
 
 @app.middleware("http")
@@ -162,8 +151,9 @@ class TenantConfigUpdateRequest(_BaseModel):
 def get_tenant_config_by_id(
     tenant_id: str,
     db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
 ):
-    """Return config for any tenant by ID. No auth required — operator bootstrap helper."""
+    """Return config for any tenant by ID. Requires X-Admin-API-Key."""
     config = get_tenant_config(tenant_id, db=db)
     allowed = [
         i.value if hasattr(i, "value") else str(i)
@@ -181,8 +171,9 @@ def get_tenant_config_by_id(
 @app.get("/tenants")
 def list_tenants(
     db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
 ):
-    """Return all tenants that exist in the DB. No fallback/static tenants included."""
+    """Return all tenants in the DB. Requires X-Admin-API-Key."""
     from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
     records = TenantConfigRepository.list_all(db)
     items = [{"tenant_id": r.tenant_id, "name": r.name} for r in records]
@@ -451,6 +442,7 @@ def _run_verification_pipeline(job: Job, job_type_value: str, db) -> Job:
 def verify_tenant(
     tenant_id: str,
     db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
 ):
     """
     Run a deterministic verification job for any tenant by ID.
@@ -525,6 +517,7 @@ def verify_tenant(
 def create_tenant(
     request: TenantCreateRequest,
     db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
 ):
     from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
     existing = TenantConfigRepository.get(db, request.tenant_id)
@@ -566,8 +559,9 @@ def update_tenant_config_by_id(
     tenant_id: str,
     request: TenantConfigUpdateRequest,
     db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
 ):
-    """Save config for any tenant by ID. No auth required — operator bootstrap helper."""
+    """Save config for any tenant by ID. Requires X-Admin-API-Key."""
     from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
     existing = TenantConfigRepository.get(db, tenant_id)
     if existing is None:
@@ -1654,16 +1648,18 @@ def trigger_inbox_sync(
     except HTTPException:
         raise
     except Exception as exc:
+        import logging as _log
+        _log.getLogger(__name__).exception("Inbox sync failed")
         raise HTTPException(
             status_code=500,
             detail={
                 "status": "failed",
-                "message": f"Inbox sync failed: {exc}",
+                "message": "Inbox sync misslyckades. Kontrollera loggar för detaljer.",
                 "processed": 0,
                 "created_jobs": 0,
                 "continued_threads": 0,
                 "deduped": 0,
-                "errors": [{"message": str(exc)}],
+                "errors": [],
             },
         ) from exc
 
@@ -2052,9 +2048,11 @@ def send_daily_digest(
             "body":      body,
         })
     except Exception as exc:
+        import logging as _log
+        _log.getLogger(__name__).exception("Daily digest dispatch failed")
         raise HTTPException(
             status_code=500,
-            detail={"status": "failed", "message": f"Email dispatch failed: {exc}"},
+            detail={"status": "failed", "message": "Utskick av daglig rapport misslyckades. Kontrollera loggar."},
         ) from exc
 
     return {

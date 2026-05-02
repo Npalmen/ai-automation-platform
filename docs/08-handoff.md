@@ -2027,3 +2027,67 @@ New admin-only view "Redo för drift" (`#viewReadiness`) accessible from sidebar
 
 ### Tests
 No backend changes. 1779/1779 tests pass (1 pre-existing env-dependent failure unchanged).
+
+---
+
+## Slice 31 — Production Safety Pass
+
+**Status:** COMPLETE  
+**Date:** 2026-05-03
+
+### Backend changes (`app/main.py`)
+
+**Endpoint auth hardening — 5 previously unauthenticated endpoints now require `X-Admin-API-Key`:**
+- `GET /tenant/config/{tenant_id}` — tenant config read by ID
+- `PUT /tenant/config/{tenant_id}` — tenant config write by ID
+- `GET /tenants` — list all tenants
+- `POST /tenant` — create tenant
+- `POST /verify/{tenant_id}` — run verification job for any tenant
+
+All 5 now have `_: None = Depends(require_admin_api_key)` in their signature. Tests still pass because they call functions directly (dependency not injected in unit tests).
+
+**Startup debug block removed:**
+- Removed `[TEMPORARY: local-debug]` 9-line block that printed masked OAuth env var values at startup.
+- Kept the OAuth completeness warning (< 3 of 3 fields set → logs warning).
+
+**Exception message sanitization:**
+- `POST /dashboard/inbox-sync` 500 response: replaced `f"Inbox sync failed: {exc}"` with generic Swedish message; exception logged server-side.
+- `POST /notifications/daily-digest/send` 500 response: replaced `f"Email dispatch failed: {exc}"` with generic Swedish message; exception logged server-side.
+
+### UI changes (`app/ui/index.html`)
+
+**`adminApiFetch()` helper added** (after `apiFetch`):
+- Merges `headers()` + `adminHeaders()` (sends both `X-API-Key` and `X-Admin-API-Key`).
+- Used by all admin-context calls to newly-gated endpoints.
+
+**Updated call sites (apiFetch → adminApiFetch):**
+- `loadTenants()` — `GET /tenants`
+- `loadSetup()` — `GET /tenant/config/{id}`
+- `switchTenant()` — `GET /tenant/config/{id}`
+- `createTenant()` — `POST /tenant` + `GET /tenant/config/{id}`
+- `saveConfig()` — `PUT /tenant/config/{id}` + `GET /tenant/config/{id}`
+- `runVerification()` — `POST /verify/{id}`
+- `_wizCreate()` (wizard) — `POST /tenant` + `PUT /tenant/config/{id}`
+
+**Customer view: `job_id` removed from title fallback:**
+- `_openCustomerCase()` line 5078: `c.subject || \`${typeLabel} – ${c.job_id}\`` → `c.subject || typeLabel`
+- Internal job IDs no longer leaked to customer users.
+
+### New docs
+
+`docs/12-production-guide.md` — production deployment reference:
+- Required env vars table (TENANT_API_KEYS, ADMIN_API_KEY, DATABASE_URL, Gmail OAuth, Monday, Fortnox)
+- Auth model table (customer / admin / anonymous)
+- Pre-launch checklist (8 steps)
+- Run instructions
+- Error behaviour notes
+- MVP scope limits (HTTPS, rate limiting, background worker)
+
+### Files changed
+- `app/main.py` — 5 endpoint signatures, startup block, 2 exception handlers
+- `app/ui/index.html` — adminApiFetch, 8 call site updates, 1 customer view fix
+- `docs/05-current-state.md` — Slice 31 row
+- `docs/12-production-guide.md` — new file
+
+### Tests
+No schema changes. 1779/1779 tests pass (1 pre-existing env-dependent failure unchanged).

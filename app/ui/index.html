@@ -4036,6 +4036,18 @@ async function apiFetch(path, opts) {
   return resp.json();
 }
 
+// Admin-authenticated fetch — merges X-Admin-API-Key into headers.
+// Use for endpoints that require require_admin_api_key dependency.
+async function adminApiFetch(path, opts) {
+  const merged = { ...headers(), ...adminHeaders() };
+  const resp = await fetch(path, { headers: merged, ...opts });
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`HTTP ${resp.status}: ${body}`);
+  }
+  return resp.json();
+}
+
 // ---------------------------------------------------------------------------
 // Jobblista
 // ---------------------------------------------------------------------------
@@ -4295,7 +4307,7 @@ const ALL_INTEGRATIONS = [
 // ---------------------------------------------------------------------------
 async function loadTenants() {
   try {
-    const data   = await apiFetch('/tenants');
+    const data   = await adminApiFetch('/tenants');
     const items  = data.items || [];
     const select = document.getElementById('switchTenantSelect');
     const prev   = _activeTenantId || select.value;
@@ -4319,7 +4331,7 @@ async function loadSetup() {
   try {
     let cfg;
     if (_activeTenantId) {
-      cfg = await apiFetch(`/tenant/config/${encodeURIComponent(_activeTenantId)}`);
+      cfg = await adminApiFetch(`/tenant/config/${encodeURIComponent(_activeTenantId)}`);
     } else {
       // Initial load: use API-key tenant, then lock _activeTenantId to it.
       cfg = await apiFetch('/tenant');
@@ -4355,7 +4367,7 @@ async function switchTenant() {
 
   setMsg('msgSetup', '');
   try {
-    const cfg = await apiFetch(`/tenant/config/${encodeURIComponent(tenantId)}`);
+    const cfg = await adminApiFetch(`/tenant/config/${encodeURIComponent(tenantId)}`);
     _activeTenantId = tenantId;
     renderSetup(cfg);
     msgEl.className = 'cfg-save-msg ok';
@@ -4564,7 +4576,7 @@ async function createTenant() {
   }
 
   try {
-    await apiFetch('/tenant', {
+    await adminApiFetch('/tenant', {
       method: 'POST',
       body: JSON.stringify({ tenant_id, name }),
     });
@@ -4578,7 +4590,7 @@ async function createTenant() {
     // Select the new tenant in dropdown.
     document.getElementById('switchTenantSelect').value = tenant_id;
     // Load its config (empty initially).
-    const cfg = await apiFetch(`/tenant/config/${encodeURIComponent(tenant_id)}`);
+    const cfg = await adminApiFetch(`/tenant/config/${encodeURIComponent(tenant_id)}`);
     renderSetup(cfg);
   } catch (e) {
     msgEl.className = 'cfg-save-msg err';
@@ -4617,14 +4629,14 @@ async function saveConfig() {
 
   try {
     // Always save to the explicit tenant ID — never relies on API-key tenant derivation.
-    await apiFetch(`/tenant/config/${encodeURIComponent(_activeTenantId)}`, {
+    await adminApiFetch(`/tenant/config/${encodeURIComponent(_activeTenantId)}`, {
       method: 'PUT',
       body: JSON.stringify({ enabled_job_types, allowed_integrations, auto_actions }),
     });
     const saveMsg = document.getElementById('msgSetupSave');
     if (saveMsg) { saveMsg.className = 'cfg-save-msg ok'; saveMsg.textContent = 'Konfigurationen sparad.'; }
     // Reload config for the same tenant — _activeTenantId must not change.
-    const cfg = await apiFetch(`/tenant/config/${encodeURIComponent(_activeTenantId)}`);
+    const cfg = await adminApiFetch(`/tenant/config/${encodeURIComponent(_activeTenantId)}`);
     renderSetup(cfg);
     // Ensure dropdown stays on the correct tenant after reload.
     document.getElementById('switchTenantSelect').value = _activeTenantId;
@@ -4655,7 +4667,7 @@ async function runVerification() {
   }
 
   try {
-    const job = await apiFetch(`/verify/${encodeURIComponent(tenant_id)}`, {
+    const job = await adminApiFetch(`/verify/${encodeURIComponent(tenant_id)}`, {
       method: 'POST',
     });
 
@@ -5075,7 +5087,7 @@ async function _openCustomerCase(jobId) {
     const receivedTs  = c.received_at  ? new Date(c.received_at).toLocaleString('sv-SE')  : '–';
     const processedTs = c.processed_at ? new Date(c.processed_at).toLocaleString('sv-SE') : '–';
 
-    titleEl.textContent = c.subject || `${typeLabel} – ${c.job_id}`;
+    titleEl.textContent = c.subject || typeLabel;
     metaEl.textContent  = `${typeLabel} · Mottaget ${receivedTs}`;
 
     // Next step card
@@ -6483,14 +6495,14 @@ async function _wizCreate() {
 
   try {
     // Step 1: create tenant (name + tenant_id only)
-    await apiFetch('/tenant', {
+    await adminApiFetch('/tenant', {
       method: 'POST',
       body: JSON.stringify({ tenant_id: tenantId, name }),
     });
 
     // Step 2: set config (job types, integrations, auto actions)
     if (jts.length || ints.length || Object.keys(auto).length) {
-      await apiFetch(`/tenant/config/${encodeURIComponent(tenantId)}`, {
+      await adminApiFetch(`/tenant/config/${encodeURIComponent(tenantId)}`, {
         method: 'PUT',
         body: JSON.stringify({
           enabled_job_types:   jts,
