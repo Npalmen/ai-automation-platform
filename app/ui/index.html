@@ -1278,6 +1278,141 @@ label { color: var(--text-muted); }
 .wiz-success-title { font-size: 18px; font-weight: 700; color: var(--text); }
 .wiz-success-sub   { font-size: 13px; color: var(--text-muted); max-width: 380px; line-height: 1.6; }
 .wiz-success-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 8px; }
+
+/* ═══════════════════════════════════════════════════════
+   INTEGRATION SETUP OVERLAY (Slice 28)
+═══════════════════════════════════════════════════════ */
+#intSetupOverlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 8500;
+  background: rgba(0,0,0,.7);
+  align-items: flex-start; justify-content: center;
+  padding: 40px 16px;
+  overflow-y: auto;
+}
+#intSetupOverlay.open { display: flex; }
+
+.int-setup-panel {
+  width: 100%; max-width: 720px;
+  background: var(--surface);
+  border: 1px solid var(--border-med);
+  border-radius: var(--radius-lg);
+  display: flex; flex-direction: column;
+  box-shadow: 0 16px 60px rgba(0,0,0,.7);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.int-setup-header {
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface-2);
+}
+.int-setup-header-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--blue), var(--cyan));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; flex-shrink: 0;
+}
+.int-setup-header-title { font-size: 15px; font-weight: 700; color: var(--text); }
+.int-setup-header-sub   { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.int-setup-close {
+  margin-left: auto; background: none; border: none;
+  color: var(--text-dim); font-size: 18px; cursor: pointer;
+  padding: 4px 8px; border-radius: var(--radius-sm); transition: all 0.12s;
+}
+.int-setup-close:hover { color: var(--text); background: var(--surface-3); }
+
+.int-setup-body {
+  padding: 20px 24px; display: flex; flex-direction: column; gap: 14px;
+}
+
+/* Integration card */
+.int-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.int-card:hover { border-color: var(--border-med); }
+.int-card.coming { opacity: 0.55; }
+
+.int-card-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+}
+.int-card-logo {
+  width: 36px; height: 36px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.int-card-logo.gmail   { background: rgba(234,67,53,.15); }
+.int-card-logo.monday  { background: rgba(255,80,40,.12); }
+.int-card-logo.fortnox { background: rgba(59,130,246,.12); }
+.int-card-logo.visma   { background: rgba(124,58,237,.12); }
+
+.int-card-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.int-card-desc { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+.int-status-pill {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+  flex-shrink: 0;
+}
+.int-status-pill.healthy        { background: var(--success-bg); color: #6ee7b7; border: 1px solid rgba(16,185,129,.25); }
+.int-status-pill.warning        { background: var(--warning-bg); color: #fcd34d; border: 1px solid rgba(245,158,11,.25); }
+.int-status-pill.error          { background: var(--danger-bg);  color: #fca5a5; border: 1px solid rgba(239,68,68,.25); }
+.int-status-pill.not_configured { background: var(--surface-3);  color: var(--text-dim); border: 1px solid var(--border-med); }
+.int-status-pill.coming         { background: var(--surface-3);  color: var(--text-dim); border: 1px solid var(--border); }
+
+.int-card-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+
+.int-card-checks { display: flex; flex-direction: column; gap: 4px; }
+.int-card-check-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: var(--text-muted);
+}
+.int-card-check-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.int-card-check-dot.ok   { background: var(--success); }
+.int-card-check-dot.warn { background: var(--warning); }
+.int-card-check-dot.fail { background: var(--danger); }
+.int-card-check-dot.gray { background: var(--text-dim); }
+
+.int-card-meta {
+  font-size: 11px; color: var(--text-dim);
+  display: flex; flex-wrap: wrap; gap: 12px;
+}
+
+.int-card-keys {
+  background: var(--surface-3); border-radius: var(--radius-sm);
+  padding: 8px 12px; font-size: 11px; color: var(--text-muted);
+  line-height: 1.7;
+}
+.int-card-key-name {
+  font-family: 'SF Mono','Fira Code',monospace;
+  color: var(--purple-light); font-size: 10px;
+}
+
+.int-card-actions {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  padding-top: 4px;
+}
+
+.int-setup-footer {
+  padding: 14px 24px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface-2); flex-shrink: 0;
+}
+.int-setup-tenant-badge {
+  font-size: 11px; color: var(--text-muted);
+  background: var(--surface-3); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 4px 10px;
+  font-family: 'SF Mono','Fira Code',monospace;
+}
 </style>
 </head>
 <body>
@@ -1772,6 +1907,7 @@ label { color: var(--text-muted); }
     </div>
     <div class="dash-quick-actions">
       <div id="setupReadinessPill" class="status-pill gray" style="font-size:10px;">–</div>
+      <button class="btn btn-neutral btn-sm" id="btnOpenIntSetup" onclick="openIntegrationSetup(_activeTenantId)" style="display:none;">⚡ Integrationer</button>
       <button class="btn btn-neutral btn-sm" onclick="loadSetup()">↻ Uppdatera</button>
     </div>
   </div>
@@ -2784,6 +2920,7 @@ label { color: var(--text-muted); }
           <div class="wiz-success-sub" id="wizSuccessSub"></div>
           <div class="wiz-success-actions">
             <button class="btn btn-primary" id="wizBtnOpen" onclick="wizOpenCustomer()">Öppna kund</button>
+            <button class="btn btn-primary" onclick="wizOpenIntegrations()">⚡ Konfigurera integrationer</button>
             <button class="btn btn-neutral" onclick="switchView('admin'); closeWizard()">Till Super Admin</button>
           </div>
         </div>
@@ -2800,6 +2937,37 @@ label { color: var(--text-muted); }
 
   </div><!-- /.wiz-panel -->
 </div><!-- /#wizardOverlay -->
+
+<!-- ═══════════════════════════════════════════════════════
+     INTEGRATION SETUP OVERLAY (Slice 28)
+═══════════════════════════════════════════════════════ -->
+<div id="intSetupOverlay" onclick="_intSetupBgClick(event)">
+  <div class="int-setup-panel">
+
+    <!-- Header -->
+    <div class="int-setup-header">
+      <div class="int-setup-header-icon">⚡</div>
+      <div>
+        <div class="int-setup-header-title">Integrationskonfiguration</div>
+        <div class="int-setup-header-sub" id="intSetupHeaderSub">Konfigurera anslutna system för tenant</div>
+      </div>
+      <button class="int-setup-close" onclick="closeIntegrationSetup()" title="Stäng">✕</button>
+    </div>
+
+    <!-- Body: cards injected by JS -->
+    <div class="int-setup-body" id="intSetupBody">
+      <div class="empty" style="padding:32px 0; text-align:center;">Laddar integrationer…</div>
+    </div>
+
+    <!-- Footer -->
+    <div class="int-setup-footer">
+      <span class="int-setup-tenant-badge" id="intSetupTenantBadge"></span>
+      <button class="btn btn-neutral btn-sm" onclick="loadIntegrationSetup()">↻ Uppdatera</button>
+      <button class="btn btn-primary btn-sm" onclick="closeIntegrationSetup()" style="margin-left:auto;">Klar</button>
+    </div>
+
+  </div>
+</div><!-- /#intSetupOverlay -->
 
 <script>
 // ---------------------------------------------------------------------------
@@ -3064,6 +3232,9 @@ function _applyRoleMode() {
     const el = document.getElementById(id);
     if (el) el.style.display = isAdmin ? '' : 'none';
   });
+  // Show integration setup shortcut in Inställningar header only for admin
+  const intBtn = document.getElementById('btnOpenIntSetup');
+  if (intBtn) intBtn.style.display = isAdmin ? '' : 'none';
 }
 
 function toggleRole() {
@@ -6068,6 +6239,245 @@ function _wizShowSuccess(tenantId, name) {
 function wizOpenCustomer() {
   closeWizard();
   if (_wizCreatedId) openTenant(_wizCreatedId);
+}
+
+function wizOpenIntegrations() {
+  closeWizard();
+  openIntegrationSetup(_wizCreatedId);
+}
+
+// ---------------------------------------------------------------------------
+// Integration Setup Overlay (Slice 28)
+// ---------------------------------------------------------------------------
+let _intSetupTenantId = null;
+
+const INT_CARD_DEFS = [
+  {
+    key:     'gmail',
+    name:    'Gmail',
+    desc:    'Läs och skicka e-post via Google Workspace',
+    logo:    '✉',
+    logoClass: 'gmail',
+    keys:    ['GOOGLE_MAIL_ACCESS_TOKEN', 'GOOGLE_MAIL_REFRESH_TOKEN', 'GOOGLE_MAIL_USER'],
+    scanSystem: 'gmail',
+    docsUrl: 'https://developers.google.com/gmail/api',
+    coming:  false,
+  },
+  {
+    key:     'monday',
+    name:    'Monday.com',
+    desc:    'Skapa och uppdatera ärenden i Monday-boards',
+    logo:    '◼',
+    logoClass: 'monday',
+    keys:    ['MONDAY_API_KEY', 'MONDAY_BOARD_ID'],
+    scanSystem: 'monday',
+    docsUrl: 'https://developer.monday.com',
+    coming:  false,
+  },
+  {
+    key:     'fortnox',
+    name:    'Fortnox',
+    desc:    'Fakturor och ekonomidata via Fortnox API',
+    logo:    '₣',
+    logoClass: 'fortnox',
+    keys:    ['FORTNOX_ACCESS_TOKEN', 'FORTNOX_CLIENT_SECRET'],
+    scanSystem: 'fortnox',
+    docsUrl: 'https://developer.fortnox.se',
+    coming:  false,
+  },
+  {
+    key:     'visma',
+    name:    'Visma',
+    desc:    'Ekonomisystem — kommer snart',
+    logo:    '⊞',
+    logoClass: 'visma',
+    keys:    ['VISMA_ACCESS_TOKEN'],
+    scanSystem: null,
+    docsUrl: null,
+    coming:  true,
+  },
+];
+
+function openIntegrationSetup(tenantId) {
+  _intSetupTenantId = tenantId || _activeTenantId || null;
+  const overlay = document.getElementById('intSetupOverlay');
+  overlay.classList.add('open');
+  loadIntegrationSetup();
+}
+
+function closeIntegrationSetup() {
+  document.getElementById('intSetupOverlay').classList.remove('open');
+}
+
+function _intSetupBgClick(e) {
+  if (e.target === document.getElementById('intSetupOverlay')) closeIntegrationSetup();
+}
+
+async function loadIntegrationSetup() {
+  const body   = document.getElementById('intSetupBody');
+  const badge  = document.getElementById('intSetupTenantBadge');
+  const subHdr = document.getElementById('intSetupHeaderSub');
+
+  const tid = _intSetupTenantId;
+  badge.textContent  = tid ? `Tenant: ${tid}` : 'Ingen tenant vald';
+  subHdr.textContent = tid
+    ? `Integrationer för ${tid}`
+    : 'Konfigurera anslutna system för tenant';
+
+  body.innerHTML = '<div class="empty" style="padding:32px 0; text-align:center;">Laddar…</div>';
+
+  // Fetch health + verify data in parallel
+  let health = null, verify = null;
+  try {
+    [health, verify] = await Promise.allSettled([
+      apiFetch('/integrations/health'),
+      apiFetch('/setup/verify', { method: 'POST', body: '{}' }),
+    ]);
+    health = health.status === 'fulfilled' ? health.value : null;
+    verify = verify.status === 'fulfilled' ? verify.value : null;
+  } catch (_) {}
+
+  const systems = health?.systems || {};
+  const isAdmin = (_uiMode === 'admin');
+
+  body.innerHTML = INT_CARD_DEFS.map(def => _renderIntCard(def, systems[def.key], verify, isAdmin)).join('');
+}
+
+function _renderIntCard(def, sysData, verify, isAdmin) {
+  const coming   = def.coming;
+  const status   = coming ? 'coming' : (sysData?.status || 'not_configured');
+  const configured = sysData?.configured || false;
+
+  const statusLabel = {
+    healthy:        '● Aktiv',
+    warning:        '⚠ Varning',
+    error:          '✕ Fel',
+    not_configured: '○ Ej konfigurerad',
+    coming:         '⏳ Kommer snart',
+  }[status] || status;
+
+  const lastVerified = sysData?.last_success_at
+    ? `Senast OK: ${new Date(sysData.last_success_at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}`
+    : (sysData?.last_error_at
+        ? `Senaste fel: ${new Date(sysData.last_error_at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}`
+        : 'Aldrig verifierad');
+
+  // Build checks list from sysData.checks
+  let checksHtml = '';
+  if (sysData?.checks?.length) {
+    checksHtml = `<div class="int-card-checks">` +
+      sysData.checks.map(c => {
+        const dotClass = c.status === 'ok' ? 'ok' : c.status === 'warning' ? 'warn' : 'fail';
+        return `<div class="int-card-check-row">
+          <div class="int-card-check-dot ${dotClass}"></div>
+          <span>${escapeHtml(c.description || c.check || '')}</span>
+        </div>`;
+      }).join('') +
+    `</div>`;
+  } else if (!coming && !configured) {
+    checksHtml = `<div class="int-card-checks">
+      <div class="int-card-check-row">
+        <div class="int-card-check-dot gray"></div>
+        <span>Inga kontroller tillgängliga — konfigurera miljövariabler för att aktivera</span>
+      </div>
+    </div>`;
+  }
+
+  // Required keys section (admin-only)
+  let keysHtml = '';
+  if (isAdmin && def.keys?.length) {
+    keysHtml = `<div class="int-card-keys">
+      <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-dim); margin-bottom:6px;">Nödvändiga miljövariabler</div>
+      ${def.keys.map(k => `<div><span class="int-card-key-name">${escapeHtml(k)}</span></div>`).join('')}
+    </div>`;
+  }
+
+  // Recommended action
+  const recommended = sysData?.recommended_action
+    ? `<div style="font-size:11px; color:var(--warning); margin-top:2px;">→ ${escapeHtml(sysData.recommended_action)}</div>`
+    : '';
+
+  // Action buttons
+  let actionsHtml = '';
+  if (!coming) {
+    const scanBtn = (def.scanSystem && isAdmin)
+      ? `<button class="btn btn-neutral btn-sm" onclick="_intCardScan('${escapeHtml(def.scanSystem)}', this)">⟳ Skanna</button>`
+      : '';
+    const testBtn = isAdmin
+      ? `<button class="btn btn-neutral btn-sm" onclick="_intCardVerify('${escapeHtml(def.key)}', this)">✓ Testa</button>`
+      : '';
+    const docsBtn = def.docsUrl
+      ? `<a class="btn btn-neutral btn-sm" href="${escapeHtml(def.docsUrl)}" target="_blank" rel="noopener">↗ Dokumentation</a>`
+      : '';
+    const msgSpan = `<span class="cfg-save-msg" id="intMsg_${escapeHtml(def.key)}"></span>`;
+    actionsHtml = `<div class="int-card-actions">${testBtn}${scanBtn}${docsBtn}${msgSpan}</div>`;
+  }
+
+  return `
+<div class="int-card${coming ? ' coming' : ''}">
+  <div class="int-card-header">
+    <div class="int-card-logo ${escapeHtml(def.logoClass)}">${def.logo}</div>
+    <div>
+      <div class="int-card-name">${escapeHtml(def.name)}${coming ? ' <span style="font-size:10px; font-weight:500; color:var(--text-dim);">(kommer snart)</span>' : ''}</div>
+      <div class="int-card-desc">${escapeHtml(def.desc)}</div>
+    </div>
+    <div class="int-status-pill ${escapeHtml(status)}">${statusLabel}</div>
+  </div>
+  <div class="int-card-body">
+    ${checksHtml}
+    <div class="int-card-meta">
+      <span>${escapeHtml(lastVerified)}</span>
+    </div>
+    ${recommended}
+    ${keysHtml}
+    ${actionsHtml}
+  </div>
+</div>`;
+}
+
+async function _intCardVerify(intKey, btn) {
+  const msgEl = document.getElementById(`intMsg_${intKey}`);
+  if (msgEl) { msgEl.textContent = 'Testar…'; msgEl.className = 'cfg-save-msg'; }
+  const prevText = btn.textContent;
+  btn.disabled = true;
+  try {
+    const res = await apiFetch('/setup/verify', { method: 'POST', body: '{}' });
+    // Find check relevant to this integration
+    const checks = res.checks || [];
+    const ok = checks.length === 0 || checks.every(c => c.status !== 'fail');
+    if (msgEl) {
+      msgEl.textContent = ok ? 'OK' : (res.message || 'Verifiering klar med varningar');
+      msgEl.className = 'cfg-save-msg ' + (ok ? 'ok' : 'err');
+    }
+    // Refresh cards to reflect latest state
+    setTimeout(() => loadIntegrationSetup(), 1200);
+  } catch (e) {
+    if (msgEl) { msgEl.textContent = 'Fel: ' + e.message; msgEl.className = 'cfg-save-msg err'; }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevText;
+  }
+}
+
+async function _intCardScan(system, btn) {
+  const intKey = system === 'google_mail' ? 'gmail' : system;
+  const msgEl  = document.getElementById(`intMsg_${intKey}`);
+  if (msgEl) { msgEl.textContent = 'Skannar…'; msgEl.className = 'cfg-save-msg'; }
+  const prevText = btn.textContent;
+  btn.disabled = true;
+  try {
+    const res = await apiFetch(`/workflow-scan/${encodeURIComponent(system)}`, { method: 'POST', body: '{}' });
+    if (msgEl) {
+      msgEl.textContent = res.message || `Skanning av ${system} klar`;
+      msgEl.className = 'cfg-save-msg ok';
+    }
+    setTimeout(() => loadIntegrationSetup(), 1200);
+  } catch (e) {
+    if (msgEl) { msgEl.textContent = 'Fel: ' + e.message; msgEl.className = 'cfg-save-msg err'; }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevText;
+  }
 }
 
 // ---------------------------------------------------------------------------

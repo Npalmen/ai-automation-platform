@@ -1870,3 +1870,63 @@ Admin-only: `openWizard()` returns immediately if `_uiMode !== 'admin'`.
 
 ### Tests
 No backend changes. 1756/1756 tests pass (1 pre-existing env-dependent failure unchanged).
+
+---
+
+## Slice 28 — Integration Setup Flow
+
+**Status:** COMPLETE  
+**Date:** 2026-05-02
+
+### What was built
+
+A fullscreen integration setup overlay (`#intSetupOverlay`) accessible from:
+1. Wizard success state → "⚡ Konfigurera integrationer" button (`wizOpenIntegrations()`)
+2. Inställningar page header → "⚡ Integrationer" button (admin-only, hidden via `_applyRoleMode()`)
+
+### Integration cards
+
+Four cards rendered for: Gmail, Monday, Fortnox, Visma (marked coming soon).
+
+Each card shows:
+- **Status pill**: healthy / warning / error / not_configured / coming (styled variants)
+- **Health checks list**: from `GET /integrations/health` → `systems[key].checks[]`
+- **Last verified timestamp**: `last_success_at` or `last_error_at` from health response
+- **Recommended action**: if backend provides `recommended_action`
+- **Required env vars**: admin-only, listed as monospace key names (`GOOGLE_MAIL_ACCESS_TOKEN` etc.)
+- **Action buttons** (admin-only):
+  - ✓ Testa → `POST /setup/verify` + refreshes cards after 1.2s
+  - ⟳ Skanna → `POST /workflow-scan/{system}` + refreshes cards after 1.2s
+  - ↗ Dokumentation → external docs link (opens in new tab)
+
+Customer mode: sees card layout without env var section or action buttons (health status only).
+
+### Data sources
+- `GET /integrations/health` — per-system status, checks, timestamps (tenant-scoped)
+- `POST /setup/verify {}` — 5 server-side checks (tenant config, modules, email, scheduler, destination)
+- Both fetched in parallel via `Promise.allSettled`; either can fail gracefully
+
+### State management
+- `_intSetupTenantId` — set to passed tenant ID (or `_activeTenantId` fallback) when overlay opens
+- Overlay shows tenant badge + header subtitle scoped to that tenant
+- Background click or ✕ button closes overlay
+
+### New JS functions
+`openIntegrationSetup(tenantId)`, `closeIntegrationSetup()`, `_intSetupBgClick(event)`,
+`loadIntegrationSetup()`, `_renderIntCard(def, sysData, verify, isAdmin)`,
+`_intCardVerify(intKey, btn)`, `_intCardScan(system, btn)`, `wizOpenIntegrations()`
+
+### New CSS classes
+`#intSetupOverlay`, `.int-setup-panel`, `.int-setup-header`, `.int-setup-header-icon/title/sub`,
+`.int-setup-close`, `.int-setup-body`, `.int-setup-footer`, `.int-setup-tenant-badge`,
+`.int-card` (coming variant), `.int-card-header`, `.int-card-logo` (gmail/monday/fortnox/visma),
+`.int-card-name/desc`, `.int-status-pill` (healthy/warning/error/not_configured/coming),
+`.int-card-body`, `.int-card-checks`, `.int-card-check-row`, `.int-card-check-dot` (ok/warn/fail/gray),
+`.int-card-meta`, `.int-card-keys`, `.int-card-key-name`, `.int-card-actions`
+
+### Files changed
+- `app/ui/index.html` — CSS (int-setup section), HTML (overlay + wizard success button + settings header button), JS (all integration setup functions)
+- `docs/05-current-state.md` — Slice 28 row added, test count updated
+
+### Tests
+No backend changes. 1779/1779 tests pass (1 pre-existing env-dependent failure unchanged).
