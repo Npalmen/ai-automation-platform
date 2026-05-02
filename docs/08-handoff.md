@@ -1968,3 +1968,62 @@ Both `viewCtrl` and `viewNotif` are already in `ADMIN_ONLY_VIEWS` — they are h
 
 ### Tests
 No backend changes. 1779/1779 tests pass (1 pre-existing env-dependent failure unchanged).
+
+---
+
+## Slice 30 — Readiness / Launch Checklist
+
+**Status:** COMPLETE  
+**Date:** 2026-05-03
+
+### What was built
+
+New admin-only view "Redo för drift" (`#viewReadiness`) accessible from sidebar under Konfiguration.
+
+**Data source:** `GET /pilot/readiness` — 11 deterministic, read-only checks (no external API calls):
+`auth_configured`, `tenant_exists`, `onboarding_ready`, `integrations_health_not_error`,
+`routing_ready_for_lead`, `dispatch_duplicate_protection`, `dispatch_observability`,
+`scheduler_safe`, `required_env_present`, `ui_available`, `test_lead_exists`
+
+**Score banner:**
+- Percentage: pass=1 pt, warning=0.5 pt; rounded to integer
+- Pass / Warning / Fail counters in colour (success / warning / danger)
+- Colour-coded `cfg-readiness-bar` fill (green/amber/red)
+
+**Header pill:** `status-pill ok` "Redo ✓" / `status-pill warn` "Nästan redo" / `status-pill err` "Inte redo"
+
+**Checklist rows:** Each check shows:
+- Coloured `cfg-check-dot` (ok/warn/fail)
+- Swedish label from `READINESS_LABELS` map
+- Backend message text
+- `int-status-pill` (healthy/warning/error)
+- "→ Åtgärda" button (only when not passing) navigating to the relevant view or opening integration overlay
+
+**Fix-button routing:**
+- `auth_configured` / `scheduler_safe` → `switchView('ctrl')`
+- `tenant_exists` → `switchView('setup')`
+- `onboarding_ready` / `test_lead_exists` → `switchView('onboarding')`
+- `integrations_health_not_error` / `required_env_present` → `openIntegrationSetup(_activeTenantId)`
+- `routing_ready_for_lead` → `switchView('memory')`
+- `dispatch_observability` → `switchView('cases')`
+- `dispatch_duplicate_protection` / `ui_available` → no fix button (infrastructure-level)
+
+### Registration
+- `ADMIN_ONLY_VIEWS` — added `'readiness'`
+- `_VIEW_DISPLAY` — `readiness: 'block'`
+- `_VIEW_TITLE` — `readiness: 'Redo för drift'`
+- `switchView()` — `if (name === 'readiness') loadReadiness()`
+- Sidebar nav — under Konfiguration section, after Kundminne
+
+### New JS functions
+`loadReadiness()`, `_renderReadinessView(r)`
+
+### Constants
+`READINESS_LABELS` (key → Swedish label), `READINESS_FIX` (key → {label, view|action})
+
+### Files changed
+- `app/ui/index.html` — sidebar nav, ADMIN_ONLY_VIEWS, _VIEW_DISPLAY/TITLE, switchView, view HTML, JS
+- `docs/05-current-state.md` — Slice 30 row added
+
+### Tests
+No backend changes. 1779/1779 tests pass (1 pre-existing env-dependent failure unchanged).

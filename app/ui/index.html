@@ -1505,6 +1505,9 @@ label { color: var(--text-muted); }
     <div class="nav-item admin-only" id="viewTabMemory"     onclick="switchView('memory')">
       <span class="nav-icon">◈</span> Kundminne
     </div>
+    <div class="nav-item admin-only" id="viewTabReadiness"  onclick="switchView('readiness')">
+      <span class="nav-icon">✦</span> Redo för drift
+    </div>
 
     <!-- Super admin section -->
     <div class="sidebar-section admin-only" id="sideSecAdmin">Super Admin</div>
@@ -2902,6 +2905,73 @@ label { color: var(--text-muted); }
 
 </div><!-- /viewAdmin -->
 
+<!-- ══════════════════════════════════════════════════════ REDO FÖR DRIFT -->
+<div id="viewReadiness" style="display:none; padding:24px; overflow-y:auto; flex:1; max-width:800px;">
+
+  <div class="dash-page-hdr" style="max-width:760px;">
+    <div>
+      <div class="dash-page-title">Redo för drift</div>
+      <div class="dash-page-sub">Kontrollera att tenanten är redo att gå live</div>
+    </div>
+    <div class="dash-quick-actions">
+      <div id="readinessSummaryPill" class="status-pill gray" style="font-size:11px; font-weight:700;">–</div>
+      <button class="btn btn-neutral btn-sm" onclick="loadReadiness()">↻ Uppdatera</button>
+    </div>
+  </div>
+
+  <!-- Score banner -->
+  <div id="readinessBanner" style="display:none; max-width:760px; margin-bottom:16px;">
+    <div class="cfg-section">
+      <div class="cfg-section-body" style="padding:16px 20px;">
+        <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:160px;">
+            <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-dim); margin-bottom:6px;">Beredskapspoäng</div>
+            <div style="display:flex; align-items:baseline; gap:6px;">
+              <span id="readinessScoreNum" style="font-size:32px; font-weight:800; color:var(--text);">–</span>
+              <span style="font-size:14px; color:var(--text-muted);">/ 100</span>
+            </div>
+          </div>
+          <div style="display:flex; gap:16px; flex-wrap:wrap;">
+            <div style="text-align:center;">
+              <div id="readinessPassCount" style="font-size:20px; font-weight:700; color:var(--success);">–</div>
+              <div style="font-size:11px; color:var(--text-muted);">Godkända</div>
+            </div>
+            <div style="text-align:center;">
+              <div id="readinessWarnCount" style="font-size:20px; font-weight:700; color:var(--warning);">–</div>
+              <div style="font-size:11px; color:var(--text-muted);">Varningar</div>
+            </div>
+            <div style="text-align:center;">
+              <div id="readinessFailCount" style="font-size:20px; font-weight:700; color:var(--danger);">–</div>
+              <div style="font-size:11px; color:var(--text-muted);">Fel</div>
+            </div>
+          </div>
+          <div style="flex:2; min-width:200px;">
+            <div class="cfg-readiness-bar" style="margin:0; height:8px;">
+              <div id="readinessScoreBar" class="cfg-readiness-fill" style="width:0%; background:var(--success);"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Checklist -->
+  <div class="cfg-section" id="readinessChecklist" style="max-width:760px; display:none;">
+    <div class="cfg-section-hdr">
+      <div class="cfg-section-icon purple">✦</div>
+      <div>
+        <div class="cfg-section-title">Driftchecklista</div>
+        <div class="cfg-section-sub">Alla punkter måste vara gröna eller gula för att gå live</div>
+      </div>
+    </div>
+    <div class="cfg-section-body" id="readinessChecklistBody" style="padding:0;">
+    </div>
+  </div>
+
+  <div id="readinessError" class="msg msg-error" style="display:none; max-width:760px; margin-top:14px;"></div>
+
+</div><!-- /viewReadiness -->
+
   </div><!-- /#viewWrap -->
 </div><!-- /#mainContent -->
 
@@ -3147,7 +3217,7 @@ const LS_SESSION    = 'ui_session';      // 'admin' | 'customer' — set after s
 let _uiMode = 'admin';   // current role; initialised in initApiKey()
 
 // Admin-only tab names — hidden in customer mode
-const ADMIN_ONLY_VIEWS = ['ops', 'setup', 'ctrl', 'onboarding', 'notif', 'memory', 'admin'];
+const ADMIN_ONLY_VIEWS = ['ops', 'setup', 'ctrl', 'onboarding', 'notif', 'memory', 'readiness', 'admin'];
 // Views visible to customers
 const CUSTOMER_VIEWS   = ['dash', 'cases'];
 
@@ -3370,13 +3440,14 @@ function toggleRole() {
 // ---------------------------------------------------------------------------
 const _VIEW_DISPLAY = {
   dash: 'block', ops: 'flex', setup: 'block', ctrl: 'block',
-  cases: 'block', onboarding: 'block', notif: 'block', memory: 'block', admin: 'block',
+  cases: 'block', onboarding: 'block', notif: 'block', memory: 'block',
+  readiness: 'block', admin: 'block',
 };
 
 const _VIEW_TITLE = {
   dash: 'Dashboard', ops: 'Drift', setup: 'Inställningar', ctrl: 'Kontrollpanel',
   cases: 'Ärenden', onboarding: 'Onboarding', notif: 'Notifieringar',
-  memory: 'Kundminne', admin: 'Alla kunder',
+  memory: 'Kundminne', readiness: 'Redo för drift', admin: 'Alla kunder',
 };
 
 function switchView(name) {
@@ -3400,6 +3471,7 @@ function switchView(name) {
   if (name === 'onboarding') { loadOnboarding(); if (_uiMode === 'admin') loadWizardStatus(); }
   if (name === 'notif')      loadNotifSettings();
   if (name === 'memory')     loadMemory();
+  if (name === 'readiness')  loadReadiness();
   if (name === 'admin')      loadAdminOverview();
 }
 
@@ -6005,6 +6077,127 @@ async function saveMemory() {
     msg.textContent = 'Kunde inte spara: ' + e.message;
     msg.style.display = 'block';
   }
+}
+
+// ---------------------------------------------------------------------------
+// Redo för drift — Readiness Checklist (Slice 30)
+// ---------------------------------------------------------------------------
+
+const READINESS_LABELS = {
+  auth_configured:               'Autentisering konfigurerad',
+  tenant_exists:                 'Tenant finns i databasen',
+  onboarding_ready:              'Onboarding slutförd',
+  integrations_health_not_error: 'Integrationshälsa OK',
+  routing_ready_for_lead:        'Lead-routing konfigurerad',
+  dispatch_duplicate_protection: 'Duplicate-skydd aktivt',
+  dispatch_observability:        'Dispatch-loggning aktiv',
+  scheduler_safe:                'Scheduler-inställning säker',
+  required_env_present:          'Miljövariabler satta',
+  ui_available:                  'Operatörsgränssnitt tillgängligt',
+  test_lead_exists:              'Testlead bearbetad',
+};
+
+const READINESS_FIX = {
+  auth_configured:               { label: 'Kontrollpanel', view: 'ctrl' },
+  tenant_exists:                 { label: 'Inställningar', view: 'setup' },
+  onboarding_ready:              { label: 'Onboarding', view: 'onboarding' },
+  integrations_health_not_error: { label: 'Integrationer', action: () => openIntegrationSetup(_activeTenantId) },
+  routing_ready_for_lead:        { label: 'Kundminne', view: 'memory' },
+  dispatch_duplicate_protection: null,
+  dispatch_observability:        { label: 'Ärenden', view: 'cases' },
+  scheduler_safe:                { label: 'Kontrollpanel', view: 'ctrl' },
+  required_env_present:          { label: 'Integrationer', action: () => openIntegrationSetup(_activeTenantId) },
+  ui_available:                  null,
+  test_lead_exists:              { label: 'Onboarding', view: 'onboarding' },
+};
+
+async function loadReadiness() {
+  const errEl     = document.getElementById('readinessError');
+  const banner    = document.getElementById('readinessBanner');
+  const checklist = document.getElementById('readinessChecklist');
+  const pill      = document.getElementById('readinessSummaryPill');
+
+  errEl.style.display     = 'none';
+  banner.style.display    = 'none';
+  checklist.style.display = 'none';
+  pill.textContent        = '↻';
+  pill.className          = 'status-pill gray';
+
+  try {
+    const r = await apiFetch('/pilot/readiness');
+    _renderReadinessView(r);
+  } catch (e) {
+    errEl.textContent   = 'Kunde inte ladda beredskapsdata: ' + escapeHtml(e.message);
+    errEl.style.display = 'block';
+    pill.textContent    = 'Fel';
+    pill.className      = 'status-pill err';
+  }
+}
+
+function _renderReadinessView(r) {
+  const score    = r.score || {};
+  const checks   = r.checks || [];
+  const passed   = score.passed   || 0;
+  const warnings = score.warnings || 0;
+  const failures = score.failures || 0;
+  const total    = score.total    || checks.length || 1;
+
+  // Score: full credit for pass, half for warning
+  const pct = Math.round(((passed + warnings * 0.5) / total) * 100);
+
+  // Pill
+  const pill = document.getElementById('readinessSummaryPill');
+  const pillMap = {
+    ready:        ['status-pill ok',   'Redo ✓'],
+    almost_ready: ['status-pill warn', 'Nästan redo'],
+    not_ready:    ['status-pill err',  'Inte redo'],
+  };
+  const [pillCls, pillTxt] = pillMap[r.overall_status] || ['status-pill gray', '–'];
+  pill.className   = pillCls;
+  pill.textContent = pillTxt;
+
+  // Banner
+  document.getElementById('readinessScoreNum').textContent  = pct;
+  document.getElementById('readinessPassCount').textContent  = passed;
+  document.getElementById('readinessWarnCount').textContent  = warnings;
+  document.getElementById('readinessFailCount').textContent  = failures;
+  const barColor = failures > 0 ? 'var(--danger)' : warnings > 0 ? 'var(--warning)' : 'var(--success)';
+  const bar = document.getElementById('readinessScoreBar');
+  bar.style.width      = pct + '%';
+  bar.style.background = barColor;
+  document.getElementById('readinessBanner').style.display = 'block';
+
+  // Checklist rows
+  const body = document.getElementById('readinessChecklistBody');
+  body.innerHTML = checks.map((c, i) => {
+    const isLast = i === checks.length - 1;
+    const dotCls = c.status === 'pass' ? 'ok' : c.status === 'warning' ? 'warn' : 'fail';
+    const pillCls2 = c.status === 'pass' ? 'healthy' : c.status === 'warning' ? 'warning' : 'error';
+    const pillTxt2 = c.status === 'pass' ? '● OK' : c.status === 'warning' ? '⚠ Varning' : '✕ Fel';
+    const label = READINESS_LABELS[c.key] || c.key;
+
+    const fix = READINESS_FIX[c.key];
+    let fixBtn = '';
+    if (fix && c.status !== 'pass') {
+      if (fix.action) {
+        fixBtn = `<button class="btn btn-neutral btn-sm" style="margin-left:auto; flex-shrink:0;" onclick="(${fix.action.toString()})()">${escapeHtml(fix.label)} →</button>`;
+      } else if (fix.view) {
+        fixBtn = `<button class="btn btn-neutral btn-sm" style="margin-left:auto; flex-shrink:0;" onclick="switchView('${escapeHtml(fix.view)}')">${escapeHtml(fix.label)} →</button>`;
+      }
+    }
+
+    return `<div style="display:flex; align-items:flex-start; gap:12px; padding:14px 20px; ${isLast ? '' : 'border-bottom:1px solid var(--border);'}">
+      <div class="cfg-check-dot ${dotCls}" style="margin-top:4px; flex-shrink:0;"></div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:13px; font-weight:600; color:var(--text); margin-bottom:3px;">${escapeHtml(label)}</div>
+        <div style="font-size:12px; color:var(--text-muted); line-height:1.5;">${escapeHtml(c.message)}</div>
+      </div>
+      <div class="int-status-pill ${pillCls2}" style="flex-shrink:0; font-size:10px;">${pillTxt2}</div>
+      ${fixBtn}
+    </div>`;
+  }).join('');
+
+  document.getElementById('readinessChecklist').style.display = 'block';
 }
 
 // ---------------------------------------------------------------------------
