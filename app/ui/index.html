@@ -217,6 +217,33 @@ body {
 }
 .topbar-input:focus { outline: none; border-color: var(--purple); box-shadow: 0 0 0 2px var(--purple-glow); }
 
+/* ── Topbar tenant context ── */
+.topbar-tenant-ctx {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.topbar-tenant-ctx .tenant-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); }
+.topbar-tenant-ctx .tenant-name  { font-weight: 600; color: var(--text); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-tenant-select {
+  padding: 4px 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  max-width: 160px;
+}
+.topbar-tenant-select:focus { outline: none; border-color: var(--purple); }
+
 /* ── Auth banner ── */
 .auth-banner {
   background: var(--danger-bg);
@@ -1534,6 +1561,11 @@ label { color: var(--text-muted); }
   <!-- Topbar -->
   <div id="topbar">
     <div class="topbar-title" id="topbarTitle">Dashboard</div>
+    <!-- Tenant context — admin mode only -->
+    <div id="topbarTenantCtx" class="topbar-tenant-ctx" style="display:none;">
+      <span class="tenant-label">Tenant</span>
+      <select id="topbarTenantSelect" class="topbar-tenant-select" onchange="_topbarSwitchTenant(this.value)" title="Byt aktiv tenant"></select>
+    </div>
     <div class="topbar-key-group">
       <span class="topbar-key-label">API-nyckel</span>
       <input id="apiKeyInput" type="password" class="topbar-input" placeholder="X-API-Key" oninput="onKeyInput()">
@@ -3411,6 +3443,9 @@ function _applyRoleMode() {
   // Show integration setup shortcut in Inställningar header only for admin
   const intBtn = document.getElementById('btnOpenIntSetup');
   if (intBtn) intBtn.style.display = isAdmin ? '' : 'none';
+  // Tenant context in topbar — admin only
+  const tenantCtx = document.getElementById('topbarTenantCtx');
+  if (tenantCtx) tenantCtx.style.display = isAdmin && _activeTenantId ? '' : 'none';
 }
 
 function toggleRole() {
@@ -3523,7 +3558,7 @@ async function _loadCustomerDashboard() {
 
   // Integration health → status card + hero pill
   try {
-    const h = await apiFetch('/integrations/health');
+    const h = await adminApiFetch('/integrations/health');
     const systems = Object.entries(h.systems || {});
     const overall = h.overall_status || 'unknown';
     const [oCls, oLabel] = HEALTH_MAP[overall] || ['gray', overall];
@@ -3801,7 +3836,7 @@ async function loadIntegrationHealth() {
   const _STATUS_CSS   = { healthy: 'var(--success)', warning: 'var(--warning)', error: 'var(--danger)', not_configured: 'var(--text-dim)' };
   const _PILL_CLASS   = { healthy: 'ok', warning: 'warn', error: 'err', not_configured: 'gray' };
   try {
-    const h = await apiFetch('/integrations/health');
+    const h = await adminApiFetch('/integrations/health');
 
     const ov = h.overall_status || 'warning';
     const ovEl = document.getElementById('healthOverall');
@@ -3911,7 +3946,7 @@ async function loadAdminOverview() {
   const banner = document.getElementById('adminKeyBanner');
   if (banner) banner.style.display = 'none';
   try {
-    const r = await apiFetch('/admin/tenants/overview', { headers: adminHeaders() });
+    const r = await adminApiFetch('/admin/tenants/overview');
 
     document.getElementById('adminTotal').textContent    = r.total_tenants    ?? '–';
     document.getElementById('adminHealthy').textContent  = r.healthy          ?? '–';
@@ -3950,7 +3985,11 @@ async function loadAdminOverview() {
         <td>${disp.hours_saved_30d != null ? disp.hours_saved_30d + ' h' : '–'}</td>
         <td style="color:${(t.recent_error_count || 0) > 0 ? 'var(--danger)' : 'var(--text-dim)'};">${t.recent_error_count ?? 0}</td>
         <td style="font-size:11px; color:var(--text-dim);">${actAt}</td>
-        <td><button class="btn btn-neutral btn-sm" onclick="openTenant(${JSON.stringify(t.tenant_id)})">Öppna kund</button></td>
+        <td style="white-space:nowrap; display:flex; gap:4px; flex-wrap:wrap;">
+          <button class="btn btn-neutral btn-sm" onclick="openTenant(${JSON.stringify(t.tenant_id)})" title="Öppna Inställningar för denna kund">Öppna</button>
+          <button class="btn btn-neutral btn-sm" onclick="_adminOpenIntegrations(${JSON.stringify(t.tenant_id)})" title="Integrationsstatus & konfiguration">Integr.</button>
+          <button class="btn btn-neutral btn-sm" onclick="_adminOpenReadiness(${JSON.stringify(t.tenant_id)})" title="Redo för drift">Redo</button>
+        </td>
       </tr>`;
     }).join('');
 
@@ -3960,7 +3999,7 @@ async function loadAdminOverview() {
           <th>Kund</th><th>Tenant ID</th><th>Status</th>
           <th>Onboarding %</th><th>Pilotberedskap %</th><th>Integrationshälsa</th>
           <th>Dispatch 30d</th><th>Sparad tid 30d</th><th>Fel</th>
-          <th>Senaste aktivitet</th><th>Åtgärd</th>
+          <th>Senaste aktivitet</th><th>Åtgärder</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
@@ -3977,16 +4016,77 @@ async function loadAdminOverview() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Topbar tenant context
+// ---------------------------------------------------------------------------
+async function _populateTopbarTenantSelect(currentId) {
+  const sel = document.getElementById('topbarTenantSelect');
+  if (!sel) return;
+  try {
+    const data = await adminApiFetch('/tenants');
+    const items = data.items || [];
+    sel.innerHTML = items.map(t =>
+      `<option value="${escapeHtml(t.tenant_id)}"${t.tenant_id === currentId ? ' selected' : ''}>${escapeHtml(t.tenant_id)}${t.name ? ' – ' + escapeHtml(t.name) : ''}</option>`
+    ).join('');
+    if (!sel.value && currentId) sel.value = currentId;
+  } catch (_) { /* silent */ }
+}
+
+function _updateTenantCtx(tenantId) {
+  const ctx = document.getElementById('topbarTenantCtx');
+  if (!ctx) return;
+  const isAdmin = (_uiMode === 'admin');
+  ctx.style.display = isAdmin && tenantId ? '' : 'none';
+  if (tenantId) _populateTopbarTenantSelect(tenantId);
+}
+
+async function _topbarSwitchTenant(tenantId) {
+  if (!tenantId) return;
+  _activeTenantId = tenantId;
+  // Reload whichever admin view is currently active
+  const activeView = Object.keys(_VIEW_DISPLAY).find(v => {
+    const el = document.getElementById('view' + v.charAt(0).toUpperCase() + v.slice(1));
+    return el && el.style.display !== 'none';
+  });
+  if (activeView === 'setup') {
+    await loadSetup();
+  } else if (activeView === 'dash') {
+    await loadDashboard();
+  } else if (activeView === 'cases') {
+    await loadCases();
+  } else if (activeView === 'ops') {
+    await loadOps();
+  }
+  // Sync setup dropdown if visible
+  const sel = document.getElementById('switchTenantSelect');
+  if (sel && sel.value !== tenantId) sel.value = tenantId;
+}
+
 async function openTenant(tenantId) {
   // Pre-set the active tenant so loadSetup() picks it up correctly.
   _activeTenantId = tenantId;
   // Switch to admin mode so Inställningar tab is visible
   if (_uiMode !== 'admin') { _uiMode = 'admin'; _applyRoleMode(); }
+  _updateTenantCtx(tenantId);
   switchView('setup');
   // After loadSetup() has run (called by switchView), sync the dropdown.
   await loadTenants();
   const sel = document.getElementById('switchTenantSelect');
   if (sel) sel.value = tenantId;
+}
+
+function _adminOpenIntegrations(tenantId) {
+  _activeTenantId = tenantId;
+  if (_uiMode !== 'admin') { _uiMode = 'admin'; _applyRoleMode(); }
+  _updateTenantCtx(tenantId);
+  openIntegrationSetup(tenantId);
+}
+
+function _adminOpenReadiness(tenantId) {
+  _activeTenantId = tenantId;
+  if (_uiMode !== 'admin') { _uiMode = 'admin'; _applyRoleMode(); }
+  _updateTenantCtx(tenantId);
+  switchView('readiness');
 }
 
 
@@ -4343,6 +4443,7 @@ async function loadSetup() {
         if (opt) select.value = _activeTenantId;
       }
     }
+    _updateTenantCtx(_activeTenantId);
     renderSetup(cfg);
   } catch (e) {
     setMsg('msgSetup', e.message, true);
@@ -4369,6 +4470,7 @@ async function switchTenant() {
   try {
     const cfg = await adminApiFetch(`/tenant/config/${encodeURIComponent(tenantId)}`);
     _activeTenantId = tenantId;
+    _updateTenantCtx(tenantId);
     renderSetup(cfg);
     msgEl.className = 'cfg-save-msg ok';
     msgEl.textContent = `Tenant '${escapeHtml(tenantId)}' laddad.`;
@@ -5467,7 +5569,7 @@ async function _loadCustomerOnboarding() {
   const errEl = document.getElementById('custOnboardingError');
   errEl.style.display = 'none';
   try {
-    const r = await apiFetch('/setup/status');
+    const r = await adminApiFetch('/setup/status');
     const c = r.connections || {};
     const auto = r.automation || {};
     const m = r.modules || {};
@@ -5506,7 +5608,7 @@ async function _loadAdminOnboarding() {
   const errEl = document.getElementById('onboardingError');
   errEl.style.display = 'none';
   try {
-    const r = await apiFetch('/setup/status');
+    const r = await adminApiFetch('/setup/status');
 
     // Readiness score + ring
     const rd = r.readiness || {};
@@ -5593,7 +5695,7 @@ async function runOnboardingVerify() {
   const resultEl = document.getElementById('obVerifyResult');
   resultEl.innerHTML = '<div style="font-size:12px; color:var(--text-muted); padding:8px 0;">Kör verifiering…</div>';
   try {
-    const r = await apiFetch('/setup/verify', { method: 'POST' });
+    const r = await adminApiFetch('/setup/verify', { method: 'POST' });
     const statusVars = { ok: 'var(--success)', warning: 'var(--warning)', failed: 'var(--danger)' };
     const pillMap    = { ok: 'ok', warning: 'warn', failed: 'err' };
     const color = statusVars[r.status] || 'var(--text-muted)';
@@ -5820,7 +5922,7 @@ async function loadMemory() {
   msg.style.display = 'none';
   try {
     // Load scan status
-    const scan = await apiFetch('/workflow-scan/status');
+    const scan = await adminApiFetch('/workflow-scan/status');
     _renderScanStatus(scan);
 
     // Discovered systems from summary (JSON view)
@@ -5862,7 +5964,7 @@ async function scanWorkflowSystem(system) {
   if (fortnoxBtn) fortnoxBtn.disabled = true;
   running.style.display = 'block';
   try {
-    const result = await apiFetch(`/workflow-scan/${system}`, { method: 'POST' });
+    const result = await adminApiFetch(`/workflow-scan/${system}`, { method: 'POST' });
     _renderScanStatus(result);
     await loadMemory();
     const s = result.summary?.[system] || {};
@@ -5881,7 +5983,7 @@ async function scanWorkflowSystem(system) {
     msg.textContent = 'Scanning misslyckades: ' + e.message;
     msg.style.display = 'block';
     try {
-      const status = await apiFetch('/workflow-scan/status');
+      const status = await adminApiFetch('/workflow-scan/status');
       _renderScanStatus(status);
     } catch (_) {}
   } finally {
@@ -6642,8 +6744,8 @@ async function loadIntegrationSetup() {
   let health = null, verify = null;
   try {
     [health, verify] = await Promise.allSettled([
-      apiFetch('/integrations/health'),
-      apiFetch('/setup/verify', { method: 'POST', body: '{}' }),
+      adminApiFetch('/integrations/health'),
+      adminApiFetch('/setup/verify', { method: 'POST', body: '{}' }),
     ]);
     health = health.status === 'fulfilled' ? health.value : null;
     verify = verify.status === 'fulfilled' ? verify.value : null;
@@ -6753,7 +6855,7 @@ async function _intCardVerify(intKey, btn) {
   const prevText = btn.textContent;
   btn.disabled = true;
   try {
-    const res = await apiFetch('/setup/verify', { method: 'POST', body: '{}' });
+    const res = await adminApiFetch('/setup/verify', { method: 'POST', body: '{}' });
     // Find check relevant to this integration
     const checks = res.checks || [];
     const ok = checks.length === 0 || checks.every(c => c.status !== 'fail');
@@ -6778,7 +6880,7 @@ async function _intCardScan(system, btn) {
   const prevText = btn.textContent;
   btn.disabled = true;
   try {
-    const res = await apiFetch(`/workflow-scan/${encodeURIComponent(system)}`, { method: 'POST', body: '{}' });
+    const res = await adminApiFetch(`/workflow-scan/${encodeURIComponent(system)}`, { method: 'POST', body: '{}' });
     if (msgEl) {
       msgEl.textContent = res.message || `Skanning av ${system} klar`;
       msgEl.className = 'cfg-save-msg ok';
