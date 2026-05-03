@@ -5433,12 +5433,137 @@ async function _openAdminCase(jobId) {
         </div>`;
     }
 
-    detailEl.innerHTML = rpHtml + omHtml + extHtml + threadHtml + actHtml + errSectionHtml;
+    // Lead Analysis panel (only for lead type)
+    const leadHtml = _renderLeadAnalysisPanel(c);
+
+    detailEl.innerHTML = leadHtml + rpHtml + omHtml + extHtml + threadHtml + actHtml + errSectionHtml;
   } catch (e) {
     errEl.textContent = 'Kunde inte ladda ärendedetaljer: ' + escapeHtml(e.message);
     errEl.style.display = 'block';
     detailEl.innerHTML = '';
   }
+}
+
+// ---------------------------------------------------------------------------
+// Lead Analysis panel renderer
+// ---------------------------------------------------------------------------
+function _renderLeadAnalysisPanel(c) {
+  if (c.type !== 'lead' || !c.lead_analysis) return '';
+
+  const la = c.lead_analysis;
+  const mi = c.missing_fields || [];
+  const cs = c.completeness_score != null ? Math.round(c.completeness_score * 100) : null;
+  const score = c.lead_score;
+  const cat = c.score_category || 'cold';
+  const nextAction = c.next_action || '–';
+  const qMsg = c.generated_question_message;
+  const offer = c.offer_draft;
+
+  const catColors = { hot: 'var(--danger)', warm: 'var(--warning)', cold: 'var(--text-dim)' };
+  const catColor  = catColors[cat] || 'var(--text-muted)';
+
+  const naLabels = {
+    ask_questions:     'Ställ frågor till kund',
+    create_offer_draft:'Skapa offertutkast',
+    manual_review:     'Manuell granskning',
+    approval_required: 'Kräver godkännande',
+    ready_to_dispatch: 'Redo att skicka',
+  };
+  const intentLabels = { researching: 'Undersöker', comparing: 'Jämför', ready_to_buy: 'Köpredo' };
+  const urgencyLabels = { low: 'Låg', medium: 'Medel', high: 'Hög' };
+  const urgencyColors = { low: 'var(--text-dim)', medium: 'var(--warning)', high: 'var(--danger)' };
+  const ltLabel = (la.lead_type || 'unknown').replace(/_/g, ' ');
+
+  // Score badge
+  const scoreHtml = score != null
+    ? `<span style="font-size:22px; font-weight:700; color:${catColor};">${score}</span>
+       <span style="font-size:11px; color:${catColor}; font-weight:600; text-transform:uppercase; margin-left:4px;">${escapeHtml(cat)}</span>`
+    : '–';
+
+  // Completeness bar
+  const barWidth = cs != null ? cs : 0;
+  const barColor = barWidth >= 70 ? 'var(--success)' : barWidth >= 40 ? 'var(--warning)' : 'var(--danger)';
+  const completenessHtml = cs != null
+    ? `<div style="margin-top:6px;">
+         <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-dim); margin-bottom:4px;">
+           <span>Informationskomplett</span><span>${cs}%</span>
+         </div>
+         <div style="height:6px; background:var(--surface-3); border-radius:3px; overflow:hidden;">
+           <div style="width:${barWidth}%; height:100%; background:${barColor}; border-radius:3px;"></div>
+         </div>
+       </div>`
+    : '';
+
+  // Missing fields
+  const missingHtml = mi.length > 0
+    ? `<div style="margin-top:10px;">
+         <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;">Saknad information</div>
+         <div style="display:flex; gap:6px; flex-wrap:wrap;">
+           ${mi.map(f => `<span style="background:rgba(239,68,68,.12); color:var(--danger); font-size:11px; padding:2px 8px; border-radius:20px;">${escapeHtml(f.replace(/_/g,' '))}</span>`).join('')}
+         </div>
+       </div>`
+    : '';
+
+  // Next action badge
+  const naHtml =
+    `<div style="margin-top:10px;">
+       <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;">AI rekommenderar</div>
+       <div style="font-size:13px; font-weight:600; color:var(--purple);">${escapeHtml(naLabels[nextAction] || nextAction)}</div>
+     </div>`;
+
+  // Question message box
+  const qHtml = qMsg
+    ? `<div style="margin-top:12px;">
+         <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;">Frågor att skicka till kund</div>
+         <pre style="background:var(--surface-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; font-size:12px; white-space:pre-wrap; color:var(--text);">${escapeHtml(qMsg)}</pre>
+       </div>`
+    : '';
+
+  // Offer draft box
+  const offerHtml = offer
+    ? `<div style="margin-top:12px;">
+         <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;">Offertutkast</div>
+         <div style="background:var(--surface-3); border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:12px; font-size:12px;">
+           <div style="color:var(--text); margin-bottom:6px;">${escapeHtml(offer.summary || '')}</div>
+           ${offer.estimated_price_range ? `<div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;"><strong>Prisuppskattning:</strong> ${escapeHtml(offer.estimated_price_range)}</div>` : ''}
+           ${offer.recommended_next_step ? `<div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;"><strong>Nästa steg:</strong> ${escapeHtml(offer.recommended_next_step)}</div>` : ''}
+           <div style="font-size:10px; color:var(--text-dim); margin-top:8px; font-style:italic;">${escapeHtml(offer.disclaimer || '')}</div>
+         </div>
+       </div>`
+    : '';
+
+  return `<div class="detail-section" style="margin-bottom:14px; border-color:rgba(139,92,246,.3);">
+    <div class="detail-section-title" style="color:var(--purple);">Lead-analys</div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:8px;">
+      <div>
+        <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px;">Leadtyp</div>
+        <div style="font-size:13px; font-weight:600; color:var(--text);">${escapeHtml(ltLabel)}</div>
+      </div>
+      <div>
+        <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px;">Kundtyp</div>
+        <div style="font-size:13px; color:var(--text);">${escapeHtml(la.customer_type || '–')}</div>
+      </div>
+      <div>
+        <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px;">Intent</div>
+        <div style="font-size:13px; color:var(--text);">${escapeHtml(intentLabels[la.intent] || la.intent || '–')}</div>
+      </div>
+      <div>
+        <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px;">Angelägenhet</div>
+        <div style="font-size:13px; color:${urgencyColors[la.urgency] || 'var(--text)'}; font-weight:600;">${escapeHtml(urgencyLabels[la.urgency] || la.urgency || '–')}</div>
+      </div>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:16px; padding:10px 0; border-top:1px solid var(--border);">
+      <div style="display:flex; align-items:baseline; gap:4px;">${scoreHtml}</div>
+      <div style="flex:1;">${completenessHtml}</div>
+    </div>
+
+    ${missingHtml}
+    ${naHtml}
+    ${qHtml}
+    ${offerHtml}
+  </div>`;
 }
 
 // ---------------------------------------------------------------------------

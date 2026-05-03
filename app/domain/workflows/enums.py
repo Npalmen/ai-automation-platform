@@ -33,6 +33,7 @@ class JobType(str, Enum):
 
     # Sales
     LEAD = "lead"
+    LEAD_ANALYSIS = "lead_analysis"
     LEAD_QUALIFICATION = "lead_qualification"
     QUOTE = "quote"
     SALES_FOLLOWUP = "sales_followup"

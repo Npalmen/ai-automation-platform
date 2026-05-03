@@ -2091,3 +2091,104 @@ All 5 now have `_: None = Depends(require_admin_api_key)` in their signature. Te
 
 ### Tests
 No schema changes. 1779/1779 tests pass (1 pre-existing env-dependent failure unchanged).
+
+## Completed: Slice 32 — Super Admin Control & Tenant Context Fix (2026-05-03)
+
+### What changed
+
+**Topbar tenant context:**
+- `#topbarTenantCtx` — new `<select>` dropdown in topbar, visible only in admin mode when a tenant is active
+- Populated from `GET /tenants` via `_populateTopbarTenantSelect()`
+- Switching triggers `_topbarSwitchTenant(tenantId)` — updates `_activeTenantId` and reloads current view
+- `_updateTenantCtx(tenantId)` — called from `openTenant()`, `switchTenant()`, `loadSetup()`, and new `_adminOpen*` helpers
+- Hidden via `_applyRoleMode()` in customer mode
+
+**Super Admin table upgrade:**
+- Each row now has 3 buttons: **Öppna** (→ setup), **Integr.** (→ integration overlay), **Redo** (→ readiness)
+- `_adminOpenIntegrations(tenantId)` and `_adminOpenReadiness(tenantId)` set `_activeTenantId` + call `_updateTenantCtx()` before navigating
+- No manual tenant ID typing required
+
+**Admin API fix — 12 call sites:**
+All remaining plain `apiFetch()` calls to admin-gated endpoints converted to `adminApiFetch()`:
+- `/integrations/health` (×3: dashboard, admin dashboard, integration overlay)
+- `/setup/status` (×2: customer onboarding, admin onboarding)
+- `/setup/verify` (×3: onboarding verify, integration overlay parallel fetch, integration card test)
+- `/workflow-scan/status` (×2: loadMemory, scan error handler)
+- `/workflow-scan/{system}` (×2: scanWorkflowSystem, _intCardScan)
+- `/admin/tenants/overview` (×1: removed manual `adminHeaders()` override)
+
+### Files changed
+- `app/ui/index.html` — CSS, topbar HTML, `_updateTenantCtx`, `_populateTopbarTenantSelect`, `_topbarSwitchTenant`, `openTenant`, `_adminOpenIntegrations`, `_adminOpenReadiness`, `switchTenant`, `loadSetup`, `_applyRoleMode`, 12 apiFetch → adminApiFetch fixes, super admin table row
+- `docs/05-current-state.md` — Slice 32 row
+
+### Tests
+1756/1756 pass. JS syntax validated with `node -e "new Function(script)"`.
+
+---
+
+## Completed: Lead Layer — Slices A–G (2026-05-03)
+
+### What changed
+
+**New package: `app/lead/`**
+- `models.py` — typed result structures: `LeadAnalysis`, `MissingInfoResult`, `LeadScore`, `OfferDraft`; literal types for `LeadType`, `Intent`, `Urgency`, `CustomerType`, `ScoreCategory`, `NextAction`
+- `analyzer.py` — rule-based `analyze_lead()`: 6 lead_types, 3 intent levels, 2 urgency levels, 4 customer types; keyword tables with `\b` word boundary matching; confidence scoring
+- `missing_info.py` — `compute_missing_info()`: field schemas for 7 lead_types (solar, battery, ev_charger, electrical, roof_painting, roof_cleaning, unknown); field presence via keyword matching + entity extraction; completeness_score 0–1
+- `question_generator.py` — `generate_question_message()`: Swedish templates per field; triggered when completeness < 0.7
+- `scorer.py` — `score_lead()`: 0–100 score; intent/urgency/completeness/contact/keyword factors; hot/warm/cold category
+- `next_action.py` — `decide_next_action()`: completeness < 0.7 → ask_questions; score ≥70 → create_offer_draft/ready_to_dispatch; 40–69 → approval_required; <40 → manual_review
+- `offer_draft.py` — `build_offer_draft()`: safe preliminary draft when completeness ≥ 0.7; static price ranges per lead_type; sections + assumptions; always marked "Preliminärt underlag"
+
+**New processor: `lead_analyzer_processor.py`**
+- `PROCESSOR_NAME = "lead_analyzer_processor"`
+- Runs all 6 lead modules; saves `lead_analysis`, `missing_info`, `lead_score`, `next_action`, optional `generated_question_message` and `offer_draft` in payload
+- No LLM dependency; no external writes
+
+**Pipeline wiring:**
+- `JobType.LEAD_ANALYSIS` added to `app/domain/workflows/enums.py`
+- Registered in `app/workflows/processor_registry.py`
+- Inserted after `ENTITY_EXTRACTION` in `POST_CLASSIFICATION_PIPELINES[LEAD]` in `orchestrator.py`
+- Runs before existing `LEAD` (AI scoring), `DECISIONING`, `POLICY`, `ACTION_DISPATCH`, `HUMAN_HANDOFF`
+
+**API: `GET /cases/{job_id}`**
+- Now includes: `lead_analysis`, `missing_fields`, `completeness_score`, `lead_score`, `score_category`, `score_reasons`, `offer_draft`, `next_action`, `generated_question_message`
+- Fields are `null` for non-lead jobs
+
+**UI: Admin case detail**
+- `_renderLeadAnalysisPanel(c)` — renders a purple-bordered Lead-analys section at the top of case detail for lead jobs
+- Score badge (number + hot/warm/cold in matching color)
+- Completeness bar (green/yellow/red based on threshold)
+- Missing field chips (red pills)
+- AI rekommenderar label (purple, Swedish action label)
+- Question message block (pre-formatted, copyable)
+- Offer draft card (summary, price range, next step, disclaimer)
+
+### Files changed
+- `app/lead/__init__.py` — new
+- `app/lead/models.py` — new
+- `app/lead/analyzer.py` — new
+- `app/lead/missing_info.py` — new
+- `app/lead/question_generator.py` — new
+- `app/lead/scorer.py` — new
+- `app/lead/next_action.py` — new
+- `app/lead/offer_draft.py` — new
+- `app/workflows/processors/lead_analyzer_processor.py` — new
+- `app/domain/workflows/enums.py` — `LEAD_ANALYSIS` added
+- `app/workflows/processor_registry.py` — `LEAD_ANALYSIS` registered
+- `app/workflows/orchestrator.py` — `LEAD_ANALYSIS` inserted in pipeline
+- `app/main.py` — `GET /cases/{job_id}` extended with lead fields
+- `app/ui/index.html` — `_renderLeadAnalysisPanel()` added; wired into `_openAdminCase()`
+- `docs/05-current-state.md` — Lead Layer row
+
+### Acceptance criteria met
+- Incoming lead gets `lead_analysis` (lead_type, intent, urgency, customer_type, confidence)
+- System identifies missing info (missing_fields, completeness_score)
+- System generates Swedish customer questions when completeness < 0.7
+- System scores lead 0–100 with hot/warm/cold category
+- System creates offer draft when completeness ≥ 0.7
+- UI/case detail shows lead analysis panel with all fields
+- No external actions without policy/approval (existing dispatch engine unchanged)
+- 1756/1756 tests pass; no regressions
+
+### Tests
+No new test files (rule-based logic, smoke-tested via Python inline). Existing 1756 tests unaffected.

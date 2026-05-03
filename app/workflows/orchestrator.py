@@ -32,6 +32,7 @@ POST_CLASSIFICATION_PIPELINES = {
     ],
     JobType.LEAD: [
         JobType.ENTITY_EXTRACTION,
+        JobType.LEAD_ANALYSIS,
         JobType.LEAD,
         JobType.DECISIONING,
         JobType.POLICY,

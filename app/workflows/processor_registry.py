@@ -10,6 +10,7 @@ from app.workflows.processors.entity_extraction_processor import process_entity_
 from app.workflows.processors.human_handoff_processor import process_human_handoff_job
 from app.workflows.processors.intake_processor import process_universal_intake_job
 from app.workflows.processors.invoice_processor import process_invoice_job
+from app.workflows.processors.lead_analyzer_processor import process_lead_analyzer_job
 from app.workflows.processors.lead_processor import process_lead_job
 from app.workflows.processors.policy_processor import process_policy_job
 
@@ -21,6 +22,7 @@ PROCESSOR_REGISTRY: dict[JobType, Processor] = {
     JobType.ENTITY_EXTRACTION: process_entity_extraction_job,
     JobType.INVOICE: process_invoice_job,
     JobType.LEAD: process_lead_job,
+    JobType.LEAD_ANALYSIS: process_lead_analyzer_job,
     JobType.CUSTOMER_INQUIRY: process_customer_inquiry_job,
     JobType.DECISIONING: process_decisioning_job,
     JobType.POLICY: process_policy_job,

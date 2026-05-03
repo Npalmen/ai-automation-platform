@@ -2487,6 +2487,13 @@ def get_case(
         else None
     )
 
+    # --- lead analysis fields (from lead_analyzer_processor) ---
+    lead_payload: dict = {}
+    for entry in history:
+        if entry.get("processor") == "lead_analyzer_processor":
+            lead_payload = (entry.get("result") or {}).get("payload") or {}
+            break
+
     return {
         "job_id":           r.job_id,
         "created_at":       r.created_at.isoformat() if r.created_at else None,
@@ -2504,6 +2511,16 @@ def get_case(
         "actions":          actions,
         "errors":           errors,
         "routing_preview":  routing_preview,
+        # Lead analysis (present only for lead job_type)
+        "lead_analysis":                lead_payload.get("lead_analysis"),
+        "missing_fields":               (lead_payload.get("missing_info") or {}).get("missing_fields"),
+        "completeness_score":           (lead_payload.get("missing_info") or {}).get("completeness_score"),
+        "lead_score":                   (lead_payload.get("lead_score") or {}).get("score"),
+        "score_category":               (lead_payload.get("lead_score") or {}).get("category"),
+        "score_reasons":                (lead_payload.get("lead_score") or {}).get("reasons"),
+        "offer_draft":                  lead_payload.get("offer_draft"),
+        "next_action":                  lead_payload.get("next_action"),
+        "generated_question_message":   lead_payload.get("generated_question_message"),
     }
 
 
