@@ -2192,3 +2192,48 @@ All remaining plain `apiFetch()` calls to admin-gated endpoints converted to `ad
 
 ### Tests
 No new test files (rule-based logic, smoke-tested via Python inline). Existing 1756 tests unaffected.
+
+---
+
+## Completed slice (2026-05-03 — Lead Layer v2: Tenant-aware Intelligence, Slices A–M)
+
+### What was built
+Full tenant-aware upgrade to the lead analysis layer. Same pipeline as before, now makes different decisions per tenant based on their memory/config stored in `settings.memory.lead_config`.
+
+### New file
+- `app/lead/tenant_context.py` — `TenantLeadContext` dataclass; `load_tenant_context(tenant_id, settings)` reads from `memory.lead_config` + `memory.business_profile`; `load_tenant_context_from_job(job, db)` for pipeline use; graceful fallback (context_available=False) when memory is absent
+
+### Modified: lead layer modules
+- `app/lead/models.py` — `LeadAnalysis` extended with `tenant_context_used`, `context_sources`, `matched_service`; `MissingInfoResult` extended with `schema_source`, `tenant_context_used`, `context_sources`; `LeadScore` extended with `tenant_context_used`, `business_fit_reason`; `OfferDraft` extended with `risk_points`, `tenant_context_used`, `context_sources`; `LeadStatus` Literal type added
+- `app/lead/analyzer.py` — filters lead_type table to tenant's offered services; prepends tenant keywords; reports `matched_service` (human-readable service name)
+- `app/lead/missing_info.py` — uses `tenant_ctx.schema_for(lead_type)` when available; reports `schema_source` ("tenant" / "default"); completeness counts only required fields in numerator (bug fix)
+- `app/lead/question_generator.py` — uses `tenant_ctx.company_name` in opening; uses per-service `field_labels` for custom question wording
+- `app/lead/scorer.py` — bonuses: `high_value_services` (+10), `priority_services` (+5), `geographic_match` (+8), `ideal_customer_type` (+5); penalties: `geographic_mismatch` (-15), `service_not_offered` (-20); sets `business_fit_reason`
+- `app/lead/offer_draft.py` — uses tenant `pricing_guidelines` for price range; per-service `offer_sections` and `assumptions`; appends `offer_principles`; geographic risk_point when address outside served_areas; company_name in summary
+- `app/lead/next_action.py` — added: geo-mismatch / low score → `manual_review` regardless of score
+
+### Modified: processor
+- `app/workflows/processors/lead_analyzer_processor.py` — added `db=None` parameter; calls `load_tenant_context_from_job`; passes `tenant_ctx` to all 6 lead modules; adds `lead_status` to payload; `_infer_lead_status()` determines initial status from pipeline outcome + conversation_messages
+
+### Modified: main.py (new endpoints)
+- `PATCH /jobs/{job_id}/lead-status` — operator override; validates against `_VALID_LEAD_STATUSES`; persists to `input_data["lead_status"]`
+- `POST /jobs/{job_id}/lead-regenerate` — re-runs lead modules only (not full pipeline); updates `lead_analyzer_processor` entry in `processor_history`; returns full lead analysis result
+- `GET /dashboard/leads` — KPIs: `total_leads`, `by_status`, `by_category` (hot/warm/cold), `by_service`, `pipeline_value_estimate` (low_sek, high_sek, leads_with_estimate)
+- `GET /cases/{job_id}` extended with: `lead_status`, `tenant_context_used`, `tenant_context_sources`, `matched_service`, `schema_source`, `required_fields_used`, `optional_fields_used`, `business_fit_reason`
+
+### Modified: UI
+- `app/ui/index.html` — `_renderLeadAnalysisPanel()` enhanced: lead status badge + operator select + Spara button (calls `PATCH`); tenant-context badges (Tenant-kontext/matched_service/schema source); business_fit_reason callout; risk_points in offer draft; tenant-context flag on offer; "Kopiera" on question message; "↻ Regenerera analys" button (calls `POST`); `_saveLeadStatus()`, `_regenerateLeadAnalysis()`, `_copyToClipboard()` added
+- `app/ui/index.html` — Lead-pipeline KPI section added to admin dashboard: `loadLeadKpis()` calls `GET /dashboard/leads`; shows total + category breakdown + status grid + per-service table + pipeline value estimate
+
+### Tests
+- `tests/test_lead_layer_v2.py` — 41 new unit tests: `TenantLeadContext` loading, tenant vs default analyzer behavior, missing info schema override, completeness fix, scorer bonuses/penalties, offer draft tenant overrides, next action geo-constraint, question generator company name; all pass
+- Full suite: 1820 pass, 1 pre-existing failure in `test_admin_auth` (env-dependent, unrelated)
+
+### Acceptance criteria met
+- Same lead → different pipeline output when tenant config differs (different field schema, score, offer sections, price range, next action)
+- Full fallback to v1 behavior when `memory.lead_config` absent
+- `lead_status` persisted in `input_data`, survives pipeline reruns, operator-settable
+- Operator can regenerate analysis in-place without full re-run
+- Dashboard shows live lead KPIs by status/category/service
+- No external dispatch without policy/approval (dispatch engine unchanged)
+- No LLM dependency

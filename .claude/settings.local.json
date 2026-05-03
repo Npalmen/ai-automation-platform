@@ -32,7 +32,15 @@
       "Bash(python -m pytest tests/test_google_mail_list_messages.py -v)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(grep -n \"^function wizOpenCustomer\\\\|^// ---------------------------------------------------------------------------$\" c:/ai_automation_platform/app/ui/index.html)",
+      "Bash(git -C c:/ai_automation_platform diff HEAD app/ui/index.html)",
+      "Bash(grep -E \"\\\\.\\(py|yaml|yml\\)$\")",
+      "Bash(awk '/@app\\\\.\\(get|post|put|delete|patch\\)/{route=1} route && /^def /{print NR\": \"route; route=0} route && /get_db/{getdb=1} route && /get_verified_tenant/{verified=1} route && /require_admin_api_key/{admin=1} /@app\\\\.\\(get|post|put|delete|patch\\)/{getdb=0;verified=0;admin=0}' /c/ai_automation_platform/app/main.py)",
+      "Bash(curl -s -w \"\\\\nSTATUS:%{http_code}\" -H \"X-Admin-API-Key: admin123\" http://127.0.0.1:8000/admin/tenants/overview)",
+      "Bash(Get-ChildItem -Path \"c:\\\\ai_automation_platform\" -Directory)",
+      "Bash(Select-Object Name)",
+      "PowerShell(ls -r c:\\\\ai_automation_platform -Directory -Depth 2 | Select-Object -ExpandProperty Name | Where-Object {$_ -notmatch '\\\\.venv|\\\\.git|__pycache__|\\\\.pytest'})"
     ]
   }
 }

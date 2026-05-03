@@ -2,8 +2,18 @@
 
 Generates a customer-facing Swedish message asking for missing fields.
 Triggered when completeness_score < 0.7.
+
+When a TenantLeadContext is provided the message uses:
+- the tenant's company name
+- tone/language preferences
+- service-specific field labels
 """
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.lead.tenant_context import TenantLeadContext
 
 # Swedish question templates per field
 _FIELD_QUESTIONS: dict[str, str] = {
@@ -29,27 +39,51 @@ _FIELD_QUESTIONS: dict[str, str] = {
     "previous_cleaning":          "Har taket tvättats tidigare, och i så fall när?",
     "preferred_brand":            "Har du något föredraget laddboxsmärke?",
     "parking_type":               "Parkeringstyp (garage, carport, utomhus)",
+    "contact_name":               "Ditt namn",
+    "contact_phone":              "Telefonnummer",
+    "contact_email":              "E-postadress",
+    "notes":                      "Övrig information du vill dela",
 }
 
 _COMPLETENESS_THRESHOLD = 0.7
 
 
-def generate_question_message(missing_fields: list[str]) -> str | None:
+def generate_question_message(
+    missing_fields: list[str],
+    tenant_ctx: "TenantLeadContext | None" = None,
+    lead_type: str | None = None,
+) -> str | None:
     """Return a Swedish customer message asking for missing_fields, or None if list is empty."""
     if not missing_fields:
         return None
 
-    questions = [
-        f"• {_FIELD_QUESTIONS.get(f, f.replace('_', ' ').capitalize())}"
-        for f in missing_fields
-    ]
+    # Resolve company name and tone from tenant context
+    company_name: str | None = None
+    if tenant_ctx and tenant_ctx.context_available:
+        company_name = tenant_ctx.company_name
+
+    # Resolve field label overrides from tenant service config
+    custom_labels: dict[str, str] = {}
+    if tenant_ctx and lead_type:
+        for svc in tenant_ctx.services:
+            if svc.get("lead_type") == lead_type:
+                custom_labels = svc.get("field_labels") or {}
+                break
+
+    # Build question list
+    questions = []
+    for f in missing_fields:
+        label = custom_labels.get(f) or _FIELD_QUESTIONS.get(f) or f.replace("_", " ").capitalize()
+        questions.append(f"• {label}")
     body = "\n".join(questions)
 
-    return (
-        "För att kunna ta fram ett bra förslag behöver vi bara lite mer information:\n\n"
-        f"{body}\n\n"
-        "Svar räcker kort — så återkommer vi med nästa steg."
-    )
+    # Opening line
+    if company_name:
+        opening = f"För att vi på {company_name} ska kunna ta fram ett bra förslag behöver vi bara lite mer information:"
+    else:
+        opening = "För att kunna ta fram ett bra förslag behöver vi bara lite mer information:"
+
+    return f"{opening}\n\n{body}\n\nSvar räcker kort — så återkommer vi med nästa steg."
 
 
 def should_ask_questions(completeness_score: float) -> bool:

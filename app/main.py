@@ -1429,6 +1429,81 @@ def dashboard_roi(
     return _compute_roi(db, tenant_id)
 
 
+@app.get("/dashboard/leads")
+def dashboard_leads(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Lead pipeline KPIs — counts by lead_status and score_category, plus pipeline value."""
+    from sqlalchemy import func
+
+    # All lead jobs for this tenant
+    lead_records = (
+        db.query(JobRecord)
+        .filter(JobRecord.tenant_id == tenant_id, JobRecord.job_type == "lead")
+        .all()
+    )
+
+    status_counts: dict[str, int] = {}
+    category_counts: dict[str, int] = {"hot": 0, "warm": 0, "cold": 0}
+    service_counts: dict[str, int] = {}
+    total_pipeline_low = 0
+    total_pipeline_high = 0
+    pipeline_leads = 0
+
+    import re as _re
+    _price_re = _re.compile(r"([\d\s]+)\s*[–\-]\s*([\d\s]+)\s*kr")
+
+    for r in lead_records:
+        stored = r.result or {}
+        history = stored.get("processor_history") or []
+        lead_payload: dict = {}
+        for entry in history:
+            if entry.get("processor") == "lead_analyzer_processor":
+                lead_payload = (entry.get("result") or {}).get("payload") or {}
+                break
+
+        # lead_status
+        status = (r.input_data or {}).get("lead_status") or lead_payload.get("lead_status") or "new"
+        status_counts[status] = status_counts.get(status, 0) + 1
+
+        # score category
+        cat = (lead_payload.get("lead_score") or {}).get("category") or "cold"
+        if cat in category_counts:
+            category_counts[cat] += 1
+
+        # matched_service / lead_type
+        la = lead_payload.get("lead_analysis") or {}
+        service = la.get("matched_service") or la.get("lead_type") or "unknown"
+        service_counts[service] = service_counts.get(service, 0) + 1
+
+        # Pipeline value estimate from offer_draft
+        offer = lead_payload.get("offer_draft") or {}
+        price_str = offer.get("estimated_price_range") or ""
+        m = _price_re.search(price_str)
+        if m:
+            try:
+                lo = int(m.group(1).replace(" ", ""))
+                hi = int(m.group(2).replace(" ", ""))
+                total_pipeline_low += lo
+                total_pipeline_high += hi
+                pipeline_leads += 1
+            except ValueError:
+                pass
+
+    return {
+        "total_leads": len(lead_records),
+        "by_status": status_counts,
+        "by_category": category_counts,
+        "by_service": service_counts,
+        "pipeline_value_estimate": {
+            "leads_with_estimate": pipeline_leads,
+            "low_sek": total_pipeline_low,
+            "high_sek": total_pipeline_high,
+        },
+    }
+
+
 @app.get("/dashboard/activity")
 def dashboard_activity(
     db: Session = Depends(get_db),
@@ -2494,6 +2569,14 @@ def get_case(
             lead_payload = (entry.get("result") or {}).get("payload") or {}
             break
 
+    # lead_status: operator-set value in input_data takes precedence over pipeline value
+    lead_status = (inp.get("lead_status")
+                   or lead_payload.get("lead_status"))
+
+    la = lead_payload.get("lead_analysis") or {}
+    mi = lead_payload.get("missing_info") or {}
+    ls = lead_payload.get("lead_score") or {}
+
     return {
         "job_id":           r.job_id,
         "created_at":       r.created_at.isoformat() if r.created_at else None,
@@ -2512,15 +2595,24 @@ def get_case(
         "errors":           errors,
         "routing_preview":  routing_preview,
         # Lead analysis (present only for lead job_type)
-        "lead_analysis":                lead_payload.get("lead_analysis"),
-        "missing_fields":               (lead_payload.get("missing_info") or {}).get("missing_fields"),
-        "completeness_score":           (lead_payload.get("missing_info") or {}).get("completeness_score"),
-        "lead_score":                   (lead_payload.get("lead_score") or {}).get("score"),
-        "score_category":               (lead_payload.get("lead_score") or {}).get("category"),
-        "score_reasons":                (lead_payload.get("lead_score") or {}).get("reasons"),
+        "lead_analysis":                la or None,
+        "missing_fields":               mi.get("missing_fields"),
+        "completeness_score":           mi.get("completeness_score"),
+        "lead_score":                   ls.get("score"),
+        "score_category":               ls.get("category"),
+        "score_reasons":                ls.get("reasons"),
         "offer_draft":                  lead_payload.get("offer_draft"),
         "next_action":                  lead_payload.get("next_action"),
         "generated_question_message":   lead_payload.get("generated_question_message"),
+        # Extended lead intelligence (Slice J)
+        "lead_status":                  lead_status,
+        "tenant_context_used":          la.get("tenant_context_used"),
+        "tenant_context_sources":       la.get("context_sources"),
+        "matched_service":              la.get("matched_service"),
+        "schema_source":                mi.get("schema_source"),
+        "required_fields_used":         mi.get("required_fields"),
+        "optional_fields_used":         mi.get("optional_fields"),
+        "business_fit_reason":          ls.get("business_fit_reason"),
     }
 
 
@@ -2977,6 +3069,158 @@ def get_dispatch_policy(
         "job_id":            job_id,
         "job_type":          r.job_type or "unknown",
         **policy,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Lead Status + Operational Actions
+# ---------------------------------------------------------------------------
+
+_VALID_LEAD_STATUSES = {
+    "new", "waiting_for_customer", "info_received",
+    "offer_ready", "offer_sent", "won", "lost", "manual_review",
+}
+
+
+class LeadStatusRequest(_BaseModel):
+    status: str
+
+
+@app.patch("/jobs/{job_id}/lead-status")
+def set_lead_status(
+    job_id: str,
+    body: LeadStatusRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Set operational lead_status on a lead job (stored in input_data)."""
+    if body.status not in _VALID_LEAD_STATUSES:
+        raise HTTPException(status_code=422, detail=f"Invalid status. Valid: {sorted(_VALID_LEAD_STATUSES)}")
+
+    r = (
+        db.query(JobRecord)
+        .filter(JobRecord.job_id == job_id, JobRecord.tenant_id == tenant_id)
+        .first()
+    )
+    if r is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if r.job_type != "lead":
+        raise HTTPException(status_code=422, detail="Job is not a lead")
+
+    updated_input = dict(r.input_data or {})
+    updated_input["lead_status"] = body.status
+    r.input_data = updated_input
+    db.commit()
+    return {"job_id": job_id, "lead_status": body.status}
+
+
+@app.post("/jobs/{job_id}/lead-regenerate")
+def regenerate_lead_analysis(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Re-run lead analysis for a job without re-running the full pipeline.
+
+    Useful after operator manual edits or customer reply merging.
+    Updates the lead_analyzer_processor entry in processor_history in-place.
+    """
+    from app.domain.workflows.models import Job as _Job
+    from app.lead.analyzer import analyze_lead
+    from app.lead.missing_info import compute_missing_info
+    from app.lead.next_action import decide_next_action
+    from app.lead.offer_draft import build_offer_draft
+    from app.lead.question_generator import generate_question_message, should_ask_questions
+    from app.lead.scorer import score_lead
+    from app.lead.tenant_context import load_tenant_context
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    from app.repositories.postgres.job_repository import JobRepository
+
+    r = (
+        db.query(JobRecord)
+        .filter(JobRecord.job_id == job_id, JobRecord.tenant_id == tenant_id)
+        .first()
+    )
+    if r is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if r.job_type != "lead":
+        raise HTTPException(status_code=422, detail="Job is not a lead")
+
+    job = JobRepository._to_domain(r)
+    input_data = job.input_data or {}
+
+    # Load entities from existing history
+    entities: dict = {}
+    for entry in job.processor_history:
+        p = (entry.get("result") or {}).get("payload") or {}
+        if "entities" in p:
+            entities = p["entities"]
+            break
+
+    # Load tenant context
+    settings = TenantConfigRepository.get_settings(db, tenant_id)
+    tenant_ctx = load_tenant_context(tenant_id, settings)
+
+    # Re-run analysis
+    auto_actions = dict(r.result or {})  # best effort
+    analysis = analyze_lead(input_data, entities, tenant_ctx)
+    missing_info = compute_missing_info(analysis.lead_type, input_data, entities, tenant_ctx)
+    lead_score = score_lead(analysis, missing_info, entities, input_data, tenant_ctx)
+    next_action = decide_next_action(lead_score, missing_info, {}, tenant_ctx)
+
+    question_message: str | None = None
+    if should_ask_questions(missing_info.completeness_score):
+        question_message = generate_question_message(missing_info.missing_fields, tenant_ctx, analysis.lead_type)
+
+    offer_draft_dict: dict | None = None
+    draft = build_offer_draft(analysis, missing_info, entities, tenant_ctx)
+    if draft:
+        offer_draft_dict = draft.to_dict()
+
+    new_payload: dict = {
+        "processor_name": "lead_analyzer_processor",
+        "lead_analysis": analysis.to_dict(),
+        "missing_info": missing_info.to_dict(),
+        "lead_score": lead_score.to_dict(),
+        "next_action": next_action,
+        "confidence": analysis.confidence,
+        "regenerated": True,
+    }
+    if question_message:
+        new_payload["generated_question_message"] = question_message
+    if offer_draft_dict:
+        new_payload["offer_draft"] = offer_draft_dict
+
+    new_result = {
+        "status": "completed",
+        "summary": f"Lead re-analyserad: score={lead_score.score}, next_action={next_action}.",
+        "requires_human_review": next_action in ("manual_review", "approval_required"),
+        "payload": new_payload,
+    }
+
+    # Replace or append lead_analyzer_processor in history
+    history = list(job.processor_history)
+    replaced = False
+    for i, entry in enumerate(history):
+        if entry.get("processor") == "lead_analyzer_processor":
+            history[i] = {"processor": "lead_analyzer_processor", "result": new_result}
+            replaced = True
+            break
+    if not replaced:
+        history.append({"processor": "lead_analyzer_processor", "result": new_result})
+
+    job.processor_history = history
+    job.result = new_result
+    JobRepository.update_job(db, job)
+
+    return {
+        "job_id": job_id,
+        "lead_analysis": analysis.to_dict(),
+        "missing_info": missing_info.to_dict(),
+        "lead_score": lead_score.to_dict(),
+        "next_action": next_action,
+        "generated_question_message": question_message,
+        "offer_draft": offer_draft_dict,
     }
 
 

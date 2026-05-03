@@ -1879,6 +1879,17 @@ label { color: var(--text-muted); }
     </div>
   </div>
 
+  <!-- Lead pipeline KPIs -->
+  <div class="dash-section-hdr">
+    <span class="dash-section-title">Lead-pipeline</span>
+  </div>
+  <div id="leadKpiWrap">
+    <div class="empty-state" style="padding:20px 0;">
+      <div class="empty-state-icon">◌</div>
+      <div class="empty-state-title">Laddar lead-statistik…</div>
+    </div>
+  </div>
+
   <!-- Recent activity -->
   <div class="dash-section-hdr">
     <span class="dash-section-title">Senaste aktivitet</span>
@@ -3655,6 +3666,9 @@ async function _loadAdminDashboard() {
   // Pilot readiness
   loadPilotReadiness();
 
+  // Lead pipeline KPIs
+  loadLeadKpis();
+
   // Summary
   try {
     const s = await apiFetch('/dashboard/summary');
@@ -3744,6 +3758,79 @@ async function loadRoi() {
   }
 }
 
+
+async function loadLeadKpis() {
+  const wrap = document.getElementById('leadKpiWrap');
+  if (!wrap) return;
+  try {
+    const d = await apiFetch('/dashboard/leads');
+    const statusLabels = {
+      new: 'Ny', waiting_for_customer: 'Väntar', info_received: 'Info mottagen',
+      offer_ready: 'Offert klar', offer_sent: 'Skickad',
+      won: 'Vunnen', lost: 'Förlorad', manual_review: 'Manuell',
+    };
+    const statusColors = {
+      new: 'var(--text-dim)', waiting_for_customer: 'var(--warning)', info_received: 'var(--info)',
+      offer_ready: 'var(--success)', offer_sent: 'var(--purple)',
+      won: 'var(--success)', lost: 'var(--danger)', manual_review: 'var(--warning)',
+    };
+    const catColors = { hot: 'var(--danger)', warm: 'var(--warning)', cold: 'var(--text-dim)' };
+
+    // by_status pills
+    const byStatus = Object.entries(d.by_status || {})
+      .filter(([,v]) => v > 0)
+      .map(([k, v]) => `<div style="display:flex; flex-direction:column; align-items:center; padding:8px 14px; background:var(--surface-3); border-radius:var(--radius-sm); border:1px solid var(--border); min-width:80px;">
+        <span style="font-size:18px; font-weight:700; color:${statusColors[k] || 'var(--text)'};">${v}</span>
+        <span style="font-size:10px; color:var(--text-dim); margin-top:2px;">${escapeHtml(statusLabels[k] || k)}</span>
+      </div>`).join('');
+
+    // by_category
+    const byCat = Object.entries(d.by_category || {})
+      .filter(([,v]) => v > 0)
+      .map(([k, v]) => `<div style="display:flex; align-items:center; gap:6px;">
+        <span style="font-size:13px; font-weight:700; color:${catColors[k] || 'var(--text)'};">${v}</span>
+        <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">${escapeHtml(k)}</span>
+      </div>`).join('');
+
+    // by_service
+    const svcRows = Object.entries(d.by_service || {})
+      .filter(([,v]) => v > 0)
+      .sort(([,a],[,b]) => b - a)
+      .map(([k, v]) => `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid var(--border);">
+        <span style="font-size:12px; color:var(--text-muted);">${escapeHtml(k.replace(/_/g,' '))}</span>
+        <span style="font-size:12px; font-weight:600; color:var(--text);">${v}</span>
+      </div>`).join('');
+
+    // pipeline value
+    const pv = d.pipeline_value_estimate || {};
+    const pvHtml = pv.leads_with_estimate > 0
+      ? `<div style="font-size:11px; color:var(--text-muted); margin-top:8px;">
+           Estimerat pipeline-värde (${pv.leads_with_estimate} leads):
+           <strong style="color:var(--text);">${(pv.low_sek||0).toLocaleString('sv-SE')} – ${(pv.high_sek||0).toLocaleString('sv-SE')} SEK</strong>
+         </div>`
+      : '';
+
+    wrap.innerHTML = `
+      <div style="display:grid; grid-template-columns:auto 1fr; gap:16px; align-items:start; padding:12px 0;">
+        <div>
+          <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;">Totalt leads</div>
+          <div style="font-size:32px; font-weight:700; color:var(--text);">${d.total_leads ?? '–'}</div>
+          <div style="display:flex; gap:10px; margin-top:6px;">${byCat || '<span style="color:var(--text-dim); font-size:11px;">Inga kategorier</span>'}</div>
+          ${pvHtml}
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;">Status-fördelning</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">${byStatus || '<span style="color:var(--text-dim); font-size:12px;">Inga leads ännu</span>'}</div>
+        </div>
+      </div>
+      ${svcRows ? `<div style="margin-top:4px;">
+        <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;">Per tjänst</div>
+        ${svcRows}
+      </div>` : ''}`;
+  } catch (e) {
+    if (wrap) wrap.innerHTML = `<div style="font-size:12px; color:var(--text-dim); padding:12px 0;">Kunde inte ladda lead-statistik: ${escapeHtml(e.message)}</div>`;
+  }
+}
 
 let _dsRange = '30d';
 
@@ -5458,6 +5545,12 @@ function _renderLeadAnalysisPanel(c) {
   const nextAction = c.next_action || '–';
   const qMsg = c.generated_question_message;
   const offer = c.offer_draft;
+  const leadStatus = c.lead_status || 'new';
+  const tenantUsed = c.tenant_context_used;
+  const matchedService = c.matched_service;
+  const schemaSource = c.schema_source;
+  const businessFitReason = c.business_fit_reason;
+  const jobId = c.id;
 
   const catColors = { hot: 'var(--danger)', warm: 'var(--warning)', cold: 'var(--text-dim)' };
   const catColor  = catColors[cat] || 'var(--text-muted)';
@@ -5473,6 +5566,17 @@ function _renderLeadAnalysisPanel(c) {
   const urgencyLabels = { low: 'Låg', medium: 'Medel', high: 'Hög' };
   const urgencyColors = { low: 'var(--text-dim)', medium: 'var(--warning)', high: 'var(--danger)' };
   const ltLabel = (la.lead_type || 'unknown').replace(/_/g, ' ');
+
+  const statusLabels = {
+    new: 'Ny', waiting_for_customer: 'Väntar på svar', info_received: 'Info mottagen',
+    offer_ready: 'Offert klar', offer_sent: 'Offert skickad',
+    won: 'Vunnen', lost: 'Förlorad', manual_review: 'Manuell granskning',
+  };
+  const statusColors = {
+    new: 'var(--text-dim)', waiting_for_customer: 'var(--warning)', info_received: 'var(--info)',
+    offer_ready: 'var(--success)', offer_sent: 'var(--purple)',
+    won: 'var(--success)', lost: 'var(--danger)', manual_review: 'var(--warning)',
+  };
 
   // Score badge
   const scoreHtml = score != null
@@ -5492,6 +5596,42 @@ function _renderLeadAnalysisPanel(c) {
            <div style="width:${barWidth}%; height:100%; background:${barColor}; border-radius:3px;"></div>
          </div>
        </div>`
+    : '';
+
+  // Lead status control
+  const statusHtml = `<div style="margin-top:12px; padding:10px; background:var(--surface-3); border-radius:var(--radius-sm); border:1px solid var(--border);">
+    <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;">Leadstatus</div>
+    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <span style="font-size:12px; font-weight:600; color:${statusColors[leadStatus] || 'var(--text)'};">● ${escapeHtml(statusLabels[leadStatus] || leadStatus)}</span>
+      <select id="leadStatusSelect_${escapeHtml(jobId)}" style="font-size:12px; background:var(--surface-2); border:1px solid var(--border-med); color:var(--text); border-radius:4px; padding:3px 6px; cursor:pointer;">
+        ${['new','waiting_for_customer','info_received','offer_ready','offer_sent','won','lost','manual_review'].map(s =>
+          `<option value="${s}"${s === leadStatus ? ' selected' : ''}>${escapeHtml(statusLabels[s] || s)}</option>`
+        ).join('')}
+      </select>
+      <button onclick="_saveLeadStatus('${escapeHtml(jobId)}')" style="font-size:11px; padding:3px 10px; background:var(--purple); color:#fff; border:none; border-radius:4px; cursor:pointer;">Spara</button>
+    </div>
+  </div>`;
+
+  // Tenant context indicator
+  const tenantBadges = [];
+  if (tenantUsed) {
+    tenantBadges.push(`<span style="font-size:10px; background:rgba(139,92,246,.15); color:var(--purple); padding:2px 8px; border-radius:20px; font-weight:600;">Tenant-kontext: Ja</span>`);
+  }
+  if (matchedService) {
+    tenantBadges.push(`<span style="font-size:10px; background:rgba(16,185,129,.12); color:var(--success); padding:2px 8px; border-radius:20px;">${escapeHtml(matchedService.replace(/_/g,' '))}</span>`);
+  }
+  if (schemaSource) {
+    const schemaBg = schemaSource === 'tenant' ? 'rgba(139,92,246,.12)' : 'rgba(107,114,128,.12)';
+    const schemaColor = schemaSource === 'tenant' ? 'var(--purple)' : 'var(--text-muted)';
+    tenantBadges.push(`<span style="font-size:10px; background:${schemaBg}; color:${schemaColor}; padding:2px 8px; border-radius:20px;">Schema: ${escapeHtml(schemaSource)}</span>`);
+  }
+  const tenantBadgeHtml = tenantBadges.length > 0
+    ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">${tenantBadges.join('')}</div>`
+    : '';
+
+  // Business fit reason
+  const fitHtml = businessFitReason
+    ? `<div style="margin-top:8px; font-size:11px; color:var(--text-muted); font-style:italic; padding:6px 8px; background:rgba(245,158,11,.08); border-left:2px solid var(--warning); border-radius:2px;">${escapeHtml(businessFitReason)}</div>`
     : '';
 
   // Missing fields
@@ -5516,6 +5656,7 @@ function _renderLeadAnalysisPanel(c) {
     ? `<div style="margin-top:12px;">
          <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;">Frågor att skicka till kund</div>
          <pre style="background:var(--surface-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; font-size:12px; white-space:pre-wrap; color:var(--text);">${escapeHtml(qMsg)}</pre>
+         <button onclick="_copyToClipboard(${JSON.stringify(qMsg)})" style="margin-top:4px; font-size:11px; padding:2px 10px; background:var(--surface-3); border:1px solid var(--border-med); color:var(--text-muted); border-radius:4px; cursor:pointer;">Kopiera</button>
        </div>`
     : '';
 
@@ -5527,10 +5668,17 @@ function _renderLeadAnalysisPanel(c) {
            <div style="color:var(--text); margin-bottom:6px;">${escapeHtml(offer.summary || '')}</div>
            ${offer.estimated_price_range ? `<div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;"><strong>Prisuppskattning:</strong> ${escapeHtml(offer.estimated_price_range)}</div>` : ''}
            ${offer.recommended_next_step ? `<div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;"><strong>Nästa steg:</strong> ${escapeHtml(offer.recommended_next_step)}</div>` : ''}
+           ${offer.risk_points && offer.risk_points.length > 0 ? `<div style="font-size:11px; color:var(--warning); margin-top:6px;"><strong>Risk:</strong> ${offer.risk_points.map(r => escapeHtml(r)).join(' · ')}</div>` : ''}
+           ${offer.tenant_context_used ? `<div style="font-size:10px; color:var(--purple); margin-top:6px; font-style:italic;">Offertdata från tenant-konfiguration</div>` : ''}
            <div style="font-size:10px; color:var(--text-dim); margin-top:8px; font-style:italic;">${escapeHtml(offer.disclaimer || '')}</div>
          </div>
        </div>`
     : '';
+
+  // Regenerate button
+  const regenHtml = `<div style="margin-top:12px; display:flex; justify-content:flex-end;">
+    <button id="regenBtn_${escapeHtml(jobId)}" onclick="_regenerateLeadAnalysis('${escapeHtml(jobId)}')" style="font-size:11px; padding:4px 14px; background:var(--surface-3); border:1px solid var(--border-med); color:var(--text-muted); border-radius:4px; cursor:pointer;">↻ Regenerera analys</button>
+  </div>`;
 
   return `<div class="detail-section" style="margin-bottom:14px; border-color:rgba(139,92,246,.3);">
     <div class="detail-section-title" style="color:var(--purple);">Lead-analys</div>
@@ -5559,11 +5707,47 @@ function _renderLeadAnalysisPanel(c) {
       <div style="flex:1;">${completenessHtml}</div>
     </div>
 
+    ${tenantBadgeHtml}
+    ${fitHtml}
+    ${statusHtml}
     ${missingHtml}
     ${naHtml}
     ${qHtml}
     ${offerHtml}
+    ${regenHtml}
   </div>`;
+}
+
+async function _saveLeadStatus(jobId) {
+  const sel = document.getElementById('leadStatusSelect_' + jobId);
+  if (!sel) return;
+  const newStatus = sel.value;
+  try {
+    const r = await apiFetch(`/jobs/${jobId}/lead-status`, { method: 'PATCH', body: JSON.stringify({ lead_status: newStatus }) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    showToast('Leadstatus uppdaterad');
+    loadCaseDetail(jobId);
+  } catch (e) {
+    showToast('Fel: ' + e.message, 'error');
+  }
+}
+
+async function _regenerateLeadAnalysis(jobId) {
+  const btn = document.getElementById('regenBtn_' + jobId);
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Regenererar…'; }
+  try {
+    const r = await apiFetch(`/jobs/${jobId}/lead-regenerate`, { method: 'POST' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    showToast('Analys regenererad');
+    loadCaseDetail(jobId);
+  } catch (e) {
+    showToast('Fel: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Regenerera analys'; }
+  }
+}
+
+function _copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => showToast('Kopierat!')).catch(() => showToast('Kopiering misslyckades', 'error'));
 }
 
 // ---------------------------------------------------------------------------

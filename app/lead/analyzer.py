@@ -2,6 +2,11 @@
 
 Deterministic — no LLM required. Classifies lead_type, intent, urgency,
 and customer_type from message text using keyword matching.
+
+When a TenantLeadContext is provided the analyzer:
+- Restricts lead_type to services the tenant actually offers.
+- Uses per-service tenant keywords in addition to default keywords.
+- Reports tenant_context_used and matched_service.
 """
 from __future__ import annotations
 
@@ -10,7 +15,7 @@ import re
 from app.lead.models import LeadAnalysis, LeadType, Intent, Urgency, CustomerType
 
 
-# ── keyword tables ────────────────────────────────────────────────────────────
+# ── default keyword tables ────────────────────────────────────────────────────
 
 _LEAD_TYPE_KEYWORDS: list[tuple[LeadType, list[str]]] = [
     ("solar_installation", [
@@ -84,7 +89,7 @@ _CUSTOMER_TYPE_KEYWORDS: dict[CustomerType, list[str]] = {
 }
 
 
-# ── helper ────────────────────────────────────────────────────────────────────
+# ── helpers ───────────────────────────────────────────────────────────────────
 
 def _combined_text(input_data: dict) -> str:
     subject = (input_data.get("subject") or "").lower()
@@ -96,18 +101,64 @@ def _any_keyword(text: str, keywords: list[str]) -> bool:
     return any(re.search(r"\b" + re.escape(kw) + r"\b", text) for kw in keywords)
 
 
+def _build_effective_lead_type_table(
+    tenant_ctx: "TenantLeadContext | None",
+) -> list[tuple[str, list[str]]]:
+    """Merge default keywords with tenant service keywords.
+
+    If tenant has a services list, only include types the tenant offers.
+    For each offered type, prepend any tenant-specific keywords.
+    """
+    if tenant_ctx is None or not tenant_ctx.context_available:
+        return list(_LEAD_TYPE_KEYWORDS)  # type: ignore[return-value]
+
+    offered = tenant_ctx.service_lead_types()
+    if not offered:
+        return list(_LEAD_TYPE_KEYWORDS)  # type: ignore[return-value]
+
+    result = []
+    for lt, default_kws in _LEAD_TYPE_KEYWORDS:
+        if lt not in offered:
+            continue
+        extra = tenant_ctx.service_keywords_for(lt)
+        result.append((lt, extra + default_kws))
+    return result
+
+
 # ── public API ────────────────────────────────────────────────────────────────
 
-def analyze_lead(input_data: dict, entities: dict | None = None) -> LeadAnalysis:
-    """Return a LeadAnalysis from raw input_data and optional entity-extraction entities."""
+def analyze_lead(
+    input_data: dict,
+    entities: dict | None = None,
+    tenant_ctx: "TenantLeadContext | None" = None,
+) -> "LeadAnalysis":
+    """Return a LeadAnalysis from raw input_data and optional entity-extraction entities.
+
+    When tenant_ctx is provided the analysis is tenant-aware:
+    - lead_type is restricted to services the tenant offers
+    - per-service tenant keywords are added to the matching table
+    - result includes tenant_context_used and matched_service
+    """
+    from app.lead.tenant_context import TenantLeadContext  # local to avoid circular
     text = _combined_text(input_data)
     entities = entities or {}
 
-    # lead_type — first keyword match wins; unknown if none
-    lead_type: LeadType = "unknown"
-    for lt, keywords in _LEAD_TYPE_KEYWORDS:
+    effective_table = _build_effective_lead_type_table(tenant_ctx)
+
+    # lead_type — first keyword match in effective table wins
+    lead_type: str = "unknown"
+    matched_service: str | None = None
+    for lt, keywords in effective_table:
         if _any_keyword(text, keywords):
             lead_type = lt
+            # Try to resolve human-readable service name from tenant config
+            if tenant_ctx and tenant_ctx.context_available:
+                for svc in tenant_ctx.services:
+                    if svc.get("lead_type") == lt:
+                        matched_service = svc.get("name") or lt
+                        break
+                if matched_service is None:
+                    matched_service = lt
             break
 
     # intent — ready_to_buy takes priority
@@ -131,7 +182,7 @@ def analyze_lead(input_data: dict, entities: dict | None = None) -> LeadAnalysis
             customer_type = ct  # type: ignore[assignment]
             break
 
-    # confidence: higher when lead_type and intent are not default
+    # confidence
     confidence = 0.5
     if lead_type != "unknown":
         confidence += 0.25
@@ -141,10 +192,17 @@ def analyze_lead(input_data: dict, entities: dict | None = None) -> LeadAnalysis
         confidence += 0.10
     confidence = min(confidence, 1.0)
 
+    # tenant context metadata
+    ctx_used = bool(tenant_ctx and tenant_ctx.context_available)
+    ctx_sources = tenant_ctx.sources_used if ctx_used else []
+
     return LeadAnalysis(
-        lead_type=lead_type,
+        lead_type=lead_type,  # type: ignore[arg-type]
         intent=intent,
         urgency=urgency,
         customer_type=customer_type,
         confidence=round(confidence, 3),
+        tenant_context_used=ctx_used,
+        context_sources=list(ctx_sources),
+        matched_service=matched_service,
     )
