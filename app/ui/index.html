@@ -2954,7 +2954,84 @@ label { color: var(--text-muted); }
     </div>
   </div>
 
-  <!-- Tenant table -->
+  <!-- Provisioning: Skapa ny kund -->
+  <div class="cfg-section" style="max-width:1100px; margin-bottom:20px;" id="provisionFormSection">
+    <div class="cfg-section-title">Skapa ny kund</div>
+    <div class="cfg-section-body" style="padding:16px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+        <div>
+          <label style="font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; display:block; margin-bottom:4px;">Företagsnamn *</label>
+          <input id="provName" type="text" placeholder="Elitgruppen AB" style="width:100%; box-sizing:border-box;" />
+        </div>
+        <div>
+          <label style="font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; display:block; margin-bottom:4px;">Slug * (a-z, 0-9, -, _)</label>
+          <input id="provSlug" type="text" placeholder="elitgruppen" style="width:100%; box-sizing:border-box;" oninput="_provSlugInput()" />
+          <div id="provSlugHint" style="font-size:10px; color:var(--text-dim); margin-top:2px;"></div>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+        <div>
+          <label style="font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; display:block; margin-bottom:4px;">Aktiverade jobbtyper</label>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <label style="font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" value="lead" class="provJobType"> Lead</label>
+            <label style="font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" value="customer_inquiry" class="provJobType"> Support</label>
+            <label style="font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" value="invoice" class="provJobType"> Faktura</label>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; display:block; margin-bottom:4px;">Integrationer</label>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <label style="font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" value="google_mail" class="provIntegration"> Gmail</label>
+            <label style="font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" value="monday" class="provIntegration"> Monday</label>
+            <label style="font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" value="slack" class="provIntegration"> Slack</label>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <button class="btn btn-primary btn-sm" onclick="provisionTenant()" id="provBtn">Skapa kund + generera API-nyckel</button>
+        <span id="provMsg" style="font-size:12px;"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Provisioning: Ny API-nyckel (visas en gång) -->
+  <div id="provKeyBanner" style="display:none; max-width:1100px; margin-bottom:20px;">
+    <div style="background:rgba(16,185,129,.08); border:1px solid var(--success); border-radius:var(--radius-sm); padding:16px;">
+      <div style="font-size:13px; font-weight:700; color:var(--success); margin-bottom:6px;">✓ Kund skapad — spara API-nyckeln nu!</div>
+      <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">Denna nyckel visas bara en gång och lagras inte i klartext.</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <code id="provKeyValue" style="font-size:13px; font-weight:700; color:var(--text); background:var(--surface-3); padding:6px 10px; border-radius:4px; border:1px solid var(--border); letter-spacing:.03em; word-break:break-all;"></code>
+        <button onclick="_copyProvKey()" style="font-size:11px; padding:4px 12px; background:var(--success); color:#fff; border:none; border-radius:4px; cursor:pointer;">Kopiera</button>
+        <span id="provKeyCopied" style="font-size:11px; color:var(--success); display:none;">Kopierat!</span>
+      </div>
+      <div style="margin-top:8px; font-size:12px; color:var(--text-muted);">Tenant-ID: <strong id="provTenantId"></strong></div>
+    </div>
+  </div>
+
+  <!-- Provisioning: Tenant-lista -->
+  <div style="max-width:1100px; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between;">
+    <div style="font-size:13px; font-weight:700; color:var(--text);">Alla kunder i databasen</div>
+    <button class="btn btn-neutral btn-sm" onclick="loadProvisionedTenants()">↻ Ladda om</button>
+  </div>
+  <div id="provTenantList" style="max-width:1100px; margin-bottom:24px;">
+    <span class="empty" style="font-size:12px; color:var(--text-dim);">Tryck "Ladda om" för att visa.</span>
+  </div>
+
+  <!-- Rotera nyckel-banner (visas en gång) -->
+  <div id="rotateKeyBanner" style="display:none; max-width:1100px; margin-bottom:20px;">
+    <div style="background:rgba(245,158,11,.08); border:1px solid var(--warning); border-radius:var(--radius-sm); padding:16px;">
+      <div style="font-size:13px; font-weight:700; color:var(--warning); margin-bottom:6px;">↻ Ny API-nyckel — spara nu!</div>
+      <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">Gamla nyckeln är nu ogiltig.</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <code id="rotateKeyValue" style="font-size:13px; font-weight:700; color:var(--text); background:var(--surface-3); padding:6px 10px; border-radius:4px; border:1px solid var(--border); letter-spacing:.03em; word-break:break-all;"></code>
+        <button onclick="_copyRotateKey()" style="font-size:11px; padding:4px 12px; background:var(--warning); color:#fff; border:none; border-radius:4px; cursor:pointer;">Kopiera</button>
+        <span id="rotateKeyCopied" style="font-size:11px; color:var(--warning); display:none;">Kopierat!</span>
+      </div>
+      <div style="margin-top:8px; font-size:12px; color:var(--text-muted);">Tenant-ID: <strong id="rotateKeyTenantId"></strong></div>
+    </div>
+  </div>
+
+  <!-- Tenant table (existing super admin overview) -->
   <div id="adminTable" style="max-width:1100px;"><span class="empty">Tryck på "↻ Uppdatera" för att ladda.</span></div>
 
 </div><!-- /viewAdmin -->
@@ -5842,6 +5919,167 @@ async function _regenerateLeadAnalysis(jobId) {
 
 function _copyToClipboard(text) {
   navigator.clipboard.writeText(text).then(() => showToast('Kopierat!')).catch(() => showToast('Kopiering misslyckades', 'error'));
+}
+
+// ---------------------------------------------------------------------------
+// Admin Customer Provisioning
+// ---------------------------------------------------------------------------
+
+function _provSlugInput() {
+  const slug = (document.getElementById('provSlug').value || '').toLowerCase();
+  const hint = document.getElementById('provSlugHint');
+  if (!slug) { hint.textContent = ''; return; }
+  const tenantId = 'T_' + slug.toUpperCase().replace(/-/g, '_');
+  hint.textContent = 'Tenant-ID: ' + tenantId;
+}
+
+async function provisionTenant() {
+  const name = (document.getElementById('provName').value || '').trim();
+  const slug = (document.getElementById('provSlug').value || '').trim().toLowerCase();
+  const msg  = document.getElementById('provMsg');
+  const btn  = document.getElementById('provBtn');
+
+  if (!name || !slug) { msg.textContent = 'Fyll i namn och slug.'; msg.style.color = 'var(--danger)'; return; }
+
+  const jobTypes     = [...document.querySelectorAll('.provJobType:checked')].map(e => e.value);
+  const integrations = [...document.querySelectorAll('.provIntegration:checked')].map(e => e.value);
+
+  btn.disabled = true;
+  msg.textContent = 'Skapar kund…';
+  msg.style.color = 'var(--text-muted)';
+
+  try {
+    const resp = await adminApiFetch('/admin/tenants', {
+      method: 'POST',
+      body: JSON.stringify({ name, slug, enabled_job_types: jobTypes, allowed_integrations: integrations, auto_actions: {} }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) { msg.textContent = data.detail || 'Fel vid skapande.'; msg.style.color = 'var(--danger)'; btn.disabled = false; return; }
+
+    // Show key banner
+    document.getElementById('provKeyValue').textContent   = data.api_key;
+    document.getElementById('provTenantId').textContent   = data.tenant_id;
+    document.getElementById('provKeyBanner').style.display = 'block';
+    document.getElementById('rotateKeyBanner').style.display = 'none';
+
+    // Clear form
+    document.getElementById('provName').value = '';
+    document.getElementById('provSlug').value = '';
+    document.getElementById('provSlugHint').textContent = '';
+    document.querySelectorAll('.provJobType, .provIntegration').forEach(e => e.checked = false);
+
+    msg.textContent = '';
+    btn.disabled = false;
+    showToast('Kund skapad: ' + data.tenant_id);
+    loadProvisionedTenants();
+  } catch (e) {
+    msg.textContent = 'Fel: ' + e.message;
+    msg.style.color = 'var(--danger)';
+    btn.disabled = false;
+  }
+}
+
+function _copyProvKey() {
+  const key = document.getElementById('provKeyValue').textContent;
+  navigator.clipboard.writeText(key).then(() => {
+    const el = document.getElementById('provKeyCopied');
+    el.style.display = 'inline';
+    setTimeout(() => { el.style.display = 'none'; }, 2000);
+  });
+}
+
+function _copyRotateKey() {
+  const key = document.getElementById('rotateKeyValue').textContent;
+  navigator.clipboard.writeText(key).then(() => {
+    const el = document.getElementById('rotateKeyCopied');
+    el.style.display = 'inline';
+    setTimeout(() => { el.style.display = 'none'; }, 2000);
+  });
+}
+
+async function loadProvisionedTenants() {
+  const wrap = document.getElementById('provTenantList');
+  wrap.innerHTML = '<span style="font-size:12px; color:var(--text-dim);">Laddar…</span>';
+  try {
+    const resp = await adminApiFetch('/admin/tenants');
+    const data = await resp.json();
+    if (!resp.ok) { wrap.innerHTML = `<span style="color:var(--danger); font-size:12px;">${escapeHtml(data.detail || 'Kunde inte ladda.')}</span>`; return; }
+
+    const items = data.items || [];
+    if (!items.length) { wrap.innerHTML = '<span class="empty" style="font-size:12px; color:var(--text-dim);">Inga kunder ännu.</span>'; return; }
+
+    const statusColor = s => s === 'active' ? 'var(--success)' : 'var(--danger)';
+    const statusLabel = s => s === 'active' ? 'Aktiv' : 'Inaktiv';
+
+    wrap.innerHTML = `<table style="width:100%; border-collapse:collapse; font-size:12px;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border); color:var(--text-dim); text-transform:uppercase; font-size:10px; letter-spacing:.05em;">
+          <th style="padding:6px 8px; text-align:left;">Tenant-ID</th>
+          <th style="padding:6px 8px; text-align:left;">Namn</th>
+          <th style="padding:6px 8px; text-align:left;">Slug</th>
+          <th style="padding:6px 8px; text-align:left;">Status</th>
+          <th style="padding:6px 8px; text-align:left;">Skapad</th>
+          <th style="padding:6px 8px; text-align:left;">Åtgärder</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map(t => `
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px; font-family:monospace; color:var(--text-muted);">${escapeHtml(t.tenant_id)}</td>
+            <td style="padding:8px; font-weight:600; color:var(--text);">${escapeHtml(t.name || '–')}</td>
+            <td style="padding:8px; color:var(--text-muted);">${escapeHtml(t.slug || '–')}</td>
+            <td style="padding:8px;">
+              <span style="font-size:11px; font-weight:700; color:${statusColor(t.status)};">● ${escapeHtml(statusLabel(t.status))}</span>
+            </td>
+            <td style="padding:8px; color:var(--text-dim);">${t.created_at ? escapeHtml(t.created_at.slice(0,10)) : '–'}</td>
+            <td style="padding:8px; display:flex; gap:6px; flex-wrap:wrap;">
+              <button onclick="_rotateKey('${escapeHtml(t.tenant_id)}')" style="font-size:10px; padding:3px 8px; background:var(--surface-3); border:1px solid var(--border-med); color:var(--text-muted); border-radius:4px; cursor:pointer;">↻ Rotera nyckel</button>
+              ${t.status === 'active'
+                ? `<button onclick="_setTenantStatus('${escapeHtml(t.tenant_id)}','inactive')" style="font-size:10px; padding:3px 8px; background:rgba(239,68,68,.1); border:1px solid var(--danger); color:var(--danger); border-radius:4px; cursor:pointer;">Inaktivera</button>`
+                : `<button onclick="_setTenantStatus('${escapeHtml(t.tenant_id)}','active')" style="font-size:10px; padding:3px 8px; background:rgba(16,185,129,.1); border:1px solid var(--success); color:var(--success); border-radius:4px; cursor:pointer;">Aktivera</button>`
+              }
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+  } catch (e) {
+    wrap.innerHTML = `<span style="color:var(--danger); font-size:12px;">Fel: ${escapeHtml(e.message)}</span>`;
+  }
+}
+
+async function _rotateKey(tenantId) {
+  if (!confirm(`Rotera API-nyckel för ${tenantId}? Gamla nyckeln slutar fungera omedelbart.`)) return;
+  try {
+    const resp = await adminApiFetch(`/admin/tenants/${tenantId}/rotate-key`, { method: 'POST' });
+    const data = await resp.json();
+    if (!resp.ok) { showToast(data.detail || 'Rotation misslyckades', 'error'); return; }
+
+    document.getElementById('rotateKeyValue').textContent    = data.api_key;
+    document.getElementById('rotateKeyTenantId').textContent = data.tenant_id;
+    document.getElementById('rotateKeyBanner').style.display = 'block';
+    document.getElementById('provKeyBanner').style.display   = 'none';
+    showToast('Ny nyckel genererad — spara den nu!');
+    loadProvisionedTenants();
+  } catch (e) {
+    showToast('Fel: ' + e.message, 'error');
+  }
+}
+
+async function _setTenantStatus(tenantId, status) {
+  const label = status === 'active' ? 'aktivera' : 'inaktivera';
+  if (!confirm(`Vill du ${label} ${tenantId}?`)) return;
+  try {
+    const resp = await adminApiFetch(`/admin/tenants/${tenantId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) { showToast(data.detail || 'Kunde inte ändra status', 'error'); return; }
+    showToast(`${tenantId} är nu ${data.status === 'active' ? 'aktiv' : 'inaktiv'}`);
+    loadProvisionedTenants();
+  } catch (e) {
+    showToast('Fel: ' + e.message, 'error');
+  }
 }
 
 // ---------------------------------------------------------------------------

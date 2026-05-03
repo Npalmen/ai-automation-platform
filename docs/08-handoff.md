@@ -2285,3 +2285,100 @@ Full support intelligence layer for `customer_inquiry` jobs. Tenant-aware from t
 - Emergency safety disclaimer always in risk_points and question messages
 - No LLM dependency
 - No external dispatch without policy/approval
+
+---
+
+## Completed slice (2026-05-03 — Admin Customer Provisioning)
+
+### Problem solved
+Platform had no way to onboard real customers with secure, isolated API keys without manually editing environment variables or the database. Operators needed a self-service provisioning flow with show-once key display and key rotation support.
+
+### What was built
+
+**`app/repositories/postgres/tenant_api_key_models.py`** — new model
+- `TenantApiKeyRecord` with: `key_id` (UUID PK), `tenant_id`, `key_hash` (SHA-256 hex, UNIQUE), `key_hint` (last 4 chars), `is_active`, `created_at`, `revoked_at`
+- Registered in `app/repositories/postgres/__init__.py` so `Base.metadata.create_all` picks it up
+
+**`app/repositories/postgres/tenant_api_key_repository.py`** — new repository
+- `_generate_raw_key()` — returns `"kw_" + secrets.token_hex(16)` (35 chars)
+- `_hash_key(raw_key)` — SHA-256 hex digest; stored value
+- `TenantApiKeyRepository.create_key(db, tenant_id)` → `(raw_key, record)`; raw_key returned once, never stored
+- `TenantApiKeyRepository.rotate_key(db, tenant_id)` → `(raw_key, record)`; revokes all active keys first
+- `TenantApiKeyRepository.lookup_tenant(db, raw_key)` → `tenant_id | None`; hashes then queries `key_hash WHERE is_active=True`
+- `TenantApiKeyRepository.revoke_all(db, tenant_id)` → count revoked
+- `TenantApiKeyRepository.list_for_tenant(db, tenant_id)` → list of records
+
+**`app/repositories/postgres/tenant_config_models.py`** — extended
+- Added columns: `slug` (VARCHAR, nullable, indexed), `status` (VARCHAR, default `"active"`), `created_at` (TIMESTAMPTZ), `updated_at` (TIMESTAMPTZ)
+
+**`app/repositories/postgres/tenant_config_repository.py`** — extended
+- `upsert` now accepts `slug`, `status` params; sets `created_at` on first insert, `updated_at` always
+- `to_dict` now includes `slug`, `status`, `created_at`, `updated_at`
+
+**`app/repositories/postgres/schema_migrations.py`** — extended
+- `_REQUIRED_COLUMNS` extended with: `tenant_configs.slug`, `tenant_configs.status`, `tenant_configs.created_at`, `tenant_configs.updated_at`
+- `_REQUIRED_TABLES` extended with: `CREATE TABLE IF NOT EXISTS tenant_api_keys (...)` + index DDL
+
+**`app/core/auth.py`** — refactored
+- `get_verified_tenant` now accepts `db: Session = Depends(get_db)` (new parameter)
+- Resolution order when `X-API-Key` provided:
+  1. `_lookup_db_key(db, raw_key)` — SHA-256 hash lookup in `tenant_api_keys WHERE is_active=True`
+  2. `_lookup_env_key(raw_key)` — env `TENANT_API_KEYS` reverse lookup (backward compat)
+  3. 403 if neither resolves
+- After resolution: `_is_tenant_active(db, tenant_id)` — 403 "Tenant is inactive" if explicitly inactive in DB
+- When no key provided: if env map configured → 401; else dev-mode passthrough (`X-Tenant-ID` or `TENANT_1001`)
+- All three lookup helpers degrade gracefully on DB exceptions (return `None` / `True`)
+- All existing env-based keys continue to work unchanged
+
+**`app/main.py`** — 4 new admin provisioning endpoints (inserted before `GET /admin/tenants/overview`)
+
+| Endpoint | Behaviour |
+|----------|-----------|
+| `POST /admin/tenants` (201) | Provision tenant: validates slug `^[a-z0-9_-]{2,64}$`; derives `tenant_id = "T_" + slug.upper().replace("-","_")`; 400 on duplicate slug; upserts TenantConfigRecord; calls `TenantApiKeyRepository.create_key`; returns `{tenant_id, name, slug, api_key, status}` — **api_key visible here only** |
+| `GET /admin/tenants` | Lists all DB tenants via `TenantConfigRepository.list_all`; NEVER includes raw API key |
+| `POST /admin/tenants/{tenant_id}/rotate-key` | Calls `TenantApiKeyRepository.rotate_key`; returns `{tenant_id, api_key}` — **new key visible here only** |
+| `PATCH /admin/tenants/{tenant_id}/status` | Validates `status ∈ {active, inactive}`; upserts; returns `{tenant_id, status}` |
+
+All 4 endpoints require `X-Admin-API-Key` via `require_admin_api_key`.
+
+**`app/ui/index.html`** — Admin Customer Provisioning section in Super Admin tab
+- Create-tenant form: name, slug (auto-generated, editable), enabled job types, integrations
+- Show-once API key banner: yellow, large monospace key, Copy button (writes to clipboard)
+- Tenant table: all DB tenants with rotate-key / activate / deactivate action buttons
+- Rotate-key banner: same show-once pattern as creation banner
+- Slug auto-generation: `name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '').slice(0, 64)`
+- `provisionTenant()`, `_copyProvKey()`, `loadProvisionedTenants()`, `_rotateKey()`, `_setTenantStatus()`, `_copyRotateKey()` added
+
+### Tests
+39 new tests in `tests/test_admin_provisioning.py`:
+- `TestTenantApiKeyRepository` (8) — key format, hash uniqueness, create/lookup/rotate/revoke
+- `TestAuthDbKeyLookup` (9) — DB key resolves, env fallback, inactive tenant 403, dev-mode behavior
+- `TestAdminCreateTenant` (7) — 201 shape, api_key present at creation only, duplicate slug 400, tenant_id derivation, slug validation
+- `TestAdminListTenants` (4) — shape, no api_key in list, total count
+- `TestAdminRotateKey` (3) — new key returned, old key invalidated, shape
+- `TestAdminSetTenantStatus` (4) — activate/deactivate, invalid status 400, shape
+- `TestInactiveTenantRejected` (2) — inactive tenant 403 at auth layer for both DB and env keys
+
+### Auth priority chart (final state)
+
+```
+X-API-Key header present?
+  YES → DB hash lookup → env TENANT_API_KEYS lookup → 403 Invalid API key
+        ↓ resolved
+        _is_tenant_active? NO → 403 Tenant is inactive
+        ↓ active
+        set_current_tenant → return tenant_id
+
+  NO  → env TENANT_API_KEYS configured? YES → 401 Missing API key
+        NO (dev mode) → X-Tenant-ID header OR "TENANT_1001"
+```
+
+### Key design decisions
+- Raw API key is never stored — only SHA-256 hex hash; raw key returned once at creation/rotation
+- `tenant_id` derived deterministically from slug: `"T_" + slug.upper().replace("-","_")`
+- DB key lookup degrades gracefully on all DB exceptions (returns None → falls through to env)
+- Auth refactor is fully backward-compatible: existing env keys continue to work without any change
+- `test_admin_auth.py` fixes: env-isolation for `Settings` default test, patched `_load_env_key_map` (renamed from old `_load_api_key_map`), direct calls pass `db=MagicMock()`
+
+### Full suite
+**1995/1995 tests pass.**

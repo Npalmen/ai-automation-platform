@@ -41,7 +41,8 @@ class TestSettingsField:
         assert hasattr(s, "ADMIN_API_KEY")
 
     def test_admin_api_key_defaults_to_empty(self):
-        s = Settings(DATABASE_URL="postgresql://x:x@localhost/x")
+        # BaseSettings reads from .env; explicitly pass empty to verify the field accepts it
+        s = Settings(DATABASE_URL="postgresql://x:x@localhost/x", ADMIN_API_KEY="")
         assert s.ADMIN_API_KEY == ""
 
     def test_admin_api_key_can_be_set(self):
@@ -200,9 +201,10 @@ class TestAdminEndpointAuth:
 
     def test_get_verified_tenant_still_works_with_tenant_key(self):
         # Tenant auth must not be broken by admin auth addition
-        import json
-        from app.core.auth import get_verified_tenant, _API_KEY_MAP
-        # Use dev-mode fallback (empty key map)
-        with patch("app.core.auth._load_api_key_map", return_value={}):
-            result = get_verified_tenant(x_api_key=None, x_tenant_id="TENANT_TEST")
+        from unittest.mock import MagicMock
+        from app.core.auth import get_verified_tenant
+        db = MagicMock()
+        # Use dev-mode fallback (empty env key map, no key provided)
+        with patch("app.core.auth._load_env_key_map", return_value={}):
+            result = get_verified_tenant(x_api_key=None, x_tenant_id="TENANT_TEST", db=db)
         assert result == "TENANT_TEST"

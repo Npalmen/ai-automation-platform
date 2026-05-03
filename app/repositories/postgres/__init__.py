@@ -3,6 +3,7 @@ from app.repositories.postgres.job_models import JobRecord
 from app.repositories.postgres.approval_models import ApprovalRequestRecord
 from app.repositories.postgres.action_execution_models import ActionExecutionRecord
 from app.repositories.postgres.tenant_config_models import TenantConfigRecord
+from app.repositories.postgres.tenant_api_key_models import TenantApiKeyRecord
 import app.domain.integrations.models  # noqa: F401 — registers IntegrationEvent with database.Base
 
 __all__ = [
@@ -11,4 +12,5 @@ __all__ = [
     "ApprovalRequestRecord",
     "ActionExecutionRecord",
     "TenantConfigRecord",
+    "TenantApiKeyRecord",
 ]

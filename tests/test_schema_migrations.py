@@ -27,11 +27,11 @@ class TestEnsureRuntimeSchemaHappyPath:
         fn(engine)  # must not raise
 
     def test_executes_alter_for_each_required_column(self):
-        from app.repositories.postgres.schema_migrations import _REQUIRED_COLUMNS
+        from app.repositories.postgres.schema_migrations import _REQUIRED_COLUMNS, _REQUIRED_TABLES
 
         engine, conn, fn = _run()
         fn(engine)
-        assert conn.execute.call_count == len(_REQUIRED_COLUMNS)
+        assert conn.execute.call_count == len(_REQUIRED_COLUMNS) + len(_REQUIRED_TABLES)
 
     def test_alter_contains_add_column_if_not_exists(self):
         engine, conn, fn = _run()

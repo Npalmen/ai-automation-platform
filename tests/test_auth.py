@@ -61,15 +61,24 @@ class TestAuthDisabled:
         assert tenant_id == "TENANT_1001"
 
     def test_api_key_ignored_in_dev_mode(self):
-        """When auth is disabled, a provided API key is simply ignored."""
+        """In dev mode (empty env), a provided key falls through DB lookup then raises 403.
+        Dev-mode passthrough only applies when NO key is provided."""
+        from unittest.mock import MagicMock
         auth = _reload_auth()
-        with patch("app.core.auth.get_settings") as mock_settings:
+        db = MagicMock()
+        with (
+            patch("app.core.auth.get_settings") as mock_settings,
+            patch("app.core.auth._lookup_db_key", return_value=None),
+        ):
             mock_settings.return_value.TENANT_API_KEYS = ""
-            tenant_id = auth.get_verified_tenant(
-                x_api_key="some-key",
-                x_tenant_id="TENANT_2001",
-            )
-        assert tenant_id == "TENANT_2001"
+            from fastapi import HTTPException
+            with pytest.raises(HTTPException) as exc_info:
+                auth.get_verified_tenant(
+                    x_api_key="some-key",
+                    x_tenant_id="TENANT_2001",
+                    db=db,
+                )
+        assert exc_info.value.status_code == 403
 
 
 # ---------------------------------------------------------------------------

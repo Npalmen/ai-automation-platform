@@ -3775,6 +3775,140 @@ def pilot_readiness(
     return get_pilot_readiness(db=db, tenant_id=tenant_id, app_settings=s)
 
 
+# ---------------------------------------------------------------------------
+# Admin Customer Provisioning
+# ---------------------------------------------------------------------------
+
+_VALID_TENANT_STATUSES = {"active", "inactive"}
+
+_SLUG_RE = __import__("re").compile(r"^[a-z0-9_-]{2,64}$")
+
+
+class AdminTenantCreateRequest(_BaseModel):
+    name: str
+    slug: str
+    enabled_job_types: list[str] = []
+    allowed_integrations: list[str] = []
+    auto_actions: dict[str, bool] = {}
+
+
+class AdminTenantStatusRequest(_BaseModel):
+    status: str
+
+
+@app.post("/admin/tenants", status_code=201)
+def admin_create_tenant(
+    body: AdminTenantCreateRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """Provision a new tenant with a generated API key.
+
+    The api_key field in the response is shown exactly once and never stored
+    in plaintext. Store it immediately — it cannot be retrieved again.
+    Requires X-Admin-API-Key.
+    """
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    from app.repositories.postgres.tenant_api_key_repository import TenantApiKeyRepository
+
+    if not _SLUG_RE.match(body.slug):
+        raise HTTPException(
+            status_code=422,
+            detail="slug must be 2–64 lowercase alphanumeric chars, hyphens, or underscores.",
+        )
+
+    # Derive a deterministic tenant_id from slug
+    tenant_id = "T_" + body.slug.upper().replace("-", "_")
+
+    if TenantConfigRepository.get(db, tenant_id) is not None:
+        raise HTTPException(status_code=409, detail=f"Tenant '{tenant_id}' already exists.")
+
+    TenantConfigRepository.upsert(
+        db=db,
+        tenant_id=tenant_id,
+        name=body.name,
+        slug=body.slug,
+        status="active",
+        enabled_job_types=body.enabled_job_types,
+        allowed_integrations=body.allowed_integrations,
+        auto_actions=body.auto_actions,
+    )
+
+    raw_key, _ = TenantApiKeyRepository.create_key(db, tenant_id)
+
+    return {
+        "tenant_id": tenant_id,
+        "name": body.name,
+        "slug": body.slug,
+        "api_key": raw_key,
+        "status": "active",
+    }
+
+
+@app.get("/admin/tenants")
+def admin_list_tenants(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """List all tenants. Never returns API keys.
+
+    Requires X-Admin-API-Key.
+    """
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    records = TenantConfigRepository.list_all(db)
+    return {
+        "items": [TenantConfigRepository.to_dict(r) for r in records],
+        "total": len(records),
+    }
+
+
+@app.post("/admin/tenants/{tenant_id}/rotate-key", status_code=200)
+def admin_rotate_tenant_key(
+    tenant_id: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """Revoke all existing API keys for the tenant and issue a new one.
+
+    The new api_key is shown exactly once. Store it immediately.
+    Requires X-Admin-API-Key.
+    """
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    from app.repositories.postgres.tenant_api_key_repository import TenantApiKeyRepository
+
+    if TenantConfigRepository.get(db, tenant_id) is None:
+        raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found.")
+
+    raw_key, _ = TenantApiKeyRepository.rotate_key(db, tenant_id)
+    return {"tenant_id": tenant_id, "api_key": raw_key}
+
+
+@app.patch("/admin/tenants/{tenant_id}/status", status_code=200)
+def admin_set_tenant_status(
+    tenant_id: str,
+    body: AdminTenantStatusRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """Set a tenant's status to 'active' or 'inactive'.
+
+    Inactive tenants are rejected at auth with 403.
+    Requires X-Admin-API-Key.
+    """
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    if body.status not in _VALID_TENANT_STATUSES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid status. Valid values: {sorted(_VALID_TENANT_STATUSES)}",
+        )
+    if TenantConfigRepository.get(db, tenant_id) is None:
+        raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found.")
+
+    TenantConfigRepository.upsert(db=db, tenant_id=tenant_id, status=body.status)
+    return {"tenant_id": tenant_id, "status": body.status}
+
+
 @app.get("/admin/tenants/overview")
 def admin_tenants_overview(
     db: Session = Depends(get_db),

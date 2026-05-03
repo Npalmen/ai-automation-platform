@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
 
 from app.repositories.postgres.tenant_config_models import TenantConfigRecord
@@ -19,21 +21,28 @@ class TenantConfigRepository:
         db: Session,
         tenant_id: str,
         name: str | None = None,
+        slug: str | None = None,
+        status: str | None = None,
         enabled_job_types: list | None = None,
         allowed_integrations: list | None = None,
         auto_actions: dict | None = None,
     ) -> TenantConfigRecord:
+        now = datetime.now(timezone.utc)
         record = (
             db.query(TenantConfigRecord)
             .filter(TenantConfigRecord.tenant_id == tenant_id)
             .first()
         )
         if record is None:
-            record = TenantConfigRecord(tenant_id=tenant_id)
+            record = TenantConfigRecord(tenant_id=tenant_id, created_at=now)
             db.add(record)
 
         if name is not None:
             record.name = name
+        if slug is not None:
+            record.slug = slug
+        if status is not None:
+            record.status = status
         if enabled_job_types is not None:
             record.enabled_job_types = enabled_job_types
         if allowed_integrations is not None:
@@ -41,6 +50,7 @@ class TenantConfigRepository:
         if auto_actions is not None:
             record.auto_actions = auto_actions
 
+        record.updated_at = now
         db.commit()
         db.refresh(record)
         return record
@@ -56,15 +66,17 @@ class TenantConfigRepository:
 
     @staticmethod
     def update_settings(db: Session, tenant_id: str, settings: dict) -> TenantConfigRecord:
+        now = datetime.now(timezone.utc)
         record = (
             db.query(TenantConfigRecord)
             .filter(TenantConfigRecord.tenant_id == tenant_id)
             .first()
         )
         if record is None:
-            record = TenantConfigRecord(tenant_id=tenant_id)
+            record = TenantConfigRecord(tenant_id=tenant_id, created_at=now)
             db.add(record)
         record.settings = settings
+        record.updated_at = now
         db.commit()
         db.refresh(record)
         return record
@@ -76,8 +88,13 @@ class TenantConfigRepository:
     @staticmethod
     def to_dict(record: TenantConfigRecord) -> dict:
         return {
+            "tenant_id": record.tenant_id,
             "name": record.name,
+            "slug": record.slug,
+            "status": record.status or "active",
             "enabled_job_types": record.enabled_job_types or [],
             "allowed_integrations": record.allowed_integrations or [],
             "auto_actions": record.auto_actions or {},
+            "created_at": record.created_at.isoformat() if record.created_at else None,
+            "updated_at": record.updated_at.isoformat() if record.updated_at else None,
         }
