@@ -42,6 +42,7 @@ class JobType(str, Enum):
 
     # Support
     CUSTOMER_INQUIRY = "customer_inquiry"
+    SUPPORT_ANALYSIS = "support_analysis"
     SUPPORT_TRIAGE = "support_triage"
     RESPONSE_DRAFT = "response_draft"
     ESCALATION = "escalation"

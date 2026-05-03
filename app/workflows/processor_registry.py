@@ -13,6 +13,7 @@ from app.workflows.processors.invoice_processor import process_invoice_job
 from app.workflows.processors.lead_analyzer_processor import process_lead_analyzer_job
 from app.workflows.processors.lead_processor import process_lead_job
 from app.workflows.processors.policy_processor import process_policy_job
+from app.workflows.processors.support_analyzer_processor import process_support_analyzer_job
 
 Processor = Callable[[Job], Job]
 
@@ -23,6 +24,7 @@ PROCESSOR_REGISTRY: dict[JobType, Processor] = {
     JobType.INVOICE: process_invoice_job,
     JobType.LEAD: process_lead_job,
     JobType.LEAD_ANALYSIS: process_lead_analyzer_job,
+    JobType.SUPPORT_ANALYSIS: process_support_analyzer_job,
     JobType.CUSTOMER_INQUIRY: process_customer_inquiry_job,
     JobType.DECISIONING: process_decisioning_job,
     JobType.POLICY: process_policy_job,

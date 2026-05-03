@@ -2237,3 +2237,51 @@ Full tenant-aware upgrade to the lead analysis layer. Same pipeline as before, n
 - Dashboard shows live lead KPIs by status/category/service
 - No external dispatch without policy/approval (dispatch engine unchanged)
 - No LLM dependency
+
+---
+
+## Support Layer v1 — Tenant-aware Support Intelligence
+
+### What was built
+Full support intelligence layer for `customer_inquiry` jobs. Tenant-aware from the start. No LLM dependency. No external writes without approval/dispatch.
+
+### New package: `app/support/`
+- `__init__.py` — empty package marker
+- `models.py` — typed result classes: `SupportAnalysis`, `SupportMissingInfoResult`, `SupportPriority`, `SupportResponseDraft`, `SupportNextAction`; Literal types: `TicketType`, `SupportCategory`, `SupportUrgency`, `CustomerSentiment`, `PriorityCategory`, `ResponseType`, `SupportNextActionType`, `SupportStatus`
+- `tenant_context.py` — `TenantSupportContext` dataclass; `load_support_context(tenant_id, settings)` reads from `memory.support_config` + `memory.business_profile` + `memory.lead_config.services`; `load_support_context_from_job(job, db)` for pipeline use; graceful fallback when memory absent
+- `analyzer.py` — detects ticket_type (emergency/warranty/invoice_question/complaint/scheduling/question/issue/other), category, urgency, customer_sentiment (neutral/concerned/frustrated/angry), matched_service; tenant SLA critical override; input field: `message_text` (not `body`)
+- `missing_info.py` — per-ticket-type field schemas (default + tenant override via `support_requirements`); completeness_score 0–1; `schema_source` ("default" / "tenant")
+- `question_generator.py` — Swedish question messages when completeness < 0.7; emergency safety disclaimer injected; `should_ask_questions(score) -> bool` (threshold 0.7)
+- `prioritizer.py` — 0–100 score; urgency:critical +50, high +25; sentiment:angry +20; emergency +15; tenant SLA bonus +20; urgent_category bonus +15; high_value_keywords +10; category: >=70→critical, >=40→urgent, else normal
+- `response_draft.py` — response types: escalation (emergency/critical/angry), ask_for_info (completeness<0.7), suggested_solution (common_issue match + low risk), acknowledgement (default); safety disclaimer always in risk_points for emergency; no definitive diagnosis for electrical/safety
+- `next_action.py` — priority: escalate(critical/emergency) → escalate(angry+requires_human) → ask_for_info(incomplete) → suggest_solution(common+low risk) → ready_to_dispatch(auto+score≥70) → create_task(score≥40) → manual_review
+
+### New processor
+- `app/workflows/processors/support_analyzer_processor.py` — `process_support_analyzer_job(job, db=None)`; runs all 5 support modules in sequence; infers `support_status`; registered in `PROCESSOR_REGISTRY`
+
+### Modified: pipeline
+- `app/domain/workflows/enums.py` — added `SUPPORT_ANALYSIS = "support_analysis"`
+- `app/workflows/processor_registry.py` — registered `support_analyzer_processor`
+- `app/workflows/orchestrator.py` — `CUSTOMER_INQUIRY` pipeline now: `ENTITY_EXTRACTION → SUPPORT_ANALYSIS → CUSTOMER_INQUIRY → DECISIONING → POLICY → ACTION_DISPATCH → HUMAN_HANDOFF`
+
+### Modified: main.py
+- `GET /cases/{job_id}` — extended with 13 support fields: `support_analysis`, `support_missing_fields`, `support_completeness_score`, `support_priority_score`, `support_priority_category`, `support_priority_reasons`, `support_response_draft`, `support_next_action`, `support_generated_question_message`, `support_status`, `support_tenant_context_used`, `support_context_sources`, `support_business_risk_reason`
+- `PATCH /jobs/{job_id}/support-status` — operator status override; 7 valid statuses: new/waiting_for_customer/in_review/escalated/solution_suggested/resolved/closed
+- `POST /jobs/{job_id}/support-regenerate` — re-runs all support modules in-place; no external writes; only `update_job()`
+- `GET /dashboard/support` — KPIs: `total_cases`, `by_status`, `by_ticket_type`, `by_priority`, `by_next_action`, `escalated_count`, `awaiting_info_count`
+
+### Modified: UI
+- `app/ui/index.html` — `_renderSupportAnalysisPanel(c)` added; renders for `type == 'customer_inquiry'`; shows: priority score badge + category color, completeness bar, urgency/sentiment 2×2 grid, tenant-context badges, business risk reason, status badge + operator select + Spara button (calls `PATCH`), missing fields chips, AI-rekommenderar, question message pre + Kopiera, svarsutkast card (subject + body + next step + risk points + Kopiera svar), "↻ Regenerera analys" button; `_saveSupportStatus()`, `_regenerateSupportAnalysis()` added
+- `app/ui/index.html` — Support-pipeline KPI section added to admin dashboard: `loadSupportKpis()` calls `GET /dashboard/support`; shows total + priority breakdown + escalated/awaiting callout pills + status grid + per-ticket-type table
+
+### Tests
+- `tests/test_support_layer_v1.py` — 95 tests: `TenantSupportContext` (10), `load_support_context` (5), `analyze_support` (11), `compute_support_missing_info` (7), `should_ask_questions`/question generator (7), `prioritize_support` (8), `build_support_response_draft` (7), `decide_support_next_action` (7), fallback without context (13 — all modules), endpoint no-side-effects (21)
+- Full suite: 1955 pass, 1 pre-existing failure in `test_admin_auth` (env-dependent, unrelated)
+
+### Acceptance criteria met
+- Tenant-aware from the start — different output when `memory.support_config` differs
+- Full fallback to default schemas/rules when no tenant memory
+- `support_status` persisted in `input_data`, operator-settable, survives reruns
+- Emergency safety disclaimer always in risk_points and question messages
+- No LLM dependency
+- No external dispatch without policy/approval

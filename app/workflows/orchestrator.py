@@ -41,6 +41,7 @@ POST_CLASSIFICATION_PIPELINES = {
     ],
     JobType.CUSTOMER_INQUIRY: [
         JobType.ENTITY_EXTRACTION,
+        JobType.SUPPORT_ANALYSIS,
         JobType.CUSTOMER_INQUIRY,
         JobType.DECISIONING,
         JobType.POLICY,

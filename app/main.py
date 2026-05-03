@@ -1504,6 +1504,68 @@ def dashboard_leads(
     }
 
 
+@app.get("/dashboard/support")
+def dashboard_support(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Support pipeline KPIs — counts by support_status, ticket_type, priority_category."""
+    support_records = (
+        db.query(JobRecord)
+        .filter(JobRecord.tenant_id == tenant_id, JobRecord.job_type == "customer_inquiry")
+        .all()
+    )
+
+    status_counts: dict[str, int] = {}
+    ticket_type_counts: dict[str, int] = {}
+    priority_counts: dict[str, int] = {"critical": 0, "urgent": 0, "normal": 0}
+    next_action_counts: dict[str, int] = {}
+    escalated = 0
+    awaiting_info = 0
+
+    for r in support_records:
+        # support_status from input_data (operator-set) or from processor payload
+        support_payload: dict = {}
+        history = list(r.processor_history or [])
+        for entry in history:
+            if entry.get("processor") == "support_analyzer_processor":
+                support_payload = (entry.get("result") or {}).get("payload") or {}
+                break
+
+        status = (r.input_data or {}).get("support_status") or support_payload.get("support_status") or "new"
+        status_counts[status] = status_counts.get(status, 0) + 1
+
+        # ticket_type
+        analysis = support_payload.get("support_analysis") or {}
+        ttype = analysis.get("ticket_type") or "unknown"
+        ticket_type_counts[ttype] = ticket_type_counts.get(ttype, 0) + 1
+
+        # priority category
+        priority = support_payload.get("support_priority") or {}
+        cat = priority.get("category") or "normal"
+        if cat in priority_counts:
+            priority_counts[cat] += 1
+
+        # next_action
+        next_action_dict = support_payload.get("support_next_action") or {}
+        action = next_action_dict.get("action") or "unknown"
+        next_action_counts[action] = next_action_counts.get(action, 0) + 1
+        if action == "escalate":
+            escalated += 1
+        if action == "ask_for_info":
+            awaiting_info += 1
+
+    return {
+        "total_cases": len(support_records),
+        "by_status": status_counts,
+        "by_ticket_type": ticket_type_counts,
+        "by_priority": priority_counts,
+        "by_next_action": next_action_counts,
+        "escalated_count": escalated,
+        "awaiting_info_count": awaiting_info,
+    }
+
+
 @app.get("/dashboard/activity")
 def dashboard_activity(
     db: Session = Depends(get_db),
@@ -2577,6 +2639,21 @@ def get_case(
     mi = lead_payload.get("missing_info") or {}
     ls = lead_payload.get("lead_score") or {}
 
+    # --- support analysis fields (from support_analyzer_processor) ---
+    support_payload: dict = {}
+    for entry in history:
+        if entry.get("processor") == "support_analyzer_processor":
+            support_payload = (entry.get("result") or {}).get("payload") or {}
+            break
+
+    support_status = (inp.get("support_status")
+                      or support_payload.get("support_status"))
+
+    sa = support_payload.get("support_analysis") or {}
+    smi = support_payload.get("support_missing_info") or {}
+    sp = support_payload.get("support_priority") or {}
+    sna = support_payload.get("support_next_action") or {}
+
     return {
         "job_id":           r.job_id,
         "created_at":       r.created_at.isoformat() if r.created_at else None,
@@ -2604,7 +2681,7 @@ def get_case(
         "offer_draft":                  lead_payload.get("offer_draft"),
         "next_action":                  lead_payload.get("next_action"),
         "generated_question_message":   lead_payload.get("generated_question_message"),
-        # Extended lead intelligence (Slice J)
+        # Extended lead intelligence
         "lead_status":                  lead_status,
         "tenant_context_used":          la.get("tenant_context_used"),
         "tenant_context_sources":       la.get("context_sources"),
@@ -2613,6 +2690,20 @@ def get_case(
         "required_fields_used":         mi.get("required_fields"),
         "optional_fields_used":         mi.get("optional_fields"),
         "business_fit_reason":          ls.get("business_fit_reason"),
+        # Support analysis (present only for customer_inquiry job_type)
+        "support_analysis":             sa or None,
+        "support_missing_fields":       smi.get("missing_fields"),
+        "support_completeness_score":   smi.get("completeness_score"),
+        "support_priority_score":       sp.get("score"),
+        "support_priority_category":    sp.get("category"),
+        "support_priority_reasons":     sp.get("reasons"),
+        "support_response_draft":       support_payload.get("support_response_draft"),
+        "support_next_action":          sna,
+        "support_generated_question_message": support_payload.get("support_generated_question_message"),
+        "support_status":               support_status,
+        "support_tenant_context_used":  sa.get("tenant_context_used"),
+        "support_context_sources":      sa.get("context_sources"),
+        "support_business_risk_reason": sp.get("business_risk_reason"),
     }
 
 
@@ -3222,6 +3313,177 @@ def regenerate_lead_analysis(
         "generated_question_message": question_message,
         "offer_draft": offer_draft_dict,
     }
+
+
+# ---------------------------------------------------------------------------
+# Support Status + Operational Actions
+# ---------------------------------------------------------------------------
+
+_VALID_SUPPORT_STATUSES = {
+    "new", "waiting_for_customer", "in_review",
+    "escalated", "solution_suggested", "resolved", "closed",
+}
+
+
+class SupportStatusRequest(_BaseModel):
+    status: str
+
+
+@app.patch("/jobs/{job_id}/support-status")
+def set_support_status(
+    job_id: str,
+    body: SupportStatusRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Set operational support_status on a customer_inquiry job (stored in input_data)."""
+    if body.status not in _VALID_SUPPORT_STATUSES:
+        raise HTTPException(status_code=422, detail=f"Invalid status. Valid: {sorted(_VALID_SUPPORT_STATUSES)}")
+
+    r = (
+        db.query(JobRecord)
+        .filter(JobRecord.job_id == job_id, JobRecord.tenant_id == tenant_id)
+        .first()
+    )
+    if r is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if r.job_type != "customer_inquiry":
+        raise HTTPException(status_code=422, detail="Job is not a customer_inquiry")
+
+    updated_input = dict(r.input_data or {})
+    updated_input["support_status"] = body.status
+    r.input_data = updated_input
+    db.commit()
+    return {"job_id": job_id, "support_status": body.status}
+
+
+@app.post("/jobs/{job_id}/support-regenerate")
+def regenerate_support_analysis(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Re-run support analysis for a job without re-running the full pipeline.
+
+    Useful after operator manual edits or customer reply merging.
+    Updates the support_analyzer_processor entry in processor_history in-place.
+    No external writes — only update_job().
+    """
+    from app.support.analyzer import analyze_support
+    from app.support.missing_info import compute_support_missing_info
+    from app.support.next_action import decide_support_next_action
+    from app.support.prioritizer import prioritize_support
+    from app.support.question_generator import generate_support_question_message, should_ask_questions
+    from app.support.response_draft import build_support_response_draft
+    from app.support.tenant_context import load_support_context
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    from app.repositories.postgres.job_repository import JobRepository
+
+    r = (
+        db.query(JobRecord)
+        .filter(JobRecord.job_id == job_id, JobRecord.tenant_id == tenant_id)
+        .first()
+    )
+    if r is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if r.job_type != "customer_inquiry":
+        raise HTTPException(status_code=422, detail="Job is not a customer_inquiry")
+
+    job = JobRepository._to_domain(r)
+    input_data = job.input_data or {}
+
+    # Load entities from existing history
+    entities: dict = {}
+    for entry in job.processor_history:
+        p = (entry.get("result") or {}).get("payload") or {}
+        if "entities" in p:
+            entities = p["entities"]
+            break
+
+    # Load tenant context
+    settings = TenantConfigRepository.get_settings(db, tenant_id)
+    tenant_ctx = load_support_context(tenant_id, settings)
+
+    # Re-run analysis
+    analysis = analyze_support(input_data, entities, tenant_ctx)
+    missing_info = compute_support_missing_info(analysis.ticket_type, input_data, entities, tenant_ctx)
+    priority = prioritize_support(analysis, missing_info, entities, input_data, tenant_ctx)
+    next_action = decide_support_next_action(analysis, missing_info, priority, {}, tenant_ctx)
+
+    question_message: str | None = None
+    if should_ask_questions(missing_info.completeness_score):
+        question_message = generate_support_question_message(
+            missing_info.missing_fields,
+            ticket_type=analysis.ticket_type,
+            tenant_ctx=tenant_ctx,
+            input_data=input_data,
+        )
+
+    response_draft = build_support_response_draft(analysis, missing_info, priority, entities, input_data, tenant_ctx)
+
+    support_status = input_data.get("support_status") or _infer_support_status_from_action(next_action.action, input_data)
+
+    new_payload: dict = {
+        "processor_name": "support_analyzer_processor",
+        "support_analysis": analysis.to_dict(),
+        "support_missing_info": missing_info.to_dict(),
+        "support_priority": priority.to_dict(),
+        "support_next_action": next_action.to_dict(),
+        "support_response_draft": response_draft.to_dict(),
+        "support_status": support_status,
+        "confidence": analysis.confidence,
+        "regenerated": True,
+    }
+    if question_message:
+        new_payload["support_generated_question_message"] = question_message
+
+    new_result = {
+        "status": "completed",
+        "summary": f"Support re-analyserat: score={priority.score}, next_action={next_action.action}.",
+        "requires_human_review": next_action.action in ("escalate", "manual_review", "create_task"),
+        "payload": new_payload,
+    }
+
+    # Replace or append support_analyzer_processor in history
+    history = list(job.processor_history)
+    replaced = False
+    for i, entry in enumerate(history):
+        if entry.get("processor") == "support_analyzer_processor":
+            history[i] = {"processor": "support_analyzer_processor", "result": new_result}
+            replaced = True
+            break
+    if not replaced:
+        history.append({"processor": "support_analyzer_processor", "result": new_result})
+
+    job.processor_history = history
+    job.result = new_result
+    JobRepository.update_job(db, job)
+
+    return {
+        "job_id": job_id,
+        "support_analysis": analysis.to_dict(),
+        "support_missing_info": missing_info.to_dict(),
+        "support_priority": priority.to_dict(),
+        "support_next_action": next_action.to_dict(),
+        "support_response_draft": response_draft.to_dict(),
+        "support_status": support_status,
+        "support_generated_question_message": question_message,
+    }
+
+
+def _infer_support_status_from_action(action: str, input_data: dict) -> str:
+    """Infer support_status from next_action when not operator-set."""
+    if input_data.get("conversation_messages") and len(input_data["conversation_messages"]) > 1:
+        if action in ("suggest_solution", "ready_to_dispatch"):
+            return "solution_suggested"
+        return "in_review"
+    if action == "ask_for_info":
+        return "new"
+    if action == "escalate":
+        return "escalated"
+    if action in ("suggest_solution", "ready_to_dispatch"):
+        return "solution_suggested"
+    return "new"
 
 
 @app.post("/jobs/{job_id}/dispatch-preview")

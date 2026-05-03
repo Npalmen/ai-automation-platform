@@ -1890,6 +1890,17 @@ label { color: var(--text-muted); }
     </div>
   </div>
 
+  <!-- Support pipeline KPIs -->
+  <div class="dash-section-hdr">
+    <span class="dash-section-title">Support-pipeline</span>
+  </div>
+  <div id="supportKpiWrap">
+    <div class="empty-state" style="padding:20px 0;">
+      <div class="empty-state-icon">◌</div>
+      <div class="empty-state-title">Laddar support-statistik…</div>
+    </div>
+  </div>
+
   <!-- Recent activity -->
   <div class="dash-section-hdr">
     <span class="dash-section-title">Senaste aktivitet</span>
@@ -3669,6 +3680,9 @@ async function _loadAdminDashboard() {
   // Lead pipeline KPIs
   loadLeadKpis();
 
+  // Support pipeline KPIs
+  loadSupportKpis();
+
   // Summary
   try {
     const s = await apiFetch('/dashboard/summary');
@@ -3831,6 +3845,83 @@ async function loadLeadKpis() {
     if (wrap) wrap.innerHTML = `<div style="font-size:12px; color:var(--text-dim); padding:12px 0;">Kunde inte ladda lead-statistik: ${escapeHtml(e.message)}</div>`;
   }
 }
+
+async function loadSupportKpis() {
+  const wrap = document.getElementById('supportKpiWrap');
+  if (!wrap) return;
+  try {
+    const d = await apiFetch('/dashboard/support');
+    const statusLabels = {
+      new: 'Nytt', waiting_for_customer: 'Väntar', in_review: 'Under granskning',
+      escalated: 'Eskalerat', solution_suggested: 'Lösning föreslagen',
+      resolved: 'Löst', closed: 'Stängt',
+    };
+    const statusColors = {
+      new: 'var(--text-dim)', waiting_for_customer: 'var(--warning)', in_review: 'var(--info,#06b6d4)',
+      escalated: 'var(--danger)', solution_suggested: 'var(--purple)',
+      resolved: 'var(--success)', closed: 'var(--text-muted)',
+    };
+    const prioColors = { critical: 'var(--danger)', urgent: 'var(--warning)', normal: 'var(--text-dim)' };
+    const prioLabels = { critical: 'Kritisk', urgent: 'Brådskande', normal: 'Normal' };
+
+    // by_status pills
+    const byStatus = Object.entries(d.by_status || {})
+      .filter(([,v]) => v > 0)
+      .map(([k, v]) => `<div style="display:flex; flex-direction:column; align-items:center; padding:8px 14px; background:var(--surface-3); border-radius:var(--radius-sm); border:1px solid var(--border); min-width:80px;">
+        <span style="font-size:18px; font-weight:700; color:${statusColors[k] || 'var(--text)'};">${v}</span>
+        <span style="font-size:10px; color:var(--text-dim); margin-top:2px;">${escapeHtml(statusLabels[k] || k)}</span>
+      </div>`).join('');
+
+    // by_priority
+    const byPrio = Object.entries(d.by_priority || {})
+      .filter(([,v]) => v > 0)
+      .map(([k, v]) => `<div style="display:flex; align-items:center; gap:6px;">
+        <span style="font-size:13px; font-weight:700; color:${prioColors[k] || 'var(--text)'};">${v}</span>
+        <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">${escapeHtml(prioLabels[k] || k)}</span>
+      </div>`).join('');
+
+    // by_ticket_type
+    const typeRows = Object.entries(d.by_ticket_type || {})
+      .filter(([,v]) => v > 0)
+      .sort(([,a],[,b]) => b - a)
+      .map(([k, v]) => `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid var(--border);">
+        <span style="font-size:12px; color:var(--text-muted);">${escapeHtml(k.replace(/_/g,' '))}</span>
+        <span style="font-size:12px; font-weight:600; color:var(--text);">${v}</span>
+      </div>`).join('');
+
+    // escalated / awaiting info callouts
+    const escHtml = d.escalated_count > 0
+      ? `<span style="font-size:11px; background:rgba(239,68,68,.12); color:var(--danger); padding:2px 8px; border-radius:20px; font-weight:600;">${d.escalated_count} eskalerade</span>`
+      : '';
+    const awaitHtml = d.awaiting_info_count > 0
+      ? `<span style="font-size:11px; background:rgba(245,158,11,.12); color:var(--warning); padding:2px 8px; border-radius:20px;">${d.awaiting_info_count} väntar info</span>`
+      : '';
+    const calloutHtml = (escHtml || awaitHtml)
+      ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">${escHtml}${awaitHtml}</div>`
+      : '';
+
+    wrap.innerHTML = `
+      <div style="display:grid; grid-template-columns:auto 1fr; gap:16px; align-items:start; padding:12px 0;">
+        <div>
+          <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;">Totalt ärenden</div>
+          <div style="font-size:32px; font-weight:700; color:var(--text);">${d.total_cases ?? '–'}</div>
+          <div style="display:flex; gap:10px; margin-top:6px;">${byPrio || '<span style="color:var(--text-dim); font-size:11px;">Inga prioriteringar</span>'}</div>
+          ${calloutHtml}
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;">Status-fördelning</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">${byStatus || '<span style="color:var(--text-dim); font-size:12px;">Inga ärenden ännu</span>'}</div>
+        </div>
+      </div>
+      ${typeRows ? `<div style="margin-top:4px;">
+        <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;">Per ärendetyp</div>
+        ${typeRows}
+      </div>` : ''}`;
+  } catch (e) {
+    if (wrap) wrap.innerHTML = `<div style="font-size:12px; color:var(--text-dim); padding:12px 0;">Kunde inte ladda support-statistik: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
 
 let _dsRange = '30d';
 
@@ -5523,7 +5614,10 @@ async function _openAdminCase(jobId) {
     // Lead Analysis panel (only for lead type)
     const leadHtml = _renderLeadAnalysisPanel(c);
 
-    detailEl.innerHTML = leadHtml + rpHtml + omHtml + extHtml + threadHtml + actHtml + errSectionHtml;
+    // Support Analysis panel (only for customer_inquiry type)
+    const supportHtml = _renderSupportAnalysisPanel(c);
+
+    detailEl.innerHTML = supportHtml + leadHtml + rpHtml + omHtml + extHtml + threadHtml + actHtml + errSectionHtml;
   } catch (e) {
     errEl.textContent = 'Kunde inte ladda ärendedetaljer: ' + escapeHtml(e.message);
     errEl.style.display = 'block';
@@ -5748,6 +5842,222 @@ async function _regenerateLeadAnalysis(jobId) {
 
 function _copyToClipboard(text) {
   navigator.clipboard.writeText(text).then(() => showToast('Kopierat!')).catch(() => showToast('Kopiering misslyckades', 'error'));
+}
+
+// ---------------------------------------------------------------------------
+// Support Analysis panel renderer
+// ---------------------------------------------------------------------------
+function _renderSupportAnalysisPanel(c) {
+  if (c.type !== 'customer_inquiry' || !c.support_analysis) return '';
+
+  const sa = c.support_analysis;
+  const mi = c.support_missing_fields || [];
+  const cs = c.support_completeness_score != null ? Math.round(c.support_completeness_score * 100) : null;
+  const prioScore = c.support_priority_score;
+  const prioCat = c.support_priority_category || 'normal';
+  const nextAction = (c.support_next_action || {}).action || '–';
+  const qMsg = c.support_generated_question_message;
+  const responseDraft = c.support_response_draft;
+  const supportStatus = c.support_status || 'new';
+  const tenantUsed = c.support_tenant_context_used;
+  const contextSources = c.support_context_sources || [];
+  const businessRisk = c.support_business_risk_reason;
+  const jobId = c.id;
+
+  const prioCatColors = { critical: 'var(--danger)', urgent: 'var(--warning)', normal: 'var(--text-dim)' };
+  const prioCatColor = prioCatColors[prioCat] || 'var(--text-muted)';
+
+  const naLabels = {
+    ask_for_info:      'Be om mer info',
+    escalate:          'Eskalera',
+    suggest_solution:  'Föreslå lösning',
+    ready_to_dispatch: 'Redo att skicka',
+    create_task:       'Skapa uppgift',
+    manual_review:     'Manuell granskning',
+  };
+  const urgencyLabels = { low: 'Låg', medium: 'Medel', high: 'Hög', critical: 'Kritisk' };
+  const urgencyColors = { low: 'var(--text-dim)', medium: 'var(--warning)', high: 'var(--danger)', critical: 'var(--danger)' };
+  const sentimentLabels = { positive: 'Positiv', neutral: 'Neutral', frustrated: 'Frustrerad', angry: 'Arg' };
+  const sentimentColors = { positive: 'var(--success)', neutral: 'var(--text-muted)', frustrated: 'var(--warning)', angry: 'var(--danger)' };
+
+  const statusLabels = {
+    new: 'Nytt', waiting_for_customer: 'Väntar på svar', in_review: 'Under granskning',
+    escalated: 'Eskalerat', solution_suggested: 'Lösning föreslagen',
+    resolved: 'Löst', closed: 'Stängt',
+  };
+  const statusColors = {
+    new: 'var(--text-dim)', waiting_for_customer: 'var(--warning)', in_review: 'var(--info)',
+    escalated: 'var(--danger)', solution_suggested: 'var(--purple)',
+    resolved: 'var(--success)', closed: 'var(--text-muted)',
+  };
+
+  // Priority badge
+  const prioHtml = prioScore != null
+    ? `<span style="font-size:22px; font-weight:700; color:${prioCatColor};">${prioScore}</span>
+       <span style="font-size:11px; color:${prioCatColor}; font-weight:600; text-transform:uppercase; margin-left:4px;">${escapeHtml(prioCat)}</span>`
+    : '–';
+
+  // Completeness bar
+  const barWidth = cs != null ? cs : 0;
+  const barColor = barWidth >= 70 ? 'var(--success)' : barWidth >= 40 ? 'var(--warning)' : 'var(--danger)';
+  const completenessHtml = cs != null
+    ? `<div style="margin-top:6px;">
+         <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-dim); margin-bottom:4px;">
+           <span>Informationskomplett</span><span>${cs}%</span>
+         </div>
+         <div style="height:6px; background:var(--surface-3); border-radius:3px; overflow:hidden;">
+           <div style="width:${barWidth}%; height:100%; background:${barColor}; border-radius:3px;"></div>
+         </div>
+       </div>`
+    : '';
+
+  // Support status control
+  const statusHtml = `<div style="margin-top:12px; padding:10px; background:var(--surface-3); border-radius:var(--radius-sm); border:1px solid var(--border);">
+    <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;">Ärendestatus</div>
+    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <span style="font-size:12px; font-weight:600; color:${statusColors[supportStatus] || 'var(--text)'};">● ${escapeHtml(statusLabels[supportStatus] || supportStatus)}</span>
+      <select id="supportStatusSelect_${escapeHtml(jobId)}" style="font-size:12px; background:var(--surface-2); border:1px solid var(--border-med); color:var(--text); border-radius:4px; padding:3px 6px; cursor:pointer;">
+        ${['new','waiting_for_customer','in_review','escalated','solution_suggested','resolved','closed'].map(s =>
+          `<option value="${s}"${s === supportStatus ? ' selected' : ''}>${escapeHtml(statusLabels[s] || s)}</option>`
+        ).join('')}
+      </select>
+      <button onclick="_saveSupportStatus('${escapeHtml(jobId)}')" style="font-size:11px; padding:3px 10px; background:var(--info,#06b6d4); color:#fff; border:none; border-radius:4px; cursor:pointer;">Spara</button>
+    </div>
+  </div>`;
+
+  // Tenant context badges
+  const tenantBadges = [];
+  if (tenantUsed) {
+    tenantBadges.push(`<span style="font-size:10px; background:rgba(6,182,212,.15); color:var(--info,#06b6d4); padding:2px 8px; border-radius:20px; font-weight:600;">Tenant-kontext: Ja</span>`);
+  }
+  if (sa.matched_service) {
+    tenantBadges.push(`<span style="font-size:10px; background:rgba(16,185,129,.12); color:var(--success); padding:2px 8px; border-radius:20px;">${escapeHtml((sa.matched_service || '').replace(/_/g,' '))}</span>`);
+  }
+  contextSources.forEach(src => {
+    tenantBadges.push(`<span style="font-size:10px; background:rgba(107,114,128,.12); color:var(--text-muted); padding:2px 8px; border-radius:20px;">${escapeHtml(src)}</span>`);
+  });
+  const tenantBadgeHtml = tenantBadges.length > 0
+    ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">${tenantBadges.join('')}</div>`
+    : '';
+
+  // Business risk reason
+  const riskHtml = businessRisk
+    ? `<div style="margin-top:8px; font-size:11px; color:var(--text-muted); font-style:italic; padding:6px 8px; background:rgba(239,68,68,.08); border-left:2px solid var(--danger); border-radius:2px;">${escapeHtml(businessRisk)}</div>`
+    : '';
+
+  // Missing fields
+  const missingHtml = mi.length > 0
+    ? `<div style="margin-top:10px;">
+         <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;">Saknad information</div>
+         <div style="display:flex; gap:6px; flex-wrap:wrap;">
+           ${mi.map(f => `<span style="background:rgba(239,68,68,.12); color:var(--danger); font-size:11px; padding:2px 8px; border-radius:20px;">${escapeHtml(f.replace(/_/g,' '))}</span>`).join('')}
+         </div>
+       </div>`
+    : '';
+
+  // Next action badge
+  const naHtml =
+    `<div style="margin-top:10px;">
+       <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;">AI rekommenderar</div>
+       <div style="font-size:13px; font-weight:600; color:var(--info,#06b6d4);">${escapeHtml(naLabels[nextAction] || nextAction)}</div>
+     </div>`;
+
+  // Question message box
+  const qHtml = qMsg
+    ? `<div style="margin-top:12px;">
+         <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;">Frågor att skicka till kund</div>
+         <pre style="background:var(--surface-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; font-size:12px; white-space:pre-wrap; color:var(--text);">${escapeHtml(qMsg)}</pre>
+         <button onclick="_copyToClipboard(${JSON.stringify(qMsg)})" style="margin-top:4px; font-size:11px; padding:2px 10px; background:var(--surface-3); border:1px solid var(--border-med); color:var(--text-muted); border-radius:4px; cursor:pointer;">Kopiera</button>
+       </div>`
+    : '';
+
+  // Response draft box
+  const rd = responseDraft || {};
+  const draftHtml = (rd.body || rd.subject)
+    ? `<div style="margin-top:12px;">
+         <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;">Svarsutkast</div>
+         <div style="background:var(--surface-3); border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:12px; font-size:12px;">
+           ${rd.subject ? `<div style="font-weight:600; color:var(--text); margin-bottom:6px;">${escapeHtml(rd.subject)}</div>` : ''}
+           ${rd.body ? `<pre style="margin:0; white-space:pre-wrap; color:var(--text); font-size:12px;">${escapeHtml(rd.body)}</pre>` : ''}
+           ${rd.recommended_next_step ? `<div style="font-size:11px; color:var(--text-muted); margin-top:8px;"><strong>Nästa steg:</strong> ${escapeHtml(rd.recommended_next_step)}</div>` : ''}
+           ${rd.risk_points && rd.risk_points.length > 0 ? `<div style="font-size:11px; color:var(--warning); margin-top:6px;"><strong>Risk:</strong> ${rd.risk_points.map(r => escapeHtml(r)).join(' · ')}</div>` : ''}
+         </div>
+         <button onclick="_copyToClipboard(${JSON.stringify(rd.body || '')})" style="margin-top:4px; font-size:11px; padding:2px 10px; background:var(--surface-3); border:1px solid var(--border-med); color:var(--text-muted); border-radius:4px; cursor:pointer;">Kopiera svar</button>
+       </div>`
+    : '';
+
+  // Regenerate button
+  const regenHtml = `<div style="margin-top:12px; display:flex; justify-content:flex-end;">
+    <button id="supportRegenBtn_${escapeHtml(jobId)}" onclick="_regenerateSupportAnalysis('${escapeHtml(jobId)}')" style="font-size:11px; padding:4px 14px; background:var(--surface-3); border:1px solid var(--border-med); color:var(--text-muted); border-radius:4px; cursor:pointer;">↻ Regenerera analys</button>
+  </div>`;
+
+  const ttype = (sa.ticket_type || 'unknown').replace(/_/g, ' ');
+  const category = (sa.category || '').replace(/_/g, ' ');
+
+  return `<div class="detail-section" style="margin-bottom:14px; border-color:rgba(6,182,212,.3);">
+    <div class="detail-section-title" style="color:var(--info,#06b6d4);">Support-analys</div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:8px;">
+      <div>
+        <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px;">Ärendetyp</div>
+        <div style="font-size:13px; font-weight:600; color:var(--text);">${escapeHtml(ttype)}</div>
+      </div>
+      <div>
+        <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px;">Kategori</div>
+        <div style="font-size:13px; color:var(--text);">${escapeHtml(category || '–')}</div>
+      </div>
+      <div>
+        <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px;">Angelägenhet</div>
+        <div style="font-size:13px; color:${urgencyColors[sa.urgency] || 'var(--text)'}; font-weight:600;">${escapeHtml(urgencyLabels[sa.urgency] || sa.urgency || '–')}</div>
+      </div>
+      <div>
+        <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px;">Kundkänsla</div>
+        <div style="font-size:13px; color:${sentimentColors[sa.customer_sentiment] || 'var(--text)'}; font-weight:600;">${escapeHtml(sentimentLabels[sa.customer_sentiment] || sa.customer_sentiment || '–')}</div>
+      </div>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:16px; padding:10px 0; border-top:1px solid var(--border);">
+      <div style="display:flex; align-items:baseline; gap:4px;">${prioHtml}</div>
+      <div style="flex:1;">${completenessHtml}</div>
+    </div>
+
+    ${tenantBadgeHtml}
+    ${riskHtml}
+    ${statusHtml}
+    ${missingHtml}
+    ${naHtml}
+    ${qHtml}
+    ${draftHtml}
+    ${regenHtml}
+  </div>`;
+}
+
+async function _saveSupportStatus(jobId) {
+  const sel = document.getElementById('supportStatusSelect_' + jobId);
+  if (!sel) return;
+  const newStatus = sel.value;
+  try {
+    const r = await apiFetch(`/jobs/${jobId}/support-status`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    showToast('Ärendestatus uppdaterad');
+    loadCaseDetail(jobId);
+  } catch (e) {
+    showToast('Fel: ' + e.message, 'error');
+  }
+}
+
+async function _regenerateSupportAnalysis(jobId) {
+  const btn = document.getElementById('supportRegenBtn_' + jobId);
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Regenererar…'; }
+  try {
+    const r = await apiFetch(`/jobs/${jobId}/support-regenerate`, { method: 'POST' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    showToast('Analys regenererad');
+    loadCaseDetail(jobId);
+  } catch (e) {
+    showToast('Fel: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Regenerera analys'; }
+  }
 }
 
 // ---------------------------------------------------------------------------
