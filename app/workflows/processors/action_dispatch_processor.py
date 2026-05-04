@@ -20,6 +20,13 @@ from app.workflows.processors.ai_processor_utils import (
 
 PROCESSOR_NAME = "action_dispatch_processor"
 
+# Action types that represent outbound customer/internal emails requiring approval gate
+_EMAIL_ACTION_TYPES = frozenset({
+    "send_customer_auto_reply",
+    "send_internal_handoff",
+    "send_email",
+})
+
 
 def _build_actions_from_input(job: Job) -> list[dict[str, Any]]:
     input_data = job.input_data or {}
@@ -209,6 +216,14 @@ def _build_lead_default_actions(
     if not completeness["is_complete"] and sender_email and completeness["follow_up_questions"]:
         actions.append(_build_follow_up_email(sender_email, completeness["follow_up_questions"]))
 
+    # Gate outbound customer emails on auto_actions approval policy
+    if _email_needs_approval("lead", settings):
+        actions = [
+            _build_email_approval_action(a) if a.get("type") in _EMAIL_ACTION_TYPES and not a.get("_skip")
+            else a
+            for a in actions
+        ]
+
     return actions
 
 
@@ -322,6 +337,14 @@ def _build_inquiry_default_actions(
 
     if not completeness["is_complete"] and sender_email and completeness["follow_up_questions"]:
         actions.append(_build_follow_up_email(sender_email, completeness["follow_up_questions"]))
+
+    # Gate outbound customer emails on auto_actions approval policy
+    if _email_needs_approval("customer_inquiry", settings):
+        actions = [
+            _build_email_approval_action(a) if a.get("type") in _EMAIL_ACTION_TYPES and not a.get("_skip")
+            else a
+            for a in actions
+        ]
 
     return actions
 
@@ -549,14 +572,91 @@ def _read_automation_settings(job: Job, db: Session | None) -> dict[str, Any]:
         from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
         ctrl = TenantConfigRepository.get_settings(db, job.tenant_id)
         auto = ctrl.get("automation") or {}
+        # Also read the auto_actions column (separate from settings JSON blob)
+        record = TenantConfigRepository.get(db, job.tenant_id)
+        auto_actions = (record.auto_actions or {}) if record else {}
         return {
             "followups_enabled": auto.get("followups_enabled", True),
             "leads_enabled":     auto.get("leads_enabled", True),
             "support_enabled":   auto.get("support_enabled", True),
             "support_email":     ctrl.get("support_email") or "",
+            "auto_actions":      auto_actions,
         }
     except Exception:
         return {}
+
+
+def _email_needs_approval(job_type: str, automation_settings: dict[str, Any]) -> bool:
+    """Return True when customer emails for this job type require manual approval.
+
+    Approval is required when auto_actions[job_type] is falsy or explicitly 'manual'.
+    auto_actions[job_type] == True / 'full_auto' / 'semi' → execute immediately.
+    auto_actions[job_type] missing / False / 'manual' → approval required.
+    """
+    auto_actions = automation_settings.get("auto_actions") or {}
+    value = auto_actions.get(job_type)
+    if value is None or value is False or value == "manual":
+        return True
+    return False
+
+
+def _build_email_approval_action(action: dict[str, Any]) -> dict[str, Any]:
+    """Wrap an email action as an approval-pending sentinel."""
+    return {
+        **action,
+        "_needs_approval": True,
+    }
+
+
+def _create_email_approval_record(
+    db: Session,
+    job: Job,
+    action: dict[str, Any],
+    index: int,
+) -> dict[str, Any]:
+    """Persist a pending email approval and return a summary dict."""
+    import uuid
+    from app.repositories.postgres.approval_repository import ApprovalRequestRepository
+
+    approval_id = f"eml_{uuid.uuid4().hex[:20]}"
+    action_type = action.get("type", "send_email")
+    recipient = action.get("to") or ""
+    subject = action.get("subject") or ""
+
+    approval_payload = {
+        "approval_id": approval_id,
+        "state": "pending",
+        "channel": "dashboard",
+        "title": f"E-post: {subject[:60]}",
+        "summary": f"Väntande e-post till {recipient} ({action_type})",
+        "next_on_approve": "email_send",
+        "next_on_reject": "email_reject",
+        "requested_by": "system",
+    }
+    # Store the full email payload so approve can execute it
+    delivery = {
+        "type": action_type,
+        "to": recipient,
+        "subject": subject,
+        "body": action.get("body") or "",
+    }
+
+    ApprovalRequestRepository.upsert_from_payload(
+        db=db,
+        tenant_id=job.tenant_id,
+        job_id=job.job_id,
+        job_type=job.job_type.value if hasattr(job.job_type, "value") else str(job.job_type),
+        approval_request=approval_payload,
+        delivery_payload=delivery,
+    )
+
+    return {
+        "approval_id": approval_id,
+        "action_type": action_type,
+        "to": recipient,
+        "subject": subject,
+        "status": "pending_approval",
+    }
 
 
 def process_action_dispatch_job(job: Job, db: Session | None = None) -> Job:
@@ -565,8 +665,23 @@ def process_action_dispatch_job(job: Job, db: Session | None = None) -> Job:
     executed_actions: list[dict[str, Any]] = []
     failed_actions: list[dict[str, Any]] = []
     skipped_actions: list[dict[str, Any]] = []
+    pending_approvals: list[dict[str, Any]] = []
 
     for index, action in enumerate(actions, start=1):
+        # Approval-pending sentinel — create approval record, do not execute
+        if action.get("_needs_approval"):
+            if db is not None:
+                approval_summary = _create_email_approval_record(db, job, action, index)
+                pending_approvals.append(approval_summary)
+            else:
+                pending_approvals.append({
+                    "action_type": action.get("type"),
+                    "to": action.get("to"),
+                    "subject": action.get("subject"),
+                    "status": "pending_approval",
+                })
+            continue
+
         # Skipped sentinel — log to action_executions but do not dispatch
         if action.get("_skip"):
             skip_record = {
@@ -654,9 +769,11 @@ def process_action_dispatch_job(job: Job, db: Session | None = None) -> Job:
             "actions_executed": executed_actions,
             "actions_failed": failed_actions,
             "actions_skipped": skipped_actions,
+            "actions_pending_approval": pending_approvals,
             "executed_count": len(executed_actions),
             "failed_count": len(failed_actions),
             "skipped_count": len(skipped_actions),
+            "pending_approval_count": len(pending_approvals),
             "recommended_next_step": "manual_review" if has_failures else "completed",
         },
     }

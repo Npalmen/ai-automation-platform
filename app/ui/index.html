@@ -4511,9 +4511,50 @@ function renderJobDetail(job, approvals, actions) {
 // ---------------------------------------------------------------------------
 // Godkännandekortar
 // ---------------------------------------------------------------------------
+function _isEmailApproval(a) {
+  return (a.next_on_approve === 'email_send') ||
+         ((a.request_payload || {}).next_on_approve === 'email_send');
+}
+
+function _renderEmailApprovalCard(a, fromJobDetail) {
+  const isPending = a.state === 'pending';
+  const dp = a.delivery_payload || {};
+  const recipient = dp.to || '';
+  const subject   = dp.subject || a.title || '(inget ämne)';
+  const body      = dp.body || '';
+  const btns = isPending ? `
+    <div class="approval-actions">
+      <button class="btn btn-success btn-sm" onclick="doApprove('${a.approval_id}', ${fromJobDetail})">Godkänn och skicka</button>
+      <button class="btn btn-danger  btn-sm" onclick="doReject('${a.approval_id}',  ${fromJobDetail})">Avvisa</button>
+    </div>` : '';
+  const stateColor = a.state === 'approved' ? 'var(--success)' :
+                     a.state === 'rejected' ? 'var(--danger)' : 'var(--text-muted)';
+  return `<div class="approval-card email-approval-card">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600;">E-POST</span>
+      <span style="font-size:12px;color:${stateColor};font-weight:600;">${escapeHtml(a.state || 'pending')}</span>
+      ${a.created_at ? `<span style="font-size:11px;color:var(--text-muted);margin-left:auto;">${a.created_at.slice(0,16).replace('T',' ')}</span>` : ''}
+    </div>
+    <div style="margin-bottom:4px;">
+      <span style="font-size:12px;color:var(--text-muted);">Till:</span>
+      <strong style="font-size:13px;">&nbsp;${escapeHtml(recipient)}</strong>
+    </div>
+    <div style="margin-bottom:6px;">
+      <span style="font-size:12px;color:var(--text-muted);">Ämne:</span>
+      <span style="font-size:13px;">&nbsp;${escapeHtml(subject)}</span>
+    </div>
+    ${body ? `<pre style="white-space:pre-wrap;font-size:12px;background:var(--surface-2);border-radius:4px;padding:8px;max-height:160px;overflow:auto;margin:0 0 8px;">${escapeHtml(body)}</pre>` : ''}
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Jobb: ${escapeHtml(a.job_id || '—')}</div>
+    ${a.resolution_note ? `<div style="font-size:12px;color:var(--text-muted);">Notering: ${escapeHtml(a.resolution_note)}</div>` : ''}
+    ${btns}
+  </div>`;
+}
+
 function renderApprovalCards(approvals, fromJobDetail) {
   if (!approvals.length) return '<span class="empty">Inga godkännanden.</span>';
   return approvals.map(a => {
+    if (_isEmailApproval(a)) return _renderEmailApprovalCard(a, fromJobDetail);
+
     const isPending = a.state === 'pending';
     const isDispatch = (a.next_on_approve === 'controlled_dispatch') ||
                        ((a.request_payload || {}).next_on_approve === 'controlled_dispatch');
@@ -4604,7 +4645,30 @@ async function loadPendingApprovals() {
 function renderPendingList(approvals) {
   const el = document.getElementById('approvalsList');
   if (!approvals.length) { el.innerHTML = '<span class="empty">Inga väntande godkännanden.</span>'; return; }
-  el.innerHTML = renderApprovalCards(approvals, false);
+
+  const emailApprovals  = approvals.filter(a => _isEmailApproval(a));
+  const otherApprovals  = approvals.filter(a => !_isEmailApproval(a));
+
+  let html = '';
+
+  if (emailApprovals.length) {
+    html += `<div class="cfg-section" style="margin-bottom:16px;">
+      <div class="cfg-section-hdr" style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:18px;">✉️</span>
+        <div>
+          <div class="cfg-section-title">Väntar på godkännande</div>
+          <div style="font-size:12px;color:var(--text-muted);">${emailApprovals.length} e-post behöver godkännas innan de skickas</div>
+        </div>
+      </div>
+      ${emailApprovals.map(a => _renderEmailApprovalCard(a, false)).join('')}
+    </div>`;
+  }
+
+  if (otherApprovals.length) {
+    html += renderApprovalCards(otherApprovals, false);
+  }
+
+  el.innerHTML = html;
 }
 
 // ---------------------------------------------------------------------------

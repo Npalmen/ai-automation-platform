@@ -735,6 +735,63 @@ def list_pending_approvals(
     )
 
 
+def _resolve_email_approval(
+    db,
+    approval,
+    *,
+    approved: bool,
+    actor: str | None = None,
+    note: str | None = None,
+) -> dict:
+    """Mark an email approval approved/rejected; send the email when approved."""
+    from datetime import datetime, timezone
+    from app.workflows.action_executor import execute_action
+
+    now = datetime.now(timezone.utc)
+    new_state = "approved" if approved else "rejected"
+
+    send_result = None
+    send_error = None
+
+    if approved:
+        delivery = approval.delivery_payload or {}
+        if delivery:
+            try:
+                send_result = execute_action(delivery)
+            except Exception as exc:
+                send_error = str(exc)
+                # Do not raise — record the failure but complete the approval
+                import logging
+                logging.getLogger(__name__).error(
+                    "Email send failed for approval %s: %s",
+                    approval.approval_id, exc,
+                )
+
+    # Update approval record state
+    updated_payload = dict(approval.request_payload or {})
+    updated_payload["state"] = new_state
+    updated_payload["resolved_at"] = now.isoformat()
+    updated_payload["resolved_by"] = actor or "operator"
+    updated_payload["resolution_note"] = note
+
+    ApprovalRequestRepository.upsert_from_payload(
+        db=db,
+        tenant_id=approval.tenant_id,
+        job_id=approval.job_id,
+        job_type=approval.job_type,
+        approval_request=updated_payload,
+        delivery_payload=approval.delivery_payload,
+    )
+
+    return {
+        "approval_id": approval.approval_id,
+        "status": new_state,
+        "job_id": approval.job_id,
+        "send_result": send_result,
+        "send_error": send_error,
+    }
+
+
 @app.post("/approvals/{approval_id}/approve")
 def approve_request(
     approval_id: str,
@@ -764,6 +821,11 @@ def approve_request(
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
+
+    # Email approvals: execute the stored email payload then mark approved
+    if approval.next_on_approve == "email_send":
+        return _resolve_email_approval(db, approval, approved=True,
+                                       actor=request.actor, note=request.note)
 
     job = resolve_approval(
         db=db,
@@ -808,6 +870,11 @@ def reject_request(
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
+
+    # Email approvals: just mark rejected, no send
+    if approval.next_on_approve == "email_send":
+        return _resolve_email_approval(db, approval, approved=False,
+                                       actor=request.actor, note=request.note)
 
     job = resolve_approval(
         db=db,

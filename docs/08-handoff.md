@@ -2382,3 +2382,45 @@ X-API-Key header present?
 
 ### Full suite
 **1995/1995 tests pass.**
+
+## Completed slice (2026-05-03 — Approval-Based Email Dispatch)
+
+**Goal:** For production safety (e.g. Elitgruppen onboarding), when `auto_actions[job_type]` is falsy, email actions must not fire automatically — they must wait for operator approval. Monday item creation always executes immediately.
+
+### What changed
+
+**`app/workflows/processors/action_dispatch_processor.py`:**
+- `_EMAIL_ACTION_TYPES = frozenset({"send_customer_auto_reply", "send_internal_handoff", "send_email"})` — constant marks which action types are gatable
+- `_email_needs_approval(job_type, settings)` — True when `auto_actions[job_type]` is None/False/"manual"; False when True/"full_auto"/"semi"
+- `_build_email_approval_action(action)` — wraps action with `_needs_approval: True` sentinel (parallel to existing `_skip: True` pattern)
+- `_build_lead_default_actions` and `_build_inquiry_default_actions` both call the gate after building the action list
+- Skipped actions (`_skip: True`) are never wrapped — sentinel is left unchanged
+- `_create_email_approval_record(db, job, action, index)` — creates real `approval_requests` DB row with `next_on_approve="email_send"`, `delivery_payload={type, to, subject, body}`, title/summary in Swedish
+- `process_action_dispatch_job`: `_needs_approval` branch runs before `_skip` check; pending approvals collected into `actions_pending_approval` list in result payload
+
+**`app/main.py`:**
+- `_resolve_email_approval(db, approval, *, approved, actor, note)` — loads delivery payload; if approving: calls `execute_action(delivery)` (imported locally to avoid circular import); captures send errors without raising; upserts approval record with new state + resolution metadata
+- `approve_request` — detects `approval.next_on_approve == "email_send"` and delegates to `_resolve_email_approval(approved=True)`
+- `reject_request` — same detection → `_resolve_email_approval(approved=False)` (no send)
+
+**`app/ui/index.html`:**
+- `_isEmailApproval(a)` + `_renderEmailApprovalCard(a, fromJobDetail)` helpers
+- Email approval cards: blue ✉️ badge, state color-coding, recipient, subject, body in `<pre>`, Godkänn och skicka / Avvisa buttons
+- `renderApprovalCards` delegates to `_renderEmailApprovalCard` for email approvals
+- `renderPendingList` splits: email approvals shown first with ✉️ + count, then dispatch approvals
+
+### Tests
+`tests/test_email_approval.py` — 37 tests:
+- `TestEmailNeedsApproval` (8): all gate logic branches
+- `TestEmailActionTypes` (4): constant membership
+- `TestLeadActionsEmailGate` (7): auto=False/True/missing/"manual"/"full_auto"; skipped not wrapped
+- `TestInquiryActionsEmailGate` (3): same for inquiry
+- `TestProcessActionDispatchEmailApproval` (4): execute_action not called when gate on; Monday executes; payload shape; no approval when auto=True
+- `TestResolveEmailApproval` (7): approve calls execute_action; reject does not; send error captured; state persisted; None delivery is safe
+- `TestApproveRejectEndpointRouting` (3): correct routing for email_send and non-email approvals
+- `TestEmailApprovalTenantIsolation` (1): wrong tenant → 404
+
+**Patch path**: `execute_action` is imported locally inside `_resolve_email_approval` — must patch `app.workflows.action_executor.execute_action`, not `app.main.execute_action`.
+
+### Full suite
+**2032/2032 tests pass.**
