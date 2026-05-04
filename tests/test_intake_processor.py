@@ -95,3 +95,28 @@ class TestMissingSenderFields:
         assert "sender_name" in origin
         assert "sender_email" in origin
         assert "sender_phone" in origin
+
+
+class TestPlainTextFallback:
+    def _content(self, job: Job) -> dict:
+        return job.result["payload"]["content"]
+
+    def test_message_used_when_only_message_provided(self):
+        job = _make_job({"message": "Hej från message-fältet"})
+        result = process_universal_intake_job(job)
+        assert self._content(result)["plain_text"] == "Hej från message-fältet"
+
+    def test_plain_text_takes_priority_over_message(self):
+        job = _make_job({"plain_text": "Rätt text", "message": "Fel text"})
+        result = process_universal_intake_job(job)
+        assert self._content(result)["plain_text"] == "Rätt text"
+
+    def test_message_text_still_works(self):
+        job = _make_job({"message_text": "Gammal nyckel"})
+        result = process_universal_intake_job(job)
+        assert self._content(result)["plain_text"] == "Gammal nyckel"
+
+    def test_plain_text_empty_when_nothing_provided(self):
+        job = _make_job({})
+        result = process_universal_intake_job(job)
+        assert self._content(result)["plain_text"] == ""

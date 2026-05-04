@@ -34,7 +34,7 @@ def process_universal_intake_job(job: Job) -> Job:
             },
             "content": {
                 "subject": input_data.get("subject", "") or "",
-                "plain_text": input_data.get("message_text", "") or "",
+                "plain_text": input_data.get("plain_text") or input_data.get("message_text") or input_data.get("message") or "",
                 "attachment_count": len(attachments),
             },
             "attachments": attachments,
