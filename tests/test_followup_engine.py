@@ -235,7 +235,8 @@ class TestInquiryFollowUp:
             "subject": "Problem",
             "message_text": "Produkten slutar fungera när jag trycker på knappen.",
         })
-        actions = _build_inquiry_default_actions(job)
+        settings = {"internal_notification_email": "support@internal.com", "email_signature_name": ""}
+        actions = _build_inquiry_default_actions(job, settings)
         support_handoffs = [a for a in actions if a["type"] == "send_internal_handoff" and "support" in a.get("to", "")]
         assert len(support_handoffs) == 1
 

@@ -44,12 +44,16 @@ def _settings(
     leads_enabled: bool = True,
     support_enabled: bool = True,
     support_email: str = "internal@company.com",
+    internal_notification_email: str = "internal@company.com",
 ) -> dict:
     return {
         "followups_enabled": followups_enabled,
         "leads_enabled": leads_enabled,
         "support_enabled": support_enabled,
         "support_email": support_email,
+        "internal_notification_email": internal_notification_email,
+        "email_signature_name": "",
+        "company_display_name": "",
     }
 
 
@@ -96,7 +100,9 @@ class TestLeadDefaultActions:
 
     def test_internal_handoff_to_configured_email(self):
         job = _make_job()
-        actions = _build_lead_default_actions(job, _settings(support_email="sales@company.com"))
+        actions = _build_lead_default_actions(
+            job, _settings(internal_notification_email="sales@company.com")
+        )
         handoff = next(a for a in actions if a["type"] == "send_internal_handoff")
         assert handoff["to"] == "sales@company.com"
 
@@ -157,7 +163,9 @@ class TestInquiryDefaultActions:
 
     def test_handoff_to_configured_support_email(self):
         job = _make_job(job_type=JobType.CUSTOMER_INQUIRY)
-        actions = _build_inquiry_default_actions(job, _settings(support_email="help@firm.com"))
+        actions = _build_inquiry_default_actions(
+            job, _settings(internal_notification_email="help@firm.com")
+        )
         handoff = next(a for a in actions if a["type"] == "send_internal_handoff")
         assert handoff["to"] == "help@firm.com"
 

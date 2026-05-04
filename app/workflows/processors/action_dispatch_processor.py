@@ -64,9 +64,6 @@ def _build_actions_from_decisioning(job: Job) -> list[dict[str, Any]]:
     return normalized
 
 
-_DEFAULT_SUPPORT_EMAIL = "support@company.com"
-_COMPANY_NAME = "AI Automation"
-
 _FOLLOW_UP_SUBJECT = "Vi behöver lite mer information"
 _FOLLOW_UP_GREETING = (
     "Hej!\n\n"
@@ -107,7 +104,8 @@ def _build_lead_default_actions(
     settings = automation_settings or {}
 
     followups_enabled = settings.get("followups_enabled", True)
-    internal_recipient = settings.get("support_email") or _DEFAULT_SUPPORT_EMAIL
+    internal_recipient = settings.get("internal_notification_email") or ""
+    signature_name = settings.get("email_signature_name") or ""
 
     sender_name = sender.get("name", "")
     sender_email = sender.get("email", "")
@@ -155,6 +153,7 @@ def _build_lead_default_actions(
         actions.append(_build_skipped_action("send_customer_auto_reply", "no_customer_email"))
     else:
         short_summary = subject if subject != "Lead" else message_text[:120]
+        closing = f"\n\nVänliga hälsningar\n{signature_name}" if signature_name else ""
         auto_reply_body = (
             f"Hej {sender_name or 'där'},\n\n"
             f"Tack för din förfrågan. Vi har tagit emot ditt meddelande och återkommer så snart som möjligt.\n\n"
@@ -163,8 +162,7 @@ def _build_lead_default_actions(
             f"- bilder på nuvarande installation\n"
             f"- telefonnummer om det saknas\n"
             f"- när du önskar få arbetet utfört\n\n"
-            f"Sammanfattning:\n{short_summary}\n\n"
-            f"Vänliga hälsningar\n{_COMPANY_NAME}"
+            f"Sammanfattning:\n{short_summary}{closing}"
         )
         actions.append({
             "type": "send_customer_auto_reply",
@@ -185,7 +183,7 @@ def _build_lead_default_actions(
             city = (entities.get("entities") or {}).get("city") or ""
         city_line = f"Ort:          {city}\n" if city else ""
         handoff_body = (
-            f"Nytt lead inkom via AI Automation Platform.\n\n"
+            f"Nytt lead inkom.\n\n"
             f"Prioritet:    {priority.upper()}\n"
             f"Namn:         {sender_label}\n"
             f"E-post:       {sender_email or '(okänd)'}\n"
@@ -236,7 +234,8 @@ def _build_inquiry_default_actions(
     settings = automation_settings or {}
 
     followups_enabled = settings.get("followups_enabled", True)
-    internal_recipient = settings.get("support_email") or _DEFAULT_SUPPORT_EMAIL
+    internal_recipient = settings.get("internal_notification_email") or ""
+    signature_name = settings.get("email_signature_name") or ""
 
     sender_name = sender.get("name", "")
     sender_email = sender.get("email", "")
@@ -285,12 +284,12 @@ def _build_inquiry_default_actions(
         actions.append(_build_skipped_action("send_customer_auto_reply", "no_customer_email"))
     else:
         short_summary = subject if subject != "Support" else message_text[:120]
+        closing = f"\n\nVänliga hälsningar\n{signature_name}" if signature_name else ""
         auto_reply_body = (
             f"Hej {sender_name or 'där'},\n\n"
             f"Tack för ditt meddelande. Vi har tagit emot ärendet och återkommer så snart som möjligt.\n\n"
             f"Sammanfattning:\n{short_summary}\n\n"
-            f"Om ärendet är akut, ring oss direkt.\n\n"
-            f"Vänliga hälsningar\n{_COMPANY_NAME}"
+            f"Om ärendet är akut, ring oss direkt.{closing}"
         )
         actions.append({
             "type": "send_customer_auto_reply",
@@ -307,7 +306,7 @@ def _build_inquiry_default_actions(
         phone_line = f"Telefon:   {sender_phone}\n" if sender_phone else ""
         email_subject = f"Ny kundfråga [{priority}]" if priority == "HIGH" else "Ny kundfråga"
         handoff_body = (
-            f"Ny kundfråga inkom via AI Automation Platform.\n\n"
+            f"Ny kundfråga inkom.\n\n"
             f"Prioritet: {priority}\n"
             f"Från:      {sender_label}\n"
             f"E-post:    {sender_email or '(okänd)'}\n"
@@ -572,15 +571,27 @@ def _read_automation_settings(job: Job, db: Session | None) -> dict[str, Any]:
         from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
         ctrl = TenantConfigRepository.get_settings(db, job.tenant_id)
         auto = ctrl.get("automation") or {}
+        branding = ctrl.get("branding") or {}
         # Also read the auto_actions column (separate from settings JSON blob)
         record = TenantConfigRepository.get(db, job.tenant_id)
         auto_actions = (record.auto_actions or {}) if record else {}
+        tenant_name = (record.name or "") if record else ""
+        company_display_name = branding.get("company_display_name") or tenant_name or ""
+        email_signature_name = branding.get("email_signature_name") or company_display_name or ""
+        internal_notification_email = (
+            branding.get("internal_notification_email")
+            or ctrl.get("support_email")
+            or ""
+        )
         return {
-            "followups_enabled": auto.get("followups_enabled", True),
-            "leads_enabled":     auto.get("leads_enabled", True),
-            "support_enabled":   auto.get("support_enabled", True),
-            "support_email":     ctrl.get("support_email") or "",
-            "auto_actions":      auto_actions,
+            "followups_enabled":           auto.get("followups_enabled", True),
+            "leads_enabled":               auto.get("leads_enabled", True),
+            "support_enabled":             auto.get("support_enabled", True),
+            "support_email":               ctrl.get("support_email") or "",
+            "auto_actions":                auto_actions,
+            "company_display_name":        company_display_name,
+            "email_signature_name":        email_signature_name,
+            "internal_notification_email": internal_notification_email,
         }
     except Exception:
         return {}

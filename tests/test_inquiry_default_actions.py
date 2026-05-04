@@ -56,6 +56,14 @@ from app.workflows.processors.ai_processor_utils import (
 )
 
 
+# Settings dict that enables handoff (internal_notification_email must be set).
+_HANDOFF_SETTINGS = {
+    "internal_notification_email": "support@company.com",
+    "email_signature_name": "",
+    "company_display_name": "",
+    "auto_actions": {"customer_inquiry": True},
+}
+
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 def _make_job(
@@ -219,19 +227,21 @@ class TestBuildInquiryDefaultActions:
             "sender": {"name": "Anna", "email": "a@ex.com"},
             "message_text": "Jag behöver hjälp med mitt abonnemang snarast.",
         })
-        actions = _build_inquiry_default_actions(job)
+        actions = _build_inquiry_default_actions(job, _HANDOFF_SETTINGS)
         assert len(actions) == 3
 
     def test_first_action_is_create_monday_item(self):
         actions = _build_inquiry_default_actions(
-            _inquiry_job({"subject": "S", "sender": {"email": "x@x.com"}})
+            _inquiry_job({"subject": "S", "sender": {"email": "x@x.com"}}),
+            _HANDOFF_SETTINGS,
         )
         monday = _get_monday(actions)
         assert monday["type"] == "create_monday_item"
 
     def test_second_action_is_send_internal_handoff(self):
         actions = _build_inquiry_default_actions(
-            _inquiry_job({"subject": "S", "sender": {"email": "x@x.com"}})
+            _inquiry_job({"subject": "S", "sender": {"email": "x@x.com"}}),
+            _HANDOFF_SETTINGS,
         )
         handoff = _get_handoff(actions)
         assert handoff["type"] == "send_internal_handoff"
@@ -274,22 +284,22 @@ class TestBuildInquiryDefaultActions:
 
     def test_high_priority_email_subject_includes_high(self):
         job = _inquiry_job({"subject": "Akut", "message_text": ""})
-        email_subject = _get_handoff(_build_inquiry_default_actions(job))["subject"]
+        email_subject = _get_handoff(_build_inquiry_default_actions(job, _HANDOFF_SETTINGS))["subject"]
         assert "[HIGH]" in email_subject or "HIGH" in email_subject
 
     def test_normal_priority_email_subject_no_high(self):
         job = _inquiry_job({"subject": "Fråga"})
-        email_subject = _get_handoff(_build_inquiry_default_actions(job))["subject"]
+        email_subject = _get_handoff(_build_inquiry_default_actions(job, _HANDOFF_SETTINGS))["subject"]
         assert "[HIGH]" not in email_subject
 
     def test_email_body_contains_priority_high(self):
         job = _inquiry_job({"subject": "Akut ärende"})
-        body = _get_handoff(_build_inquiry_default_actions(job))["body"]
+        body = _get_handoff(_build_inquiry_default_actions(job, _HANDOFF_SETTINGS))["body"]
         assert "HIGH" in body
 
     def test_email_body_contains_priority_normal(self):
         job = _inquiry_job({"subject": "Vanlig fråga"})
-        body = _get_handoff(_build_inquiry_default_actions(job))["body"]
+        body = _get_handoff(_build_inquiry_default_actions(job, _HANDOFF_SETTINGS))["body"]
         assert "NORMAL" in body
 
     def test_column_values_contains_priority(self):
@@ -363,19 +373,19 @@ class TestBuildInquiryDefaultActions:
 
     def test_email_to_is_support_address(self):
         job = _inquiry_job({"subject": "T"})
-        assert _get_handoff(_build_inquiry_default_actions(job))["to"] == "support@company.com"
+        assert _get_handoff(_build_inquiry_default_actions(job, _HANDOFF_SETTINGS))["to"] == "support@company.com"
 
     def test_email_subject_is_ny_kundfraga(self):
         job = _inquiry_job({"subject": "T"})
-        assert "kundfråga" in _get_handoff(_build_inquiry_default_actions(job))["subject"].lower()
+        assert "kundfråga" in _get_handoff(_build_inquiry_default_actions(job, _HANDOFF_SETTINGS))["subject"].lower()
 
     def test_email_body_contains_sender_name(self):
         job = _inquiry_job({"subject": "S", "sender": {"name": "Lena", "email": "l@ex.com"}})
-        assert "Lena" in _get_handoff(_build_inquiry_default_actions(job))["body"]
+        assert "Lena" in _get_handoff(_build_inquiry_default_actions(job, _HANDOFF_SETTINGS))["body"]
 
     def test_email_body_contains_sender_email(self):
         job = _inquiry_job({"subject": "S", "sender": {"email": "lena@ex.com"}})
-        assert "lena@ex.com" in _get_handoff(_build_inquiry_default_actions(job))["body"]
+        assert "lena@ex.com" in _get_handoff(_build_inquiry_default_actions(job, _HANDOFF_SETTINGS))["body"]
 
     def test_email_body_contains_phone_when_present(self):
         job = _inquiry_job({
@@ -383,43 +393,43 @@ class TestBuildInquiryDefaultActions:
             "message_text": "Ring 070-555 44 33",
             "sender": {"email": "x@x.com"},
         })
-        body = _get_handoff(_build_inquiry_default_actions(job))["body"]
+        body = _get_handoff(_build_inquiry_default_actions(job, _HANDOFF_SETTINGS))["body"]
         assert "070" in body
 
     def test_email_body_omits_phone_line_when_absent(self):
         job = _inquiry_job({"subject": "S", "sender": {"email": "x@x.com"}, "message_text": "Ingen tel"})
-        body = _get_handoff(_build_inquiry_default_actions(job))["body"]
+        body = _get_handoff(_build_inquiry_default_actions(job, _HANDOFF_SETTINGS))["body"]
         assert "Telefon" not in body
 
     def test_email_body_contains_subject(self):
         job = _inquiry_job({"subject": "Specialfråga"})
-        assert "Specialfråga" in _get_handoff(_build_inquiry_default_actions(job))["body"]
+        assert "Specialfråga" in _get_handoff(_build_inquiry_default_actions(job, _HANDOFF_SETTINGS))["body"]
 
     def test_email_body_contains_message_text(self):
         job = _inquiry_job({"subject": "S", "message_text": "Jag behöver hjälp"})
-        assert "Jag behöver hjälp" in _get_handoff(_build_inquiry_default_actions(job))["body"]
+        assert "Jag behöver hjälp" in _get_handoff(_build_inquiry_default_actions(job, _HANDOFF_SETTINGS))["body"]
 
     def test_email_body_contains_job_id(self):
         job = _inquiry_job({"subject": "S"})
         job.job_id = "job-abc-123"
-        assert "job-abc-123" in _get_handoff(_build_inquiry_default_actions(job))["body"]
+        assert "job-abc-123" in _get_handoff(_build_inquiry_default_actions(job, _HANDOFF_SETTINGS))["body"]
 
     def test_email_body_contains_tenant_id(self):
         job = _inquiry_job({"subject": "S"})
-        assert "TENANT_1001" in _get_handoff(_build_inquiry_default_actions(job))["body"]
+        assert "TENANT_1001" in _get_handoff(_build_inquiry_default_actions(job, _HANDOFF_SETTINGS))["body"]
 
     def test_email_body_contains_source(self):
         job = _inquiry_job({"subject": "S"})
-        assert "inquiry" in _get_handoff(_build_inquiry_default_actions(job))["body"]
+        assert "inquiry" in _get_handoff(_build_inquiry_default_actions(job, _HANDOFF_SETTINGS))["body"]
 
     def test_source_from_nested_source_dict(self):
         job = _inquiry_job({"subject": "S", "source": {"system": "gmail"}})
-        body = _get_handoff(_build_inquiry_default_actions(job))["body"]
+        body = _get_handoff(_build_inquiry_default_actions(job, _HANDOFF_SETTINGS))["body"]
         assert "gmail" in body
 
     def test_empty_input_data_produces_valid_actions(self):
         job = _inquiry_job({})
-        actions = _build_inquiry_default_actions(job)
+        actions = _build_inquiry_default_actions(job, _HANDOFF_SETTINGS)
         assert len(actions) == 3
         types = {a["type"] for a in actions}
         assert "create_monday_item" in types
@@ -486,9 +496,15 @@ class TestResolveActions:
 
 class TestProcessActionDispatch:
     def _run(self, job: Job) -> Job:
-        with patch(
-            "app.workflows.processors.action_dispatch_processor.execute_action",
-            return_value={"status": "success", "type": "stub"},
+        with (
+            patch(
+                "app.workflows.processors.action_dispatch_processor.execute_action",
+                return_value={"status": "success", "type": "stub"},
+            ),
+            patch(
+                "app.workflows.processors.action_dispatch_processor._read_automation_settings",
+                return_value=_HANDOFF_SETTINGS,
+            ),
         ):
             return process_action_dispatch_job(job, db=None)
 

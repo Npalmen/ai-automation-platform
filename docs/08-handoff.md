@@ -2424,3 +2424,44 @@ X-API-Key header present?
 
 ### Full suite
 **2032/2032 tests pass.**
+
+## Completed slice (2026-05-04 — Tenant Email Branding)
+
+**Goal:** Remove hardcoded `"AI Automation"` and `support@company.com` from generated emails. Let tenants configure their own display name, signature, and internal recipient.
+
+### What changed
+
+**`app/workflows/processors/action_dispatch_processor.py`:**
+- Removed `_DEFAULT_SUPPORT_EMAIL = "support@company.com"` and `_COMPANY_NAME = "AI Automation"` constants
+- `_read_automation_settings` extended with three new keys read from `settings.branding` JSON blob:
+  - `company_display_name` — from `branding.company_display_name` → fallback to `record.name`
+  - `email_signature_name` — from `branding.email_signature_name` → fallback to `company_display_name`
+  - `internal_notification_email` — from `branding.internal_notification_email` → fallback to `settings.support_email` → `""` (no fallback to any hardcoded address)
+- `_build_lead_default_actions` + `_build_inquiry_default_actions`:
+  - Read `internal_recipient = settings.get("internal_notification_email")` (no default)
+  - When `internal_recipient` is empty → handoff skipped (was previously using `support@company.com`)
+  - Customer auto-reply: `closing = f"\n\nVänliga hälsningar\n{signature_name}" if signature_name else ""` — appended only when signature configured
+  - Internal handoff body: `"Nytt lead inkom."` / `"Ny kundfråga inkom."` (no "AI Automation Platform")
+
+**`app/repositories/postgres/schema_migrations.py`:**
+- `_TENANT_SETTING_DEFAULTS` list — each entry: `(tenant_id, settings_key, defaults_dict)`
+- `provision_tenant_defaults(engine)` — startup function; for each entry, reads `tenant_configs.settings`, merges defaults (no-clobber: existing values win), writes back if changed; skips if tenant not in DB; logs warning on failure (never raises)
+- T_ELITGRUPPEN seeded with `settings.branding = {company_display_name: "Elit Gruppen", email_signature_name: "Elit Gruppen", internal_notification_email: "info@elitgruppen.se"}`
+
+**`app/main.py`:**
+- `on_startup` imports and calls `provision_tenant_defaults(engine)` after `ensure_runtime_schema`
+
+### Tests
+`tests/test_tenant_branding.py` — 33 tests:
+- `TestNoHardcodedAIAutomation` (4): lead+inquiry auto-reply and handoff have no "AI Automation"
+- `TestNoHardcodedSupportEmail` (5): handoff skipped when no email configured; custom recipient used; legacy support_email fallback works
+- `TestEmailSignatureName` (4): lead+inquiry auto-reply contain/omit closing block depending on config
+- `TestElitgruppenBranding` (5): T_ELITGRUPPEN gets correct signature + recipient for both job types; no "AI Automation"
+- `TestReadAutomationSettingsBranding` (8): all branding fields read correctly; fallbacks chain correctly; db=None returns `{}`
+- `TestApprovalGateWithBranding` (2): approval gate still works with branding; Monday unaffected
+- `TestProvisionTenantDefaults` (5): seeds when missing; no-clobber when complete; partial fill; skips unknown tenant; non-fatal on DB error
+
+**Existing tests updated** (3 files): `test_inquiry_default_actions.py`, `test_auto_reply_handoff.py`, `test_followup_engine.py` — calls that relied on the `support@company.com` fallback now explicitly pass `internal_notification_email` in settings.
+
+### Full suite
+**2065/2065 tests pass.**

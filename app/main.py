@@ -68,10 +68,14 @@ app = FastAPI(title=settings.APP_NAME)
 @app.on_event("startup")
 async def on_startup():
     import app.repositories.postgres  # noqa: F401
-    from app.repositories.postgres.schema_migrations import ensure_runtime_schema
+    from app.repositories.postgres.schema_migrations import (
+        ensure_runtime_schema,
+        provision_tenant_defaults,
+    )
 
     Base.metadata.create_all(bind=engine)
     ensure_runtime_schema(engine)
+    provision_tenant_defaults(engine)
     print("Startup complete")
 
     # Warn if OAuth refresh credential set is incomplete — prevents silent invalid_grant failures.

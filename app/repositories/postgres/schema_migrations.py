@@ -1,4 +1,8 @@
-"""Runtime schema safeguard for columns that create_all cannot add to existing tables."""
+"""Runtime schema safeguard for columns that create_all cannot add to existing tables.
+
+Also provides provision_tenant_defaults() for seeding tenant-specific settings at startup.
+"""
+import json
 import logging
 
 from sqlalchemy import text
@@ -30,6 +34,64 @@ _REQUIRED_TABLES: list[str] = [
     """,
     "CREATE INDEX IF NOT EXISTS ix_tenant_api_keys_tenant_id ON tenant_api_keys (tenant_id)",
 ]
+
+
+# Tenant branding/settings defaults provisioned at startup.
+# Each entry: (tenant_id, settings_key, default_value_dict)
+# Merged no-clobber: existing keys inside settings_key are never overwritten.
+_TENANT_SETTING_DEFAULTS: list[tuple[str, str, dict]] = [
+    (
+        "T_ELITGRUPPEN",
+        "branding",
+        {
+            "company_display_name":        "Elit Gruppen",
+            "email_signature_name":        "Elit Gruppen",
+            "internal_notification_email": "info@elitgruppen.se",
+        },
+    ),
+]
+
+
+def provision_tenant_defaults(engine: Engine) -> None:
+    """Seed tenant-level settings defaults on startup (no-clobber — never overwrites existing values)."""
+    try:
+        with engine.begin() as conn:
+            for tenant_id, settings_key, defaults in _TENANT_SETTING_DEFAULTS:
+                row = conn.execute(
+                    text("SELECT settings FROM tenant_configs WHERE tenant_id = :tid"),
+                    {"tid": tenant_id},
+                ).fetchone()
+                if row is None:
+                    log.debug("provision_tenant_defaults: tenant %s not in DB, skipping", tenant_id)
+                    continue
+                raw = row[0]
+                if isinstance(raw, str):
+                    current_settings: dict = json.loads(raw)
+                elif isinstance(raw, dict):
+                    current_settings = dict(raw)
+                else:
+                    current_settings = {}
+                existing_section = current_settings.get(settings_key) or {}
+                merged = {**defaults, **existing_section}
+                if merged == existing_section:
+                    log.debug(
+                        "provision_tenant_defaults: %s.settings.%s already complete, no update",
+                        tenant_id, settings_key,
+                    )
+                    continue
+                current_settings[settings_key] = merged
+                conn.execute(
+                    text(
+                        "UPDATE tenant_configs SET settings = :s WHERE tenant_id = :tid"
+                    ),
+                    {"s": json.dumps(current_settings), "tid": tenant_id},
+                )
+                log.info(
+                    "provision_tenant_defaults: seeded %s.settings.%s with defaults",
+                    tenant_id, settings_key,
+                )
+    except Exception as exc:
+        log.warning("provision_tenant_defaults failed (non-fatal): %s", exc)
 
 
 def ensure_runtime_schema(engine: Engine) -> None:
