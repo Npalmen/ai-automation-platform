@@ -136,10 +136,22 @@
 - [x] Ärenden tab UI: search/filter/sort/pagination controls; Swedish labels; received_at as primary timestamp
 - [x] 33 new tests in test_cases.py; 1107/1107 pass
 
+## Done (live email response chapter 1 — 2026-05-05)
+- [x] Server live verification completed against `api.krowolf.se` for lead/support flow with real inbox messages
+- [x] Personalized customer auto-replies deployed (more human tone + targeted info questions)
+- [x] Removed static summary block from customer reply templates
+- [x] Added Gmail subject cleanup to strip UI helper text pollution
+- [x] Added Gmail thread-reply support (`thread_id`, `In-Reply-To`, `References`) in send path
+- [x] Added no-reply relay handling (Webflow-style): extract real customer email from body/payload and send a new message to customer
+- [x] Approval workflow validated end-to-end after deploy (create → pending → approve → sent)
+- [x] Regression subset passed locally after patch (`test_auto_reply_handoff.py`, `test_tenant_branding.py`, `test_email_approval.py`)
+
 ## Next (priority order)
-- [ ] Monday Routing v2 — DEFERRED; per-job-type Monday board/group routing based on tenant config; deprioritized in favour of pipeline polish
-- [ ] Dashboard polish — date-range filters, charts, auto-refresh interval
+- [ ] Finance layer v1 — bookkeeping-assist foundation (invoice flow hardening, VAT handling, accounting suggestions, finance-focused backoffice workflows)
+- [ ] Finance integrations planning — define first integration pair for Swedish market finance operations (read-first, then controlled writes)
+- [ ] OAuth hardening runbook — formalize live recovery playbook for refresh/invalid_grant scenarios
 - [ ] Scheduler / cron trigger — external periodic call to `POST /scheduler/run-once`
+- [ ] Dashboard polish — date-range filters, charts, auto-refresh interval
 
 ## Future UI improvements (out of current scope)
 - [ ] Audit log view — surface `GET /audit-events` in the UI

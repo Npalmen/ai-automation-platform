@@ -6,6 +6,7 @@ AI Automation Platform — multi-tenant backend-first plattform för AI-driven w
 ## Current objective
 MVP is complete and stabilized. The platform is in a demonstrable state.
 Pipeline runs end-to-end, verification is deterministic, intake normalization is correct, and docs reflect actual behavior.
+Email response chapter 1 is now live-validated on server (personalized replies, approval-gated sends, no-reply relay handling, and Gmail thread-reply capability).
 
 ## Read these first
 1. docs/02-mvp-scope.md
@@ -21,6 +22,7 @@ Pipeline runs end-to-end, verification is deterministic, intake normalization is
 - Approval persistence and action persistence exist
 - Gmail integration has been live-tested
 - Read-endpoints exist for jobs, approvals, actions and audit
+- Server deploy flow is active (`/opt/krowolf`, docker compose prod stack)
 
 ## What must not happen
 - Do not rewrite the architecture from scratch
@@ -567,13 +569,24 @@ Deterministic completeness evaluation and automatic follow-up action injection. 
 ## Next steps
 
 ### Most likely next slice
-1. **Scheduler / cron trigger** — wire a periodic external trigger to call `POST /gmail/process-inbox`
-2. **Dashboard polish** — date-range filters, charts, auto-refresh
+1. **Finance layer v1** — build bookkeeping-assist/backoffice layer (invoice + VAT + accounting suggestion workflows) as next business-critical pillar
+2. **Finance integration path** — define read-first + controlled-write pattern for Swedish finance systems
+3. **Scheduler / cron trigger** — wire a periodic external trigger to call `POST /gmail/process-inbox`
+4. **Dashboard polish** — date-range filters, charts, auto-refresh
 
 ### After that
-3. **HTML-to-text** — `body_text` is empty for HTML-only Gmail messages
-4. **Monday per-request board_id override** — currently env-only
-5. **Gmail credential health check** — proactive `invalid_grant` surface before ingestion run
+5. **HTML-to-text** — `body_text` is empty for HTML-only Gmail messages
+6. **Monday per-request board_id override** — currently env-only
+7. **Gmail credential health check** — proactive `invalid_grant` surface before ingestion run
+
+## Completed slice (2026-05-05 — Email response chapter 1, live on server)
+- Personalized lead/support customer replies deployed and verified in production-like server flow
+- Removed static summary section from customer emails
+- Added Gmail subject cleanup to prevent helper-text pollution in subject lines
+- Added Gmail reply-thread capability (`thread_id`, `In-Reply-To`, `References`) in Google Mail send path
+- Added no-reply relay routing (Webflow-style): when sender is no-reply, extract customer email from payload/body and send new email to customer
+- Re-verified approval queue lifecycle live: pending → approve → sent
+- Performed operational cleanup of stale pending approvals during validation
 
 ## Remaining work
 All original MVP backlog items are complete. The platform is live-verified, stable, and demonstrable.
