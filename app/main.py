@@ -1022,6 +1022,13 @@ _HIGH_PRIORITY_KEYWORDS = {
     "urgent", "asap", "immediately", "akut", "omgående",
     "critical", "emergency", "prioritet",
 }
+_GMAIL_UI_NOISE_PHRASES = (
+    "Klicka för att informera Gmail om att den här konversationen är viktig",
+)
+_GMAIL_UI_NOISE_RE = re.compile(
+    r"(?:klicka|kilcka)\s+för\s+att\s+informera\s+gmail\s+om\s+att\s+den\s+här\s+konversationen\s+är\s+viktig",
+    re.IGNORECASE,
+)
 
 
 def _infer_priority(subject: str, body_text: str) -> str:
@@ -1032,6 +1039,16 @@ def _infer_priority(subject: str, body_text: str) -> str:
     if subject.strip() and subject.strip() != "(no subject)":
         return "medium"
     return "low"
+
+
+def _clean_gmail_subject(subject: str) -> str:
+    cleaned = (subject or "").strip()
+    if not cleaned:
+        return cleaned
+    for phrase in _GMAIL_UI_NOISE_PHRASES:
+        cleaned = cleaned.replace(phrase, "").strip()
+    cleaned = _GMAIL_UI_NOISE_RE.sub("", cleaned).strip()
+    return cleaned
 
 
 def _make_monday_item_name(sender_name: str, sender_email: str, subject: str) -> str:
@@ -1146,7 +1163,7 @@ def _run_gmail_inbox_sync(
         msg = detail_result.get("message") or {}
         sender_name, sender_email = _parse_from_header(msg.get("from", ""))
 
-        subject = msg.get("subject") or "(no subject)"
+        subject = _clean_gmail_subject(msg.get("subject") or "(no subject)")
         body_text = msg.get("body_text") or ""
         thread_id = msg.get("thread_id") or ""
 
@@ -1168,6 +1185,7 @@ def _run_gmail_inbox_sync(
                 "source": "gmail",
                 "message_id": message_id,
                 "thread_id": thread_id,
+                "internet_message_id": msg.get("internet_message_id") or "",
                 "subject": subject,
                 "message_text": body_text,
                 "sender": sender_dict,
@@ -1253,6 +1271,7 @@ def _run_gmail_inbox_sync(
                 "system": "gmail",
                 "message_id": message_id,
                 "thread_id": thread_id,
+                "internet_message_id": msg.get("internet_message_id") or "",
             },
             "received_at": msg.get("received_at") or None,
         }

@@ -98,6 +98,12 @@ def _build_email_result(action: dict[str, Any]) -> dict[str, Any]:
         payload["from_email"] = action.get("from_email")
     if "from_name" in action:
         payload["from_name"] = action.get("from_name")
+    if "thread_id" in action:
+        payload["thread_id"] = action.get("thread_id")
+    if "in_reply_to" in action:
+        payload["in_reply_to"] = action.get("in_reply_to")
+    if "references" in action:
+        payload["references"] = action.get("references")
 
     connection_config = get_integration_connection_config(
         tenant_id=tenant_id,

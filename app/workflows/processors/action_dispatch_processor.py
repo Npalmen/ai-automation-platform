@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -26,6 +27,72 @@ _EMAIL_ACTION_TYPES = frozenset({
     "send_internal_handoff",
     "send_email",
 })
+
+_NO_REPLY_RE = re.compile(r"\b(?:no[-_. ]?reply|donotreply)\b", re.IGNORECASE)
+_EMAIL_RE = re.compile(r"([A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,})", re.IGNORECASE)
+
+
+def _is_no_reply_email(value: str) -> bool:
+    return bool(value and _NO_REPLY_RE.search(value))
+
+
+def _extract_customer_email_candidates(text: str) -> list[str]:
+    if not text:
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+    for match in _EMAIL_RE.findall(text):
+        email = match.strip().lower()
+        if email in seen:
+            continue
+        seen.add(email)
+        out.append(email)
+    return out
+
+
+def _resolve_customer_reply_target(
+    input_data: dict[str, Any],
+    sender_email: str,
+    internal_recipient: str,
+) -> tuple[str, bool]:
+    """Return (recipient_email, use_thread_reply) for customer replies.
+
+    For no-reply/form relays (e.g. Webflow), prefer a customer email from payload/body
+    and send as a fresh message (not thread reply).
+    """
+    sender_email = (sender_email or "").strip().lower()
+    if sender_email and not _is_no_reply_email(sender_email):
+        return sender_email, True
+
+    source = input_data.get("source") or {}
+    if isinstance(source, dict):
+        explicit = (
+            source.get("customer_email")
+            or source.get("reply_to")
+            or source.get("from_email")
+            or ""
+        )
+        explicit = str(explicit).strip().lower()
+        if explicit and not _is_no_reply_email(explicit):
+            return explicit, False
+
+    for key in ("customer_contact_email", "customer_email", "reply_to_email", "email"):
+        val = str(input_data.get(key) or "").strip().lower()
+        if val and not _is_no_reply_email(val):
+            return val, False
+
+    body_text = str(input_data.get("message_text") or "")
+    internal_recipient = (internal_recipient or "").strip().lower()
+    for candidate in _extract_customer_email_candidates(body_text):
+        if candidate == sender_email:
+            continue
+        if internal_recipient and candidate == internal_recipient:
+            continue
+        if _is_no_reply_email(candidate):
+            continue
+        return candidate, False
+
+    return "", False
 
 
 def _build_actions_from_input(job: Job) -> list[dict[str, Any]]:
@@ -119,6 +186,19 @@ def _build_lead_default_actions(
     source = input_data.get("source") or "lead"
     if isinstance(source, dict):
         source = source.get("system") or "lead"
+    source_meta = input_data.get("source") if isinstance(input_data.get("source"), dict) else {}
+    source_thread_id = source_meta.get("thread_id") if isinstance(source_meta, dict) else None
+    source_internet_message_id = source_meta.get("internet_message_id") if isinstance(source_meta, dict) else None
+    customer_to, use_thread_reply = _resolve_customer_reply_target(
+        input_data=input_data,
+        sender_email=sender_email,
+        internal_recipient=internal_recipient,
+    )
+    customer_to, use_thread_reply = _resolve_customer_reply_target(
+        input_data=input_data,
+        sender_email=sender_email,
+        internal_recipient=internal_recipient,
+    )
 
     sender_label = sender_name or sender_email or "Okänd avsändare"
     item_name = f"Lead: {sender_label} - {subject}"[:80].rstrip()
@@ -146,30 +226,41 @@ def _build_lead_default_actions(
 
     actions: list[dict[str, Any]] = []
 
-    # Customer auto-reply
+    # Customer auto-reply: conversational and information-seeking.
     if not followups_enabled:
         actions.append(_build_skipped_action("send_customer_auto_reply", "followups_enabled=false"))
-    elif not sender_email:
+    elif not customer_to:
         actions.append(_build_skipped_action("send_customer_auto_reply", "no_customer_email"))
     else:
-        short_summary = subject if subject != "Lead" else message_text[:120]
         closing = f"\n\nVänliga hälsningar\n{signature_name}" if signature_name else ""
+        lead_questions = [
+            "- Gäller det en specifik tjänst eller vill du att vi rekommenderar en lösning?",
+            "- Vilken adress gäller ärendet?",
+            "- När vill du helst komma igång?",
+        ]
+        if not sender_phone:
+            lead_questions.append("- Vilket telefonnummer når vi dig bäst på?")
+        if completeness["missing_fields"]:
+            lead_questions.append(
+                "- Har du möjlighet att skicka bilder eller annan info som hjälper oss bedöma snabbare?"
+            )
+        reply_subject = f"Re: {subject}" if subject and subject != "Lead" else "Tack för ditt mejl"
         auto_reply_body = (
             f"Hej {sender_name or 'där'},\n\n"
-            f"Tack för din förfrågan. Vi har tagit emot ditt meddelande och återkommer så snart som möjligt.\n\n"
-            f"För att kunna hjälpa dig snabbare får du gärna komplettera med:\n"
-            f"- adress/ort\n"
-            f"- bilder på nuvarande installation\n"
-            f"- telefonnummer om det saknas\n"
-            f"- när du önskar få arbetet utfört\n\n"
-            f"Sammanfattning:\n{short_summary}{closing}"
+            "Vad kul att du hör av dig till oss. Jag tar gärna detta vidare direkt.\n\n"
+            "För att vi ska kunna ge dig ett träffsäkert nästa steg får du gärna svara på:\n"
+            f"{chr(10).join(lead_questions)}"
+            f"{closing}"
         )
         actions.append({
             "type": "send_customer_auto_reply",
             "tenant_id": job.tenant_id,
-            "to": sender_email,
-            "subject": "Tack för din förfrågan",
+            "to": customer_to,
+            "subject": reply_subject,
             "body": auto_reply_body,
+            "thread_id": source_thread_id if use_thread_reply else None,
+            "in_reply_to": source_internet_message_id if use_thread_reply else None,
+            "references": source_internet_message_id if use_thread_reply else None,
         })
 
     # Internal sales handoff
@@ -249,6 +340,14 @@ def _build_inquiry_default_actions(
     source = input_data.get("source") or "inquiry"
     if isinstance(source, dict):
         source = source.get("system") or "inquiry"
+    source_meta = input_data.get("source") if isinstance(input_data.get("source"), dict) else {}
+    source_thread_id = source_meta.get("thread_id") if isinstance(source_meta, dict) else None
+    source_internet_message_id = source_meta.get("internet_message_id") if isinstance(source_meta, dict) else None
+    customer_to, use_thread_reply = _resolve_customer_reply_target(
+        input_data=input_data,
+        sender_email=sender_email,
+        internal_recipient=internal_recipient,
+    )
 
     priority = classify_inquiry_priority(subject, message_text)
     completeness = evaluate_information_completeness("customer_inquiry", input_data)
@@ -277,26 +376,43 @@ def _build_inquiry_default_actions(
 
     actions: list[dict[str, Any]] = []
 
-    # Customer auto-reply
+    # Customer auto-reply: empathetic and action-oriented.
     if not followups_enabled:
         actions.append(_build_skipped_action("send_customer_auto_reply", "followups_enabled=false"))
-    elif not sender_email:
+    elif not customer_to:
         actions.append(_build_skipped_action("send_customer_auto_reply", "no_customer_email"))
     else:
-        short_summary = subject if subject != "Support" else message_text[:120]
         closing = f"\n\nVänliga hälsningar\n{signature_name}" if signature_name else ""
+        urgency_line = (
+            "Tråkigt att höra att det strular. Jag tar en titt på det här direkt.\n\n"
+            if priority == "HIGH"
+            else "Tack för att du hör av dig. Jag tar detta vidare direkt.\n\n"
+        )
+        support_questions = [
+            "- Vilken adress/anläggning gäller det?",
+            "- När började problemet och om något förändrades precis innan?",
+            "- Ser du någon felkod eller lampa som blinkar? (fota gärna om möjligt)",
+        ]
+        if not sender_phone:
+            support_questions.append("- Vilket telefonnummer når vi dig bäst på idag?")
+        reply_subject = f"Re: {subject}" if subject and subject != "Support" else "Re: ditt ärende"
         auto_reply_body = (
             f"Hej {sender_name or 'där'},\n\n"
-            f"Tack för ditt meddelande. Vi har tagit emot ärendet och återkommer så snart som möjligt.\n\n"
-            f"Sammanfattning:\n{short_summary}\n\n"
-            f"Om ärendet är akut, ring oss direkt.{closing}"
+            f"{urgency_line}"
+            "För att vi ska kunna hjälpa dig snabbare får du gärna svara med:\n"
+            f"{chr(10).join(support_questions)}\n\n"
+            "Om det är akut och påverkar drift helt får du gärna skriva AKUT i ditt svar så prioriterar vi direkt."
+            f"{closing}"
         )
         actions.append({
             "type": "send_customer_auto_reply",
             "tenant_id": job.tenant_id,
-            "to": sender_email,
-            "subject": "Vi har tagit emot ditt ärende",
+            "to": customer_to,
+            "subject": reply_subject,
             "body": auto_reply_body,
+            "thread_id": source_thread_id if use_thread_reply else None,
+            "in_reply_to": source_internet_message_id if use_thread_reply else None,
+            "references": source_internet_message_id if use_thread_reply else None,
         })
 
     # Internal support handoff
@@ -651,6 +767,12 @@ def _create_email_approval_record(
         "subject": subject,
         "body": action.get("body") or "",
     }
+    if action.get("thread_id"):
+        delivery["thread_id"] = action.get("thread_id")
+    if action.get("in_reply_to"):
+        delivery["in_reply_to"] = action.get("in_reply_to")
+    if action.get("references"):
+        delivery["references"] = action.get("references")
 
     ApprovalRequestRepository.upsert_from_payload(
         db=db,

@@ -91,6 +91,8 @@ class GoogleMailClient:
         html_body: str | None = None,
         from_email: str | None = None,
         from_name: str | None = None,
+        in_reply_to: str | None = None,
+        references: str | None = None,
     ) -> str:
         to_recipients = self._normalize_recipients(to)
         cc_recipients = self._normalize_recipients(cc)
@@ -114,6 +116,10 @@ class GoogleMailClient:
                 if from_name and from_name.strip()
                 else from_email.strip()
             )
+        if in_reply_to and in_reply_to.strip():
+            message["In-Reply-To"] = in_reply_to.strip()
+        if references and references.strip():
+            message["References"] = references.strip()
 
         if html_body:
             message.set_content(body or " ")
@@ -127,16 +133,19 @@ class GoogleMailClient:
     def _can_refresh(self) -> bool:
         return bool(self.refresh_token and self.client_id and self.client_secret)
 
-    def _post_message(self, raw_message: str) -> requests.Response:
+    def _post_message(self, raw_message: str, thread_id: str | None = None) -> requests.Response:
         url = f"{self.api_url}/users/{self.user_id}/messages/send"
         headers = {
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json",
         }
+        body: dict[str, Any] = {"raw": raw_message}
+        if thread_id and thread_id.strip():
+            body["threadId"] = thread_id.strip()
         return requests.post(
             url,
             headers=headers,
-            json={"raw": raw_message},
+            json=body,
             timeout=self.timeout_seconds,
         )
 
@@ -236,6 +245,7 @@ class GoogleMailClient:
             "from": self._extract_header(hdrs, "From"),
             "to": self._extract_header(hdrs, "To"),
             "subject": self._extract_header(hdrs, "Subject"),
+            "internet_message_id": self._extract_header(hdrs, "Message-ID"),
             "received_at": self._extract_header(hdrs, "Date"),
             "snippet": data.get("snippet", ""),
             "label_ids": data.get("labelIds", []),
@@ -315,6 +325,9 @@ class GoogleMailClient:
         html_body: str | None = None,
         from_email: str | None = None,
         from_name: str | None = None,
+        thread_id: str | None = None,
+        in_reply_to: str | None = None,
+        references: str | None = None,
     ) -> dict[str, Any]:
         if not self.access_token or not self.access_token.strip():
             raise ValueError("GOOGLE_MAIL_ACCESS_TOKEN is missing.")
@@ -328,6 +341,8 @@ class GoogleMailClient:
             html_body=html_body,
             from_email=from_email,
             from_name=from_name,
+            in_reply_to=in_reply_to,
+            references=references,
         )
 
         logger.info(
@@ -339,7 +354,7 @@ class GoogleMailClient:
             },
         )
 
-        response = self._post_message(raw_message)
+        response = self._post_message(raw_message, thread_id=thread_id)
 
         # On 401, attempt token refresh and retry once.
         if response.status_code == 401 and self._can_refresh():
@@ -349,7 +364,7 @@ class GoogleMailClient:
                 client_id=self.client_id,
                 client_secret=self.client_secret,
             )
-            response = self._post_message(raw_message)
+            response = self._post_message(raw_message, thread_id=thread_id)
 
         self._raise_for_response(response)
 

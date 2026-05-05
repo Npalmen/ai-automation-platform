@@ -126,6 +126,9 @@ class GoogleMailAdapter(BaseIntegrationAdapter):
             html_body=payload.get("html_body"),
             from_email=payload.get("from_email"),
             from_name=payload.get("from_name"),
+            thread_id=payload.get("thread_id"),
+            in_reply_to=payload.get("in_reply_to"),
+            references=payload.get("references"),
         )
 
         return {

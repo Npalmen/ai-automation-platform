@@ -130,6 +130,18 @@ class TestLeadDefaultActions:
         auto_reply = next(a for a in actions if a["type"] == "send_customer_auto_reply")
         assert auto_reply["to"] == "test@example.com"
 
+    def test_no_reply_sender_uses_customer_email_from_body(self):
+        job = _make_job(input_data={
+            "sender": {"name": "Webflow", "email": "noreply@webflow.com"},
+            "subject": "Nytt formulär",
+            "message_text": "Namn: Anna\\nE-post: anna.customer@example.com\\nMeddelande: Hej",
+            "source": {"system": "gmail", "thread_id": "thr_1", "internet_message_id": "<id1>"},
+        })
+        actions = _build_lead_default_actions(job, _settings())
+        auto_reply = next(a for a in actions if a["type"] == "send_customer_auto_reply")
+        assert auto_reply["to"] == "anna.customer@example.com"
+        assert auto_reply.get("thread_id") is None
+
     def test_always_creates_monday_item(self):
         job = _make_job()
         actions = _build_lead_default_actions(job, _settings())
@@ -188,6 +200,21 @@ class TestInquiryDefaultActions:
         job = _make_job(job_type=JobType.CUSTOMER_INQUIRY)
         actions = _build_inquiry_default_actions(job, _settings())
         assert any(a["type"] == "create_monday_item" for a in actions)
+
+    def test_normal_sender_keeps_thread_reply_metadata(self):
+        job = _make_job(
+            job_type=JobType.CUSTOMER_INQUIRY,
+            input_data={
+                "sender": {"name": "Bjorn", "email": "bjorn@example.com"},
+                "subject": "Supportfråga",
+                "message_text": "Hej, hjälp.",
+                "source": {"system": "gmail", "thread_id": "thr_9", "internet_message_id": "<orig9>"},
+            },
+        )
+        actions = _build_inquiry_default_actions(job, _settings())
+        auto_reply = next(a for a in actions if a["type"] == "send_customer_auto_reply")
+        assert auto_reply["to"] == "bjorn@example.com"
+        assert auto_reply.get("thread_id") == "thr_9"
 
 
 # ---------------------------------------------------------------------------
