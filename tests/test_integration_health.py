@@ -25,6 +25,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.health.integration_health import (
+    _build_runbook_signals,
     _check_gmail,
     _check_monday,
     _overall_status,
@@ -101,6 +102,38 @@ def _settings_with_monday_scan(scan_status="success"):
             }
         }
     }
+
+
+# ---------------------------------------------------------------------------
+# _build_runbook_signals
+# ---------------------------------------------------------------------------
+
+class TestBuildRunbookSignals:
+    def test_returns_empty_when_all_healthy_and_no_errors(self):
+        systems = {
+            "gmail": {"status": "healthy"},
+            "monday": {"status": "healthy"},
+        }
+        assert _build_runbook_signals(systems, []) == []
+
+    def test_critical_signal_when_not_configured(self):
+        systems = {
+            "gmail": {"status": "not_configured"},
+            "monday": {"status": "healthy"},
+        }
+        signals = _build_runbook_signals(systems, [])
+        assert any(s["severity"] == "critical" for s in signals)
+
+    def test_warning_signal_when_recent_errors_exist(self):
+        systems = {
+            "gmail": {"status": "healthy"},
+            "monday": {"status": "healthy"},
+        }
+        signals = _build_runbook_signals(
+            systems,
+            [{"action": "gmail_inbox_sync", "category": "gmail", "created_at": "2026-05-06T00:00:00Z"}],
+        )
+        assert any(s["area"] == "operations" for s in signals)
 
 
 # ---------------------------------------------------------------------------
@@ -374,6 +407,7 @@ class TestGetIntegrationHealth:
         assert "overall_status" in result
         assert "systems" in result
         assert "recent_errors" in result
+        assert "runbook_signals" in result
 
     def test_systems_include_gmail_and_monday(self):
         result = self._run()
@@ -454,6 +488,10 @@ class TestGetIntegrationHealth:
     def test_recent_errors_is_list(self):
         result = self._run()
         assert isinstance(result["recent_errors"], list)
+
+    def test_runbook_signals_is_list(self):
+        result = self._run()
+        assert isinstance(result["runbook_signals"], list)
 
     def test_system_health_dict_has_required_fields(self):
         result = self._run()

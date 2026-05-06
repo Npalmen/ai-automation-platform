@@ -91,6 +91,7 @@ class TestGetControlShape:
         assert "support_enabled" in auto
         assert "invoices_enabled" in auto
         assert "followups_enabled" in auto
+        assert "demo_mode" in auto
 
     def test_scheduler_has_run_mode(self):
         assert "run_mode" in _get()["scheduler"]
@@ -101,6 +102,7 @@ class TestGetControlShape:
         assert auto["support_enabled"] is True
         assert auto["invoices_enabled"] is True
         assert auto["followups_enabled"] is True
+        assert auto["demo_mode"] is False
 
     def test_default_run_mode_is_manual(self):
         assert _get()["scheduler"]["run_mode"] == "manual"
@@ -121,6 +123,7 @@ class TestGetControlStoredSettings:
                 "support_enabled": True,
                 "invoices_enabled": False,
                 "followups_enabled": True,
+                "demo_mode": True,
             },
             "support_email": "ops@example.com",
             "scheduler": {"run_mode": "paused"},
@@ -128,6 +131,7 @@ class TestGetControlStoredSettings:
         r = _get(stored_settings=stored)
         assert r["automation"]["leads_enabled"] is False
         assert r["automation"]["invoices_enabled"] is False
+        assert r["automation"]["demo_mode"] is True
         assert r["support_email"] == "ops@example.com"
         assert r["scheduler"]["run_mode"] == "paused"
 
@@ -150,6 +154,7 @@ class TestPutControl:
                 "support_enabled": True,
                 "invoices_enabled": False,
                 "followups_enabled": True,
+                "demo_mode": True,
             },
             "support_email": "help@company.com",
             "scheduler": {"run_mode": "scheduled"},
@@ -159,18 +164,20 @@ class TestPutControl:
         saved = mock_save.call_args[0][2]  # positional: db, tenant_id, settings
         assert saved["automation"]["leads_enabled"] is False
         assert saved["automation"]["invoices_enabled"] is False
+        assert saved["automation"]["demo_mode"] is True
         assert saved["scheduler"]["run_mode"] == "scheduled"
         assert saved["support_email"] == "help@company.com"
 
     def test_response_reflects_saved_values(self):
         body = {
             "automation": {"leads_enabled": False, "support_enabled": False,
-                           "invoices_enabled": True, "followups_enabled": True},
+                           "invoices_enabled": True, "followups_enabled": True, "demo_mode": True},
             "support_email": "x@y.com",
             "scheduler": {"run_mode": "paused"},
         }
         result, _ = _put(body)
         assert result["automation"]["leads_enabled"] is False
+        assert result["automation"]["demo_mode"] is True
         assert result["scheduler"]["run_mode"] == "paused"
 
     def test_empty_support_email_accepted(self):

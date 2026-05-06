@@ -232,6 +232,64 @@ def _overall_status(systems: dict) -> str:
     return "healthy"
 
 
+def _build_runbook_signals(systems: dict[str, dict], recent_errors: list[dict]) -> list[dict]:
+    """
+    Build actionable runbook signals from health state.
+
+    Signals are deterministic and free from secrets. They point operators
+    to the first remediation step when pilot drift is detected.
+    """
+    signals: list[dict] = []
+
+    gmail = systems.get("gmail") or {}
+    monday = systems.get("monday") or {}
+
+    if gmail.get("status") in {"error", "not_configured"}:
+        signals.append({
+            "severity": "critical",
+            "area": "gmail",
+            "title": "Gmail integration is unavailable",
+            "action": "Configure OAuth env vars and rerun setup verification.",
+            "runbook_ref": "docs/12-production-guide.md#gmail-integration",
+        })
+    elif gmail.get("status") == "warning":
+        signals.append({
+            "severity": "warning",
+            "area": "gmail",
+            "title": "Gmail integration needs validation",
+            "action": "Run inbox sync and workflow scan to confirm mail flow.",
+            "runbook_ref": "docs/12-production-guide.md#pre-launch-checklist",
+        })
+
+    if monday.get("status") in {"error", "not_configured"}:
+        signals.append({
+            "severity": "critical",
+            "area": "monday",
+            "title": "Monday integration is unavailable",
+            "action": "Set MONDAY_API_KEY and MONDAY_BOARD_ID, then verify dispatch.",
+            "runbook_ref": "docs/12-production-guide.md#mondaycom-integration",
+        })
+    elif monday.get("status") == "warning":
+        signals.append({
+            "severity": "warning",
+            "area": "monday",
+            "title": "Monday integration needs dispatch validation",
+            "action": "Run a dispatch preview/live dispatch for a lead case.",
+            "runbook_ref": "docs/12-production-guide.md#pre-launch-checklist",
+        })
+
+    if recent_errors:
+        signals.append({
+            "severity": "warning",
+            "area": "operations",
+            "title": "Recent integration-related failures detected",
+            "action": "Review /audit-events and resolve the latest failed actions before pilot traffic.",
+            "runbook_ref": "docs/12-production-guide.md#error-behaviour",
+        })
+
+    return signals
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -254,10 +312,12 @@ def get_integration_health(
         "gmail":  _check_gmail(settings, app_settings, db, tenant_id),
         "monday": _check_monday(settings, app_settings, db, tenant_id),
     }
+    recent_errors = _recent_errors(db, tenant_id)
 
     return {
         "tenant_id":      tenant_id,
         "overall_status": _overall_status(systems),
         "systems":        systems,
-        "recent_errors":  _recent_errors(db, tenant_id),
+        "recent_errors":  recent_errors,
+        "runbook_signals": _build_runbook_signals(systems, recent_errors),
     }

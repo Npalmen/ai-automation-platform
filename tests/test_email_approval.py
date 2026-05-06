@@ -278,6 +278,10 @@ class TestProcessActionDispatchEmailApproval:
         assert "pending_approval_count" in payload
         assert payload["pending_approval_count"] > 0
         assert "actions_pending_approval" in payload
+        assert "ai_reply_suggestions" in payload
+        assert payload["ai_reply_suggestions"], "Lead flow should expose at least one AI reply suggestion"
+        assert "lead_sla" in payload
+        assert payload["lead_sla"]["enabled"] is True
 
     def test_no_approval_when_auto_true(self):
         job = _make_job(JobType.LEAD)

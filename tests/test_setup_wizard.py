@@ -362,6 +362,7 @@ class TestPostSetupVerify:
         assert "status" in r
         assert "checks" in r
         assert "message" in r
+        assert "runbook_signal" in r
 
     def test_checks_is_list(self):
         assert isinstance(_post_verify()["checks"], list)
@@ -395,3 +396,27 @@ class TestPostSetupVerify:
 
     def test_message_is_string(self):
         assert isinstance(_post_verify()["message"], str)
+
+    def test_runbook_signal_none_when_ok(self):
+        db_record = MagicMock()
+        r = _post_verify(
+            enabled_job_types=["lead"],
+            ctrl_settings={"scheduler": {"run_mode": "manual"}},
+            db_record=db_record,
+            GOOGLE_MAIL_ACCESS_TOKEN="tok",
+            MONDAY_API_KEY="key",
+        )
+        assert r["status"] == "ok"
+        assert r["runbook_signal"] is None
+
+    def test_runbook_signal_present_on_warning(self):
+        r = _post_verify(enabled_job_types=["lead"], db_record=MagicMock())
+        assert r["status"] == "warning"
+        assert r["runbook_signal"] is not None
+        assert r["runbook_signal"]["severity"] == "warning"
+
+    def test_runbook_signal_present_on_failed(self):
+        r = _post_verify(enabled_job_types=[], db_record=MagicMock())
+        assert r["status"] == "failed"
+        assert r["runbook_signal"] is not None
+        assert r["runbook_signal"]["severity"] == "critical"

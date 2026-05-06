@@ -20,6 +20,7 @@ Tenant identifieras via `X-API-Key`-header. Nyckeln mappas server-side till `ten
 - Tenant är inte längre client-controlled i produktion
 - API-nycklar konfigureras via `.env`, inte i kod
 - `X-Tenant-ID` kvar som dev-fallback utan breaking change
+- Adminverktyg får använda giltig `X-Admin-API-Key` tillsammans med explicit `X-Tenant-ID` för tenant-scopade endpoints när en operatör arbetar med vald kund; vanlig kund-/tenantåtkomst använder fortsatt `X-API-Key`
 
 ---
 

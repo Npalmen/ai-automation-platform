@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 import re
 from typing import Any
 
@@ -30,6 +31,7 @@ _EMAIL_ACTION_TYPES = frozenset({
 
 _NO_REPLY_RE = re.compile(r"\b(?:no[-_. ]?reply|donotreply)\b", re.IGNORECASE)
 _EMAIL_RE = re.compile(r"([A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,})", re.IGNORECASE)
+_LEAD_SLA_TARGET_MINUTES = 15
 
 
 def _is_no_reply_email(value: str) -> bool:
@@ -735,6 +737,76 @@ def _build_email_approval_action(action: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _is_customer_email_action(action: dict[str, Any]) -> bool:
+    action_type = str(action.get("type") or "")
+    if action_type == "send_customer_auto_reply":
+        return True
+    if action_type == "send_email":
+        recipient = str(action.get("to") or "").strip().lower()
+        return bool(recipient)
+    return False
+
+
+def _build_ai_reply_suggestions(actions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    suggestions: list[dict[str, Any]] = []
+    for action in actions:
+        if not _is_customer_email_action(action):
+            continue
+        if action.get("_skip"):
+            continue
+        suggestions.append({
+            "type": action.get("type"),
+            "to": action.get("to"),
+            "subject": action.get("subject"),
+            "body": action.get("body"),
+            "approval_required": bool(action.get("_needs_approval")),
+        })
+    return suggestions
+
+
+def _compute_lead_sla_payload(
+    *,
+    job: Job,
+    actions_requested: list[dict[str, Any]],
+    actions_executed: list[dict[str, Any]],
+    actions_pending_approval: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    job_type = job.job_type.value if hasattr(job.job_type, "value") else str(job.job_type)
+    if job_type != "lead":
+        return None
+
+    created_at = job.created_at or datetime.now(timezone.utc)
+    due_at = created_at + timedelta(minutes=_LEAD_SLA_TARGET_MINUTES)
+    now = datetime.now(timezone.utc)
+
+    tracked_types = {"send_customer_auto_reply", "send_internal_handoff", "send_email"}
+    has_executed = any((a.get("type") in tracked_types) for a in actions_executed)
+    has_pending = any((a.get("action_type") in tracked_types) for a in actions_pending_approval)
+    has_requested = any((a.get("type") in tracked_types and not a.get("_skip")) for a in actions_requested)
+
+    if has_executed:
+        follow_up_state = "executed"
+    elif has_pending:
+        follow_up_state = "pending_approval"
+    elif has_requested:
+        follow_up_state = "queued"
+    else:
+        follow_up_state = "missing"
+
+    if follow_up_state in {"executed", "pending_approval", "queued"}:
+        sla_status = "met" if now <= due_at else "breached"
+    else:
+        sla_status = "breached" if now > due_at else "pending"
+
+    return {
+        "enabled": True,
+        "target_minutes": _LEAD_SLA_TARGET_MINUTES,
+        "first_follow_up_due_at": due_at.isoformat(),
+        "first_follow_up_state": follow_up_state,
+        "status": sla_status,
+    }
+
+
 def _create_email_approval_record(
     db: Session,
     job: Job,
@@ -789,6 +861,7 @@ def _create_email_approval_record(
         "to": recipient,
         "subject": subject,
         "status": "pending_approval",
+        "approval_kind": "ai_reply_draft" if _is_customer_email_action(action) else "email_action",
     }
 
 
@@ -903,6 +976,13 @@ def process_action_dispatch_job(job: Job, db: Session | None = None) -> Job:
             "actions_failed": failed_actions,
             "actions_skipped": skipped_actions,
             "actions_pending_approval": pending_approvals,
+            "ai_reply_suggestions": _build_ai_reply_suggestions(actions),
+            "lead_sla": _compute_lead_sla_payload(
+                job=job,
+                actions_requested=actions,
+                actions_executed=executed_actions,
+                actions_pending_approval=pending_approvals,
+            ),
             "executed_count": len(executed_actions),
             "failed_count": len(failed_actions),
             "skipped_count": len(skipped_actions),

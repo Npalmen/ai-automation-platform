@@ -8,6 +8,76 @@ MVP is complete and stabilized. The platform is in a demonstrable state.
 Pipeline runs end-to-end, verification is deterministic, intake normalization is correct, and docs reflect actual behavior.
 Email response chapter 1 is now live-validated on server (personalized replies, approval-gated sends, no-reply relay handling, and Gmail thread-reply capability).
 
+Latest reliability hardening for pilot drift handling:
+- `GET /integrations/health` now includes `runbook_signals` for deterministic operator next-steps.
+- `POST /setup/verify` now includes a `runbook_signal` when warnings/failures are present.
+
+Latest release process hardening:
+- R1 release gate is now executed as one consolidated run via `python -m scripts.run_release_gate_r1`.
+- The command runs two phases sequentially: `regression` then `e2e` (pilot flow matrix).
+- During slice implementation, teams should continue running only smoke + affected unit tests; full R1 gate is run at release-candidate time.
+
+Latest R2 implementation drop (Slice 4 + 5):
+- Case/project workspace v1 is now live as tenant-scoped case operations data under `operations_workspace`.
+- Installer vertical v1 primitives are implemented: work-order status, project context, customer/property structure, deterministic checklist templates, documentation buckets (before/after/docs), tasks, timeline, attachments, and delivery package state.
+- API surface:
+  - `GET/PUT /cases/{job_id}/operations`
+  - `POST /cases/{job_id}/operations/timeline`
+  - `POST /cases/{job_id}/operations/tasks`
+  - `POST /cases/{job_id}/operations/attachments`
+  - `PATCH /cases/{job_id}/operations/checklists`
+  - `POST /cases/{job_id}/operations/checklists/template`
+  - `POST /cases/{job_id}/operations/documentation`
+  - `POST /cases/{job_id}/operations/delivery-package`
+- Default checklist phases are seeded from the general installer template; project-specific templates currently cover `solar` and `ev_charger`, with unknown types falling back to `general`.
+- Admin case detail UI includes an operations panel for inspection and updates.
+
+Latest Fas 1 productification work:
+- Onboarding remains a progress-based tenant checklist with setup verification and synthetic test lead creation.
+- Demo/test tenant mode is now operational: when `demo_mode` is active, live inbox sync and scheduler-driven external sends are skipped; synthetic demo jobs can be seeded through `/demo/seed` or `/admin/tenants/{tenant_id}/demo/seed`.
+- The single-file UI has mobile responsive rules for the sidebar/topbar, dashboards, cases, onboarding/setup, tables, and overlays.
+- Fas 1 Gate is verified: desktop/mobile core UI, onboarding, active tenant context, admin/customer separation, demo/test mode, and docs were checked. Admin tooling now resolves tenant-scoped endpoints with `X-Admin-API-Key` + active `X-Tenant-ID`; customer tenant-key flow remains unchanged.
+- Gate evidence: focused Phase 1 test run passed (`146 passed`); `py -3.10 -m scripts.run_release_gate_r1` passed regression (`338 passed`) and E2E (`145 passed`).
+
+Latest Fas 4 finance work:
+- Pre-accounting invoice drafts include deterministic VAT/category/account suggestions.
+- Fortnox invoice export is now approval-gated by default, supports dry-run preview, uses a stable idempotency key, and records successful exports in `integration_events`.
+- Project profitability is available at `GET /finance/projects/{job_id}/profitability`, based on `operations_workspace.finance` or `project_finance` inputs.
+
+Latest Fas 6 automation experience work:
+- Case-level automation insight is available at `GET /cases/{job_id}/automation-wow`.
+- `GET /cases/{job_id}` includes `automation_summary`, `automation_risks`, and `wow_flows`.
+- Admin case detail renders an "Automationsöversikt & wow-flöden" panel with deterministic next step, evidence, risk signals, and three preview-only flows.
+- The three flows are approved customer reply, case-to-project handoff, and project-to-invoice-ready package. They do not execute external writes; Gmail/Fortnox paths still depend on existing approval gates and controlled dispatch/export endpoints.
+
+Latest Fas 7 ready-to-market hardening:
+- Admin usage analytics are available at `GET /admin/usage/analytics?range=today|7d|30d|all`.
+- The endpoint is protected by `X-Admin-API-Key`, read-only, uses only persisted DB state, and returns no secrets.
+- Summary fields cover total/active tenants, active tenants in range, jobs created/completed, pending approvals, blocked flows, controlled-dispatch totals, automation rate, and estimated time saved.
+- Per-tenant rows and `top_blocked_tenants` are included for pilot follow-up and launch-risk triage.
+
+## Active planning lock (Slice 0, 2026-05-06)
+
+Before any new implementation starts, release scope is locked:
+
+- **R1 (in):** productification light, lead-to-case core, and pilot operations/reliability slices
+- **R2 (deferred):** case/project workspace v1 and installer-specific vertical slices
+- **Later (deferred):** finance layer v1 slices
+
+Locked R1 KPIs:
+
+- Setup readiness >= 90% in onboarding/setup checks
+- >= 95% lead first follow-up action coverage within SLA
+- 100% approval gate for AI-generated customer reply drafts before external send
+- Zero P0/P1 regressions in release-gate pilot E2E flow (`inbox -> classification -> approval -> dispatch`)
+
+Locked out-of-scope for R1:
+
+- Full frontend rewrite/replatforming
+- New architecture patterns outside current backend-first model
+- Full accounting/billing platforms, white-labeling, mobile app expansion
+- Broad integration expansion outside existing controlled MVP adapters
+
 ## Read these first
 1. docs/02-mvp-scope.md
 2. docs/03-system-architecture.md
@@ -569,10 +639,20 @@ Deterministic completeness evaluation and automatic follow-up action injection. 
 ## Next steps
 
 ### Most likely next slice
-1. **Finance layer v1** — build bookkeeping-assist/backoffice layer (invoice + VAT + accounting suggestion workflows) as next business-critical pillar
-2. **Finance integration path** — define read-first + controlled-write pattern for Swedish finance systems
-3. **Scheduler / cron trigger** — wire a periodic external trigger to call `POST /gmail/process-inbox`
-4. **Dashboard polish** — date-range filters, charts, auto-refresh
+1. **Finance integration path (expanded)** — broaden read-first + controlled-write pattern beyond initial Fortnox pre-accounting export
+2. **Scheduler / cron trigger** — wire a periodic external trigger to call `POST /gmail/process-inbox`
+3. **Dashboard polish** — date-range filters, charts, auto-refresh
+
+## Completed slice (2026-05-06 — Finance Layer v1 pre-accounting)
+
+- Added deterministic pre-accounting draft flow for invoice jobs:
+  - `POST /finance/invoices/{job_id}/draft`
+  - Computes amount ex VAT, VAT amount, total, VAT rate, expense category, and suggested account code
+- Added controlled Fortnox finance export flow:
+  - `POST /finance/invoices/{job_id}/fortnox/preview` (read-only payload preview)
+  - `POST /finance/invoices/{job_id}/fortnox/export` (controlled write, optional customer creation, supports `dry_run`)
+- Added `app/finance/pre_accounting.py` with deterministic VAT/category/account heuristics and Fortnox payload mapping helpers
+- Added tests in `tests/test_finance_layer_v1.py` covering draft, preview, dry-run, and export behavior
 
 ### After that
 5. **HTML-to-text** — `body_text` is empty for HTML-only Gmail messages

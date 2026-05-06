@@ -146,9 +146,90 @@
 - [x] Approval workflow validated end-to-end after deploy (create → pending → approve → sent)
 - [x] Regression subset passed locally after patch (`test_auto_reply_handoff.py`, `test_tenant_branding.py`, `test_email_approval.py`)
 
+## Done (slice3 pilot reliability runbook signals — 2026-05-06)
+- [x] `GET /integrations/health` now returns `runbook_signals` with deterministic remediation hints per system and operations state
+- [x] `POST /setup/verify` now returns `runbook_signal` when status is `warning` or `failed` (null when `ok`)
+- [x] Updated tests for integration health + setup verify response shape and severity behavior
+
+## Done (R1 consolidated release gate — 2026-05-06)
+- [x] Added `scripts/run_release_gate_r1.py` to run one combined R1 gate instead of repeated full-suite runs during slice work
+- [x] Gate phases locked:
+  - Regression: setup/onboarding/integration health/cases/control panel/dispatch policy+approval+auto-dispatch
+  - E2E pilot matrix: inbox -> classification -> approval -> dispatch (+ dispatch observability checks)
+- [x] Command interface:
+  - `python -m scripts.run_release_gate_r1` (full gate)
+  - `python -m scripts.run_release_gate_r1 --phase regression`
+  - `python -m scripts.run_release_gate_r1 --phase e2e`
+- [x] Process intent aligned with Slice plan: fast local loops use focused tests; full regression+e2e run is centralized into release gate execution
+
+## Done (R2 slice4-5 operations + installer vertical v1 — 2026-05-06)
+- [x] Added case-scoped operations workspace persisted in `input_data.operations_workspace` with default v1 shape
+- [x] Added deterministic installer checklist templates (`general`, `solar`, `ev_charger`) and a tenant-scoped template seed/replace endpoint
+- [x] Added first-class documentation bucket mutation for before images, after images, and project documents
+- [x] Implemented API endpoints:
+  - `GET /cases/{job_id}/operations`
+  - `PUT /cases/{job_id}/operations`
+  - `POST /cases/{job_id}/operations/timeline`
+  - `POST /cases/{job_id}/operations/tasks`
+  - `POST /cases/{job_id}/operations/attachments`
+  - `PATCH /cases/{job_id}/operations/checklists`
+  - `POST /cases/{job_id}/operations/checklists/template`
+  - `POST /cases/{job_id}/operations/documentation`
+  - `POST /cases/{job_id}/operations/delivery-package`
+- [x] Included operations workspace in `GET /cases/{job_id}` response
+- [x] Added admin case-detail panel in UI for operations workspace (summary + JSON editor + quick actions)
+- [x] Added focused tests in `tests/test_operations_workspace.py` (9 tests)
+
+## Done (Fas 1 slices 1.3-1.5 — onboarding, demo mode, mobile polish)
+- [x] Onboarding wizard v2 kept as tenant-scoped progress/checklist flow with setup verification and synthetic test lead creation.
+- [x] Demo/test tenant mode now blocks live inbox sync and scheduler-driven external sends when `demo_mode` is active.
+- [x] Added safe demo-data seeding via `/demo/seed` and `/admin/tenants/{tenant_id}/demo/seed`; jobs use the deterministic verification pipeline only.
+- [x] Added mobile-first CSS for core dashboard, cases, onboarding/setup, tables, overlays, sidebar and topbar.
+
+## Done (Fas 1 Gate — productification verification)
+- [x] Verified Phase 1 gate criteria: desktop/mobile core UI, onboarding, active tenant context, admin/customer separation, demo/test mode, and docs.
+- [x] Fixed admin tenant-context auth alignment for admin tooling: tenant-scoped endpoints now accept a valid `X-Admin-API-Key` together with the active `X-Tenant-ID`; normal tenant API-key behavior is unchanged.
+- [x] Rewired onboarding UI calls so customer mode uses tenant auth and admin mode uses admin auth with the selected tenant context.
+- [x] Gate evidence: focused Phase 1 suite passed (`146 passed`); consolidated R1 gate passed (`338 passed` regression + `145 passed` E2E).
+
+## Done (Fas 6 — Automationsupplevelse och wow-floden)
+- [x] Added deterministic case automation summary with status, next step, confidence, evidence, and sources.
+- [x] Added risk detection for failed jobs/actions, pending approvals, missing customer info, blocked projects, incomplete delivery package, low margin, and stale active cases.
+- [x] Added three preview-only wow flows: approved customer reply, case-to-project handoff, and project-to-invoice-ready package.
+- [x] Exposed `GET /cases/{job_id}/automation-wow` and embedded `automation_summary`, `automation_risks`, and `wow_flows` in `GET /cases/{job_id}`.
+- [x] Added admin case-detail UI panel for automation overview, risk signals, and safe flow previews.
+- [x] Added focused tests in `tests/test_automation_wow.py`; updated case shape tests.
+
+## Done (Fas 7 — Ready-to-market usage analytics)
+- [x] Added `app/analytics/usage.py` for read-only pilot usage analytics across DB tenants.
+- [x] Added admin-protected `GET /admin/usage/analytics?range=today|7d|30d|all`.
+- [x] Aggregates active tenants, jobs created/completed, pending approvals, blocked flows, dispatch success/failure, automation rate, and estimated time saved.
+- [x] Keeps Phase 7 hardening inside existing backend-first architecture: no schema changes, no external calls, no secrets in responses.
+- [x] Added focused tests in `tests/test_usage_analytics.py`.
+
 ## Next (priority order)
-- [ ] Finance layer v1 — bookkeeping-assist foundation (invoice flow hardening, VAT handling, accounting suggestions, finance-focused backoffice workflows)
-- [ ] Finance integrations planning — define first integration pair for Swedish market finance operations (read-first, then controlled writes)
+- [ ] **R1 scope lock (Slice 0, 2026-05-06)**
+  - **R1 (in scope for next release):**
+    - Produktifiering light: navigation + tenant context + onboarding wizard + demo/test-tenant mode
+    - Lead till arende core: SLA/reminders for unanswered leads, case communication timeline, AI reply drafts behind approval gate
+    - Pilot operations/reliability: integration setup validation UX, observability minimum, security hardening light
+  - **R2 (explicitly deferred):**
+    - Arende och projekt v1 (work-order statuses, project timeline, attachments v1)
+    - Installatorsspecifika funktioner (property/project structure, checklists, delivery package)
+  - **Later (explicitly deferred):**
+    - Finance layer v1 (invoice prep flow, VAT/category engine, profitability/export sync)
+  - **KPI lock for R1 release gate:**
+    - Setup readiness: >= 90% for pilot tenant in onboarding/status flows
+    - SLA follow-up: >= 95% of new lead jobs receive first follow-up action inside SLA window
+    - Approval safety: 100% of AI-generated customer reply drafts require explicit approval before send
+    - Reliability: zero P0/P1 defects in inbox -> classification -> approval -> dispatch pilot flow during release gate run
+  - **Out of scope for R1 (locked):**
+    - Full UI rewrite or frontend re-platforming
+    - New architecture patterns outside existing backend-first model
+    - Full accounting platform, billing platform, white-labeling, mobile app
+    - Broad integration expansion beyond controlled MVP adapters and already-wired flows
+- [x] Finance layer v1 — bookkeeping-assist foundation (invoice draft, VAT/category classification, project profitability, approval-gated/idempotent Fortnox preview/export controlled write path)
+- [ ] Finance integrations planning — define expanded Swedish finance sync scope beyond initial Fortnox pre-accounting export
 - [ ] OAuth hardening runbook — formalize live recovery playbook for refresh/invalid_grant scenarios
 - [ ] Scheduler / cron trigger — external periodic call to `POST /scheduler/run-once`
 - [ ] Dashboard polish — date-range filters, charts, auto-refresh interval

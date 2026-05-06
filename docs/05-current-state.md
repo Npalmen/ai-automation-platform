@@ -51,8 +51,9 @@ The following has been confirmed through real API calls against a running instan
 | Dispatch Observability + ROI Attribution | ✅ IMPLEMENTED | `app/workflows/dispatchers/observability.py` — `get_dispatch_summary()` / `get_dispatch_report()`; time-range presets (today/7d/30d/all, default 30d); summary aggregates total/success/failed/skipped, by_mode, by_job_type, by_system, ROI; report returns executive headline (dispatches_completed, time_saved_hours, success_rate_percent, automation_share_percent); `GET /dispatch/summary?range=` + `GET /dispatch/report?range=` endpoints; range selector buttons + ROI Rapport card in Dashboard UI; 28 + 38 tests |
 | Customer Onboarding Wizard | ✅ IMPLEMENTED | `app/onboarding/readiness.py` — `get_onboarding_status(db, tenant_id, app_settings)` computes 8-step checklist from existing platform state (no external API calls): tenant_created, gmail_ready, monday_ready, systems_scanned, routing_hints_saved, automation_policy_set, test_lead_created, dispatch_verified; `GET /onboarding/status` endpoint; `POST /onboarding/test-lead` creates synthetic lead via deterministic pipeline; Kunduppsättning wizard section added to existing Onboarding UI tab with progress bar, checklist, action buttons, and "Skapa testlead" form; 49 tests |
 | UI action label map | ✅ IMPLEMENTED | Case View renders human-readable labels: Kundsvar / Intern notifiering / Monday-objekt / Slack-notis / etc.; shows recipient and Gmail message_id when available |
-| Integration Health Center | ✅ IMPLEMENTED | `GET /integrations/health` — tenant-scoped; per-system (gmail/monday) health from internal signals only (no external API calls, no secrets in response); checks: config_present, scanner_ran, inbox_sync/dispatch_success; status: healthy/warning/error/not_configured; overall_status aggregation; recent_errors list (action/category/created_at only); Integrationshälsa card in Dashboard UI; 47 tests |
+| Integration Health Center | ✅ IMPLEMENTED | `GET /integrations/health` — tenant-scoped; per-system (gmail/monday) health from internal signals only (no external API calls, no secrets in response); checks: config_present, scanner_ran, inbox_sync/dispatch_success; status: healthy/warning/error/not_configured; overall_status aggregation; recent_errors list (action/category/created_at only); **runbook_signals** array adds deterministic remediation hints with `severity`, `action`, and `runbook_ref`; Integrationshälsa card in Dashboard UI; 47+ tests |
 | Pilot Readiness Hardening | ✅ IMPLEMENTED | `GET /pilot/readiness` — tenant-scoped; 11 deterministic checks from existing platform state (no external API calls, no secrets in response): auth_configured, tenant_exists, onboarding_ready, integrations_health_not_error, routing_ready_for_lead, dispatch_duplicate_protection, dispatch_observability, scheduler_safe, required_env_present, ui_available, test_lead_exists; overall_status: ready/almost_ready/not_ready; score counters (passed/warnings/failures); Pilotberedskap card in Dashboard UI; 49 tests |
+| Setup Verify Runbook Signal | ✅ IMPLEMENTED | `POST /setup/verify` response now includes `runbook_signal` (`null` when ok, object on warning/failed) with severity/action/runbook reference, so pilot operators get direct next-step guidance without reading logs. |
 | Super Admin Panel v1 | ✅ IMPLEMENTED | `GET /admin/tenants/overview` — aggregates health for ALL DB tenants; read-only; no external API calls; no secrets in response; per-tenant: onboarding status/percent, pilot_readiness status/percent, integration health (overall+gmail+monday), dispatch 30d stats (total/success/failed/hours/automation_share), recent_error_count, latest_activity_at; top-level: total_tenants, healthy/warning/error/not_ready counts, total_hours_saved_30d; one failing tenant does not break the rest; "Super Admin" tab in operator UI with summary cards + tenant table + "Öppna kund" button; 44 tests |
 | Admin Auth Hardening | ✅ IMPLEMENTED | `ADMIN_API_KEY` env var + `X-Admin-API-Key` header; `app/core/admin_auth.py` — `require_admin_api_key` FastAPI dependency; constant-time comparison; missing/wrong key → 401; ADMIN_API_KEY not configured → 401 (fail closed); configured value never in response/logs; tenant X-API-Key not accepted; `GET /admin/tenants/overview` now uses `require_admin_api_key` instead of `get_verified_tenant`; UI: Admin API-nyckel input in Super Admin tab (stored in localStorage as `ui_admin_api_key`); requests send `X-Admin-API-Key` header; clear "Åtkomst nekad" error on 401/403; 24 tests |
 | Fortnox Workflow Scanner | ✅ IMPLEMENTED | `FortnoxWorkflowScannerAdapter` registered in `ADAPTER_REGISTRY`; reads customers (limit 50), articles (limit 50), invoices (limit 50) via `FortnoxClient` read-only methods; normalises to `{customer_number, name, email, organisation_number, phone}` / `{article_number, description, unit, sales_price}` / `{document_number, customer_number, customer_name, total, balance, status, due_date}`; persists into `settings.memory.system_map.fortnox` and `settings.workflow_scan`; missing `FORTNOX_ACCESS_TOKEN` or `FORTNOX_CLIENT_SECRET` → failed ScanResult (no exception, no credential leak); `_DEFAULT_MEMORY` seeded with fortnox slot; "Skanna Fortnox" button in Kundminne UI; no-clobber on failure; 42 tests |
@@ -80,6 +81,11 @@ The following has been confirmed through real API calls against a running instan
 | Gmail subject cleanup | ✅ IMPLEMENTED + DEPLOYED | Inbox ingestion now strips Gmail UI noise text from subject lines (including misspelled variant), preventing polluted subjects in downstream actions and approvals. |
 | Gmail thread-reply capability | ✅ IMPLEMENTED + DEPLOYED | Google Mail send path now supports `thread_id` + `In-Reply-To` + `References`; metadata is propagated from inbox ingestion to approval payload and action executor. |
 | No-reply form relay handling (Webflow-style) | ✅ IMPLEMENTED + DEPLOYED | For no-reply senders, customer reply target is extracted from payload/body and sent as a new outbound message (not thread reply to relay sender); normal inbox customer mails keep thread-reply behavior. |
+| Case/Project Workspace v1 + Installer Vertical v1 | ✅ IMPLEMENTED | New case-scoped operations workspace (`operations_workspace`) with work order status, project context, property/customer structure, installer checklist templates (general/solar/EV charger), documentation buckets (before/after/docs), tasks, timeline, attachments, and delivery package state; API: `GET/PUT /cases/{job_id}/operations`, plus timeline/task/attachment/checklist-template/documentation/delivery mutations; admin case detail includes editable operations panel in UI. |
+| Demo/test tenant mode | ✅ IMPLEMENTED | `demo_mode` in control settings blocks live inbox sync and scheduled external sends; `/demo/seed` and `/admin/tenants/{tenant_id}/demo/seed` create synthetic demo jobs through the deterministic verification pipeline only. |
+| Mobile-first core UI polish | ✅ IMPLEMENTED | Core single-file UI has responsive rules for sidebar/topbar, dashboard cards, cases filters/cards, onboarding/setup cards, tables, and overlays. |
+| Fas 1 Gate | ✅ VERIFIED | Product structure/navigation, admin/customer separation, active tenant context, onboarding, demo mode, docs, and desktop/mobile core UI verified. Admin tooling can use `X-Admin-API-Key` + active `X-Tenant-ID` for tenant-scoped endpoints; customer tenant-key flow remains unchanged. Gate evidence: focused Phase 1 tests `146 passed`; `py -3.10 -m scripts.run_release_gate_r1` passed regression (`338 passed`) + E2E (`145 passed`). |
+| Fas 6 Automation Experience | ✅ IMPLEMENTED | `GET /cases/{job_id}/automation-wow` returns deterministic case summary, risk signals, and three preview-only wow flows: approved customer reply, case-to-project handoff, and project-to-invoice-ready package. `GET /cases/{job_id}` includes the same `automation_summary`, `automation_risks`, and `wow_flows`; admin case detail renders an automation overview panel. All flows are no-side-effect previews and preserve existing approval-gated external writes. |
 | 2065 tests passing | ✅ | `python -m pytest` — all pass |
 
 ---
@@ -100,6 +106,36 @@ These are sharp edges discovered during live testing. Each one has caused a real
 | Tenant config — enum vs string | `allowed_integrations` in static config previously stored `IntegrationType.MONDAY` (enum objects). DB stores `"monday"` (strings). Code normalizes both; the DB row is authoritative when present. |
 | Google Mail | All four env vars required for refresh: `GOOGLE_MAIL_ACCESS_TOKEN`, `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`. Partial config → `invalid_grant` on first token expiry. |
 | UTF-8 output | API response is correct UTF-8. Windows terminals (GBK/CP936) misrender Swedish chars as `?` in curl output. The data is correct. Run `chcp 65001` to fix terminal display. |
+
+---
+
+## Release planning lock (2026-05-06)
+
+Slice 0 is now locked as planning baseline before implementation starts:
+
+- **R1 (next release):** Productification light, Lead-to-case core, and Pilot operations/reliability
+- **R2:** Case/project workspace v1 and installer-specific vertical functionality
+- **Later:** Finance layer v1
+
+Locked R1 KPIs:
+
+- Setup readiness score >= 90% on pilot tenant
+- >= 95% of new leads receive first follow-up action within SLA window
+- 100% of AI-generated customer reply drafts are approval-gated before send
+- Zero P0/P1 defects in release-gate E2E pilot flow (`inbox -> classification -> approval -> dispatch`)
+
+R1 release-gate execution is now consolidated in one command instead of repeated full-suite runs:
+
+- `python -m scripts.run_release_gate_r1` runs the full R1 gate (regression + E2E phases)
+- `python -m scripts.run_release_gate_r1 --phase regression` runs only the regression phase
+- `python -m scripts.run_release_gate_r1 --phase e2e` runs only the E2E pilot-flow phase
+
+Locked out-of-scope for R1:
+
+- Full frontend rewrite or platform shift
+- New architecture patterns outside current backend-first architecture
+- Full accounting/billing suites, white-labeling, and mobile app scope
+- Broad net-new integration tracks beyond current controlled MVP adapters
 
 ---
 
@@ -673,11 +709,35 @@ The platform can be demonstrated to a first customer for:
 
 **780/780 tests pass.**
 
+## Finance Layer v1 (2026-05-06)
+
+- `POST /finance/invoices/{job_id}/draft` — builds deterministic pre-accounting invoice drafts from stored invoice jobs (amount ex VAT, VAT amount, total, VAT rate, expense category, account suggestion).
+- `POST /finance/invoices/{job_id}/fortnox/preview` — read-only preview of mapped Fortnox customer+invoice payload based on the draft.
+- `POST /finance/invoices/{job_id}/fortnox/export` — approval-gated controlled write path to Fortnox with optional customer creation, `dry_run` support, idempotency key, and persisted integration event audit after export.
+- `GET /finance/projects/{job_id}/profitability` — deterministic project profitability signal from case operations finance data (revenue, material/labor/external/other costs, margin, risk status).
+- Deterministic classification for finance prep includes VAT rate inference (`0/6/12/25`) and expense category/account suggestion (e.g., materials -> `4010`, services -> `4531`).
+
+## Fas 6 Automation Experience (2026-05-06)
+
+- `app/automation/wow_flows.py` adds pure deterministic helpers for case summaries, risk detection, and wow-flow previews.
+- `GET /cases/{job_id}/automation-wow` exposes the Phase 6 payload without external writes.
+- `GET /cases/{job_id}` now includes `automation_summary`, `automation_risks`, and `wow_flows` for the existing case UI.
+- Admin case detail shows an automation overview with next step, evidence, risks, and three safe preview flows: approved customer reply, case-to-project handoff, and project-to-invoice-ready package.
+- Risk signals cover failed jobs/actions, pending approvals, missing customer information, blocked projects, incomplete delivery package, low margin, and stale active cases.
+
+## Fas 7 Ready-to-Market Hardening (2026-05-06)
+
+- `GET /admin/usage/analytics` — admin-protected, read-only usage analytics across all tenants.
+- Reports tenant count, active customers, active tenants in range, jobs created/completed, pending approvals, blocked flows, controlled-dispatch totals, automation rate, and estimated time saved.
+- Supports `range=today|7d|30d|all` with default `30d`.
+- Uses only existing DB state (`tenant_configs`, `jobs`, `approval_requests`, `integration_events`); no external API calls and no secrets in response.
+- `app/analytics/usage.py` contains the deterministic aggregation service for reuse in future pilot dashboards.
+
 ## Next likely product step
 
 - **Scheduler / cron trigger** — wire a periodic external trigger to call `POST /gmail/process-inbox`
 - **Dashboard polish** — date-range filters, charts, auto-refresh interval
-- **Finance layer (next major focus)** — bookkeeping support, VAT handling, invoice workflows and accounting-assist features as a new backoffice core layer
+- **Finance sync expansion** — broaden finance sync patterns beyond the initial approval-gated Fortnox pre-accounting export flow
 
 ## Known issues / filesystem
 - `pyproject.toml` is a directory (not a file) in the local filesystem — not tracked in git; does not affect runtime

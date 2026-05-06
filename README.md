@@ -290,6 +290,19 @@ python -m pytest
 
 Expected: 326 passed.
 
+For a consolidated R1 release-candidate gate (regression + E2E pilot flow), run:
+
+```bash
+python -m scripts.run_release_gate_r1
+```
+
+Run one phase only:
+
+```bash
+python -m scripts.run_release_gate_r1 --phase regression
+python -m scripts.run_release_gate_r1 --phase e2e
+```
+
 ---
 
 ## Gmail Integration (Working Setup)

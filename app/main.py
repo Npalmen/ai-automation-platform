@@ -1,4 +1,5 @@
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -7,6 +8,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_db
+from app.automation.wow_flows import build_automation_case_payload
 from app.core.audit_list_response_schemas import AuditEventListResponse
 from app.core.audit_service import create_audit_event
 from app.core.admin_auth import require_admin_api_key
@@ -137,6 +139,35 @@ def tenant_info(
     }
 
 
+def _build_tenant_context_payload(tenant_id: str, db: Session) -> dict:
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    cfg = get_tenant_config(tenant_id, db=db)
+    control = _build_control_response(TenantConfigRepository.get_settings(db, tenant_id))
+    onboarding = onboarding_status(db=db, tenant_id=tenant_id)
+    return {
+        "tenant_id": tenant_id,
+        "name": cfg.get("name"),
+        "enabled_job_types": cfg.get("enabled_job_types") or [],
+        "demo_mode": bool((control.get("automation") or {}).get("demo_mode", False)),
+        "onboarding": {
+            "status": onboarding.get("status"),
+            "percent": (onboarding.get("score") or {}).get("percent", 0),
+            "completed": (onboarding.get("score") or {}).get("completed", 0),
+            "total": (onboarding.get("score") or {}).get("total", 0),
+        },
+    }
+
+
+@app.get("/tenant/context")
+def tenant_context_current(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return tenant context for the authenticated tenant API key."""
+    return _build_tenant_context_payload(tenant_id=tenant_id, db=db)
+
+
 from pydantic import BaseModel as _BaseModel
 
 
@@ -170,6 +201,16 @@ def get_tenant_config_by_id(
         "auto_actions": config.get("auto_actions") or {},
         "allowed_integrations": allowed,
     }
+
+
+@app.get("/admin/tenant-context/{tenant_id}")
+def admin_tenant_context(
+    tenant_id: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """Return tenant context for admin tooling (navigation/onboarding context)."""
+    return _build_tenant_context_payload(tenant_id=tenant_id, db=db)
 
 
 @app.get("/tenants")
@@ -831,6 +872,16 @@ def approve_request(
         return _resolve_email_approval(db, approval, approved=True,
                                        actor=request.actor, note=request.note)
 
+    # Finance approvals: execute the stored Fortnox payload after operator approval
+    if approval.next_on_approve == "finance_fortnox_export":
+        return _resolve_finance_fortnox_approval(
+            db=db,
+            approval=approval,
+            approved=True,
+            actor=request.actor,
+            note=request.note,
+        )
+
     job = resolve_approval(
         db=db,
         tenant_id=tenant_id,
@@ -879,6 +930,16 @@ def reject_request(
     if approval.next_on_approve == "email_send":
         return _resolve_email_approval(db, approval, approved=False,
                                        actor=request.actor, note=request.note)
+
+    # Finance approvals: close without any external Fortnox write
+    if approval.next_on_approve == "finance_fortnox_export":
+        return _resolve_finance_fortnox_approval(
+            db=db,
+            approval=approval,
+            approved=False,
+            actor=request.actor,
+            note=request.note,
+        )
 
     job = resolve_approval(
         db=db,
@@ -1749,6 +1810,7 @@ _DEFAULT_CONTROL = {
         "support_enabled":  True,
         "invoices_enabled": True,
         "followups_enabled": True,
+        "demo_mode": False,
     },
     "support_email": "",
     "scheduler": {
@@ -1766,6 +1828,7 @@ def _build_control_response(settings: dict) -> dict:
             "support_enabled":   bool(auto.get("support_enabled",  _DEFAULT_CONTROL["automation"]["support_enabled"])),
             "invoices_enabled":  bool(auto.get("invoices_enabled", _DEFAULT_CONTROL["automation"]["invoices_enabled"])),
             "followups_enabled": bool(auto.get("followups_enabled",_DEFAULT_CONTROL["automation"]["followups_enabled"])),
+            "demo_mode":         bool(auto.get("demo_mode",        _DEFAULT_CONTROL["automation"]["demo_mode"])),
         },
         "support_email": settings.get("support_email") or "",
         "scheduler": {
@@ -1774,12 +1837,20 @@ def _build_control_response(settings: dict) -> dict:
     }
 
 
+def _is_demo_mode_enabled(settings: dict) -> bool:
+    """Return whether this tenant is explicitly marked as demo/test."""
+    if not isinstance(settings, dict):
+        return False
+    return bool(((settings or {}).get("automation") or {}).get("demo_mode", False))
+
+
 class ControlPanelRequest(_BaseModel):
     class _Automation(_BaseModel):
         leads_enabled:    bool = True
         support_enabled:  bool = True
         invoices_enabled: bool = True
         followups_enabled: bool = True
+        demo_mode: bool = False
 
     class _Scheduler(_BaseModel):
         run_mode: str = "manual"
@@ -1827,6 +1898,7 @@ def put_control_panel(
             "support_enabled":   request.automation.support_enabled,
             "invoices_enabled":  request.automation.invoices_enabled,
             "followups_enabled": request.automation.followups_enabled,
+            "demo_mode":         request.automation.demo_mode,
         },
         "support_email": email,
         "scheduler": {"run_mode": run_mode},
@@ -1849,6 +1921,20 @@ def trigger_inbox_sync(
 
     Returns 503 with a clean JSON body if Gmail credentials are not configured.
     """
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    ctrl_settings = TenantConfigRepository.get_settings(db, tenant_id)
+    if _is_demo_mode_enabled(ctrl_settings):
+        return {
+            "status": "demo_mode",
+            "processed": 0,
+            "created_jobs": 0,
+            "continued_threads": 0,
+            "deduped": 0,
+            "errors": [],
+            "message": "Demo-läge är aktivt — live inbox-sync är spärrad. Använd demo-data i Onboarding.",
+        }
+
     s = get_settings()
     if not s.GOOGLE_MAIL_ACCESS_TOKEN:
         raise HTTPException(
@@ -1955,11 +2041,13 @@ def _build_setup_status(
     auto  = ctrl_settings.get("automation") or {}
     scheduler_mode     = sched.get("run_mode") or "manual"
     followups_enabled  = bool(auto.get("followups_enabled", True))
+    demo_mode          = bool(auto.get("demo_mode", False))
     support_email      = ctrl_settings.get("support_email") or ""
 
     automation = {
         "scheduler_mode":    scheduler_mode,
         "followups_enabled": followups_enabled,
+        "demo_mode":         demo_mode,
     }
 
     # Readiness scoring
@@ -2133,7 +2221,23 @@ def post_setup_verify(
         overall = "ok"
         message = "System ready for onboarding"
 
-    return {"status": overall, "checks": checks, "message": message}
+    signal: dict | None = None
+    if overall == "failed":
+        signal = {
+            "severity": "critical",
+            "title": "Setup verification failed",
+            "action": "Fix failed checks before enabling scheduled pilot operations.",
+            "runbook_ref": "docs/12-production-guide.md#pre-launch-checklist",
+        }
+    elif overall == "warning":
+        signal = {
+            "severity": "warning",
+            "title": "Setup verification has warnings",
+            "action": "Review warning checks and run a manual smoke flow before go-live.",
+            "runbook_ref": "docs/12-production-guide.md#pre-launch-checklist",
+        }
+
+    return {"status": overall, "checks": checks, "message": message, "runbook_signal": signal}
 
 
 # ── Notifications ─────────────────────────────────────────────────────────────
@@ -2302,6 +2406,7 @@ def _run_scheduler_pass(tenant_id: str, db: "Session", now_utc: "datetime") -> d
     sched = ctrl.get("scheduler") or {}
     run_mode = sched.get("run_mode") or "manual"
     state = ctrl.get("scheduler_state") or {}
+    demo_mode = _is_demo_mode_enabled(ctrl)
 
     inbox_sync_result: dict | None = None
     digest_result: dict | None = None
@@ -2309,7 +2414,9 @@ def _run_scheduler_pass(tenant_id: str, db: "Session", now_utc: "datetime") -> d
 
     try:
         # ── Inbox sync ────────────────────────────────────────────────────────
-        if run_mode == "scheduled":
+        if demo_mode:
+            inbox_sync_result = {"skipped": True, "reason": "demo_mode"}
+        elif run_mode == "scheduled":
             if not s.GOOGLE_MAIL_ACCESS_TOKEN:
                 inbox_sync_result = {"skipped": True, "reason": "gmail_not_configured"}
             else:
@@ -2334,7 +2441,9 @@ def _run_scheduler_pass(tenant_id: str, db: "Session", now_utc: "datetime") -> d
         send_hour       = notif.get("send_hour", 8)
         recipient       = notif.get("recipient_email") or ""
 
-        if not notif_enabled or not recipient:
+        if demo_mode:
+            digest_result = {"skipped": True, "reason": "demo_mode"}
+        elif not notif_enabled or not recipient:
             digest_result = {"skipped": True, "reason": "notifications_disabled_or_no_recipient"}
         elif now_utc.hour < send_hour:
             digest_result = {"skipped": True, "reason": f"before_send_hour ({now_utc.hour} < {send_hour})"}
@@ -2466,6 +2575,109 @@ _CASES_SORT_COLUMNS = {
 _CASES_VALID_SORT_DIR = {"asc", "desc"}
 
 
+def _parse_iso_datetime(value: str | None):
+    if not value:
+        return None
+    try:
+        from datetime import datetime
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _build_case_timeline(
+    *,
+    inp: dict,
+    thread_messages: list[dict],
+    action_records: list,
+    approval_records: list,
+    history: list[dict],
+) -> list[dict]:
+    events: list[dict] = []
+
+    received_at = inp.get("received_at")
+    if received_at:
+        events.append({
+            "timestamp": received_at,
+            "kind": "inbound_received",
+            "title": "Inkommande meddelande",
+            "status": "completed",
+        })
+
+    for msg in thread_messages:
+        if msg.get("direction") != "incoming":
+            continue
+        ts = msg.get("created_at")
+        if not ts:
+            continue
+        events.append({
+            "timestamp": ts,
+            "kind": "conversation_inbound",
+            "title": "Kundsvar mottaget",
+            "status": "completed",
+        })
+
+    for entry in history:
+        if entry.get("processor") != "action_dispatch_processor":
+            continue
+        payload = (entry.get("result") or {}).get("payload") or {}
+        lead_sla = payload.get("lead_sla") or {}
+        if lead_sla.get("enabled") and lead_sla.get("first_follow_up_due_at"):
+            due_at = lead_sla.get("first_follow_up_due_at")
+            status = "warning" if lead_sla.get("status") in {"pending", "breached"} else "completed"
+            events.append({
+                "timestamp": due_at,
+                "kind": "sla_deadline",
+                "title": "SLA: första uppföljning",
+                "status": status,
+                "meta": {
+                    "sla_status": lead_sla.get("status"),
+                    "follow_up_state": lead_sla.get("first_follow_up_state"),
+                },
+            })
+        break
+
+    for approval in approval_records:
+        payload = approval.request_payload or {}
+        title = payload.get("title") or "Godkännande"
+        state = approval.state or "unknown"
+        ts = (
+            approval.resolved_at.isoformat() if approval.resolved_at
+            else approval.requested_at.isoformat() if approval.requested_at
+            else approval.created_at.isoformat()
+        )
+        events.append({
+            "timestamp": ts,
+            "kind": "approval",
+            "title": title,
+            "status": state,
+            "meta": {
+                "approval_id": approval.approval_id,
+                "next_on_approve": approval.next_on_approve,
+                "resolved_by": approval.resolved_by,
+            },
+        })
+
+    for action in action_records:
+        ts = action.executed_at.isoformat() if action.executed_at else None
+        if not ts:
+            continue
+        events.append({
+            "timestamp": ts,
+            "kind": "action",
+            "title": f"Aktion: {action.action_type}",
+            "status": action.status,
+        })
+
+    events.sort(
+        key=lambda item: (
+            _parse_iso_datetime(item.get("timestamp")) is None,
+            _parse_iso_datetime(item.get("timestamp")) or item.get("timestamp"),
+        )
+    )
+    return events
+
+
 def _derive_case_fields(r: "JobRecord") -> dict:
     """Extract derived display fields from a JobRecord (shared by list and detail)."""
     inp = r.input_data or {}
@@ -2509,6 +2721,14 @@ def _derive_case_fields(r: "JobRecord") -> dict:
 
     received_at: str | None = inp.get("received_at") or None
     processed_at: str | None = r.created_at.isoformat() if r.created_at else None
+    sla_status: str | None = None
+    for entry in reversed(history):
+        if entry.get("processor") != "action_dispatch_processor":
+            continue
+        payload = (entry.get("result") or {}).get("payload") or {}
+        lead_sla = payload.get("lead_sla") or {}
+        sla_status = lead_sla.get("status")
+        break
 
     return {
         "subject":       subject,
@@ -2517,6 +2737,7 @@ def _derive_case_fields(r: "JobRecord") -> dict:
         "priority":      priority,
         "received_at":   received_at,
         "processed_at":  processed_at,
+        "sla_status":    sla_status,
     }
 
 
@@ -2578,6 +2799,7 @@ def list_cases(
             "customer_name":  derived["customer_name"],
             "customer_email": derived["customer_email"],
             "priority":       derived["priority"],
+            "sla_status":     derived["sla_status"],
         })
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
@@ -2642,6 +2864,11 @@ def get_case(
         )
         .order_by(ActionExecutionRecord.executed_at.asc())
         .all()
+    )
+    approval_records = ApprovalRequestRepository.list_for_job(
+        db=db,
+        tenant_id=tenant_id,
+        job_id=job_id,
     )
     actions = [
         {
@@ -2736,6 +2963,25 @@ def get_case(
             support_payload = (entry.get("result") or {}).get("payload") or {}
             break
 
+    action_dispatch_payload: dict = {}
+    for entry in reversed(history):
+        if entry.get("processor") == "action_dispatch_processor":
+            action_dispatch_payload = (entry.get("result") or {}).get("payload") or {}
+            break
+
+    timeline = _build_case_timeline(
+        inp=inp,
+        thread_messages=thread_messages,
+        action_records=action_records,
+        approval_records=approval_records,
+        history=history,
+    )
+    automation_case = build_automation_case_payload(
+        r,
+        action_records=action_records,
+        approval_records=approval_records,
+    )
+
     support_status = (inp.get("support_status")
                       or support_payload.get("support_status"))
 
@@ -2758,9 +3004,12 @@ def get_case(
         "original_message": original_message,
         "extracted_data":   extracted_data,
         "thread_messages":  thread_messages,
+        "timeline":         timeline,
         "actions":          actions,
         "errors":           errors,
         "routing_preview":  routing_preview,
+        "lead_sla":                     action_dispatch_payload.get("lead_sla"),
+        "ai_reply_suggestions":         action_dispatch_payload.get("ai_reply_suggestions") or [],
         # Lead analysis (present only for lead job_type)
         "lead_analysis":                la or None,
         "missing_fields":               mi.get("missing_fields"),
@@ -2794,7 +3043,622 @@ def get_case(
         "support_tenant_context_used":  sa.get("tenant_context_used"),
         "support_context_sources":      sa.get("context_sources"),
         "support_business_risk_reason": sp.get("business_risk_reason"),
+        "operations_workspace":         _merge_operations_workspace(inp.get("operations_workspace")),
+        "automation_summary":           automation_case["summary"],
+        "automation_risks":             automation_case["risks"],
+        "wow_flows":                    automation_case["wow_flows"],
     }
+
+
+@app.get("/cases/{job_id}/automation-wow")
+def get_case_automation_wow(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return deterministic Phase 6 automation summary, risks, and safe flow previews."""
+    from app.repositories.postgres.action_execution_models import ActionExecutionRecord
+
+    record = (
+        db.query(JobRecord)
+        .filter(JobRecord.job_id == job_id, JobRecord.tenant_id == tenant_id)
+        .first()
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    action_records = (
+        db.query(ActionExecutionRecord)
+        .filter(
+            ActionExecutionRecord.job_id == job_id,
+            ActionExecutionRecord.tenant_id == tenant_id,
+        )
+        .order_by(ActionExecutionRecord.executed_at.asc())
+        .all()
+    )
+    approval_records = ApprovalRequestRepository.list_for_job(
+        db=db,
+        tenant_id=tenant_id,
+        job_id=job_id,
+    )
+    return {
+        "job_id": job_id,
+        **build_automation_case_payload(
+            record,
+            action_records=action_records,
+            approval_records=approval_records,
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Operations Workspace v1 (Slice 4 + 5)
+# ---------------------------------------------------------------------------
+
+_VALID_WORK_ORDER_STATUSES = {
+    "new", "planned", "scheduled", "in_progress", "blocked", "completed", "cancelled",
+}
+_VALID_PROJECT_STATUSES = {
+    "intake", "planning", "active", "handover", "done", "on_hold",
+}
+_VALID_TASK_STATUSES = {
+    "todo", "in_progress", "done", "blocked",
+}
+_VALID_DELIVERY_PACKAGE_STATUSES = {
+    "not_started", "collecting", "ready", "sent",
+}
+_VALID_DOCUMENTATION_BUCKETS = {"before_images", "after_images", "documents"}
+
+
+def _checklist_item(item_id: str, label: str) -> dict:
+    return {
+        "id": item_id,
+        "label": label,
+        "done": False,
+        "note": None,
+        "updated_at": None,
+    }
+
+
+_INSTALLER_CHECKLIST_TEMPLATES: dict[str, dict[str, list[dict]]] = {
+    "general": {
+        "site_survey": [
+            _checklist_item("access_confirmed", "Atkomst till fastigheten bekräftad"),
+            _checklist_item("site_conditions_documented", "Förutsättningar på plats dokumenterade"),
+            _checklist_item("customer_requirements_confirmed", "Kundens krav och omfattning bekräftade"),
+        ],
+        "installation": [
+            _checklist_item("materials_available", "Material och utrustning finns på plats"),
+            _checklist_item("installation_completed", "Installation genomförd"),
+            _checklist_item("work_area_cleaned", "Arbetsyta städad och återställd"),
+        ],
+        "commissioning": [
+            _checklist_item("function_test_passed", "Funktionstest godkänt"),
+            _checklist_item("safety_check_passed", "Säkerhetskontroll godkänd"),
+        ],
+        "handover": [
+            _checklist_item("customer_walkthrough_done", "Genomgång med kund genomförd"),
+            _checklist_item("documentation_collected", "Dokumentation och bilder insamlade"),
+            _checklist_item("ready_for_invoice", "Underlag redo för fakturering"),
+        ],
+    },
+    "solar": {
+        "site_survey": [
+            _checklist_item("roof_condition_checked", "Takets skick och bärighet kontrollerad"),
+            _checklist_item("electrical_capacity_checked", "Elcentral och kapacitet kontrollerad"),
+            _checklist_item("shading_documented", "Skuggning och placering dokumenterad"),
+        ],
+        "installation": [
+            _checklist_item("mounting_installed", "Montagesystem installerat"),
+            _checklist_item("panels_installed", "Paneler installerade"),
+            _checklist_item("inverter_connected", "Växelriktare ansluten"),
+        ],
+        "commissioning": [
+            _checklist_item("production_test_passed", "Produktionstest godkänt"),
+            _checklist_item("monitoring_enabled", "Övervakning aktiverad"),
+        ],
+        "handover": [
+            _checklist_item("customer_walkthrough_done", "Genomgång med kund genomförd"),
+            _checklist_item("documentation_collected", "Dokumentation och bilder insamlade"),
+            _checklist_item("ready_for_invoice", "Underlag redo för fakturering"),
+        ],
+    },
+    "ev_charger": {
+        "site_survey": [
+            _checklist_item("parking_location_confirmed", "Placering vid parkeringsplats bekräftad"),
+            _checklist_item("electrical_capacity_checked", "Elcentral och säkringsnivå kontrollerad"),
+            _checklist_item("cable_route_documented", "Kabeldragning dokumenterad"),
+        ],
+        "installation": [
+            _checklist_item("charger_mounted", "Laddbox monterad"),
+            _checklist_item("cabling_completed", "Kabeldragning genomförd"),
+            _checklist_item("load_balancing_configured", "Lastbalansering konfigurerad"),
+        ],
+        "commissioning": [
+            _checklist_item("charging_test_passed", "Laddtest godkänt"),
+            _checklist_item("app_pairing_verified", "App/konto verifierat med kund"),
+        ],
+        "handover": [
+            _checklist_item("customer_walkthrough_done", "Genomgång med kund genomförd"),
+            _checklist_item("documentation_collected", "Dokumentation och bilder insamlade"),
+            _checklist_item("ready_for_invoice", "Underlag redo för fakturering"),
+        ],
+    },
+}
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _default_operations_workspace() -> dict:
+    return {
+        "customer": {
+            "name": None,
+            "phone": None,
+            "email": None,
+        },
+        "property": {
+            "address": None,
+            "property_type": None,
+            "access_notes": None,
+        },
+        "project": {
+            "project_code": None,
+            "name": None,
+            "status": "intake",
+            "technician": None,
+            "installation_type": None,
+        },
+        "work_order": {
+            "status": "new",
+            "scheduled_start_at": None,
+            "scheduled_end_at": None,
+            "technician": None,
+        },
+        "checklists": {
+            phase: [dict(item) for item in items]
+            for phase, items in _INSTALLER_CHECKLIST_TEMPLATES["general"].items()
+        },
+        "documentation": {
+            "before_images": [],
+            "after_images": [],
+            "documents": [],
+        },
+        "delivery_package": {
+            "status": "not_started",
+            "items": [],
+            "sent_at": None,
+            "recipient_email": None,
+        },
+        "timeline": [],
+        "internal_notes": [],
+        "tasks": [],
+        "attachments": [],
+    }
+
+
+def _merge_operations_workspace(data: dict | None) -> dict:
+    """Merge user data into v1 operations defaults without clobbering shape."""
+    merged = _default_operations_workspace()
+    if not isinstance(data, dict):
+        return merged
+
+    for key, value in data.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key].update(value)
+        elif key in ("timeline", "internal_notes", "tasks", "attachments") and isinstance(value, list):
+            merged[key] = value
+        elif key in merged:
+            merged[key] = value
+        else:
+            # Keep unknown keys for forward compatibility.
+            merged[key] = value
+    return merged
+
+
+def _apply_operations_workspace_patch(current: dict, patch: dict | None) -> dict:
+    """Apply a partial update without dropping nested workspace keys."""
+    merged = _merge_operations_workspace(current)
+    if not isinstance(patch, dict):
+        return merged
+    for key, value in patch.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key].update(value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _build_installer_checklists(installation_type: str | None = None) -> dict:
+    template_key = (installation_type or "general").strip().lower() or "general"
+    template = _INSTALLER_CHECKLIST_TEMPLATES.get(template_key, _INSTALLER_CHECKLIST_TEMPLATES["general"])
+    return {
+        phase: [dict(item) for item in items]
+        for phase, items in template.items()
+    }
+
+
+def _merge_checklist_templates(existing: dict, template: dict, *, replace: bool = False) -> dict:
+    if replace:
+        return {
+            phase: [dict(item) for item in items]
+            for phase, items in template.items()
+        }
+
+    merged = {
+        phase: list(existing.get(phase) or [])
+        for phase in _INSTALLER_CHECKLIST_TEMPLATES["general"].keys()
+    }
+    for phase, items in template.items():
+        by_id = {
+            item.get("id"): item
+            for item in merged.get(phase, [])
+            if isinstance(item, dict) and item.get("id")
+        }
+        for item in items:
+            if item["id"] not in by_id:
+                merged.setdefault(phase, []).append(dict(item))
+    return merged
+
+
+def _validate_operations_workspace_shape(workspace: dict) -> None:
+    work_order = workspace.get("work_order") or {}
+    wo_status = work_order.get("status")
+    if wo_status and wo_status not in _VALID_WORK_ORDER_STATUSES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid work_order.status '{wo_status}'. Valid: {sorted(_VALID_WORK_ORDER_STATUSES)}",
+        )
+
+    project = workspace.get("project") or {}
+    project_status = project.get("status")
+    if project_status and project_status not in _VALID_PROJECT_STATUSES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid project.status '{project_status}'. Valid: {sorted(_VALID_PROJECT_STATUSES)}",
+        )
+
+    delivery = workspace.get("delivery_package") or {}
+    delivery_status = delivery.get("status")
+    if delivery_status and delivery_status not in _VALID_DELIVERY_PACKAGE_STATUSES:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Invalid delivery_package.status '{delivery_status}'. "
+                f"Valid: {sorted(_VALID_DELIVERY_PACKAGE_STATUSES)}"
+            ),
+        )
+
+    tasks = workspace.get("tasks") or []
+    if isinstance(tasks, list):
+        for idx, task in enumerate(tasks):
+            if not isinstance(task, dict):
+                continue
+            task_status = task.get("status")
+            if task_status and task_status not in _VALID_TASK_STATUSES:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Invalid tasks[{idx}].status '{task_status}'. Valid: {sorted(_VALID_TASK_STATUSES)}",
+                )
+
+
+def _get_case_record_for_operations(db: Session, tenant_id: str, job_id: str) -> JobRecord:
+    r = (
+        db.query(JobRecord)
+        .filter(JobRecord.job_id == job_id, JobRecord.tenant_id == tenant_id)
+        .first()
+    )
+    if r is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return r
+
+
+def _persist_operations_workspace(r: JobRecord, workspace: dict, db: Session) -> dict:
+    _validate_operations_workspace_shape(workspace)
+    updated_input = dict(r.input_data or {})
+    updated_input["operations_workspace"] = workspace
+    r.input_data = updated_input
+    db.commit()
+    return workspace
+
+
+class OperationsWorkspaceUpdateRequest(_BaseModel):
+    workspace: dict
+
+
+class OperationsTimelineEventRequest(_BaseModel):
+    message: str
+    event_type: str = "note"
+    metadata: dict | None = None
+
+
+class OperationsTaskCreateRequest(_BaseModel):
+    title: str
+    assignee: str | None = None
+    due_at: str | None = None
+
+
+class OperationsAttachmentCreateRequest(_BaseModel):
+    name: str
+    url: str | None = None
+    category: str = "document"
+
+
+class OperationsChecklistUpdateRequest(_BaseModel):
+    checklist: str
+    item_id: str
+    label: str | None = None
+    done: bool = True
+    note: str | None = None
+
+
+class OperationsChecklistTemplateRequest(_BaseModel):
+    installation_type: str | None = None
+    replace: bool = False
+
+
+class OperationsDocumentationCreateRequest(_BaseModel):
+    bucket: str
+    name: str
+    url: str | None = None
+    note: str | None = None
+    taken_at: str | None = None
+
+
+class DeliveryPackageUpdateRequest(_BaseModel):
+    status: str
+    recipient_email: str | None = None
+    items: list[dict] | None = None
+
+
+@app.get("/cases/{job_id}/operations")
+def get_case_operations_workspace(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return case-level operations/project workspace for installer workflows."""
+    r = _get_case_record_for_operations(db, tenant_id, job_id)
+    workspace = _merge_operations_workspace((r.input_data or {}).get("operations_workspace"))
+    return {"job_id": job_id, "workspace": workspace}
+
+
+@app.put("/cases/{job_id}/operations")
+def put_case_operations_workspace(
+    job_id: str,
+    body: OperationsWorkspaceUpdateRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Merge and persist operations workspace v1.
+
+    Used for work order status, project context, installer checklists, and
+    delivery package preparation in a single tenant-scoped case record.
+    """
+    r = _get_case_record_for_operations(db, tenant_id, job_id)
+    current = _merge_operations_workspace((r.input_data or {}).get("operations_workspace"))
+    merged = _apply_operations_workspace_patch(current, body.workspace)
+    saved = _persist_operations_workspace(r, merged, db)
+    return {"status": "ok", "job_id": job_id, "workspace": saved}
+
+
+@app.post("/cases/{job_id}/operations/timeline")
+def add_case_operations_timeline_event(
+    job_id: str,
+    body: OperationsTimelineEventRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Append a timeline event for project/work-order traceability."""
+    r = _get_case_record_for_operations(db, tenant_id, job_id)
+    workspace = _merge_operations_workspace((r.input_data or {}).get("operations_workspace"))
+    timeline = list(workspace.get("timeline") or [])
+    timeline.append(
+        {
+            "id": str(uuid4()),
+            "created_at": _utc_now_iso(),
+            "event_type": body.event_type,
+            "message": body.message,
+            "metadata": body.metadata or {},
+        }
+    )
+    workspace["timeline"] = timeline
+    saved = _persist_operations_workspace(r, workspace, db)
+    return {"status": "ok", "job_id": job_id, "timeline_count": len(saved["timeline"])}
+
+
+@app.post("/cases/{job_id}/operations/tasks")
+def add_case_operations_task(
+    job_id: str,
+    body: OperationsTaskCreateRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Add an installer task under the case operations workspace."""
+    r = _get_case_record_for_operations(db, tenant_id, job_id)
+    workspace = _merge_operations_workspace((r.input_data or {}).get("operations_workspace"))
+    tasks = list(workspace.get("tasks") or [])
+    tasks.append(
+        {
+            "id": str(uuid4()),
+            "title": body.title,
+            "assignee": body.assignee,
+            "status": "todo",
+            "due_at": body.due_at,
+            "created_at": _utc_now_iso(),
+        }
+    )
+    workspace["tasks"] = tasks
+    saved = _persist_operations_workspace(r, workspace, db)
+    return {"status": "ok", "job_id": job_id, "tasks_count": len(saved["tasks"])}
+
+
+@app.post("/cases/{job_id}/operations/attachments")
+def add_case_operations_attachment(
+    job_id: str,
+    body: OperationsAttachmentCreateRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Add document/photo attachment metadata to the case workspace."""
+    r = _get_case_record_for_operations(db, tenant_id, job_id)
+    workspace = _merge_operations_workspace((r.input_data or {}).get("operations_workspace"))
+    attachments = list(workspace.get("attachments") or [])
+    attachments.append(
+        {
+            "id": str(uuid4()),
+            "name": body.name,
+            "url": body.url,
+            "category": body.category,
+            "created_at": _utc_now_iso(),
+        }
+    )
+    workspace["attachments"] = attachments
+    saved = _persist_operations_workspace(r, workspace, db)
+    return {"status": "ok", "job_id": job_id, "attachments_count": len(saved["attachments"])}
+
+
+@app.patch("/cases/{job_id}/operations/checklists")
+def update_case_operations_checklist(
+    job_id: str,
+    body: OperationsChecklistUpdateRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Upsert/toggle checklist item state for installation phases."""
+    r = _get_case_record_for_operations(db, tenant_id, job_id)
+    workspace = _merge_operations_workspace((r.input_data or {}).get("operations_workspace"))
+    checklists = workspace.get("checklists") or {}
+    if body.checklist not in checklists:
+        raise HTTPException(status_code=422, detail=f"Unknown checklist '{body.checklist}'")
+
+    entries = list(checklists.get(body.checklist) or [])
+    found = False
+    for item in entries:
+        if item.get("id") == body.item_id:
+            item["done"] = body.done
+            if body.note is not None:
+                item["note"] = body.note
+            item["updated_at"] = _utc_now_iso()
+            found = True
+            break
+    if not found:
+        entries.append(
+            {
+                "id": body.item_id,
+                "label": body.label or body.item_id,
+                "done": body.done,
+                "note": body.note,
+                "updated_at": _utc_now_iso(),
+            }
+        )
+    checklists[body.checklist] = entries
+    workspace["checklists"] = checklists
+    saved = _persist_operations_workspace(r, workspace, db)
+    return {"status": "ok", "job_id": job_id, "checklists": saved["checklists"]}
+
+
+@app.post("/cases/{job_id}/operations/checklists/template")
+def apply_case_operations_checklist_template(
+    job_id: str,
+    body: OperationsChecklistTemplateRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Seed installer phase checklists for a project type without external side effects."""
+    r = _get_case_record_for_operations(db, tenant_id, job_id)
+    workspace = _merge_operations_workspace((r.input_data or {}).get("operations_workspace"))
+    installation_type = body.installation_type or (workspace.get("project") or {}).get("installation_type") or "general"
+    template = _build_installer_checklists(installation_type)
+    workspace["checklists"] = _merge_checklist_templates(
+        workspace.get("checklists") or {},
+        template,
+        replace=body.replace,
+    )
+    project = dict(workspace.get("project") or {})
+    project["installation_type"] = installation_type
+    workspace["project"] = project
+    saved = _persist_operations_workspace(r, workspace, db)
+    return {
+        "status": "ok",
+        "job_id": job_id,
+        "installation_type": installation_type,
+        "checklists": saved["checklists"],
+    }
+
+
+@app.post("/cases/{job_id}/operations/documentation")
+def add_case_operations_documentation(
+    job_id: str,
+    body: OperationsDocumentationCreateRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Add before/after photo or document metadata to the installer documentation flow."""
+    if body.bucket not in _VALID_DOCUMENTATION_BUCKETS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown documentation bucket '{body.bucket}'. Valid: {sorted(_VALID_DOCUMENTATION_BUCKETS)}",
+        )
+
+    r = _get_case_record_for_operations(db, tenant_id, job_id)
+    workspace = _merge_operations_workspace((r.input_data or {}).get("operations_workspace"))
+    documentation = dict(workspace.get("documentation") or {})
+    bucket_items = list(documentation.get(body.bucket) or [])
+    bucket_items.append(
+        {
+            "id": str(uuid4()),
+            "name": body.name,
+            "url": body.url,
+            "note": body.note,
+            "taken_at": body.taken_at,
+            "created_at": _utc_now_iso(),
+        }
+    )
+    documentation[body.bucket] = bucket_items
+    workspace["documentation"] = documentation
+    saved = _persist_operations_workspace(r, workspace, db)
+    return {
+        "status": "ok",
+        "job_id": job_id,
+        "bucket": body.bucket,
+        "count": len(saved["documentation"][body.bucket]),
+        "documentation": saved["documentation"],
+    }
+
+
+@app.post("/cases/{job_id}/operations/delivery-package")
+def update_case_delivery_package(
+    job_id: str,
+    body: DeliveryPackageUpdateRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Update delivery package status/items for installation handover."""
+    if body.status not in _VALID_DELIVERY_PACKAGE_STATUSES:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Invalid delivery package status '{body.status}'. "
+                f"Valid: {sorted(_VALID_DELIVERY_PACKAGE_STATUSES)}"
+            ),
+        )
+
+    r = _get_case_record_for_operations(db, tenant_id, job_id)
+    workspace = _merge_operations_workspace((r.input_data or {}).get("operations_workspace"))
+    delivery = dict(workspace.get("delivery_package") or {})
+    delivery["status"] = body.status
+    if body.recipient_email is not None:
+        delivery["recipient_email"] = body.recipient_email
+    if body.items is not None:
+        delivery["items"] = body.items
+    if body.status == "sent":
+        delivery["sent_at"] = _utc_now_iso()
+    workspace["delivery_package"] = delivery
+    saved = _persist_operations_workspace(r, workspace, db)
+    return {"status": "ok", "job_id": job_id, "delivery_package": saved["delivery_package"]}
 
 
 # ---------------------------------------------------------------------------
@@ -3207,6 +4071,395 @@ def fortnox_invoice_lookup(
     limit = min(int(body.get("limit") or 10), 50)
     invoices = client.find_recent_invoices_by_customer(cust_number, limit=limit)
     return {"invoices": invoices}
+
+
+def _extract_invoice_payload_from_history(record: JobRecord) -> dict:
+    history = record.processor_history or []
+    for entry in reversed(history):
+        if entry.get("processor") != "invoice_processor":
+            continue
+        payload = (entry.get("result") or {}).get("payload") or {}
+        if isinstance(payload, dict):
+            return payload.get("invoice_data") or {}
+    return {}
+
+
+def _get_invoice_record_or_422(db: Session, tenant_id: str, job_id: str) -> JobRecord:
+    record = (
+        db.query(JobRecord)
+        .filter(JobRecord.job_id == job_id, JobRecord.tenant_id == tenant_id)
+        .first()
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if record.job_type != "invoice":
+        raise HTTPException(status_code=422, detail="Job is not an invoice")
+    return record
+
+
+class FinanceFortnoxExportRequest(_BaseModel):
+    create_customer_if_missing: bool = True
+    approval_required: bool = True
+    dry_run: bool = False
+
+
+def _finance_fortnox_idempotency_key(tenant_id: str, job_id: str) -> str:
+    return f"finance:fortnox_export:{tenant_id}:{job_id}"
+
+
+def _get_successful_finance_export_event(db: Session, tenant_id: str, job_id: str):
+    from app.domain.integrations.models import IntegrationEvent
+
+    key = _finance_fortnox_idempotency_key(tenant_id, job_id)
+    event = IntegrationRepository(db).get_by_idempotency_key(key)
+    if isinstance(event, IntegrationEvent) and event.status == "success":
+        return event
+    return None
+
+
+def _finance_event_response(event) -> dict:
+    payload = event.payload or {}
+    return {
+        "status": "already_exported",
+        "integration_event_id": event.id,
+        "idempotency_key": event.idempotency_key,
+        "draft": payload.get("draft"),
+        "invoice": (payload.get("result") or {}).get("invoice"),
+        "customer_number": (payload.get("result") or {}).get("customer_number"),
+        "customer_created": (payload.get("result") or {}).get("customer_created", False),
+    }
+
+
+def _record_finance_fortnox_event(
+    db: Session,
+    *,
+    tenant_id: str,
+    job_id: str,
+    draft: dict,
+    export_payload: dict,
+    result: dict,
+):
+    from app.domain.integrations.models import IntegrationEvent
+
+    record = IntegrationEvent(
+        tenant_id=tenant_id,
+        job_id=job_id,
+        integration_type="fortnox",
+        payload={
+            "action": "finance_fortnox_export",
+            "request": export_payload,
+            "draft": draft,
+            "result": result,
+        },
+        status="success",
+        attempts=1,
+        idempotency_key=_finance_fortnox_idempotency_key(tenant_id, job_id),
+    )
+    repo = IntegrationRepository(db)
+    try:
+        return repo.create(record)
+    except Exception:
+        db.rollback()
+        return repo.get_by_idempotency_key(record.idempotency_key)
+
+
+def _execute_finance_fortnox_export(
+    *,
+    db: Session,
+    tenant_id: str,
+    job_id: str,
+    draft: dict,
+    export_payload: dict,
+    create_customer_if_missing: bool,
+) -> dict:
+    existing_event = _get_successful_finance_export_event(db, tenant_id, job_id)
+    if existing_event is not None:
+        return _finance_event_response(existing_event)
+
+    client = _get_fortnox_client_or_raise()
+    customer_payload = export_payload["customer"]
+    invoice_payload = dict(export_payload["invoice"])
+    customer_number = customer_payload.get("CustomerNumber")
+
+    existing_customer = None
+    if draft.get("supplier_email"):
+        existing_customer = client.find_customer_by_email(draft["supplier_email"])
+    if existing_customer is None and draft.get("supplier_name"):
+        existing_customer = client.find_customer_by_name(draft["supplier_name"])
+
+    customer_created = False
+    if existing_customer is None and create_customer_if_missing:
+        created = client.create_customer(customer_payload)
+        existing_customer = created.get("Customer") or created
+        customer_created = True
+
+    if existing_customer is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Fortnox customer not found and create_customer_if_missing=false.",
+        )
+
+    customer_number = existing_customer.get("CustomerNumber") or customer_number
+    invoice_payload["CustomerNumber"] = customer_number
+    invoice_result = client.create_invoice(invoice_payload)
+    result = {
+        "customer_created": customer_created,
+        "customer_number": customer_number,
+        "invoice": invoice_result.get("Invoice") or invoice_result,
+    }
+    event = _record_finance_fortnox_event(
+        db,
+        tenant_id=tenant_id,
+        job_id=job_id,
+        draft=draft,
+        export_payload={**export_payload, "invoice": invoice_payload},
+        result=result,
+    )
+
+    return {
+        "status": "exported",
+        "customer_created": customer_created,
+        "customer_number": customer_number,
+        "draft": draft,
+        "invoice": result["invoice"],
+        "integration_event_id": getattr(event, "id", None),
+        "idempotency_key": _finance_fortnox_idempotency_key(tenant_id, job_id),
+    }
+
+
+def _create_finance_fortnox_approval(
+    *,
+    db: Session,
+    tenant_id: str,
+    job_id: str,
+    draft: dict,
+    export_payload: dict,
+    create_customer_if_missing: bool,
+):
+    approval_payload = {
+        "approval_id": f"finance_fortnox_export:{tenant_id}:{job_id}",
+        "state": "pending",
+        "channel": "dashboard",
+        "title": f"Fortnox-export: {draft.get('invoice_number') or job_id}",
+        "summary": (
+            f"Väntande export av fakturaunderlag till Fortnox "
+            f"({draft.get('amount_inc_vat') or draft.get('amount_ex_vat') or 0} "
+            f"{draft.get('currency', 'SEK')})."
+        ),
+        "requested_by": "system",
+        "requested_at": _utc_now_iso(),
+        "next_on_approve": "finance_fortnox_export",
+        "next_on_reject": "manual_review",
+        "finance_context": {
+            "system": "fortnox",
+            "job_id": job_id,
+            "idempotency_key": _finance_fortnox_idempotency_key(tenant_id, job_id),
+        },
+    }
+    delivery_payload = {
+        "draft": draft,
+        "fortnox_payload": export_payload,
+        "create_customer_if_missing": create_customer_if_missing,
+    }
+    return ApprovalRequestRepository.upsert_from_payload(
+        db=db,
+        tenant_id=tenant_id,
+        job_id=job_id,
+        job_type="invoice",
+        approval_request=approval_payload,
+        delivery_payload=delivery_payload,
+    )
+
+
+def _resolve_finance_fortnox_approval(
+    *,
+    db: Session,
+    approval,
+    approved: bool,
+    actor: str | None,
+    note: str | None,
+) -> dict:
+    payload = dict(approval.request_payload or {})
+    new_state = "approved" if approved else "rejected"
+    payload["state"] = new_state
+    payload["resolved_at"] = _utc_now_iso()
+    payload["resolved_by"] = actor or "operator"
+    payload["resolution_note"] = note
+
+    result = None
+    if approved:
+        delivery = approval.delivery_payload or {}
+        result = _execute_finance_fortnox_export(
+            db=db,
+            tenant_id=approval.tenant_id,
+            job_id=approval.job_id,
+            draft=delivery.get("draft") or {},
+            export_payload=delivery.get("fortnox_payload") or {},
+            create_customer_if_missing=bool(delivery.get("create_customer_if_missing", True)),
+        )
+
+    ApprovalRequestRepository.upsert_from_payload(
+        db=db,
+        tenant_id=approval.tenant_id,
+        job_id=approval.job_id,
+        job_type=approval.job_type,
+        approval_request=payload,
+        delivery_payload=approval.delivery_payload,
+    )
+
+    return {
+        "approval_id": approval.approval_id,
+        "status": new_state,
+        "job_id": approval.job_id,
+        "export_result": result,
+    }
+
+
+@app.post("/finance/invoices/{job_id}/draft")
+def build_finance_invoice_draft(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Build deterministic pre-accounting draft from an invoice job."""
+    from app.finance.pre_accounting import build_invoice_draft
+
+    record = _get_invoice_record_or_422(db, tenant_id, job_id)
+    invoice_payload = _extract_invoice_payload_from_history(record)
+    draft = build_invoice_draft(
+        tenant_id=tenant_id,
+        job_id=job_id,
+        input_data=record.input_data or {},
+        invoice_payload=invoice_payload,
+    )
+    return {"status": "ok", "draft": draft}
+
+
+@app.post("/finance/invoices/{job_id}/fortnox/preview")
+def finance_fortnox_export_preview(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Create a controlled Fortnox export preview payload, no external writes."""
+    from app.finance.pre_accounting import build_fortnox_export_payload, build_invoice_draft
+
+    record = _get_invoice_record_or_422(db, tenant_id, job_id)
+    invoice_payload = _extract_invoice_payload_from_history(record)
+    draft = build_invoice_draft(
+        tenant_id=tenant_id,
+        job_id=job_id,
+        input_data=record.input_data or {},
+        invoice_payload=invoice_payload,
+    )
+    export_payload = build_fortnox_export_payload(draft)
+    return {
+        "status": "preview",
+        "draft": draft,
+        "fortnox_payload": export_payload,
+    }
+
+
+@app.post("/finance/invoices/{job_id}/fortnox/export")
+def finance_fortnox_export(
+    job_id: str,
+    body: FinanceFortnoxExportRequest | None = None,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Controlled write to Fortnox for pre-accounting invoice drafts.
+
+    Flow:
+    1) Build deterministic draft from invoice job
+    2) Build export payload
+    3) Optionally create customer when missing
+    4) Create invoice in Fortnox
+    """
+    from app.finance.pre_accounting import build_fortnox_export_payload, build_invoice_draft
+
+    req = body or FinanceFortnoxExportRequest()
+    record = _get_invoice_record_or_422(db, tenant_id, job_id)
+    invoice_payload = _extract_invoice_payload_from_history(record)
+    draft = build_invoice_draft(
+        tenant_id=tenant_id,
+        job_id=job_id,
+        input_data=record.input_data or {},
+        invoice_payload=invoice_payload,
+    )
+    export_payload = build_fortnox_export_payload(draft)
+
+    if req.dry_run:
+        return {
+            "status": "dry_run",
+            "draft": draft,
+            "fortnox_payload": export_payload,
+        }
+
+    existing_event = _get_successful_finance_export_event(db, tenant_id, job_id)
+    if existing_event is not None:
+        return _finance_event_response(existing_event)
+
+    if req.approval_required:
+        approval = _create_finance_fortnox_approval(
+            db=db,
+            tenant_id=tenant_id,
+            job_id=job_id,
+            draft=draft,
+            export_payload=export_payload,
+            create_customer_if_missing=req.create_customer_if_missing,
+        )
+        return {
+            "status": "approval_required",
+            "approval_id": approval.approval_id,
+            "draft": draft,
+            "fortnox_payload": export_payload,
+            "message": "Fortnox export queued for approval. No external write was performed.",
+        }
+
+    return _execute_finance_fortnox_export(
+        db=db,
+        tenant_id=tenant_id,
+        job_id=job_id,
+        draft=draft,
+        export_payload=export_payload,
+        create_customer_if_missing=req.create_customer_if_missing,
+    )
+
+
+@app.get("/finance/projects/{job_id}/profitability")
+def finance_project_profitability(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return deterministic project profitability from case operations data."""
+    from app.finance.pre_accounting import build_invoice_draft, build_project_profitability
+
+    record = (
+        db.query(JobRecord)
+        .filter(JobRecord.job_id == job_id, JobRecord.tenant_id == tenant_id)
+        .first()
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    invoice_draft = None
+    if record.job_type == "invoice":
+        invoice_draft = build_invoice_draft(
+            tenant_id=tenant_id,
+            job_id=job_id,
+            input_data=record.input_data or {},
+            invoice_payload=_extract_invoice_payload_from_history(record),
+        )
+
+    profitability = build_project_profitability(
+        tenant_id=tenant_id,
+        job_id=job_id,
+        input_data=record.input_data or {},
+        invoice_draft=invoice_draft,
+    )
+    return {"status": "ok", "profitability": profitability}
 
 
 # ---------------------------------------------------------------------------
@@ -3831,6 +5084,122 @@ def onboarding_test_lead(
     }
 
 
+class _DemoSeedRequest(_BaseModel):
+    include_types: list[str] | None = None
+
+
+def _seed_demo_jobs(
+    *,
+    request: _DemoSeedRequest | None = None,
+    db: Session,
+    tenant_id: str,
+) -> dict:
+    import copy
+    from app.domain.workflows.enums import JobType
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    ctrl_settings = TenantConfigRepository.get_settings(db, tenant_id)
+    if not _is_demo_mode_enabled(ctrl_settings):
+        raise HTTPException(
+            status_code=400,
+            detail="Enable demo_mode in the control panel before seeding demo data.",
+        )
+
+    tenant_cfg = get_tenant_config(tenant_id, db=db)
+    enabled_types = set(tenant_cfg.get("enabled_job_types") or [])
+    requested_types = request.include_types if request and request.include_types is not None else None
+    candidate_types = requested_types or [t for t in _VERIFICATION_SUPPORTED_TYPES if t in enabled_types]
+
+    unsupported = [t for t in candidate_types if t not in _VERIFICATION_SUPPORTED_TYPES]
+    if unsupported:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported demo job type(s): {', '.join(unsupported)}",
+        )
+
+    demo_types = [t for t in candidate_types if t in enabled_types]
+    if not demo_types:
+        supported = ", ".join(_VERIFICATION_SUPPORTED_TYPES)
+        raise HTTPException(
+            status_code=400,
+            detail=f"No enabled demo job types found. Enable at least one of: {supported}.",
+        )
+
+    created_jobs = []
+    set_current_tenant(tenant_id)
+    for job_type_value in demo_types:
+        try:
+            job_type_enum = JobType(job_type_value)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Job type '{job_type_value}' is not a recognised job type.",
+            )
+
+        input_data = copy.deepcopy(_VERIFICATION_PAYLOADS[job_type_value])
+        input_data["demo_mode"] = True
+        input_data["demo_seed"] = True
+        input_data["source"] = {"system": "demo_seed", "synthetic": True}
+
+        saved_job = JobRepository.create_job(
+            db,
+            Job(
+                tenant_id=tenant_id,
+                job_type=job_type_enum,
+                input_data=input_data,
+            ),
+        )
+        processed_job = _run_verification_pipeline(saved_job, job_type_value, db)
+        created_jobs.append({
+            "job_id": processed_job.job_id,
+            "job_type": job_type_value,
+            "status": processed_job.status.value if hasattr(processed_job.status, "value") else str(processed_job.status),
+        })
+
+    create_audit_event(
+        db=db,
+        tenant_id=tenant_id,
+        category="demo",
+        action="demo_seed_created",
+        status="success",
+        details={"created_jobs": created_jobs},
+    )
+
+    return {
+        "tenant_id": tenant_id,
+        "demo_mode": True,
+        "created_jobs": created_jobs,
+        "message": f"Skapade {len(created_jobs)} syntetiska demoärenden utan externa writes.",
+    }
+
+
+@app.post("/demo/seed", status_code=201)
+def demo_seed(
+    request: _DemoSeedRequest | None = None,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Create safe synthetic demo jobs for the current tenant.
+
+    The endpoint is gated by control-panel demo_mode and uses the deterministic
+    verification pipeline only. It never reads Gmail, marks messages, sends
+    emails, or dispatches external integration writes.
+    """
+    return _seed_demo_jobs(request=request, db=db, tenant_id=tenant_id)
+
+
+@app.post("/admin/tenants/{tenant_id}/demo/seed", status_code=201)
+def admin_demo_seed(
+    tenant_id: str,
+    request: _DemoSeedRequest | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """Admin variant of demo seed for the explicitly selected tenant."""
+    return _seed_demo_jobs(request=request, db=db, tenant_id=tenant_id)
+
+
 @app.get("/integrations/health")
 def integration_health(
     db: Session = Depends(get_db),
@@ -4016,6 +5385,22 @@ def admin_tenants_overview(
     from app.admin.super_admin import get_super_admin_overview
     s = get_settings()
     return get_super_admin_overview(db=db, app_settings=s)
+
+
+@app.get("/admin/usage/analytics")
+def admin_usage_analytics(
+    range: str = "30d",
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Super Admin: ready-to-market usage analytics across all tenants.
+
+    Read-only. No external API calls. No secrets in response.
+    Requires X-Admin-API-Key.
+    """
+    from app.analytics.usage import get_usage_analytics
+    return get_usage_analytics(db=db, range_=range)
 
 
 @app.post("/jobs/{job_id}/auto-dispatch")

@@ -15,6 +15,7 @@ Protected endpoints use:
 """
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 
@@ -93,10 +94,14 @@ def _is_tenant_active(db: Session, tenant_id: str) -> bool:
 def get_verified_tenant(
     x_api_key: str | None = Header(default=None),
     x_tenant_id: str | None = Header(default=None),
+    x_admin_api_key: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> str:
     """
     FastAPI dependency. Returns the verified tenant_id for the request.
+
+    Resolution order when X-Admin-API-Key + X-Tenant-ID are provided:
+      1. Validate the admin key and use X-Tenant-ID as the explicit tenant context.
 
     Resolution order when X-API-Key is provided:
       1. DB hashed key lookup  (new provisioned tenants)
@@ -108,6 +113,33 @@ def get_verified_tenant(
 
     After resolution, checks tenant status == 'active'.
     """
+    if isinstance(x_admin_api_key, str) and x_admin_api_key:
+        configured_admin_key = getattr(get_settings(), "ADMIN_API_KEY", "").strip()
+        if not configured_admin_key:
+            raise HTTPException(
+                status_code=http_status.HTTP_401_UNAUTHORIZED,
+                detail="Admin access is not configured on this server.",
+                headers={"WWW-Authenticate": "AdminApiKey"},
+            )
+        if not hmac.compare_digest(configured_admin_key, x_admin_api_key):
+            raise HTTPException(
+                status_code=http_status.HTTP_401_UNAUTHORIZED,
+                detail="Missing or invalid admin API key. Provide the X-Admin-API-Key header.",
+                headers={"WWW-Authenticate": "AdminApiKey"},
+            )
+        if not x_tenant_id:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="X-Tenant-ID is required when using X-Admin-API-Key on tenant endpoints.",
+            )
+        if not _is_tenant_active(db, x_tenant_id):
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="Tenant is inactive.",
+            )
+        set_current_tenant(x_tenant_id)
+        return x_tenant_id
+
     env_map = _load_env_key_map()
 
     if x_api_key:

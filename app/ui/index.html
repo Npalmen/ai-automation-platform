@@ -232,6 +232,14 @@ body {
 }
 .topbar-tenant-ctx .tenant-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); }
 .topbar-tenant-ctx .tenant-name  { font-weight: 600; color: var(--text); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-tenant-static {
+  font-weight: 600;
+  color: var(--text);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .topbar-tenant-select {
   padding: 4px 8px;
   background: var(--surface-2);
@@ -1409,6 +1417,196 @@ label { color: var(--text-muted); }
 .int-card-check-dot.fail { background: var(--danger); }
 .int-card-check-dot.gray { background: var(--text-dim); }
 
+/* ═══════════════════════════════════════════════════════
+   MOBILE-FIRST POLISH
+═══════════════════════════════════════════════════════ */
+@media (max-width: 760px) {
+  body {
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+    flex-direction: column;
+  }
+
+  #sidebar {
+    width: 100%;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-logo { padding: 12px 14px; }
+  .sidebar-logo-sub { display: none; }
+  .sidebar-nav {
+    display: flex;
+    overflow-x: auto;
+    padding: 8px;
+    gap: 6px;
+  }
+  .sidebar-section { display: none !important; }
+  .nav-item {
+    margin: 0;
+    padding: 8px 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .nav-item.active::before { display: none; }
+  .sidebar-footer {
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  #mainContent {
+    min-height: 100vh;
+    overflow: visible;
+  }
+  #topbar {
+    height: auto;
+    min-height: 52px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+  }
+  .topbar-title {
+    flex-basis: 100%;
+    font-size: 13px;
+  }
+  .topbar-tenant-ctx,
+  .topbar-key-group {
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+  .topbar-input { width: 150px; }
+  #viewWrap {
+    overflow: visible;
+    display: block;
+  }
+
+  .layout {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: visible;
+  }
+  .panel { padding: 12px; }
+  .left {
+    width: 100%;
+    max-height: 300px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .right { min-height: 420px; }
+
+  #custDash,
+  #custCasesWrap,
+  #adminCasesWrap,
+  #adminOnboardingWrap,
+  #viewCtrl,
+  #viewNotif,
+  #viewMemory,
+  #viewReadiness,
+  #viewAdmin {
+    padding: 16px !important;
+    max-width: none !important;
+  }
+
+  .cust-hero,
+  .ob-cust-hero,
+  .ob-progress-card {
+    padding: 18px;
+  }
+  .cust-hero {
+    align-items: flex-start;
+  }
+  .dash-page-hdr,
+  .dash-quick-actions,
+  .ob-page-hdr,
+  .cfg-save-row {
+    align-items: stretch;
+  }
+  .dash-quick-actions,
+  .ob-action-grid {
+    width: 100%;
+  }
+  .dash-quick-actions .btn,
+  .ob-action-grid .btn,
+  .cfg-save-row .btn {
+    justify-content: center;
+    flex: 1;
+  }
+
+  .dash-two-col,
+  .ob-integration-grid {
+    grid-template-columns: 1fr !important;
+  }
+  #custDash [style*="grid-template-columns:repeat(4,1fr)"],
+  #adminDash [style*="grid-template-columns:repeat(4,1fr)"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .cfg-section,
+  .setup-card,
+  .readiness-card,
+  .ob-test-card {
+    max-width: none !important;
+  }
+  .cfg-section-hdr,
+  .cfg-row,
+  .ob-module-row,
+  .ob-progress-top,
+  .next-step-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .cfg-row-value {
+    width: 100%;
+    overflow-wrap: anywhere;
+  }
+  .cases-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cases-filter-bar input,
+  .cases-filter-bar select {
+    width: 100%;
+    min-width: 0;
+  }
+  .act-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .case-card-subject {
+    white-space: normal;
+  }
+  .wiz-panel,
+  .int-setup-panel {
+    max-width: calc(100vw - 20px);
+    max-height: 96vh;
+  }
+  .wiz-step-label { display: none; }
+  .wiz-body,
+  .int-setup-body {
+    padding: 16px;
+  }
+  .wiz-footer {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 460px) {
+  #custDash [style*="grid-template-columns:repeat(4,1fr)"],
+  #adminDash [style*="grid-template-columns:repeat(4,1fr)"] {
+    grid-template-columns: 1fr !important;
+  }
+  .topbar-input,
+  .topbar-tenant-select {
+    width: 100%;
+    max-width: none;
+  }
+  .btn {
+    white-space: normal;
+  }
+}
+
 .int-card-meta {
   font-size: 11px; color: var(--text-dim);
   display: flex; flex-wrap: wrap; gap: 12px;
@@ -1529,6 +1727,9 @@ label { color: var(--text-muted); }
     <div class="nav-item admin-only" id="viewTabOnboarding" onclick="switchView('onboarding')">
       <span class="nav-icon">◑</span> Onboarding
     </div>
+    <div class="nav-item admin-only" id="viewTabIntegrations" onclick="openIntegrationSetup(_activeTenantId)" title="Konfigurera integrationer för aktiv tenant">
+      <span class="nav-icon">◇</span> Integrationer
+    </div>
     <div class="nav-item admin-only" id="viewTabMemory"     onclick="switchView('memory')">
       <span class="nav-icon">◈</span> Kundminne
     </div>
@@ -1561,10 +1762,12 @@ label { color: var(--text-muted); }
   <!-- Topbar -->
   <div id="topbar">
     <div class="topbar-title" id="topbarTitle">Dashboard</div>
-    <!-- Tenant context — admin mode only -->
+    <!-- Tenant context -->
     <div id="topbarTenantCtx" class="topbar-tenant-ctx" style="display:none;">
       <span class="tenant-label">Tenant</span>
       <select id="topbarTenantSelect" class="topbar-tenant-select" onchange="_topbarSwitchTenant(this.value)" title="Byt aktiv tenant"></select>
+      <span id="topbarTenantStatic" class="topbar-tenant-static" style="display:none;"></span>
+      <span id="topbarDemoBadge" class="status-pill gray" style="display:none; margin-left:6px;">Demo</span>
     </div>
     <div class="topbar-key-group">
       <span class="topbar-key-label">API-nyckel</span>
@@ -2154,6 +2357,14 @@ label { color: var(--text-muted); }
         <div class="toggle-switch" id="toggleCtrlFollowups" onclick="_clickToggle('ctrlFollowups')"></div>
         <input type="checkbox" id="ctrlFollowups" style="display:none;" onchange="_syncToggle(this)">
       </div>
+      <div class="cfg-row" style="border-bottom:none;">
+        <div>
+          <div style="font-size:13px; color:var(--text);">Demo-läge</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Markerar tenant som demo/test, spärrar live sync/scheduler och aktiverar syntetisk demo-data</div>
+        </div>
+        <div class="toggle-switch" id="toggleCtrlDemoMode" onclick="_clickToggle('ctrlDemoMode')"></div>
+        <input type="checkbox" id="ctrlDemoMode" style="display:none;" onchange="_syncToggle(this)">
+      </div>
     </div>
   </div>
 
@@ -2535,6 +2746,10 @@ label { color: var(--text-muted); }
           <span class="cfg-row-label">Uppföljningsmail</span>
           <span class="cfg-row-value" id="obFollowups">–</span>
         </div>
+        <div class="cfg-row">
+          <span class="cfg-row-label">Demo-läge</span>
+          <span class="cfg-row-value" id="obDemoMode">–</span>
+        </div>
       </div>
     </div>
 
@@ -2550,8 +2765,10 @@ label { color: var(--text-muted); }
       <div class="cfg-section-body">
         <div class="ob-action-grid">
           <button class="btn btn-neutral btn-sm" onclick="runOnboardingVerify()">Verifiera system</button>
+        <button class="btn btn-neutral btn-sm" onclick="seedDemoData()">Skapa demo-data</button>
         </div>
         <div id="obVerifyResult"></div>
+      <div id="obDemoResult"></div>
       </div>
     </div>
 
@@ -3339,6 +3556,7 @@ function intLabel(key)   { return INTEGRATION_LABELS[key] || key; }
 // ---------------------------------------------------------------------------
 let selectedJobId   = null;
 let _activeTenantId = null;   // the tenant whose config is currently loaded
+let _tenantContext  = null;
 
 const LS_KEY        = 'ui_api_key';
 const LS_ADMIN_KEY  = 'ui_admin_api_key';
@@ -3348,7 +3566,7 @@ const LS_SESSION    = 'ui_session';      // 'admin' | 'customer' — set after s
 let _uiMode = 'admin';   // current role; initialised in initApiKey()
 
 // Admin-only tab names — hidden in customer mode
-const ADMIN_ONLY_VIEWS = ['ops', 'setup', 'ctrl', 'onboarding', 'notif', 'memory', 'readiness', 'admin'];
+const ADMIN_ONLY_VIEWS = ['ops', 'setup', 'ctrl', 'onboarding', 'integrations', 'notif', 'memory', 'readiness', 'admin'];
 // Views visible to customers
 const CUSTOMER_VIEWS   = ['dash', 'cases'];
 
@@ -3365,6 +3583,7 @@ function headers() {
   const h = { 'Content-Type': 'application/json' };
   const key = apiKey();
   if (key) h['X-API-Key'] = key;
+  if (_activeTenantId) h['X-Tenant-ID'] = _activeTenantId;
   return h;
 }
 
@@ -3485,6 +3704,7 @@ function _launchApp(mode, key) {
   if (adminEl) adminEl.value = adminKey;
   document.getElementById('authBanner').style.display = apiKey ? 'none' : 'block';
 
+  _refreshTenantContext();
   switchView(_uiMode === 'admin' ? 'ops' : 'dash');
   if (apiKey || _uiMode === 'admin') loadAll();
 }
@@ -3542,9 +3762,10 @@ function _applyRoleMode() {
   // Show integration setup shortcut in Inställningar header only for admin
   const intBtn = document.getElementById('btnOpenIntSetup');
   if (intBtn) intBtn.style.display = isAdmin ? '' : 'none';
-  // Tenant context in topbar — admin only
+  // Tenant context in topbar
   const tenantCtx = document.getElementById('topbarTenantCtx');
-  if (tenantCtx) tenantCtx.style.display = isAdmin && _activeTenantId ? '' : 'none';
+  if (tenantCtx) tenantCtx.style.display = _activeTenantId ? '' : 'none';
+  _renderTenantContext();
 }
 
 function toggleRole() {
@@ -3587,6 +3808,7 @@ const _VIEW_TITLE = {
 function switchView(name) {
   // In customer mode, block admin-only navigation
   if (_uiMode === 'customer' && ADMIN_ONLY_VIEWS.includes(name)) return;
+  window._currentViewName = name;
 
   // Update topbar title
   const titleEl = document.getElementById('topbarTitle');
@@ -4287,17 +4509,62 @@ async function _populateTopbarTenantSelect(currentId) {
   } catch (_) { /* silent */ }
 }
 
+function _renderTenantContext() {
+  const badge = document.getElementById('topbarDemoBadge');
+  const select = document.getElementById('topbarTenantSelect');
+  const staticEl = document.getElementById('topbarTenantStatic');
+  if (!badge || !select || !staticEl) return;
+  const isAdmin = (_uiMode === 'admin');
+  const tenantId = (_tenantContext && _tenantContext.tenant_id) || _activeTenantId || '';
+  const name = _tenantContext && _tenantContext.name;
+  const label = name ? `${tenantId} - ${name}` : tenantId;
+
+  select.style.display = isAdmin ? '' : 'none';
+  staticEl.style.display = isAdmin ? 'none' : '';
+  staticEl.textContent = label || 'Tenant okänd';
+  staticEl.title = label || '';
+
+  const isDemo = !!(_tenantContext && _tenantContext.demo_mode);
+  badge.style.display = isDemo ? '' : 'none';
+}
+
+async function _refreshTenantContext() {
+  const isAdmin = (_uiMode === 'admin');
+  try {
+    if (isAdmin && _activeTenantId) {
+      _tenantContext = await adminApiFetch(`/admin/tenant-context/${encodeURIComponent(_activeTenantId)}`);
+    } else {
+      _tenantContext = await apiFetch('/tenant/context');
+      _activeTenantId = _tenantContext.tenant_id || _activeTenantId;
+    }
+  } catch (_) {
+    try {
+      _tenantContext = await apiFetch('/tenant/context');
+      if (!isAdmin) _activeTenantId = _tenantContext.tenant_id || _activeTenantId;
+    } catch {
+      _tenantContext = null;
+    }
+  }
+  const ctx = document.getElementById('topbarTenantCtx');
+  if (ctx) ctx.style.display = _activeTenantId ? '' : 'none';
+  _renderTenantContext();
+}
+
 function _updateTenantCtx(tenantId) {
   const ctx = document.getElementById('topbarTenantCtx');
   if (!ctx) return;
   const isAdmin = (_uiMode === 'admin');
-  ctx.style.display = isAdmin && tenantId ? '' : 'none';
-  if (tenantId) _populateTopbarTenantSelect(tenantId);
+  ctx.style.display = tenantId ? '' : 'none';
+  if (tenantId) {
+    if (isAdmin) _populateTopbarTenantSelect(tenantId);
+    _refreshTenantContext();
+  }
 }
 
 async function _topbarSwitchTenant(tenantId) {
   if (!tenantId) return;
   _activeTenantId = tenantId;
+  await _refreshTenantContext();
   // Reload whichever admin view is currently active
   const activeView = Object.keys(_VIEW_DISPLAY).find(v => {
     const el = document.getElementById('view' + v.charAt(0).toUpperCase() + v.slice(1));
@@ -4310,7 +4577,7 @@ async function _topbarSwitchTenant(tenantId) {
   } else if (activeView === 'cases') {
     await loadCases();
   } else if (activeView === 'ops') {
-    await loadOps();
+    await loadAll();
   }
   // Sync setup dropdown if visible
   const sel = document.getElementById('switchTenantSelect');
@@ -4323,6 +4590,7 @@ async function openTenant(tenantId) {
   // Switch to admin mode so Inställningar tab is visible
   if (_uiMode !== 'admin') { _uiMode = 'admin'; _applyRoleMode(); }
   _updateTenantCtx(tenantId);
+  await _refreshTenantContext();
   switchView('setup');
   // After loadSetup() has run (called by switchView), sync the dropdown.
   await loadTenants();
@@ -4334,6 +4602,7 @@ function _adminOpenIntegrations(tenantId) {
   _activeTenantId = tenantId;
   if (_uiMode !== 'admin') { _uiMode = 'admin'; _applyRoleMode(); }
   _updateTenantCtx(tenantId);
+  _refreshTenantContext();
   openIntegrationSetup(tenantId);
 }
 
@@ -4341,6 +4610,7 @@ function _adminOpenReadiness(tenantId) {
   _activeTenantId = tenantId;
   if (_uiMode !== 'admin') { _uiMode = 'admin'; _applyRoleMode(); }
   _updateTenantCtx(tenantId);
+  _refreshTenantContext();
   switchView('readiness');
 }
 
@@ -5135,8 +5405,14 @@ async function loadControl() {
   msgEl.style.display = 'none';
   try {
     const r = await apiFetch('/dashboard/control');
-    ['ctrlLeads', 'ctrlSupport', 'ctrlInvoices', 'ctrlFollowups'].forEach((id, i) => {
-      const vals = [r.automation?.leads_enabled, r.automation?.support_enabled, r.automation?.invoices_enabled, r.automation?.followups_enabled];
+    ['ctrlLeads', 'ctrlSupport', 'ctrlInvoices', 'ctrlFollowups', 'ctrlDemoMode'].forEach((id, i) => {
+      const vals = [
+        r.automation?.leads_enabled,
+        r.automation?.support_enabled,
+        r.automation?.invoices_enabled,
+        r.automation?.followups_enabled,
+        r.automation?.demo_mode,
+      ];
       const cb = document.getElementById(id);
       if (cb) { cb.checked = !!vals[i]; _syncToggle(cb); }
     });
@@ -5195,12 +5471,14 @@ async function saveControl() {
       support_enabled:  document.getElementById('ctrlSupport').checked,
       invoices_enabled: document.getElementById('ctrlInvoices').checked,
       followups_enabled:document.getElementById('ctrlFollowups').checked,
+      demo_mode:        document.getElementById('ctrlDemoMode').checked,
     },
     support_email: document.getElementById('ctrlSupportEmail').value.trim() || null,
     scheduler: { run_mode: document.getElementById('ctrlRunMode').value },
   };
   try {
     await apiFetch('/dashboard/control', { method: 'PUT', body: JSON.stringify(body) });
+    await _refreshTenantContext();
     msgEl.textContent = 'Inställningar sparade.';
     msgEl.className = 'msg msg-success';
     msgEl.style.display = 'block';
@@ -5219,7 +5497,7 @@ async function triggerInboxSync() {
   infoEl.textContent = 'Startar inbox-sync…';
   try {
     const r = await apiFetch('/dashboard/inbox-sync', { method: 'POST' });
-    const cls = r.status === 'success' ? 'ok' : r.status === 'warning' ? '' : 'err';
+    const cls = r.status === 'success' ? 'ok' : (r.status === 'warning' || r.status === 'demo_mode') ? '' : 'err';
     let detail = r.message || '';
     if (r.created_jobs > 0 || r.continued_threads > 0 || r.deduped > 0) {
       detail += ` · Nya jobb: ${r.created_jobs} · Trådar: ${r.continued_threads} · Dubbletter: ${r.deduped}`;
@@ -5752,17 +6030,209 @@ async function _openAdminCase(jobId) {
         </div>`;
     }
 
+    // Operations workspace panel (Slice 4/5)
+    const operationsHtml = _renderOperationsWorkspacePanel(c);
+    const automationWowHtml = _renderAutomationWowPanel(c);
+
     // Lead Analysis panel (only for lead type)
     const leadHtml = _renderLeadAnalysisPanel(c);
 
     // Support Analysis panel (only for customer_inquiry type)
     const supportHtml = _renderSupportAnalysisPanel(c);
 
-    detailEl.innerHTML = supportHtml + leadHtml + rpHtml + omHtml + extHtml + threadHtml + actHtml + errSectionHtml;
+    detailEl.innerHTML = automationWowHtml + operationsHtml + supportHtml + leadHtml + rpHtml + omHtml + extHtml + threadHtml + actHtml + errSectionHtml;
   } catch (e) {
     errEl.textContent = 'Kunde inte ladda ärendedetaljer: ' + escapeHtml(e.message);
     errEl.style.display = 'block';
     detailEl.innerHTML = '';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6 automation experience panel (admin case detail)
+// ---------------------------------------------------------------------------
+function _renderAutomationWowPanel(c) {
+  const summary = c.automation_summary || {};
+  const risks = c.automation_risks || {};
+  const flows = c.wow_flows || [];
+  if (!summary.headline && flows.length === 0) return '';
+
+  const statusColors = {
+    ready: 'var(--success)',
+    watch: 'var(--warning)',
+    needs_attention: 'var(--danger)',
+    ok: 'var(--success)',
+    risk: 'var(--danger)',
+    critical: 'var(--danger)',
+  };
+  const flowStatus = {
+    ready: ['Redo', 'var(--success)'],
+    blocked: ['Blockerad', 'var(--warning)'],
+    not_applicable: ['Ej aktuell', 'var(--text-dim)'],
+  };
+  const riskRows = (risks.risks || []).map(r => {
+    const color = r.severity === 'high' || r.severity === 'critical' ? 'var(--danger)' : 'var(--warning)';
+    return `<div style="padding:8px; background:var(--surface-3); border:1px solid var(--border); border-radius:6px; margin-top:6px;">
+      <div style="font-size:12px; color:${color}; font-weight:700;">${escapeHtml(r.code || 'risk')} · ${escapeHtml(r.severity || '')}</div>
+      <div style="font-size:12px; color:var(--text); margin-top:3px;">${escapeHtml(r.message || '')}</div>
+      <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">${escapeHtml(r.recommended_action || '')}</div>
+    </div>`;
+  }).join('');
+  const flowRows = flows.map(f => {
+    const [label, color] = flowStatus[f.status] || [f.status || '–', 'var(--text-muted)'];
+    const steps = (f.preview_steps || []).slice(0, 4).map(s => `<li>${escapeHtml(s)}</li>`).join('');
+    return `<div style="padding:10px; background:var(--surface-3); border:1px solid var(--border); border-radius:8px;">
+      <div style="display:flex; justify-content:space-between; gap:8px; align-items:center;">
+        <div style="font-size:13px; color:var(--text); font-weight:700;">${escapeHtml(f.title || f.id || 'Flow')}</div>
+        <span style="font-size:10px; color:${color}; font-weight:700; text-transform:uppercase;">${escapeHtml(label)}</span>
+      </div>
+      <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${escapeHtml(f.why || '')}</div>
+      <ul style="margin:8px 0 0 16px; color:var(--text-dim); font-size:11px; line-height:1.5;">${steps}</ul>
+      <div style="font-size:10px; color:var(--text-dim); margin-top:8px;">
+        ${f.requires_approval ? 'Kräver godkännande' : 'Ingen ny approval krävs'} · Preview-only · Inga externa writes
+      </div>
+    </div>`;
+  }).join('');
+  const evidence = (summary.evidence || []).map(e => `<li>${escapeHtml(e)}</li>`).join('');
+  const summaryColor = statusColors[summary.status] || 'var(--text-muted)';
+  const riskColor = statusColors[risks.status] || 'var(--text-muted)';
+
+  return `<div class="detail-section" style="margin-bottom:14px; border-color:rgba(59,130,246,.3);">
+    <div class="detail-section-title" style="color:var(--blue-light);">Automationsöversikt & wow-flöden</div>
+    <div style="display:grid; grid-template-columns:1.1fr .9fr; gap:12px; margin-bottom:12px;">
+      <div style="padding:10px; background:var(--surface-3); border:1px solid var(--border); border-radius:8px;">
+        <div style="font-size:10px; color:${summaryColor}; font-weight:700; text-transform:uppercase;">${escapeHtml(summary.status || '–')}</div>
+        <div style="font-size:14px; color:var(--text); font-weight:700; margin-top:4px;">${escapeHtml(summary.headline || 'Automation summary')}</div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:6px;">${escapeHtml(summary.current_state || '')}</div>
+        <div style="font-size:12px; color:var(--purple-light); margin-top:6px; font-weight:600;">Nästa steg: ${escapeHtml(summary.next_step || '–')}</div>
+        ${evidence ? `<ul style="margin:8px 0 0 16px; color:var(--text-dim); font-size:11px; line-height:1.5;">${evidence}</ul>` : ''}
+      </div>
+      <div style="padding:10px; background:var(--surface-3); border:1px solid var(--border); border-radius:8px;">
+        <div style="font-size:10px; color:${riskColor}; font-weight:700; text-transform:uppercase;">Riskstatus: ${escapeHtml(risks.status || 'ok')}</div>
+        <div style="font-size:22px; color:var(--text); font-weight:700; margin-top:4px;">${Number(risks.risk_count || 0)}</div>
+        <div style="font-size:11px; color:var(--text-muted);">detekterade risksignaler</div>
+        ${riskRows || `<div style="font-size:12px; color:var(--success); margin-top:8px;">Inga blockerande risksignaler.</div>`}
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(3, minmax(160px,1fr)); gap:10px;">
+      ${flowRows}
+    </div>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Operations workspace panel (admin case detail)
+// ---------------------------------------------------------------------------
+function _renderOperationsWorkspacePanel(c) {
+  const ws = c.operations_workspace || {};
+  const workOrder = ws.work_order || {};
+  const project = ws.project || {};
+  const delivery = ws.delivery_package || {};
+  const summary = {
+    work_order_status: workOrder.status || 'new',
+    technician: workOrder.technician || project.technician || '–',
+    project_status: project.status || 'intake',
+    tasks: Array.isArray(ws.tasks) ? ws.tasks.length : 0,
+    attachments: Array.isArray(ws.attachments) ? ws.attachments.length : 0,
+    timeline: Array.isArray(ws.timeline) ? ws.timeline.length : 0,
+    delivery_status: delivery.status || 'not_started',
+  };
+  const json = JSON.stringify(ws, null, 2);
+
+  return `<div class="detail-section" style="margin-bottom:14px;">
+    <div class="detail-section-title">Arbetsorder & projekt v1</div>
+    <div style="display:grid; grid-template-columns:repeat(4, minmax(120px,1fr)); gap:8px; margin-bottom:10px;">
+      <div style="padding:8px; background:var(--surface-3); border:1px solid var(--border); border-radius:6px;"><div style="font-size:10px; color:var(--text-dim);">Arbetsorder</div><div style="font-size:12px; font-weight:600;">${escapeHtml(summary.work_order_status)}</div></div>
+      <div style="padding:8px; background:var(--surface-3); border:1px solid var(--border); border-radius:6px;"><div style="font-size:10px; color:var(--text-dim);">Projekt</div><div style="font-size:12px; font-weight:600;">${escapeHtml(summary.project_status)}</div></div>
+      <div style="padding:8px; background:var(--surface-3); border:1px solid var(--border); border-radius:6px;"><div style="font-size:10px; color:var(--text-dim);">Tekniker</div><div style="font-size:12px; font-weight:600;">${escapeHtml(summary.technician)}</div></div>
+      <div style="padding:8px; background:var(--surface-3); border:1px solid var(--border); border-radius:6px;"><div style="font-size:10px; color:var(--text-dim);">Leveranspaket</div><div style="font-size:12px; font-weight:600;">${escapeHtml(summary.delivery_status)}</div></div>
+    </div>
+    <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">
+      Tidslinje: <strong style="color:var(--text);">${summary.timeline}</strong> ·
+      Uppgifter: <strong style="color:var(--text);">${summary.tasks}</strong> ·
+      Bilagor: <strong style="color:var(--text);">${summary.attachments}</strong>
+    </div>
+    <textarea id="opsWsJson_${escapeHtml(c.job_id)}" rows="12" style="width:100%; font-family:monospace; font-size:12px; background:var(--surface-2); color:var(--text); border:1px solid var(--border-med); border-radius:6px; padding:8px; resize:vertical;">${escapeHtml(json)}</textarea>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+      <button class="btn btn-primary btn-sm" onclick="_saveOperationsWorkspace('${escapeHtml(c.job_id)}')">Spara workspace</button>
+      <button class="btn btn-neutral btn-sm" onclick="_addOperationsTimeline('${escapeHtml(c.job_id)}')">+ Tidslinjehändelse</button>
+      <button class="btn btn-neutral btn-sm" onclick="_addOperationsTask('${escapeHtml(c.job_id)}')">+ Uppgift</button>
+      <button class="btn btn-neutral btn-sm" onclick="_markDeliveryReady('${escapeHtml(c.job_id)}')">Markera leverans redo</button>
+    </div>
+    <div id="opsWsMsg_${escapeHtml(c.job_id)}" class="cfg-save-msg" style="display:none; margin-top:8px;"></div>
+  </div>`;
+}
+
+function _showOpsMsg(jobId, ok, text) {
+  const el = document.getElementById(`opsWsMsg_${jobId}`);
+  if (!el) return;
+  el.style.display = 'block';
+  el.className = 'cfg-save-msg ' + (ok ? 'ok' : 'err');
+  el.textContent = text;
+}
+
+async function _saveOperationsWorkspace(jobId) {
+  const ta = document.getElementById(`opsWsJson_${jobId}`);
+  if (!ta) return;
+  let workspace;
+  try {
+    workspace = JSON.parse(ta.value || '{}');
+  } catch (_) {
+    _showOpsMsg(jobId, false, 'Ogiltig JSON i workspace-fältet.');
+    return;
+  }
+  try {
+    await apiFetch(`/cases/${encodeURIComponent(jobId)}/operations`, {
+      method: 'PUT',
+      body: JSON.stringify({ workspace }),
+    });
+    _showOpsMsg(jobId, true, 'Workspace sparat.');
+    await _openAdminCase(jobId);
+  } catch (e) {
+    _showOpsMsg(jobId, false, 'Kunde inte spara: ' + e.message);
+  }
+}
+
+async function _addOperationsTimeline(jobId) {
+  const message = prompt('Beskriv händelsen i tidslinjen:');
+  if (!message) return;
+  try {
+    await apiFetch(`/cases/${encodeURIComponent(jobId)}/operations/timeline`, {
+      method: 'POST',
+      body: JSON.stringify({ message, event_type: 'manual_update' }),
+    });
+    _showOpsMsg(jobId, true, 'Tidslinjehändelse tillagd.');
+    await _openAdminCase(jobId);
+  } catch (e) {
+    _showOpsMsg(jobId, false, 'Kunde inte lägga till tidslinjehändelse: ' + e.message);
+  }
+}
+
+async function _addOperationsTask(jobId) {
+  const title = prompt('Uppgiftstitel:');
+  if (!title) return;
+  try {
+    await apiFetch(`/cases/${encodeURIComponent(jobId)}/operations/tasks`, {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    });
+    _showOpsMsg(jobId, true, 'Uppgift tillagd.');
+    await _openAdminCase(jobId);
+  } catch (e) {
+    _showOpsMsg(jobId, false, 'Kunde inte lägga till uppgift: ' + e.message);
+  }
+}
+
+async function _markDeliveryReady(jobId) {
+  try {
+    await apiFetch(`/cases/${encodeURIComponent(jobId)}/operations/delivery-package`, {
+      method: 'POST',
+      body: JSON.stringify({ status: 'ready' }),
+    });
+    _showOpsMsg(jobId, true, 'Leveranspaket markerat som redo.');
+    await _openAdminCase(jobId);
+  } catch (e) {
+    _showOpsMsg(jobId, false, 'Kunde inte uppdatera leveranspaket: ' + e.message);
   }
 }
 
@@ -6490,7 +6960,7 @@ async function _loadCustomerOnboarding() {
   const errEl = document.getElementById('custOnboardingError');
   errEl.style.display = 'none';
   try {
-    const r = await adminApiFetch('/setup/status');
+    const r = await apiFetch('/setup/status');
     const c = r.connections || {};
     const auto = r.automation || {};
     const m = r.modules || {};
@@ -6576,6 +7046,9 @@ async function _loadAdminOnboarding() {
     const modeMap = { manual: 'Manuell', scheduled: 'Schemalagd', paused: 'Pausad' };
     document.getElementById('obSchedulerMode').textContent = modeMap[auto.scheduler_mode] || auto.scheduler_mode || '–';
     document.getElementById('obFollowups').textContent = auto.followups_enabled ? 'Aktiverat' : 'Inaktiverat';
+    document.getElementById('obDemoMode').innerHTML = auto.demo_mode
+      ? '<span class="status-pill warn" style="font-size:10px;">Demo/test aktivt</span>'
+      : '<span class="status-pill gray" style="font-size:10px;">Skarpt läge</span>';
 
   } catch (e) {
     errEl.textContent = 'Kunde inte ladda onboarding-status: ' + escapeHtml(e.message);
@@ -6602,7 +7075,8 @@ async function saveModules() {
     finance: document.getElementById('obFinance').checked,
   };
   try {
-    await apiFetch('/setup/modules', { method: 'PUT', body: JSON.stringify(body) });
+    const fetcher = (_uiMode === 'admin') ? adminApiFetch : apiFetch;
+    await fetcher('/setup/modules', { method: 'PUT', body: JSON.stringify(body) });
     msgEl.className = 'cfg-save-msg ok';
     msgEl.textContent = 'Moduler sparade.';
     loadOnboarding();
@@ -6616,7 +7090,8 @@ async function runOnboardingVerify() {
   const resultEl = document.getElementById('obVerifyResult');
   resultEl.innerHTML = '<div style="font-size:12px; color:var(--text-muted); padding:8px 0;">Kör verifiering…</div>';
   try {
-    const r = await adminApiFetch('/setup/verify', { method: 'POST' });
+    const fetcher = (_uiMode === 'admin') ? adminApiFetch : apiFetch;
+    const r = await fetcher('/setup/verify', { method: 'POST' });
     const statusVars = { ok: 'var(--success)', warning: 'var(--warning)', failed: 'var(--danger)' };
     const pillMap    = { ok: 'ok', warning: 'warn', failed: 'err' };
     const color = statusVars[r.status] || 'var(--text-muted)';
@@ -6640,6 +7115,38 @@ async function runOnboardingVerify() {
   }
 }
 
+async function seedDemoData() {
+  const resultEl = document.getElementById('obDemoResult');
+  resultEl.innerHTML = '<div style="font-size:12px; color:var(--text-muted); padding:8px 0;">Skapar syntetisk demo-data…</div>';
+  try {
+    const adminSeed = (_uiMode === 'admin' && _activeTenantId);
+    const path = adminSeed
+      ? `/admin/tenants/${encodeURIComponent(_activeTenantId)}/demo/seed`
+      : '/demo/seed';
+    const r = await (adminSeed ? adminApiFetch : apiFetch)(path, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+    const jobs = r.created_jobs || [];
+    const jobsHtml = jobs.length
+      ? jobs.map(j => `<div class="cfg-row">
+          <span class="cfg-row-label">${escapeHtml(CASE_TYPE_LABELS[j.job_type] || j.job_type)}</span>
+          <span class="cfg-row-value">${statusBadge(j.status)} <span style="font-family:monospace; font-size:11px; color:var(--text-dim);">${escapeHtml(j.job_id)}</span></span>
+        </div>`).join('')
+      : '<div style="font-size:12px; color:var(--text-dim); padding:8px 0;">Inga demoärenden skapades.</div>';
+    resultEl.innerHTML = `<div class="cfg-section" style="max-width:100%; margin-top:10px;">
+      <div class="cfg-section-body">
+        <div style="font-size:13px; font-weight:700; color:var(--success); margin-bottom:8px;">${escapeHtml(r.message || 'Demo-data skapad.')}</div>
+        ${jobsHtml}
+      </div>
+    </div>`;
+    await loadWizardStatus();
+    if (window._currentViewName === 'cases') loadCases();
+  } catch (e) {
+    resultEl.innerHTML = `<div class="msg msg-error">Fel: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Onboarding wizard (Kunduppsättning)
 // ---------------------------------------------------------------------------
@@ -6657,7 +7164,8 @@ async function loadWizardStatus() {
   const errEl = document.getElementById('wizardError');
   errEl.style.display = 'none';
   try {
-    const r = await apiFetch('/onboarding/status');
+    const fetcher = (_uiMode === 'admin') ? adminApiFetch : apiFetch;
+    const r = await fetcher('/onboarding/status');
     const score   = r.score || {};
     const overall = r.status || 'not_started';
 
@@ -6710,7 +7218,8 @@ async function createTestLead() {
       email:         document.getElementById('wlEmail').value    || 'test@onboarding.example.com',
       message:       document.getElementById('wlMsg').value      || '',
     };
-    const r = await apiFetch('/onboarding/test-lead', { method: 'POST', body: JSON.stringify(body) });
+    const fetcher = (_uiMode === 'admin') ? adminApiFetch : apiFetch;
+    const r = await fetcher('/onboarding/test-lead', { method: 'POST', body: JSON.stringify(body) });
     msgEl.className   = 'cfg-save-msg ok';
     msgEl.textContent = 'Testlead skapat!';
     resultEl.innerHTML = `<div class="cfg-section" style="max-width:100%; margin-top:10px;">
@@ -7635,6 +8144,7 @@ const INT_CARD_DEFS = [
 
 function openIntegrationSetup(tenantId) {
   _intSetupTenantId = tenantId || _activeTenantId || null;
+  if (_intSetupTenantId) _activeTenantId = _intSetupTenantId;
   const overlay = document.getElementById('intSetupOverlay');
   overlay.classList.add('open');
   loadIntegrationSetup();
@@ -7826,6 +8336,7 @@ async function _intCardScan(system, btn) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('sidebar').style.display     = '';
     document.getElementById('mainContent').style.display = '';
+    _refreshTenantContext();
     switchView(_uiMode === 'admin' ? 'ops' : 'dash');
     if (apiKey() || _uiMode === 'admin') loadAll();
   } else {

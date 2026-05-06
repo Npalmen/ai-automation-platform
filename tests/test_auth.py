@@ -12,7 +12,8 @@ Covers:
 from __future__ import annotations
 
 import importlib
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -121,6 +122,86 @@ class TestAuthEnabled:
             )
         assert tenant_id == "TENANT_1001"
         assert tenant_id != "TENANT_9999"
+
+
+# ---------------------------------------------------------------------------
+# Admin-selected tenant context
+# ---------------------------------------------------------------------------
+
+class TestAdminSelectedTenant:
+
+    def test_admin_key_with_tenant_header_returns_selected_tenant(self):
+        auth = _reload_auth()
+        settings = SimpleNamespace(
+            TENANT_API_KEYS=KEY_MAP_JSON,
+            ADMIN_API_KEY="admin-secret",
+        )
+        with (
+            patch("app.core.auth.get_settings", return_value=settings),
+            patch("app.core.auth._is_tenant_active", return_value=True),
+        ):
+            tenant_id = auth.get_verified_tenant(
+                x_api_key=None,
+                x_tenant_id="TENANT_2001",
+                x_admin_api_key="admin-secret",
+                db=MagicMock(),
+            )
+
+        assert tenant_id == "TENANT_2001"
+
+    def test_admin_key_takes_precedence_over_stale_tenant_api_key(self):
+        auth = _reload_auth()
+        settings = SimpleNamespace(
+            TENANT_API_KEYS=KEY_MAP_JSON,
+            ADMIN_API_KEY="admin-secret",
+        )
+        with (
+            patch("app.core.auth.get_settings", return_value=settings),
+            patch("app.core.auth._is_tenant_active", return_value=True),
+            patch("app.core.auth._lookup_db_key", return_value=None),
+        ):
+            tenant_id = auth.get_verified_tenant(
+                x_api_key="key-abc123",
+                x_tenant_id="TENANT_2001",
+                x_admin_api_key="admin-secret",
+                db=MagicMock(),
+            )
+
+        assert tenant_id == "TENANT_2001"
+
+    def test_admin_key_requires_tenant_header(self):
+        auth = _reload_auth()
+        settings = SimpleNamespace(
+            TENANT_API_KEYS=KEY_MAP_JSON,
+            ADMIN_API_KEY="admin-secret",
+        )
+        with patch("app.core.auth.get_settings", return_value=settings):
+            with pytest.raises(HTTPException) as exc_info:
+                auth.get_verified_tenant(
+                    x_api_key=None,
+                    x_tenant_id=None,
+                    x_admin_api_key="admin-secret",
+                    db=MagicMock(),
+                )
+
+        assert exc_info.value.status_code == 400
+
+    def test_invalid_admin_key_raises_401(self):
+        auth = _reload_auth()
+        settings = SimpleNamespace(
+            TENANT_API_KEYS=KEY_MAP_JSON,
+            ADMIN_API_KEY="admin-secret",
+        )
+        with patch("app.core.auth.get_settings", return_value=settings):
+            with pytest.raises(HTTPException) as exc_info:
+                auth.get_verified_tenant(
+                    x_api_key=None,
+                    x_tenant_id="TENANT_2001",
+                    x_admin_api_key="wrong",
+                    db=MagicMock(),
+                )
+
+        assert exc_info.value.status_code == 401
 
 
 # ---------------------------------------------------------------------------

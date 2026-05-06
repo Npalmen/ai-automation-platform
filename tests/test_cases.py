@@ -122,7 +122,7 @@ class TestListCasesShape:
         rec = _make_record()
         r = _list(records=[rec])
         item = r["items"][0]
-        for key in ("job_id", "created_at", "type", "status", "subject", "customer_name", "priority"):
+        for key in ("job_id", "created_at", "type", "status", "subject", "customer_name", "priority", "sla_status"):
             assert key in item, f"Missing key: {key}"
 
     def test_item_type_and_status(self):
@@ -225,7 +225,9 @@ class TestGetCaseShape:
         r = _get(record=rec)
         for key in ("job_id", "created_at", "updated_at", "type", "status",
                     "priority", "subject", "customer_name", "original_message",
-                    "extracted_data", "thread_messages", "actions", "errors"):
+                    "extracted_data", "thread_messages", "timeline", "actions", "errors",
+                    "lead_sla", "ai_reply_suggestions", "automation_summary",
+                    "automation_risks", "wow_flows"):
             assert key in r, f"Missing key: {key}"
 
     def test_original_message_has_from_email_body(self):
@@ -327,6 +329,12 @@ class TestGetCaseContent:
         action = _make_action(status="success", error_message=None)
         r = _get(record=rec, actions=[action])
         assert r["errors"] == []
+
+    def test_timeline_includes_action_events(self):
+        rec = _make_record()
+        action = _make_action(action_type="send_customer_auto_reply", status="success")
+        r = _get(record=rec, actions=[action])
+        assert any(e.get("kind") == "action" for e in r["timeline"])
 
     def test_subject_derived_from_input(self):
         rec = _make_record(input_data={"subject": "Hej från kund"})
@@ -549,3 +557,29 @@ class TestGetCaseTimestamps:
         rec = _make_record()
         r = _get(record=rec)
         assert r["processed_at"] == _NOW.isoformat()
+
+
+class TestCaseLeadSlaAndAiDraft:
+    def test_list_includes_sla_status_from_action_dispatch_payload(self):
+        history = [{
+            "processor": "action_dispatch_processor",
+            "result": {"payload": {"lead_sla": {"status": "met"}}},
+        }]
+        rec = _make_record(result={"processor_history": history})
+        item = _list(records=[rec])["items"][0]
+        assert item["sla_status"] == "met"
+
+    def test_detail_exposes_lead_sla_and_ai_reply_suggestions(self):
+        history = [{
+            "processor": "action_dispatch_processor",
+            "result": {
+                "payload": {
+                    "lead_sla": {"status": "pending", "first_follow_up_state": "pending_approval"},
+                    "ai_reply_suggestions": [{"type": "send_customer_auto_reply", "to": "a@b.se"}],
+                }
+            },
+        }]
+        rec = _make_record(result={"processor_history": history})
+        detail = _get(record=rec)
+        assert detail["lead_sla"]["status"] == "pending"
+        assert detail["ai_reply_suggestions"][0]["type"] == "send_customer_auto_reply"
