@@ -56,6 +56,22 @@ Latest Fas 7 ready-to-market hardening:
 - Summary fields cover total/active tenants, active tenants in range, jobs created/completed, pending approvals, blocked flows, controlled-dispatch totals, automation rate, and estimated time saved.
 - Per-tenant rows and `top_blocked_tenants` are included for pilot follow-up and launch-risk triage.
 
+Latest P0 production hardening:
+- `ENV=production` disables dev-mode tenant fallback; missing tenant credentials now fail closed.
+- DB-backed tenant API keys are recognized by pilot readiness as valid tenant auth.
+- `POST /scheduler/run-once` is admin-only because it runs all-tenant scheduler work; tenant users keep tenant-scoped `GET /scheduler/status`.
+- Public FastAPI `/docs`, `/redoc`, and `/openapi.json` are disabled in production.
+- Admin browser/localStorage key handling is explicitly pilot-only; protect admin UI with VPN/IP allowlist or trusted operator access.
+- Server branch `server-local-hotfix-backup` was reviewed and should remain a historical checkpoint only. Do not merge it over repo `main`.
+
+Product SaaS Finish sprint ordering:
+- Sprint 1 (P0 Risk & Production Hardening) is complete.
+- Sprint 2-7 product-readiness pass is complete in repo: customer/admin IA, customer SaaS surfaces, admin control tower, glassmorphism CSS refresh, CI/deploy hardening and 5-customer launch checklist.
+- Customer-facing additions are backed by existing tenant settings and read-only dashboard data: `/customer/account`, `/customer/activity`, `/customer/results`, `/customer/health`.
+- Deployment additions: `Dockerfile`, `docker-compose.prod.yml`, `.github/workflows/release-gate.yml`, `scripts/smoke_check.py`, and `docs/13-5-customer-launch-checklist.md`.
+- Remaining before paid rollout is operational validation against real production secrets/customers, not another architecture slice.
+- Frontend stack is locked: vanilla single-file HTML/CSS/JS. No React, Next.js, Tailwind, Vite, or build toolchain.
+
 ## Active planning lock (Slice 0, 2026-05-06)
 
 Before any new implementation starts, release scope is locked:

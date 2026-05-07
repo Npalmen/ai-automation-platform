@@ -64,7 +64,19 @@ from app.workflows.processors.classification_processor import classify_email_typ
 settings = get_settings()
 setup_logging()
 
-app = FastAPI(title=settings.APP_NAME)
+
+def _is_production_env(app_settings) -> bool:
+    return str(getattr(app_settings, "ENV", "") or "").strip().lower() in {"prod", "production"}
+
+
+def _openapi_urls_for(app_settings) -> dict:
+    """Return FastAPI docs URLs. Public docs are disabled in production."""
+    if _is_production_env(app_settings):
+        return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    return {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}
+
+
+app = FastAPI(title=settings.APP_NAME, **_openapi_urls_for(settings))
 
 
 @app.on_event("startup")
@@ -180,6 +192,16 @@ class TenantConfigUpdateRequest(_BaseModel):
     enabled_job_types: list[str]
     allowed_integrations: list[str]
     auto_actions: dict[str, bool | str]
+
+
+class CustomerAccountRequest(_BaseModel):
+    company_name: str | None = None
+    contact_name: str | None = None
+    contact_email: str | None = None
+    support_email: str | None = None
+    language: str | None = "sv"
+    region: str | None = "SE"
+    team_members: list[dict] | None = None
 
 
 @app.get("/tenant/config/{tenant_id}")
@@ -1580,6 +1602,179 @@ def dashboard_roi(
     return _compute_roi(db, tenant_id)
 
 
+def _get_customer_account(settings_dict: dict, config: dict, tenant_id: str) -> dict:
+    account = settings_dict.get("account") or {}
+    branding = settings_dict.get("branding") or {}
+    return {
+        "tenant_id": tenant_id,
+        "company_name": (
+            account.get("company_name")
+            or branding.get("company_display_name")
+            or config.get("name")
+            or tenant_id
+        ),
+        "contact_name": account.get("contact_name") or "",
+        "contact_email": account.get("contact_email") or "",
+        "support_email": account.get("support_email") or settings_dict.get("support_email") or "",
+        "language": account.get("language") or "sv",
+        "region": account.get("region") or "SE",
+        "team_members": account.get("team_members") or [],
+    }
+
+
+def _normalise_team_members(items: list[dict] | None) -> list[dict]:
+    normalised: list[dict] = []
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        email = str(item.get("email") or "").strip()
+        name = str(item.get("name") or "").strip()
+        if not email and not name:
+            continue
+        normalised.append({
+            "name": name,
+            "email": email,
+            "role": str(item.get("role") or "member").strip() or "member",
+            "status": str(item.get("status") or "active").strip() or "active",
+        })
+    return normalised
+
+
+def _customer_activity_label(item: dict) -> str:
+    status = item.get("status")
+    action = item.get("latest_action")
+    if status == "awaiting_approval":
+        return "Väntar på godkännande"
+    if status == "failed":
+        return "Behöver åtgärd"
+    if action == "send_email":
+        return "Kundmeddelande skickat"
+    if action == "create_monday_item":
+        return "Skapat i Monday"
+    if status == "completed":
+        return "Ärende klart"
+    if status == "processing":
+        return "Bearbetas"
+    return "Aktivitet registrerad"
+
+
+@app.get("/customer/account")
+def get_customer_account(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return customer-facing account/profile metadata for the authenticated tenant."""
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    settings_dict = TenantConfigRepository.get_settings(db, tenant_id)
+    config = get_tenant_config(tenant_id, db=db)
+    return _get_customer_account(settings_dict, config, tenant_id)
+
+
+@app.put("/customer/account")
+def put_customer_account(
+    request: CustomerAccountRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Persist simple customer account/team metadata without changing auth/RBAC."""
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    existing = TenantConfigRepository.get_settings(db, tenant_id)
+    config = get_tenant_config(tenant_id, db=db)
+    current = _get_customer_account(existing, config, tenant_id)
+    incoming = request.model_dump(exclude_unset=True)
+    if "team_members" in incoming:
+        incoming["team_members"] = _normalise_team_members(request.team_members)
+    account = {**current, **incoming}
+    account.pop("tenant_id", None)
+    updated = dict(existing)
+    updated["account"] = account
+    if request.support_email is not None:
+        updated["support_email"] = request.support_email or ""
+    TenantConfigRepository.update_settings(db, tenant_id, updated)
+    return _get_customer_account(updated, config, tenant_id)
+
+
+@app.get("/customer/activity")
+def customer_activity(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+    limit: int = 25,
+    offset: int = 0,
+):
+    """Customer-friendly activity feed derived from existing dashboard activity."""
+    raw = dashboard_activity(db=db, tenant_id=tenant_id, limit=limit, offset=offset)
+    items = []
+    for item in raw.get("items", []):
+        items.append({
+            "created_at": item.get("created_at"),
+            "type": item.get("type"),
+            "status": item.get("status"),
+            "priority": item.get("priority"),
+            "label": _customer_activity_label(item),
+        })
+    return {"items": items, "total": raw.get("total", 0)}
+
+
+@app.get("/customer/results")
+def customer_results(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Customer-facing ROI/result summary for the current tenant."""
+    summary = _compute_summary(db, tenant_id)
+    roi = _compute_roi(db, tenant_id)
+    total_cases = (
+        summary.get("leads_today", 0)
+        + summary.get("inquiries_today", 0)
+        + summary.get("invoices_today", 0)
+    )
+    completed = summary.get("completed_today", 0)
+    automation_rate = round((completed / total_cases) * 100) if total_cases else 0
+    return {
+        "period": "today",
+        "estimated_hours_saved": roi.get("estimated_hours_saved", 0),
+        "estimated_value_sek": roi.get("estimated_value_sek", 0),
+        "cases_handled": total_cases,
+        "completed_cases": completed,
+        "waiting_customer": summary.get("waiting_customer", 0),
+        "automation_rate_percent": automation_rate,
+        "breakdown": {
+            "leads": summary.get("leads_today", 0),
+            "support": summary.get("inquiries_today", 0),
+            "invoices": summary.get("invoices_today", 0),
+        },
+    }
+
+
+@app.get("/customer/health")
+def customer_health(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return a simplified, customer-safe health summary."""
+    from app.health.integration_health import get_integration_health
+    health = get_integration_health(db, tenant_id, app_settings=get_settings())
+    overall = health.get("overall_status") or "warning"
+    labels = {
+        "healthy": "Allt fungerar",
+        "warning": "Kontroll rekommenderas",
+        "error": "Åtgärd krävs",
+        "not_configured": "Integration saknas",
+    }
+    systems = {}
+    for key, value in (health.get("systems") or {}).items():
+        status = value.get("status") if isinstance(value, dict) else "warning"
+        systems[key] = {
+            "status": status,
+            "label": labels.get(status, "Kontroll rekommenderas"),
+        }
+    return {
+        "overall_status": overall,
+        "message": labels.get(overall, "Kontroll rekommenderas"),
+        "systems": systems,
+    }
+
+
 @app.get("/dashboard/leads")
 def dashboard_leads(
     db: Session = Depends(get_db),
@@ -2493,9 +2688,9 @@ def _run_scheduler_pass(tenant_id: str, db: "Session", now_utc: "datetime") -> d
 @app.post("/scheduler/run-once")
 def scheduler_run_once(
     db: Session = Depends(get_db),
-    tenant_id: str = Depends(get_verified_tenant),
+    _: None = Depends(require_admin_api_key),
 ):
-    """Run one scheduler pass for all tenants. Returns aggregate result."""
+    """Run one scheduler pass for all tenants. Requires admin API key."""
     from datetime import datetime, timezone
     from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
 

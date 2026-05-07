@@ -74,3 +74,35 @@ UI levereras som en enda `app/ui/index.html` servad av FastAPI via `HTMLResponse
 - Inget frontend-beroende att underhålla
 - UI fungerar ur lådan med `uvicorn`
 - Skalbarhet begränsad — acceptabelt för MVP-operatörs-UI
+
+---
+
+## DEC-005
+**Title:** Visual UI Refresh scoped to polish on existing CSS tokens and dark shell  
+**Date:** 2026-05-07  
+**Status:** Accepted
+
+### Context
+Sprint 5 (Visual UI Refresh) i den övergripande SaaS-planen beskriver en Apple/glassmorphism-inspirerad CSS-refresh. Samtidigt har den befintliga UI:n redan ett fullständigt dark premium SaaS-shell (Slice 22) med ett moget CSS custom property-designsystem: surface-hierarki (`--bg`/`--surface`/`--surface-2`/`--surface-3`), border-system (`--border`/`--border-med`/`--border-hi`), text-hierarki (`--text`/`--text-muted`/`--text-dim`), accent/glow-tokens (`--purple`/`--blue`/`--glow-*`), status-tokens (`--success`/`--warning`/`--danger` med `-bg`-varianter), form-tokens (`--radius`/`--radius-sm`/`--radius-lg`/`--shadow`/`--shadow-sm`) samt KPI-, card-, badge-, pill- och empty-state-klasser. Att bygga en ny designriktning från noll riskerar regressioner, scope creep och onödig omarbetning.
+
+### Decision
+Sprint 5 Visual UI Refresh begränsas till en **polish-pass ovanpå befintliga CSS tokens och det befintliga dark premium shell**. Följande regler gäller:
+
+1. **Inga nya design tokens utöver befintliga** — nya tokens får bara läggas till om ett konkret gap identifieras och motiveras (t.ex. `--glass-bg` om frosted panels krävs för specifik vy). Befintliga tokens (surfaces, borders, text, accents, status, shape, shadows) ska återanvändas.
+2. **Ingen ny designriktning från noll** — inget färgschema-byte, ingen ny typografisk hierarki, ingen ny layout-approach. Förbättringar bygger vidare på det som redan finns.
+3. **Polishåtgärder som är tillåtna:**
+   - Justera spacing, padding, margin för bättre luft och fokus
+   - Förbättra hover/focus/active-states med befintliga tokens
+   - Lägga till subtila transitions/animationer (max 200ms)
+   - Förbättra kontrast och läsbarhet inom befintlig färgpalett
+   - Polisha empty states, loading states och error states
+   - Finslipa mobilvy med befintliga responsive-regler
+   - Lägga till `backdrop-filter: blur()` sparsamt på modaler/overlays (undvik på scroll-tunga vyer)
+4. **Alla befintliga ID:n och JS-selectors ska behållas** — inga breaking changes mot JavaScript-logiken.
+5. **Frontend-stack-lås (DEC-004) gäller fortsatt** — vanilla single-file HTML/CSS/JS, ingen build-toolchain.
+
+### Consequences
+- Sprint 5 blir ett snabbare, tryggare polish-pass istället för en riskfylld visuell omgörning
+- Befintliga CSS-klasser och tokens som redan används av alla vyer behålls stabila
+- Agenter som arbetar med Sprint 5 vet exakt vilka ramar de har
+- Mobilvy och tillgänglighetspass (UI-07, UI-08) ingår fortfarande men bygger på befintligt designsystem

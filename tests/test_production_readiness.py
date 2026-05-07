@@ -82,11 +82,32 @@ class TestCheckAuthConfigured:
         status, msg, sev = _check_auth_configured(_app_settings(TENANT_API_KEYS=""))
         assert status == "warning"
 
+    def test_pass_when_db_backed_keys_exist(self):
+        db = MagicMock()
+        q = MagicMock()
+        q.filter.return_value = q
+        q.limit.return_value = q
+        q.first.return_value = MagicMock()
+        db.query.return_value = q
+        status, msg, sev = _check_auth_configured(_app_settings(TENANT_API_KEYS=""), db)
+        assert status == "pass"
+        assert sev == "info"
+
+    def test_fail_when_production_has_no_env_or_db_keys(self):
+        db = MagicMock()
+        db.query.side_effect = Exception("missing tenant_api_keys")
+        status, msg, sev = _check_auth_configured(
+            _app_settings(TENANT_API_KEYS="", ENV="production"),
+            db,
+        )
+        assert status == "fail"
+        assert sev == "error"
+
     def test_severity_info_when_pass(self):
         _, _, sev = _check_auth_configured(_app_settings(TENANT_API_KEYS="k"))
         assert sev == "info"
 
-    def test_severity_warning_when_not_set(self):
+    def test_severity_warning_when_not_set_in_dev(self):
         _, _, sev = _check_auth_configured(_app_settings(TENANT_API_KEYS=""))
         assert sev == "warning"
 

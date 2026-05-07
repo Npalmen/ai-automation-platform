@@ -6,7 +6,7 @@ All checks are deterministic and read-only — no external API calls.
 No secrets are included in the response.
 
 Checks:
-  auth_configured              — TENANT_API_KEYS env var is set
+  auth_configured              — env or DB-backed tenant API keys are configured
   tenant_exists                — at least one tenant row in DB
   onboarding_ready             — onboarding status == "ready" for the tenant
   integrations_health_not_error — integration health overall_status != "error"
@@ -60,11 +60,31 @@ _CHECK_KEYS = [
 # Individual check helpers
 # ---------------------------------------------------------------------------
 
-def _check_auth_configured(app_settings: Any) -> tuple[str, str, str]:
+def _db_has_active_tenant_api_keys(db: Session | None) -> bool:
+    if db is None:
+        return False
+    try:
+        from app.repositories.postgres.tenant_api_key_models import TenantApiKeyRecord
+        return (
+            db.query(TenantApiKeyRecord)
+            .filter(TenantApiKeyRecord.is_active.is_(True))
+            .limit(1)
+            .first()
+            is not None
+        )
+    except Exception:
+        return False
+
+
+def _check_auth_configured(app_settings: Any, db: Session | None = None) -> tuple[str, str, str]:
     configured = bool(getattr(app_settings, "TENANT_API_KEYS", ""))
     if configured:
         return "pass", "TENANT_API_KEYS konfigurerat.", "info"
-    return "warning", "TENANT_API_KEYS ej satt — autentisering inaktiverad (dev-läge).", "warning"
+    if _db_has_active_tenant_api_keys(db):
+        return "pass", "DB-baserade tenant API-nycklar är konfigurerade.", "info"
+    if str(getattr(app_settings, "ENV", "") or "").strip().lower() in {"prod", "production"}:
+        return "fail", "Ingen tenant-auth konfigurerad i production.", "error"
+    return "warning", "TENANT_API_KEYS ej satt — endast lokalt dev-läge får sakna tenant-auth.", "warning"
 
 
 def _check_tenant_exists(db: Session) -> tuple[str, str, str]:
@@ -202,7 +222,7 @@ def get_pilot_readiness(
     All checks are read-only and deterministic. No external API calls.
     """
     evaluators = {
-        "auth_configured":              lambda: _check_auth_configured(app_settings),
+        "auth_configured":              lambda: _check_auth_configured(app_settings, db),
         "tenant_exists":                lambda: _check_tenant_exists(db),
         "onboarding_ready":             lambda: _check_onboarding_ready(db, tenant_id, app_settings),
         "integrations_health_not_error": lambda: _check_integrations_health(db, tenant_id, app_settings),

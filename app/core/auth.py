@@ -67,6 +67,10 @@ def _lookup_env_key(raw_key: str) -> str | None:
     return next((tid for tid, k in key_map.items() if k == raw_key), None)
 
 
+def _is_production_env() -> bool:
+    return str(getattr(get_settings(), "ENV", "") or "").strip().lower() in {"prod", "production"}
+
+
 def _lookup_db_key(db: Session, raw_key: str) -> str | None:
     """Check DB for an active hashed key. Returns tenant_id or None.
 
@@ -171,6 +175,13 @@ def get_verified_tenant(
         raise HTTPException(
             status_code=http_status.HTTP_401_UNAUTHORIZED,
             detail="Missing API key. Provide the X-API-Key header.",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+
+    if _is_production_env():
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="Missing API key. Production requires X-API-Key.",
             headers={"WWW-Authenticate": "ApiKey"},
         )
 

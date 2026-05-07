@@ -40,7 +40,11 @@
       "Bash(curl -s -w \"\\\\nSTATUS:%{http_code}\" -H \"X-Admin-API-Key: admin123\" http://127.0.0.1:8000/admin/tenants/overview)",
       "Bash(Get-ChildItem -Path \"c:\\\\ai_automation_platform\" -Directory)",
       "Bash(Select-Object Name)",
-      "PowerShell(ls -r c:\\\\ai_automation_platform -Directory -Depth 2 | Select-Object -ExpandProperty Name | Where-Object {$_ -notmatch '\\\\.venv|\\\\.git|__pycache__|\\\\.pytest'})"
+      "PowerShell(ls -r c:\\\\ai_automation_platform -Directory -Depth 2 | Select-Object -ExpandProperty Name | Where-Object {$_ -notmatch '\\\\.venv|\\\\.git|__pycache__|\\\\.pytest'})",
+      "Bash(python -m pytest tests/test_email_approval.py -q)",
+      "Bash(python -c \"from app.domain.workflows.models import Job; from app.domain.workflows.enums import JobType; j=Job.__fields__; print\\(list\\(j.keys\\(\\)\\)[:5]\\)\")",
+      "Bash(python -c \"from app.domain.workflows.models import Job; import inspect; src = inspect.getsource\\(Job\\); print\\(src[:500]\\)\")",
+      "Bash(python -c \"from app.domain.workflows.models import JobStatus; print\\(JobStatus.__module__\\)\")"
     ]
   }
 }

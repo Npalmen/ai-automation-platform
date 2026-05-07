@@ -86,7 +86,10 @@ The following has been confirmed through real API calls against a running instan
 | Mobile-first core UI polish | ✅ IMPLEMENTED | Core single-file UI has responsive rules for sidebar/topbar, dashboard cards, cases filters/cards, onboarding/setup cards, tables, and overlays. |
 | Fas 1 Gate | ✅ VERIFIED | Product structure/navigation, admin/customer separation, active tenant context, onboarding, demo mode, docs, and desktop/mobile core UI verified. Admin tooling can use `X-Admin-API-Key` + active `X-Tenant-ID` for tenant-scoped endpoints; customer tenant-key flow remains unchanged. Gate evidence: focused Phase 1 tests `146 passed`; `py -3.10 -m scripts.run_release_gate_r1` passed regression (`338 passed`) + E2E (`145 passed`). |
 | Fas 6 Automation Experience | ✅ IMPLEMENTED | `GET /cases/{job_id}/automation-wow` returns deterministic case summary, risk signals, and three preview-only wow flows: approved customer reply, case-to-project handoff, and project-to-invoice-ready package. `GET /cases/{job_id}` includes the same `automation_summary`, `automation_risks`, and `wow_flows`; admin case detail renders an automation overview panel. All flows are no-side-effect previews and preserve existing approval-gated external writes. |
-| 2065 tests passing | ✅ | `python -m pytest` — all pass |
+| P0 Production Hardening | ✅ IMPLEMENTED | Production auth now fails closed when tenant credentials are missing; DB-backed tenant API keys count as configured auth in readiness; all-tenant `POST /scheduler/run-once` requires `X-Admin-API-Key`; public `/docs`/`/redoc`/`/openapi.json` are disabled when `ENV=production`; admin localStorage key model documented as pilot-only. Server branch `server-local-hotfix-backup` is retained only as historical backup; repo `main` remains source of truth. |
+| Product SaaS Finish UI/API | ✅ IMPLEMENTED | Customer navigation is now product-focused: Översikt, Resultat, Ärenden, Aktivitetslogg, Inställningar, Konto & Team. New customer endpoints expose account/team metadata (`/customer/account`), safe activity (`/customer/activity`), ROI/results (`/customer/results`) and simplified health (`/customer/health`) using existing tenant settings and dashboard data. Admin starts in Super Admin, has a needs-help queue, customer health table and quick actions. |
+| CI / Deploy hardening | ✅ IMPLEMENTED | Added `.github/workflows/release-gate.yml`, production `Dockerfile`, `docker-compose.prod.yml`, `scripts/smoke_check.py`, and `docs/13-5-customer-launch-checklist.md`. Release gate now includes customer SaaS surface tests plus production hardening/readiness tests. |
+| 2135 tests passing | ✅ | `py -3.10 -m pytest` — all pass in latest full verification; release gate passed regression (`396 passed`) + E2E (`145 passed`). |
 
 ---
 
@@ -136,6 +139,14 @@ Locked out-of-scope for R1:
 - New architecture patterns outside current backend-first architecture
 - Full accounting/billing suites, white-labeling, and mobile app scope
 - Broad net-new integration tracks beyond current controlled MVP adapters
+
+Visual UI Refresh scope lock (DEC-005, 2026-05-07):
+
+- Sprint 5 (Visual UI Refresh) is constrained to **polish on existing CSS tokens and dark shell** — not a new design direction from scratch
+- The dark premium SaaS shell and `:root` CSS custom property design system (surfaces, borders, text hierarchy, accents, status colors, shape/shadow tokens) are already implemented
+- Allowed: spacing adjustments, hover/focus/transition polish, contrast improvements, empty/loading/error state refinement, sparse `backdrop-filter` on modals, mobile/accessibility pass
+- Prohibited: new color schemes, new typographic hierarchies, new layout approaches, breaking existing CSS classes/IDs/JS selectors
+- See `docs/07-decisions.md` DEC-005 for full rationale
 
 ---
 

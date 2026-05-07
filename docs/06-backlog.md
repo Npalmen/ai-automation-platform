@@ -207,6 +207,31 @@
 - [x] Keeps Phase 7 hardening inside existing backend-first architecture: no schema changes, no external calls, no secrets in responses.
 - [x] Added focused tests in `tests/test_usage_analytics.py`.
 
+## Done (Product SaaS Finish — Sprint 1 P0 hardening)
+- [x] `POST /scheduler/run-once` is admin-only because it runs all-tenant scheduler work.
+- [x] Production tenant auth fails closed when no tenant API credentials are configured.
+- [x] Pilot readiness recognizes DB-backed tenant API keys, not only `TENANT_API_KEYS`.
+- [x] Public FastAPI docs/OpenAPI are disabled when `ENV=production`.
+- [x] Admin browser/localStorage key model documented as pilot-only; protect `/ui` with VPN/IP allowlist or trusted operator access.
+- [x] Server `server-local-hotfix-backup` reviewed; it is an older checkpoint branch retained only as historical backup. Do not merge it over `main`.
+- [x] Focused P0 hardening tests passed (`tests/test_auth.py`, `tests/test_scheduler.py`, `tests/test_production_readiness.py`, `tests/test_production_hardening.py`).
+
+## Done (Product SaaS Finish — Sprints 2-7 product readiness)
+
+Completed product-readiness pass for 5 controlled customers:
+
+- [x] IA-01–IA-06: customer/admin navigation audited and fixed only where gaps existed.
+- [x] Customer surfaces: Resultat/ROI, Aktivitetslogg, Inställningar, Konto & Team.
+- [x] Customer settings map: notifications, support/account metadata and team metadata stored in `tenant_configs.settings`.
+- [x] Admin control tower: Super Admin start page, needs-help queue, health table and quick actions.
+- [x] Apple/glassmorphism-inspired CSS refresh on existing single-file UI; no frontend rewrite.
+- [x] CI/deploy hardening: GitHub Actions release gate, Dockerfile, production compose config and smoke-check script.
+- [x] Sales readiness checklist: `docs/13-5-customer-launch-checklist.md`.
+
+Remaining before live sales is operational validation with real customer data and real production secrets, not new product architecture.
+
+**Visual UI Refresh scope lock (DEC-005, 2026-05-07):** Sprint 5 (Visual UI Refresh) is scoped to polish on existing CSS tokens and dark shell only. No new design direction, no color scheme changes, no new typographic hierarchy. Allowed: spacing/padding adjustments, hover/focus polish, subtle transitions, contrast improvements, empty/loading/error state refinement, sparse `backdrop-filter` on modals, mobile/accessibility pass. Existing `:root` design tokens, CSS classes, element IDs, and JS selectors must be preserved. See `docs/07-decisions.md` DEC-005.
+
 ## Next (priority order)
 - [ ] **R1 scope lock (Slice 0, 2026-05-06)**
   - **R1 (in scope for next release):**
@@ -231,7 +256,7 @@
 - [x] Finance layer v1 — bookkeeping-assist foundation (invoice draft, VAT/category classification, project profitability, approval-gated/idempotent Fortnox preview/export controlled write path)
 - [ ] Finance integrations planning — define expanded Swedish finance sync scope beyond initial Fortnox pre-accounting export
 - [ ] OAuth hardening runbook — formalize live recovery playbook for refresh/invalid_grant scenarios
-- [ ] Scheduler / cron trigger — external periodic call to `POST /scheduler/run-once`
+- [ ] Scheduler / cron trigger — external periodic call to admin-protected `POST /scheduler/run-once`
 - [ ] Dashboard polish — date-range filters, charts, auto-refresh interval
 
 ## Future UI improvements (out of current scope)

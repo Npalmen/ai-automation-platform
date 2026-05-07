@@ -9,21 +9,21 @@
 ═══════════════════════════════════════════════════════ */
 :root {
   /* Surfaces */
-  --bg:           #0d0f17;
-  --surface:      #13162a;
-  --surface-2:    #1a1e36;
-  --surface-3:    #20254a;
-  --surface-hover:#252b52;
+  --bg:           #eef3fb;
+  --surface:      rgba(255,255,255,.72);
+  --surface-2:    rgba(255,255,255,.54);
+  --surface-3:    rgba(241,245,249,.78);
+  --surface-hover:rgba(255,255,255,.86);
 
   /* Borders */
-  --border:       rgba(255,255,255,.07);
-  --border-med:   rgba(255,255,255,.12);
-  --border-hi:    rgba(255,255,255,.20);
+  --border:       rgba(15,23,42,.09);
+  --border-med:   rgba(15,23,42,.14);
+  --border-hi:    rgba(15,23,42,.22);
 
   /* Text */
-  --text:         #e8eaf6;
-  --text-muted:   #8892b0;
-  --text-dim:     #4a5270;
+  --text:         #111827;
+  --text-muted:   #64748b;
+  --text-dim:     #94a3b8;
 
   /* Accent */
   --purple:       #7c3aed;
@@ -48,10 +48,10 @@
   --radius-lg:    14px;
 
   /* Shadows */
-  --shadow:       0 4px 20px rgba(0,0,0,.4);
-  --shadow-sm:    0 2px 8px rgba(0,0,0,.3);
-  --glow-purple:  0 0 20px rgba(124,58,237,.3);
-  --glow-blue:    0 0 20px rgba(59,130,246,.25);
+  --shadow:       0 22px 70px rgba(15,23,42,.12);
+  --shadow-sm:    0 12px 32px rgba(15,23,42,.08);
+  --glow-purple:  0 18px 50px rgba(124,58,237,.16);
+  --glow-blue:    0 18px 50px rgba(59,130,246,.14);
 
   /* Sidebar */
   --sidebar-w:    220px;
@@ -65,7 +65,10 @@
 body {
   font-family: -apple-system, 'Inter', 'Segoe UI', system-ui, sans-serif;
   font-size: 13px;
-  background: var(--bg);
+  background:
+    radial-gradient(circle at 12% 8%, rgba(124,58,237,.16), transparent 30%),
+    radial-gradient(circle at 85% 12%, rgba(59,130,246,.14), transparent 34%),
+    linear-gradient(135deg, #f8fbff 0%, var(--bg) 48%, #e7eef9 100%);
   color: var(--text);
   display: flex;
   height: 100vh;
@@ -79,6 +82,8 @@ body {
   width: var(--sidebar-w);
   background: var(--surface);
   border-right: 1px solid var(--border);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -181,6 +186,8 @@ body {
   height: 52px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -347,6 +354,8 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 16px 18px;
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .dash-card:hover { border-color: var(--border-med); box-shadow: var(--shadow-sm); }
@@ -361,6 +370,8 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 18px 20px;
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -480,6 +491,8 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 18px 20px;
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
   box-shadow: var(--shadow-sm);
   transition: border-color 0.15s;
 }
@@ -504,6 +517,39 @@ body {
 .cust-activity-row:last-child { border-bottom: none; }
 .cust-activity-type { font-weight: 600; color: var(--text); min-width: 110px; }
 .cust-activity-time { font-size: 11px; color: var(--text-dim); margin-left: auto; white-space: nowrap; flex-shrink: 0; }
+.customer-page {
+  padding: 28px 32px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+.customer-grid {
+  display: grid;
+  gap: 14px;
+}
+.customer-grid.four { grid-template-columns: repeat(4, 1fr); }
+.customer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.customer-row:last-child { border-bottom: none; }
+.team-row {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr .8fr .7fr auto;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 8px;
+}
+@media (max-width: 900px) {
+  .customer-grid.four { grid-template-columns: repeat(2, 1fr); }
+  .team-row { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .customer-grid.four { grid-template-columns: 1fr; }
+}
 
 /* ═══════════════════════════════════════════════════════
    TABLES
@@ -1701,16 +1747,28 @@ label { color: var(--text-muted); }
     <!-- Customer section -->
     <div class="sidebar-section" id="sideSecOverview">Översikt</div>
     <div class="nav-item" id="viewTabDash"  onclick="switchView('dash')">
-      <span class="nav-icon">◈</span> Dashboard
+      <span class="nav-icon">◈</span> <span id="navDashLabel">Översikt</span>
+    </div>
+    <div class="nav-item customer-only" id="viewTabResults" onclick="switchView('results')">
+      <span class="nav-icon">✦</span> Resultat
     </div>
     <div class="nav-item" id="viewTabCases" onclick="switchView('cases')">
       <span class="nav-icon">◫</span> Ärenden
     </div>
+    <div class="nav-item customer-only" id="viewTabActivity" onclick="switchView('activity')">
+      <span class="nav-icon">◎</span> Aktivitetslogg
+    </div>
+    <div class="nav-item customer-only" id="viewTabCustomerSettings" onclick="switchView('customerSettings')">
+      <span class="nav-icon">◧</span> Inställningar
+    </div>
+    <div class="nav-item customer-only" id="viewTabAccount" onclick="switchView('account')">
+      <span class="nav-icon">◌</span> Konto &amp; Team
+    </div>
 
     <!-- Admin section -->
-    <div class="sidebar-section admin-only" id="sideSecOps">Drift</div>
+    <div class="sidebar-section admin-only" id="sideSecOps">Krowolf Admin</div>
     <div class="nav-item admin-only" id="viewTabOps"   onclick="switchView('ops')">
-      <span class="nav-icon">⊡</span> Drift
+      <span class="nav-icon">⊡</span> Loggar
     </div>
     <div class="nav-item admin-only" id="viewTabCtrl"  onclick="switchView('ctrl')">
       <span class="nav-icon">⊕</span> Kontrollpanel
@@ -2587,6 +2645,110 @@ label { color: var(--text-muted); }
 
 </div><!-- /viewCases -->
 
+<!-- ═════════════════════════════════════════════════════ CUSTOMER RESULTAT -->
+<div id="viewResults" style="display:none; overflow-y:auto; flex:1;">
+  <div class="customer-page">
+    <div class="dash-page-hdr">
+      <div>
+        <div class="dash-page-title">Resultat &amp; ROI</div>
+        <div class="dash-page-sub">Vad automationen har gjort för ditt konto</div>
+      </div>
+      <div class="dash-quick-actions">
+        <button class="btn btn-neutral btn-sm" onclick="loadCustomerResults()">↻ Uppdatera</button>
+      </div>
+    </div>
+    <div id="customerResultsError" class="msg msg-error" style="display:none;"></div>
+    <div class="customer-grid four" id="customerResultsKpis"></div>
+    <div class="cust-card" style="margin-top:16px;">
+      <div class="cust-section-label">Fördelning idag</div>
+      <div id="customerResultsBreakdown"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═════════════════════════════════════════════════ CUSTOMER AKTIVITETSLOGG -->
+<div id="viewActivity" style="display:none; overflow-y:auto; flex:1;">
+  <div class="customer-page">
+    <div class="dash-page-hdr">
+      <div>
+        <div class="dash-page-title">Aktivitetslogg</div>
+        <div class="dash-page-sub">Kundvänlig historik över vad automationen har gjort</div>
+      </div>
+      <div class="dash-quick-actions">
+        <button class="btn btn-neutral btn-sm" onclick="loadCustomerActivity()">↻ Uppdatera</button>
+      </div>
+    </div>
+    <div id="customerActivityError" class="msg msg-error" style="display:none;"></div>
+    <div class="cust-card" id="customerActivityList"></div>
+  </div>
+</div>
+
+<!-- ═════════════════════════════════════════════ CUSTOMER INSTÄLLNINGAR -->
+<div id="viewCustomerSettings" style="display:none; overflow-y:auto; flex:1;">
+  <div class="customer-page">
+    <div class="dash-page-hdr">
+      <div>
+        <div class="dash-page-title">Inställningar</div>
+        <div class="dash-page-sub">Notifieringar, automationsnivå och status för ditt konto</div>
+      </div>
+      <div class="dash-quick-actions">
+        <button class="btn btn-neutral btn-sm" onclick="loadCustomerSettings()">↻ Uppdatera</button>
+      </div>
+    </div>
+    <div id="customerSettingsError" class="msg msg-error" style="display:none;"></div>
+    <div class="dash-two-col">
+      <div class="cust-card">
+        <div class="cust-section-label">Notifieringar</div>
+        <div class="form-field"><label>Daglig sammanfattning</label><select id="custNotifEnabled"><option value="true">På</option><option value="false">Av</option></select></div>
+        <div class="form-field"><label>Mottagare</label><input id="custNotifEmail" type="email" placeholder="ekonomi@example.com"></div>
+        <div class="form-field"><label>Tidpunkt</label><input id="custNotifHour" type="number" min="0" max="23" value="8"></div>
+        <button class="btn btn-primary btn-sm" onclick="saveCustomerSettings()">Spara notifieringar</button>
+        <span id="customerSettingsMsg" class="cfg-save-msg"></span>
+      </div>
+      <div class="cust-card">
+        <div class="cust-section-label">Automationsstatus</div>
+        <div id="customerSettingsHealth"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═════════════════════════════════════════════ CUSTOMER KONTO & TEAM -->
+<div id="viewAccount" style="display:none; overflow-y:auto; flex:1;">
+  <div class="customer-page">
+    <div class="dash-page-hdr">
+      <div>
+        <div class="dash-page-title">Konto &amp; Team</div>
+        <div class="dash-page-sub">Företagsuppgifter och personer som ska kunna kontaktas</div>
+      </div>
+      <div class="dash-quick-actions">
+        <button class="btn btn-neutral btn-sm" onclick="loadCustomerAccount()">↻ Uppdatera</button>
+      </div>
+    </div>
+    <div id="customerAccountError" class="msg msg-error" style="display:none;"></div>
+    <div class="dash-two-col">
+      <div class="cust-card">
+        <div class="cust-section-label">Företag</div>
+        <div class="form-field"><label>Företagsnamn</label><input id="acctCompany" type="text"></div>
+        <div class="form-field"><label>Kontaktperson</label><input id="acctContactName" type="text"></div>
+        <div class="form-field"><label>Kontaktmail</label><input id="acctContactEmail" type="email"></div>
+        <div class="form-field"><label>Supportmail</label><input id="acctSupportEmail" type="email"></div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="form-field"><label>Språk</label><input id="acctLanguage" type="text" value="sv"></div>
+          <div class="form-field"><label>Region</label><input id="acctRegion" type="text" value="SE"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveCustomerAccount()">Spara konto</button>
+        <span id="customerAccountMsg" class="cfg-save-msg"></span>
+      </div>
+      <div class="cust-card">
+        <div class="cust-section-label">Teammedlemmar</div>
+        <div id="teamMemberRows"></div>
+        <button class="btn btn-neutral btn-sm" onclick="addTeamMemberRow()">+ Lägg till medlem</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════════════════════════════════════════ ONBOARDING -->
 <div id="viewOnboarding" style="display:none; overflow-y:auto; flex:1;">
 
@@ -3171,6 +3333,16 @@ label { color: var(--text-muted); }
     </div>
   </div>
 
+  <div class="dash-section-hdr" style="max-width:1100px;">
+    <span class="dash-section-title">Behöver hjälp</span>
+  </div>
+  <div id="adminNeedsHelp" style="max-width:1100px; margin-bottom:24px;">
+    <div class="empty-state" style="padding:18px;">
+      <div class="empty-state-icon">◌</div>
+      <div class="empty-state-title">Laddas med kundöversikten</div>
+    </div>
+  </div>
+
   <!-- Provisioning: Skapa ny kund -->
   <div class="cfg-section" style="max-width:1100px; margin-bottom:20px;" id="provisionFormSection">
     <div class="cfg-section-title">Skapa ny kund</div>
@@ -3567,8 +3739,9 @@ let _uiMode = 'admin';   // current role; initialised in initApiKey()
 
 // Admin-only tab names — hidden in customer mode
 const ADMIN_ONLY_VIEWS = ['ops', 'setup', 'ctrl', 'onboarding', 'integrations', 'notif', 'memory', 'readiness', 'admin'];
+const CUSTOMER_ONLY_VIEWS = ['results', 'activity', 'customerSettings', 'account'];
 // Views visible to customers
-const CUSTOMER_VIEWS   = ['dash', 'cases'];
+const CUSTOMER_VIEWS   = ['dash', 'results', 'cases', 'activity', 'customerSettings', 'account'];
 
 function apiKey() {
   return document.getElementById('apiKeyInput').value.trim();
@@ -3705,7 +3878,7 @@ function _launchApp(mode, key) {
   document.getElementById('authBanner').style.display = apiKey ? 'none' : 'block';
 
   _refreshTenantContext();
-  switchView(_uiMode === 'admin' ? 'ops' : 'dash');
+  switchView(_uiMode === 'admin' ? 'admin' : 'dash');
   if (apiKey || _uiMode === 'admin') loadAll();
 }
 
@@ -3746,14 +3919,23 @@ function _applyRoleMode() {
   const badge = document.getElementById('roleBadge');
   if (badge) {
     badge.className = 'role-badge ' + (isAdmin ? 'admin' : 'customer');
-    badge.textContent = isAdmin ? '◈ Admin' : '◈ Kund';
-    badge.title = 'Klicka för att byta vy (' + (isAdmin ? 'Admin → Kundvy' : 'Kundvy → Admin') + ')';
+    badge.textContent = isAdmin ? '◈ Admin' : '◈ Kundkonto';
+    badge.title = isAdmin ? 'Klicka för att förhandsgranska kundvy' : 'Kundvy';
+    badge.style.cursor = isAdmin ? 'pointer' : 'default';
   }
   // Show/hide admin-only nav items
   ADMIN_ONLY_VIEWS.forEach(v => {
     const tab = document.getElementById('viewTab' + v.charAt(0).toUpperCase() + v.slice(1));
     if (tab) tab.style.display = isAdmin ? '' : 'none';
   });
+  CUSTOMER_ONLY_VIEWS.forEach(v => {
+    const tab = document.getElementById('viewTab' + v.charAt(0).toUpperCase() + v.slice(1));
+    if (tab) tab.style.display = isAdmin ? 'none' : '';
+  });
+  const dashLabel = document.getElementById('navDashLabel');
+  if (dashLabel) dashLabel.textContent = isAdmin ? 'Kontrollcenter' : 'Översikt';
+  const sideOverview = document.getElementById('sideSecOverview');
+  if (sideOverview) sideOverview.textContent = isAdmin ? 'Krowolf' : 'Konto';
   // Show/hide admin-only sidebar section headers
   ['sideSecOps', 'sideSecConfig', 'sideSecAdmin'].forEach(id => {
     const el = document.getElementById(id);
@@ -3769,6 +3951,7 @@ function _applyRoleMode() {
 }
 
 function toggleRole() {
+  if (localStorage.getItem(LS_SESSION) === 'customer') return;
   _uiMode = (_uiMode === 'admin') ? 'customer' : 'admin';
   localStorage.setItem(LS_ROLE_KEY, _uiMode);
   _applyRoleMode();
@@ -3786,7 +3969,11 @@ function toggleRole() {
       loadDashboard();
     }
   } else {
-    if (activeView === 'dash') loadDashboard();
+    if (!activeView || CUSTOMER_ONLY_VIEWS.includes(activeView)) {
+      switchView('admin');
+    } else if (activeView === 'dash') {
+      loadDashboard();
+    }
   }
 }
 
@@ -3795,19 +3982,23 @@ function toggleRole() {
 // ---------------------------------------------------------------------------
 const _VIEW_DISPLAY = {
   dash: 'block', ops: 'flex', setup: 'block', ctrl: 'block',
-  cases: 'block', onboarding: 'block', notif: 'block', memory: 'block',
+  cases: 'block', results: 'block', activity: 'block', customerSettings: 'block', account: 'block',
+  onboarding: 'block', notif: 'block', memory: 'block',
   readiness: 'block', admin: 'block',
 };
 
 const _VIEW_TITLE = {
-  dash: 'Dashboard', ops: 'Drift', setup: 'Inställningar', ctrl: 'Kontrollpanel',
-  cases: 'Ärenden', onboarding: 'Onboarding', notif: 'Notifieringar',
+  dash: 'Översikt', ops: 'Loggar', setup: 'Inställningar', ctrl: 'Kontrollpanel',
+  cases: 'Ärenden', results: 'Resultat', activity: 'Aktivitetslogg',
+  customerSettings: 'Inställningar', account: 'Konto & Team',
+  onboarding: 'Onboarding', notif: 'Notifieringar',
   memory: 'Kundminne', readiness: 'Redo för drift', admin: 'Alla kunder',
 };
 
 function switchView(name) {
   // In customer mode, block admin-only navigation
   if (_uiMode === 'customer' && ADMIN_ONLY_VIEWS.includes(name)) return;
+  if (_uiMode === 'admin' && CUSTOMER_ONLY_VIEWS.includes(name)) return;
   window._currentViewName = name;
 
   // Update topbar title
@@ -3824,6 +4015,10 @@ function switchView(name) {
   if (name === 'dash')       loadDashboard();
   if (name === 'ctrl')       loadControl();
   if (name === 'cases')      loadCases();
+  if (name === 'results')    loadCustomerResults();
+  if (name === 'activity')   loadCustomerActivity();
+  if (name === 'customerSettings') loadCustomerSettings();
+  if (name === 'account')    loadCustomerAccount();
   if (name === 'onboarding') { loadOnboarding(); if (_uiMode === 'admin') loadWizardStatus(); }
   if (name === 'notif')      loadNotifSettings();
   if (name === 'memory')     loadMemory();
@@ -3879,7 +4074,7 @@ async function _loadCustomerDashboard() {
 
   // Integration health → status card + hero pill
   try {
-    const h = await adminApiFetch('/integrations/health');
+    const h = await apiFetch('/customer/health');
     const systems = Object.entries(h.systems || {});
     const overall = h.overall_status || 'unknown';
     const [oCls, oLabel] = HEALTH_MAP[overall] || ['gray', overall];
@@ -3901,7 +4096,7 @@ async function _loadCustomerDashboard() {
         </div>`;
     } else {
       const rows = systems.map(([key, info]) => {
-        const [cls, label] = HEALTH_MAP[info.status] || ['gray', info.status];
+        const [cls, label] = HEALTH_MAP[info.status] || ['gray', info.label || info.status];
         const name = { gmail: 'Gmail', monday: 'Monday', fortnox: 'Fortnox' }[key] || key;
         return `<div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border);">
           <span style="font-size:13px; color:var(--text); font-weight:500;">${escapeHtml(name)}</span>
@@ -3925,7 +4120,7 @@ async function _loadCustomerDashboard() {
   // Recent activity
   const actEl = document.getElementById('custActivity');
   try {
-    const r = await apiFetch('/dashboard/activity?limit=8');
+    const r = await apiFetch('/customer/activity?limit=8');
     if (!r.items || r.items.length === 0) {
       actEl.innerHTML =
         `<div class="empty-state">
@@ -3939,7 +4134,7 @@ async function _loadCustomerDashboard() {
       const type = TYPE_LABELS[item.type] || (item.type || '–');
       const ts   = item.created_at ? new Date(item.created_at).toLocaleString('sv-SE', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '–';
       const [pillCls, pillLabel] = STATUS_PILLS[item.status] || ['gray', item.status || '–'];
-      const subject = item.subject ? escapeHtml(item.subject).substring(0,50) : '';
+      const subject = item.label ? escapeHtml(item.label).substring(0,50) : '';
       return `<div class="cust-activity-row">
         <span class="cust-activity-type">${escapeHtml(type)}</span>
         ${subject ? `<span style="color:var(--text-muted); font-size:12px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${subject}</span>` : '<span style="flex:1;"></span>'}
@@ -3953,6 +4148,190 @@ async function _loadCustomerDashboard() {
         <div class="empty-state-icon">⚠</div>
         <div class="empty-state-title">Kunde inte ladda aktivitet</div>
       </div>`;
+  }
+}
+
+async function loadCustomerResults() {
+  const err = document.getElementById('customerResultsError');
+  if (err) err.style.display = 'none';
+  try {
+    const r = await apiFetch('/customer/results');
+    document.getElementById('customerResultsKpis').innerHTML = [
+      ['Sparad tid', `${r.estimated_hours_saved ?? 0} h`, 'accent-blue', 'idag'],
+      ['Uppskattat värde', `${Number(r.estimated_value_sek || 0).toLocaleString('sv-SE')} kr`, 'accent-green', 'sparad arbetstid'],
+      ['Ärenden hanterade', r.cases_handled ?? 0, 'accent-purple', 'idag'],
+      ['Automationsgrad', `${r.automation_rate_percent ?? 0}%`, 'accent-amber', 'klara av inkomna'],
+    ].map(([label, value, cls, help]) => `
+      <div class="kpi-card ${cls}">
+        <div class="kpi-label">${escapeHtml(label)}</div>
+        <div class="kpi-value" style="font-size:24px;">${escapeHtml(String(value))}</div>
+        <div class="kpi-helper">${escapeHtml(help)}</div>
+      </div>`).join('');
+    const b = r.breakdown || {};
+    document.getElementById('customerResultsBreakdown').innerHTML = [
+      ['Leads', b.leads ?? 0],
+      ['Supportärenden', b.support ?? 0],
+      ['Fakturor', b.invoices ?? 0],
+      ['Väntar på kund/åtgärd', r.waiting_customer ?? 0],
+    ].map(([label, value]) => `
+      <div class="customer-row">
+        <span style="color:var(--text-muted);">${escapeHtml(label)}</span>
+        <strong>${escapeHtml(String(value))}</strong>
+      </div>`).join('');
+  } catch (e) {
+    if (err) { err.textContent = 'Kunde inte ladda resultat: ' + e.message; err.style.display = 'block'; }
+  }
+}
+
+async function loadCustomerActivity() {
+  const err = document.getElementById('customerActivityError');
+  const list = document.getElementById('customerActivityList');
+  if (err) err.style.display = 'none';
+  try {
+    const r = await apiFetch('/customer/activity?limit=50');
+    if (!r.items || r.items.length === 0) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">◌</div><div class="empty-state-title">Ingen aktivitet ännu</div></div>';
+      return;
+    }
+    list.innerHTML = r.items.map(item => {
+      const ts = item.created_at ? new Date(item.created_at).toLocaleString('sv-SE', { dateStyle:'short', timeStyle:'short' }) : '–';
+      return `<div class="cust-activity-row">
+        <span class="cust-activity-type">${escapeHtml(CASE_TYPE_LABELS[item.type] || item.type || 'Ärende')}</span>
+        <span style="flex:1; color:var(--text-muted);">${escapeHtml(item.label || 'Aktivitet')}</span>
+        <span class="cust-activity-time">${escapeHtml(ts)}</span>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    if (err) { err.textContent = 'Kunde inte ladda aktivitetslogg: ' + e.message; err.style.display = 'block'; }
+  }
+}
+
+async function loadCustomerSettings() {
+  const err = document.getElementById('customerSettingsError');
+  if (err) err.style.display = 'none';
+  try {
+    const [notif, health] = await Promise.all([
+      apiFetch('/notifications/settings'),
+      apiFetch('/customer/health'),
+    ]);
+    document.getElementById('custNotifEnabled').value = String(!!notif.enabled);
+    document.getElementById('custNotifEmail').value = notif.recipient_email || '';
+    document.getElementById('custNotifHour').value = notif.send_hour ?? 8;
+    const systems = Object.entries(health.systems || {});
+    document.getElementById('customerSettingsHealth').innerHTML =
+      `<div class="customer-row"><span>Övergripande status</span><strong>${escapeHtml(health.message || '–')}</strong></div>` +
+      systems.map(([key, val]) => `<div class="customer-row">
+        <span>${escapeHtml({ gmail:'Gmail', monday:'Monday', fortnox:'Fortnox' }[key] || key)}</span>
+        <strong>${escapeHtml(val.label || val.status || '–')}</strong>
+      </div>`).join('');
+  } catch (e) {
+    if (err) { err.textContent = 'Kunde inte ladda inställningar: ' + e.message; err.style.display = 'block'; }
+  }
+}
+
+async function saveCustomerSettings() {
+  const msg = document.getElementById('customerSettingsMsg');
+  msg.textContent = 'Sparar…';
+  msg.className = 'cfg-save-msg';
+  try {
+    await apiFetch('/notifications/settings', {
+      method: 'PUT',
+      body: JSON.stringify({
+        enabled: document.getElementById('custNotifEnabled').value === 'true',
+        recipient_email: document.getElementById('custNotifEmail').value.trim(),
+        frequency: 'daily',
+        send_hour: Number(document.getElementById('custNotifHour').value || 8),
+      }),
+    });
+    msg.textContent = 'Sparat.';
+    msg.className = 'cfg-save-msg ok';
+  } catch (e) {
+    msg.textContent = 'Fel: ' + e.message;
+    msg.className = 'cfg-save-msg err';
+  }
+}
+
+let _teamRows = [];
+
+function _renderTeamRows() {
+  const wrap = document.getElementById('teamMemberRows');
+  wrap.innerHTML = (_teamRows.length ? _teamRows : [{ name:'', email:'', role:'member', status:'active' }]).map((m, idx) => `
+    <div class="team-row">
+      <input data-team-field="name" data-team-idx="${idx}" type="text" placeholder="Namn" value="${escapeHtml(m.name || '')}">
+      <input data-team-field="email" data-team-idx="${idx}" type="email" placeholder="email@example.com" value="${escapeHtml(m.email || '')}">
+      <input data-team-field="role" data-team-idx="${idx}" type="text" placeholder="roll" value="${escapeHtml(m.role || 'member')}">
+      <select data-team-field="status" data-team-idx="${idx}">
+        <option value="active" ${m.status === 'active' ? 'selected' : ''}>Aktiv</option>
+        <option value="inactive" ${m.status === 'inactive' ? 'selected' : ''}>Inaktiv</option>
+      </select>
+      <button class="btn btn-neutral btn-sm" onclick="removeTeamMemberRow(${idx})">Ta bort</button>
+    </div>`).join('');
+}
+
+function _collectTeamRows() {
+  const rows = [];
+  document.querySelectorAll('[data-team-idx]').forEach(el => {
+    const idx = Number(el.getAttribute('data-team-idx'));
+    const field = el.getAttribute('data-team-field');
+    rows[idx] = rows[idx] || {};
+    rows[idx][field] = el.value.trim();
+  });
+  return rows.filter(r => r && (r.name || r.email));
+}
+
+function addTeamMemberRow() {
+  _teamRows = _collectTeamRows();
+  _teamRows.push({ name:'', email:'', role:'member', status:'active' });
+  _renderTeamRows();
+}
+
+function removeTeamMemberRow(idx) {
+  _teamRows = _collectTeamRows();
+  _teamRows.splice(idx, 1);
+  _renderTeamRows();
+}
+
+async function loadCustomerAccount() {
+  const err = document.getElementById('customerAccountError');
+  if (err) err.style.display = 'none';
+  try {
+    const a = await apiFetch('/customer/account');
+    document.getElementById('acctCompany').value = a.company_name || '';
+    document.getElementById('acctContactName').value = a.contact_name || '';
+    document.getElementById('acctContactEmail').value = a.contact_email || '';
+    document.getElementById('acctSupportEmail').value = a.support_email || '';
+    document.getElementById('acctLanguage').value = a.language || 'sv';
+    document.getElementById('acctRegion').value = a.region || 'SE';
+    _teamRows = a.team_members || [];
+    _renderTeamRows();
+  } catch (e) {
+    if (err) { err.textContent = 'Kunde inte ladda konto: ' + e.message; err.style.display = 'block'; }
+  }
+}
+
+async function saveCustomerAccount() {
+  const msg = document.getElementById('customerAccountMsg');
+  msg.textContent = 'Sparar…';
+  msg.className = 'cfg-save-msg';
+  try {
+    await apiFetch('/customer/account', {
+      method: 'PUT',
+      body: JSON.stringify({
+        company_name: document.getElementById('acctCompany').value.trim(),
+        contact_name: document.getElementById('acctContactName').value.trim(),
+        contact_email: document.getElementById('acctContactEmail').value.trim(),
+        support_email: document.getElementById('acctSupportEmail').value.trim(),
+        language: document.getElementById('acctLanguage').value.trim() || 'sv',
+        region: document.getElementById('acctRegion').value.trim() || 'SE',
+        team_members: _collectTeamRows(),
+      }),
+    });
+    msg.textContent = 'Sparat.';
+    msg.className = 'cfg-save-msg ok';
+    await loadCustomerAccount();
+  } catch (e) {
+    msg.textContent = 'Fel: ' + e.message;
+    msg.className = 'cfg-save-msg err';
   }
 }
 
@@ -4436,8 +4815,41 @@ async function loadAdminOverview() {
     const items = r.items || [];
     if (items.length === 0) {
       document.getElementById('adminTable').innerHTML = '<span class="empty">Inga kunder i databasen.</span>';
+      document.getElementById('adminNeedsHelp').innerHTML = '<div class="cust-card"><span class="empty">Inga kunder behöver hjälp.</span></div>';
       return;
     }
+
+    const needsHelp = items.filter(t =>
+      t.status === 'error' ||
+      t.status === 'warning' ||
+      t.status === 'not_ready' ||
+      (t.recent_error_count || 0) > 0 ||
+      ((t.dispatch || {}).failed_30d || 0) > 0
+    ).slice(0, 6);
+    document.getElementById('adminNeedsHelp').innerHTML = needsHelp.length === 0
+      ? '<div class="cust-card"><span class="empty">Inga akuta åtgärder just nu.</span></div>'
+      : needsHelp.map(t => {
+          const integ = t.integrations || {};
+          const disp = t.dispatch || {};
+          const reasons = [];
+          if (t.status === 'error') reasons.push('Kundstatus fel');
+          if (t.status === 'not_ready') reasons.push('Ej redo för drift');
+          if ((t.recent_error_count || 0) > 0) reasons.push(`${t.recent_error_count} fel senaste 30d`);
+          if ((disp.failed_30d || 0) > 0) reasons.push(`${disp.failed_30d} misslyckade dispatches`);
+          if (integ.overall_status && integ.overall_status !== 'healthy') reasons.push('Integration behöver kontroll');
+          return `<div class="cust-card" style="margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div>
+              <div style="font-size:13px; font-weight:700; color:var(--text);">${escapeHtml(t.name || t.tenant_id)}</div>
+              <div style="font-size:12px; color:var(--text-muted); margin-top:3px;">${escapeHtml(reasons.join(' · ') || 'Kontroll rekommenderas')}</div>
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
+              <button class="btn btn-neutral btn-sm" onclick="openTenant(${JSON.stringify(t.tenant_id)})">Öppna kund</button>
+              <button class="btn btn-neutral btn-sm" onclick="_adminOpenCases(${JSON.stringify(t.tenant_id)})">Ärenden</button>
+              <button class="btn btn-neutral btn-sm" onclick="_adminOpenIntegrations(${JSON.stringify(t.tenant_id)})">Integrationer</button>
+              <button class="btn btn-neutral btn-sm" onclick="_adminOpenReadiness(${JSON.stringify(t.tenant_id)})">Readiness</button>
+            </div>
+          </div>`;
+        }).join('');
 
     const rows = items.map(t => {
       const statusIcon  = _ADMIN_STATUS_ICON[t.status]  || t.status;
@@ -4464,6 +4876,7 @@ async function loadAdminOverview() {
         <td style="font-size:11px; color:var(--text-dim);">${actAt}</td>
         <td style="white-space:nowrap; display:flex; gap:4px; flex-wrap:wrap;">
           <button class="btn btn-neutral btn-sm" onclick="openTenant(${JSON.stringify(t.tenant_id)})" title="Öppna Inställningar för denna kund">Öppna</button>
+          <button class="btn btn-neutral btn-sm" onclick="_adminOpenCases(${JSON.stringify(t.tenant_id)})" title="Visa kundens ärenden">Ärenden</button>
           <button class="btn btn-neutral btn-sm" onclick="_adminOpenIntegrations(${JSON.stringify(t.tenant_id)})" title="Integrationsstatus & konfiguration">Integr.</button>
           <button class="btn btn-neutral btn-sm" onclick="_adminOpenReadiness(${JSON.stringify(t.tenant_id)})" title="Redo för drift">Redo</button>
         </td>
@@ -4604,6 +5017,14 @@ function _adminOpenIntegrations(tenantId) {
   _updateTenantCtx(tenantId);
   _refreshTenantContext();
   openIntegrationSetup(tenantId);
+}
+
+function _adminOpenCases(tenantId) {
+  _activeTenantId = tenantId;
+  if (_uiMode !== 'admin') { _uiMode = 'admin'; _applyRoleMode(); }
+  _updateTenantCtx(tenantId);
+  _refreshTenantContext();
+  switchView('cases');
 }
 
 function _adminOpenReadiness(tenantId) {
@@ -5449,7 +5870,7 @@ async function runSchedulerOnce() {
   msgEl.className = 'cfg-save-msg';
   msgEl.textContent = 'Kör scheduler…';
   try {
-    const r = await apiFetch('/scheduler/run-once', { method: 'POST' });
+    const r = await adminApiFetch('/scheduler/run-once', { method: 'POST' });
     msgEl.className = 'cfg-save-msg ' + (r.status === 'success' ? 'ok' : 'err');
     msgEl.textContent = `Klart · Tenants: ${r.tenants_checked} · Inbox: ${r.inbox_syncs_run} · Rapporter: ${r.digests_sent} · Hoppade: ${r.skipped}`;
     loadControl();
@@ -8337,7 +8758,7 @@ async function _intCardScan(system, btn) {
     document.getElementById('sidebar').style.display     = '';
     document.getElementById('mainContent').style.display = '';
     _refreshTenantContext();
-    switchView(_uiMode === 'admin' ? 'ops' : 'dash');
+    switchView(_uiMode === 'admin' ? 'admin' : 'dash');
     if (apiKey() || _uiMode === 'admin') loadAll();
   } else {
     // No session — show login, detect dev mode

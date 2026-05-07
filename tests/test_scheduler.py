@@ -25,7 +25,6 @@ def _status(tenant_id: str = "T1", stored: dict | None = None):
 
 
 def _run_once(
-    tenant_id: str = "T1",
     all_records: list | None = None,
     stored_per_tenant: dict | None = None,
     inbox_raises: Exception | None = None,
@@ -59,7 +58,7 @@ def _run_once(
         patch("datetime.datetime") as mock_dt,
     ):
         mock_dt.now.return_value = _now_utc
-        result = scheduler_run_once(db=db, tenant_id=tenant_id)
+        result = scheduler_run_once(db=db)
         return result
 
 
@@ -371,7 +370,7 @@ class TestSchedulerRunOnce:
             patch("app.main.dispatch_action"),
             patch("app.main.get_settings", return_value=_mock_settings(gmail=gmail)),
         ):
-            return scheduler_run_once(db=db, tenant_id="T1")
+            return scheduler_run_once(db=db)
 
     def test_returns_required_keys(self):
         r = self._run()
@@ -432,10 +431,18 @@ class TestSchedulerRunOnce:
             patch("app.main.dispatch_action"),
             patch("app.main.get_settings", return_value=_mock_settings(gmail=True)),
         ):
-            r = scheduler_run_once(db=db, tenant_id="T1")
+            r = scheduler_run_once(db=db)
         assert r["status"] == "warning"
         assert len(r["errors"]) == 1
         assert r["errors"][0]["tenant_id"] == "T1"
+
+    def test_route_dependency_is_admin_key_not_tenant_key(self):
+        import inspect
+        from app.main import scheduler_run_once
+        from app.core.admin_auth import require_admin_api_key
+
+        dep = inspect.signature(scheduler_run_once).parameters["_"].default
+        assert dep.dependency is require_admin_api_key
 
     def test_digest_counted_when_sent(self):
         r = self._run(run_mode="manual", notif_enabled=True)

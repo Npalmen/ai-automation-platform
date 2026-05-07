@@ -55,11 +55,24 @@ class TestAuthDisabled:
         auth = _reload_auth()
         with patch("app.core.auth.get_settings") as mock_settings:
             mock_settings.return_value.TENANT_API_KEYS = ""
+            mock_settings.return_value.ENV = "dev"
             tenant_id = auth.get_verified_tenant(
                 x_api_key=None,
                 x_tenant_id=None,
             )
         assert tenant_id == "TENANT_1001"
+
+    def test_production_without_key_fails_closed(self):
+        auth = _reload_auth()
+        with patch("app.core.auth.get_settings") as mock_settings:
+            mock_settings.return_value.TENANT_API_KEYS = ""
+            mock_settings.return_value.ENV = "production"
+            with pytest.raises(HTTPException) as exc_info:
+                auth.get_verified_tenant(
+                    x_api_key=None,
+                    x_tenant_id="TENANT_1001",
+                )
+        assert exc_info.value.status_code == 401
 
     def test_api_key_ignored_in_dev_mode(self):
         """In dev mode (empty env), a provided key falls through DB lookup then raises 403.
