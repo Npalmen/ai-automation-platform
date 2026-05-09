@@ -15,3 +15,6 @@ Thumbs.db
 
 # VSCode
 .vscode/
+
+# Local dev runtime logs (do not commit)
+storage/local_dev/logs/
