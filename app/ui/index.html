@@ -1653,6 +1653,53 @@ label { color: var(--text-muted); }
   }
 }
 
+/* ── P6: Mobile field UX — touch targets for customer ops ── */
+@media (max-width: 760px) {
+  #adminDash [style*="grid-template-columns:repeat(5,1fr)"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .ops-field-form input,
+  .ops-field-form select,
+  .ops-field-form textarea,
+  .ops-field-form .btn {
+    min-height: 44px;
+    font-size: 15px;
+  }
+  .ops-field-form .btn {
+    padding: 12px 18px;
+    width: 100%;
+    justify-content: center;
+  }
+  .ops-checklist-item {
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+  .ops-timeline-entry {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+  .ops-status-badge {
+    font-size: 13px;
+    padding: 6px 14px;
+  }
+  .case-card {
+    padding: 14px 16px;
+  }
+  .case-card-header {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .detail-section {
+    padding: 14px;
+  }
+}
+@media (max-width: 460px) {
+  #adminDash [style*="grid-template-columns:repeat(5,1fr)"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 .int-card-meta {
   font-size: 11px; color: var(--text-dim);
   display: flex; flex-wrap: wrap; gap: 12px;
@@ -1927,9 +1974,17 @@ label { color: var(--text-muted); }
             <span style="font-size:12px; color:var(--text-muted);">Fakturor</span>
             <span id="cInvoices" style="font-weight:700; font-size:14px; color:var(--text);">–</span>
           </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0;">
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border);">
             <span style="font-size:12px; font-weight:600; color:var(--text);">Redo att hantera</span>
             <span id="cReady" style="font-weight:800; font-size:15px; color:var(--success);">–</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);">
+            <span style="font-size:12px; color:var(--text-muted);">Underlag redo</span>
+            <span id="cUnderlagReady" style="font-weight:700; font-size:14px; color:var(--success);">–</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0;">
+            <span style="font-size:12px; color:var(--text-muted);">Väntar på kund</span>
+            <span id="cWaitingCust" style="font-weight:700; font-size:14px; color:var(--warning);">–</span>
           </div>
         </div>
       </div>
@@ -1957,7 +2012,7 @@ label { color: var(--text-muted); }
   <!-- Page header -->
   <div class="dash-page-hdr">
     <div>
-      <div class="dash-page-title">Driftöversikt</div>
+      <div class="dash-page-title">Operationscockpit</div>
       <div class="dash-page-sub" id="adminDashSubtitle">Idag</div>
     </div>
     <div class="dash-quick-actions">
@@ -1967,6 +2022,46 @@ label { color: var(--text-muted); }
   </div>
 
   <div id="dashError" class="msg msg-error" style="display:none;"></div>
+
+  <!-- ═══ PILOT COCKPIT ═══ -->
+  <div class="dash-section-hdr" style="margin-top:4px;">
+    <span class="dash-section-title" style="font-size:14px; font-weight:700; color:var(--text);">Vad behöver göras idag?</span>
+    <button class="btn btn-neutral btn-sm" onclick="loadCockpit()">↻</button>
+  </div>
+  <div id="cockpitWrap" style="display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:8px;">
+    <div class="kpi-card accent-amber" style="cursor:pointer;" onclick="switchView('cases')" title="Kräver din åtgärd nu">
+      <div class="kpi-top"><div class="kpi-icon amber">⚡</div></div>
+      <div class="kpi-label">Kräver åtgärd</div>
+      <div class="kpi-value" id="cpActions">–</div>
+      <div class="kpi-helper">godkänn / svara</div>
+    </div>
+    <div class="kpi-card accent-amber" style="cursor:pointer;" onclick="switchView('cases')" title="Lead nära SLA-gräns">
+      <div class="kpi-top"><div class="kpi-icon amber">⚑</div></div>
+      <div class="kpi-label">Riskerar SLA</div>
+      <div class="kpi-value" id="cpSla">–</div>
+      <div class="kpi-helper">leads utan svar</div>
+    </div>
+    <div class="kpi-card accent-cyan" style="cursor:pointer;" onclick="switchView('cases')" title="Kund inväntar svar">
+      <div class="kpi-top"><div class="kpi-icon cyan">◷</div></div>
+      <div class="kpi-label">Väntar på kund</div>
+      <div class="kpi-value" id="cpWaiting">–</div>
+      <div class="kpi-helper">ärenden</div>
+    </div>
+    <div class="kpi-card accent-green" style="cursor:pointer;" onclick="switchView('cases')" title="Färdiga underlag att skicka till Fortnox">
+      <div class="kpi-top"><div class="kpi-icon green">✓</div></div>
+      <div class="kpi-label">Underlag redo</div>
+      <div class="kpi-value" id="cpUnderlag">–</div>
+      <div class="kpi-helper">ej exporterade</div>
+    </div>
+    <div class="kpi-card accent-blue" style="cursor:pointer;" onclick="switchView('cases')" title="Arbetsorder blockerade">
+      <div class="kpi-top"><div class="kpi-icon blue">✗</div></div>
+      <div class="kpi-label">Blockerade</div>
+      <div class="kpi-value" id="cpBlocked">–</div>
+      <div class="kpi-helper">arbetsorder</div>
+    </div>
+  </div>
+  <!-- Top action items -->
+  <div id="cockpitActionItems" style="margin-bottom:28px;"></div>
 
   <!-- Top KPI row: 4 cards -->
   <div class="dash-section-hdr">
@@ -1996,6 +2091,55 @@ label { color: var(--text-muted); }
       <div class="kpi-label">Inväntar åtgärd</div>
       <div class="kpi-value" id="dWaiting">–</div>
       <div class="kpi-helper">väntar på kund</div>
+    </div>
+  </div>
+
+  <!-- Operational KPIs row -->
+  <div class="dash-section-hdr">
+    <span class="dash-section-title">Driftstatus</span>
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:28px;">
+    <div class="kpi-card accent-amber">
+      <div class="kpi-top"><div class="kpi-icon amber">✉</div></div>
+      <div class="kpi-label">E-post väntar</div>
+      <div class="kpi-value" id="dEmailQueue">–</div>
+      <div class="kpi-helper">godkännande</div>
+    </div>
+    <div class="kpi-card accent-purple">
+      <div class="kpi-top"><div class="kpi-icon purple">⇢</div></div>
+      <div class="kpi-label">Dispatch väntar</div>
+      <div class="kpi-value" id="dDispatchQueue">–</div>
+      <div class="kpi-helper">godkännande</div>
+    </div>
+    <div class="kpi-card accent-cyan">
+      <div class="kpi-top"><div class="kpi-icon cyan">◷</div></div>
+      <div class="kpi-label">Väntar på kund</div>
+      <div class="kpi-value" id="dWaitingCust">–</div>
+      <div class="kpi-helper">ärenden</div>
+    </div>
+    <div class="kpi-card accent-green">
+      <div class="kpi-top"><div class="kpi-icon green">✓</div></div>
+      <div class="kpi-label">Underlag redo</div>
+      <div class="kpi-value" id="dUnderlagReady">–</div>
+      <div class="kpi-helper">för faktura</div>
+    </div>
+    <div class="kpi-card accent-blue">
+      <div class="kpi-top"><div class="kpi-icon blue">▤</div></div>
+      <div class="kpi-label">Aktiva projekt</div>
+      <div class="kpi-value" id="dActiveOps">–</div>
+      <div class="kpi-helper">operations</div>
+    </div>
+  </div>
+
+  <!-- Operational Insights -->
+  <div class="dash-section-hdr">
+    <span class="dash-section-title">Operationella insikter</span>
+    <button class="btn btn-neutral btn-sm" onclick="loadOperationalInsights()">↻</button>
+  </div>
+  <div id="opsInsightsWrap" style="margin-bottom:28px;">
+    <div class="empty-state" style="padding:16px 0;">
+      <div class="empty-state-icon">◌</div>
+      <div class="empty-state-title">Laddar insikter…</div>
     </div>
   </div>
 
@@ -4072,6 +4216,13 @@ async function _loadCustomerDashboard() {
     document.getElementById('cWaiting').textContent   = s.waiting_customer ?? '–';
   } catch (_) {}
 
+  // Extended KPIs (underlag ready, waiting customer)
+  try {
+    const k = await apiFetch('/dashboard/kpis');
+    document.getElementById('cUnderlagReady').textContent = k.underlag_ready ?? '–';
+    document.getElementById('cWaitingCust').textContent   = k.waiting_customer ?? '–';
+  } catch (_) {}
+
   // Integration health → status card + hero pill
   try {
     const h = await apiFetch('/customer/health');
@@ -4342,6 +4493,9 @@ async function _loadAdminDashboard() {
   const subEl = document.getElementById('adminDashSubtitle');
   if (subEl) subEl.textContent = new Date().toLocaleDateString('sv-SE', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
+  // Pilot cockpit (top priority — loads first)
+  loadCockpit();
+
   // ROI
   loadRoi();
 
@@ -4354,6 +4508,12 @@ async function _loadAdminDashboard() {
 
   // Pilot readiness
   loadPilotReadiness();
+
+  // Operational KPIs (P1a-d)
+  loadOperationalKpis();
+
+  // Operational Insights (P2)
+  loadOperationalInsights();
 
   // Lead pipeline KPIs
   loadLeadKpis();
@@ -4421,6 +4581,114 @@ async function _loadAdminDashboard() {
         <div class="empty-state-title">Kunde inte ladda aktivitet</div>
         <div class="empty-state-sub">${escapeHtml(e.message)}</div>
       </div>`;
+  }
+}
+
+async function loadCockpit() {
+  try {
+    const c = await apiFetch('/dashboard/cockpit');
+    const ck = c.cockpit || {};
+    document.getElementById('cpActions').textContent  = ck.actions_required ?? '–';
+    document.getElementById('cpSla').textContent      = ck.sla_risk          ?? '–';
+    document.getElementById('cpWaiting').textContent  = ck.waiting_customer  ?? '–';
+    document.getElementById('cpUnderlag').textContent = ck.underlag_ready    ?? '–';
+    document.getElementById('cpBlocked').textContent  = ck.blocked           ?? '–';
+
+    // Color code cards by urgency
+    const cpActions = document.getElementById('cpActions');
+    if (cpActions && (ck.actions_required || 0) > 0) {
+      cpActions.style.color = 'var(--danger)';
+    }
+    const cpSla = document.getElementById('cpSla');
+    if (cpSla && (ck.sla_risk || 0) > 0) {
+      cpSla.style.color = 'var(--danger)';
+    }
+
+    // Top action items
+    const wrap = document.getElementById('cockpitActionItems');
+    const items = c.top_action_items || [];
+    const breaches = c.sla_breaches || [];
+    if (!wrap) return;
+    if (!items.length && !breaches.length) {
+      wrap.innerHTML = `<div style="font-size:12px; color:var(--success); padding:8px 0;">✓ Inga akuta åtgärder — allt ser bra ut.</div>`;
+      return;
+    }
+    const SEVERITY_COLORS = {critical:'var(--danger)',high:'var(--danger)',medium:'var(--warning)',info:'var(--text-muted)'};
+    let html = `<div style="display:flex; flex-direction:column; gap:6px;">`;
+    items.slice(0,3).forEach(ins => {
+      const sc = SEVERITY_COLORS[ins.severity] || 'var(--text-muted)';
+      const jLink = ins.job_id ? `<span style="font-size:10px;color:var(--purple-light);cursor:pointer;margin-left:8px;" onclick="switchView('cases');setTimeout(()=>loadCaseDetail('${ins.job_id}'),300);">Öppna →</span>` : '';
+      html += `<div class="dash-card" style="padding:10px 14px;border-left:3px solid ${sc};display:flex;align-items:center;gap:8px;">
+        <span style="font-size:11px;font-weight:700;color:${sc};min-width:52px;text-transform:uppercase;">${ins.severity === 'critical' ? 'KRITISK' : ins.severity === 'high' ? 'HÖG' : 'MEDEL'}</span>
+        <span style="flex:1;font-size:12px;color:var(--text);">${escapeHtml(ins.title)}</span>
+        ${jLink}
+      </div>`;
+    });
+    breaches.slice(0,2).forEach(b => {
+      const jLink = b.job_id ? `<span style="font-size:10px;color:var(--purple-light);cursor:pointer;margin-left:8px;" onclick="switchView('cases');setTimeout(()=>loadCaseDetail('${b.job_id}'),300);">Öppna →</span>` : '';
+      html += `<div class="dash-card" style="padding:10px 14px;border-left:3px solid var(--danger);display:flex;align-items:center;gap:8px;">
+        <span style="font-size:11px;font-weight:700;color:var(--danger);min-width:52px;text-transform:uppercase;">SLA</span>
+        <span style="flex:1;font-size:12px;color:var(--text);">${escapeHtml(b.subject || 'Lead')}: ${b.hours_elapsed?.toFixed(0)}h utan svar</span>
+        ${jLink}
+      </div>`;
+    });
+    html += `</div>`;
+    wrap.innerHTML = html;
+  } catch (e) {
+    const wrap = document.getElementById('cockpitActionItems');
+    if (wrap) wrap.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">Cockpit kunde inte laddas: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function loadOperationalKpis() {
+  try {
+    const k = await apiFetch('/dashboard/kpis');
+    document.getElementById('dEmailQueue').textContent    = k.email_approval_queue ?? '–';
+    document.getElementById('dDispatchQueue').textContent  = k.dispatch_approval_queue ?? '–';
+    document.getElementById('dWaitingCust').textContent    = k.waiting_customer ?? '–';
+    document.getElementById('dUnderlagReady').textContent  = k.underlag_ready ?? '–';
+    document.getElementById('dActiveOps').textContent      = k.active_ops_cases ?? '–';
+  } catch (_) {}
+}
+
+async function loadOperationalInsights() {
+  const wrap = document.getElementById('opsInsightsWrap');
+  if (!wrap) return;
+  const SEVERITY_COLORS = {
+    critical: 'var(--danger)', high: 'var(--danger)',
+    medium: 'var(--warning)', info: 'var(--text-muted)',
+  };
+  const SEVERITY_LABELS = { critical: 'KRITISK', high: 'HÖG', medium: 'MEDEL', info: 'INFO' };
+  const STAGE_LABELS = { lead: 'Lead', project: 'Projekt', underlag: 'Underlag' };
+  try {
+    const r = await apiFetch('/dashboard/operational-insights?limit=10');
+    if (!r.insights || r.insights.length === 0) {
+      wrap.innerHTML = `<div class="empty-state" style="padding:16px 0;">
+        <div class="empty-state-icon">✓</div>
+        <div class="empty-state-title">Inga aktiva insikter</div>
+        <div class="empty-state-sub">Allt ser bra ut just nu.</div>
+      </div>`;
+      return;
+    }
+    const cards = r.insights.map(ins => {
+      const sColor = SEVERITY_COLORS[ins.severity] || 'var(--text-muted)';
+      const sLabel = SEVERITY_LABELS[ins.severity] || ins.severity;
+      const stage = ins.pipeline_stage ? (STAGE_LABELS[ins.pipeline_stage] || ins.pipeline_stage) : '';
+      const evidStr = (ins.evidence || []).slice(0, 3).map(e => escapeHtml(e)).join(' · ');
+      return `<div class="dash-card" style="padding:12px 16px; border-left:3px solid ${sColor}; margin-bottom:8px;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+          <span style="font-size:10px; font-weight:700; color:${sColor}; text-transform:uppercase; letter-spacing:.04em;">${sLabel}</span>
+          ${stage ? `<span style="font-size:10px; color:var(--text-dim); background:var(--surface-3); padding:1px 6px; border-radius:3px;">${escapeHtml(stage)}</span>` : ''}
+          ${ins.job_id ? `<span style="font-size:10px; color:var(--text-dim); cursor:pointer;" onclick="switchView('cases'); setTimeout(()=>loadCaseDetail('${ins.job_id}'),300);" title="Öppna ärende">${ins.job_id.substring(0,8)}…</span>` : ''}
+        </div>
+        <div style="font-size:13px; font-weight:600; color:var(--text); margin-bottom:2px;">${escapeHtml(ins.title)}</div>
+        <div style="font-size:11px; color:var(--text-muted);">${escapeHtml(ins.detail)}</div>
+        ${evidStr ? `<div style="font-size:10px; color:var(--text-dim); margin-top:4px;">${evidStr}</div>` : ''}
+      </div>`;
+    }).join('');
+    wrap.innerHTML = cards;
+  } catch (e) {
+    wrap.innerHTML = `<div style="font-size:12px; color:var(--text-dim); padding:12px 0;">Kunde inte ladda insikter: ${escapeHtml(e.message)}</div>`;
   }
 }
 
@@ -6304,12 +6572,262 @@ async function _openCustomerCase(jobId) {
         ${errors.map(e => `<div class="msg msg-error" style="margin-bottom:6px; font-size:12px;">${escapeHtml(e.message)}</div>`).join('')}
       </div>`;
 
-    detailEl.innerHTML = nextStepHtml + msgHtml + timelineHtml + threadHtml + errHtml;
+    // Operations workspace (P4a read-only + P4b guided edits)
+    let opsHtml = '';
+    try {
+      const opsResp = await apiFetch('/cases/' + encodeURIComponent(jobId) + '/operations');
+      const ws = (opsResp && opsResp.workspace) || {};
+      opsHtml = _renderCustomerOperationsPanel(ws, jobId);
+    } catch (_opsErr) {
+      // Operations data unavailable — skip panel silently
+    }
+
+    detailEl.innerHTML = nextStepHtml + msgHtml + opsHtml + timelineHtml + threadHtml + errHtml;
 
   } catch (e) {
     errEl.textContent = 'Kunde inte ladda ärendedetaljer: ' + escapeHtml(e.message);
     errEl.style.display = 'block';
     detailEl.innerHTML = '';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Customer operations panel (P4a read-only + P4b guided edits)
+// ---------------------------------------------------------------------------
+function _renderCustomerOperationsPanel(ws, jobId) {
+  const project     = ws.project || {};
+  const workOrder   = ws.work_order || {};
+  const customer    = ws.customer || {};
+  const property    = ws.property || {};
+  const checklists  = ws.checklists || {};
+  const documentation = ws.documentation || {};
+  const delivery    = ws.delivery_package || {};
+  const timeline    = Array.isArray(ws.timeline) ? ws.timeline : [];
+
+  const eid = escapeHtml(jobId);
+
+  // Status badge helper
+  const _opsBadge = (val, map) => {
+    const v = (val || '').toLowerCase();
+    const [label, cls] = (map && map[v]) || [val || '–', 'gray'];
+    return `<span class="status-pill ${cls}">${escapeHtml(label)}</span>`;
+  };
+
+  const PROJECT_STATUS_MAP = {
+    intake:      ['Intag', 'gray'],
+    planning:    ['Planering', 'warn'],
+    in_progress: ['Pågår', 'ok'],
+    completed:   ['Klart', 'ok'],
+    on_hold:     ['Pausat', 'warn'],
+  };
+  const WO_STATUS_MAP = {
+    new:         ['Ny', 'gray'],
+    planned:     ['Planerad', 'gray'],
+    scheduled:   ['Schemalagd', 'warn'],
+    in_progress: ['Pågår', 'ok'],
+    blocked:     ['Blockerad', 'err'],
+    completed:   ['Slutförd', 'ok'],
+    cancelled:   ['Avbruten', 'err'],
+  };
+  const DELIVERY_STATUS_MAP = {
+    not_started: ['Ej påbörjat', 'gray'],
+    preparing:   ['Förbereds', 'warn'],
+    ready:       ['Redo', 'ok'],
+    sent:        ['Skickat', 'ok'],
+  };
+
+  // Checklist progress
+  let checkTotal = 0, checkDone = 0;
+  for (const phase of Object.values(checklists)) {
+    if (Array.isArray(phase)) {
+      for (const item of phase) {
+        checkTotal++;
+        if (item.done) checkDone++;
+      }
+    }
+  }
+
+  // Documentation counts
+  const docBefore = Array.isArray(documentation.before_images) ? documentation.before_images.length : 0;
+  const docAfter  = Array.isArray(documentation.after_images) ? documentation.after_images.length : 0;
+  const docDocs   = Array.isArray(documentation.documents) ? documentation.documents.length : 0;
+
+  // Timeline (latest 5)
+  const sortedTimeline = timeline.slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 5);
+  const timelineRows = sortedTimeline.map(t => {
+    const ts = t.created_at ? new Date(t.created_at).toLocaleString('sv-SE', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+    return `<div style="display:flex; gap:8px; align-items:flex-start; padding:6px 0; border-bottom:1px solid var(--border);">
+      <div style="font-size:11px; color:var(--text-dim); min-width:90px; white-space:nowrap;">${escapeHtml(ts)}</div>
+      <div style="font-size:12px; color:var(--text);">${escapeHtml(t.message || '–')}</div>
+    </div>`;
+  }).join('');
+
+  // --- P4a: Read-only summary ---
+  const readOnlyHtml = `
+    <div class="detail-section" style="margin-bottom:14px; border-color:rgba(20,184,166,.3);">
+      <div class="detail-section-title" style="color:var(--cyan);">Projektöversikt</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+        <div style="padding:10px; background:var(--surface-3); border:1px solid var(--border); border-radius:8px;">
+          <div style="font-size:10px; color:var(--text-dim); margin-bottom:4px;">Projekt</div>
+          <div style="font-size:13px; font-weight:600; color:var(--text); margin-bottom:4px;">${escapeHtml(project.name || '–')}</div>
+          ${_opsBadge(project.status, PROJECT_STATUS_MAP)}
+        </div>
+        <div style="padding:10px; background:var(--surface-3); border:1px solid var(--border); border-radius:8px;">
+          <div style="font-size:10px; color:var(--text-dim); margin-bottom:4px;">Arbetsorder</div>
+          ${_opsBadge(workOrder.status, WO_STATUS_MAP)}
+          ${workOrder.scheduled_start_at ? `<div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Start: ${escapeHtml(new Date(workOrder.scheduled_start_at).toLocaleString('sv-SE'))}</div>` : ''}
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+        <div style="padding:10px; background:var(--surface-3); border:1px solid var(--border); border-radius:8px;">
+          <div style="font-size:10px; color:var(--text-dim); margin-bottom:4px;">Kund</div>
+          <div style="font-size:13px; font-weight:600; color:var(--text);">${escapeHtml(customer.name || '–')}</div>
+          ${customer.phone ? `<div style="font-size:11px; color:var(--text-muted);">${escapeHtml(customer.phone)}</div>` : ''}
+        </div>
+        <div style="padding:10px; background:var(--surface-3); border:1px solid var(--border); border-radius:8px;">
+          <div style="font-size:10px; color:var(--text-dim); margin-bottom:4px;">Fastighet</div>
+          <div style="font-size:13px; color:var(--text);">${escapeHtml(property.address || '–')}</div>
+          ${property.property_type ? `<div style="font-size:11px; color:var(--text-muted);">${escapeHtml(property.property_type)}</div>` : ''}
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;">
+        <div style="padding:10px; background:var(--surface-3); border:1px solid var(--border); border-radius:8px; text-align:center;">
+          <div style="font-size:10px; color:var(--text-dim); margin-bottom:4px;">Checklista</div>
+          <div style="font-size:16px; font-weight:700; color:var(--text);">${checkDone} / ${checkTotal}</div>
+          <div style="font-size:10px; color:var(--text-muted);">klara</div>
+        </div>
+        <div style="padding:10px; background:var(--surface-3); border:1px solid var(--border); border-radius:8px; text-align:center;">
+          <div style="font-size:10px; color:var(--text-dim); margin-bottom:4px;">Dokumentation</div>
+          <div style="font-size:11px; color:var(--text);">Före: <strong>${docBefore}</strong> · Efter: <strong>${docAfter}</strong></div>
+          <div style="font-size:11px; color:var(--text);">Dokument: <strong>${docDocs}</strong></div>
+        </div>
+        <div style="padding:10px; background:var(--surface-3); border:1px solid var(--border); border-radius:8px; text-align:center;">
+          <div style="font-size:10px; color:var(--text-dim); margin-bottom:4px;">Leveranspaket</div>
+          ${_opsBadge(delivery.status, DELIVERY_STATUS_MAP)}
+        </div>
+      </div>
+      ${sortedTimeline.length > 0 ? `
+        <div style="margin-top:8px;">
+          <div style="font-size:11px; font-weight:600; color:var(--text-dim); margin-bottom:6px;">Senaste händelser</div>
+          ${timelineRows}
+        </div>
+      ` : ''}
+    </div>`;
+
+  // --- P4b: Guided edit actions ---
+  const guidedHtml = `
+    <div class="detail-section" style="margin-bottom:14px; border-color:rgba(20,184,166,.2);">
+      <div class="detail-section-title" style="color:var(--cyan);">Åtgärder</div>
+
+      <div style="margin-bottom:14px;">
+        <label style="font-size:11px; font-weight:600; color:var(--text-dim); display:block; margin-bottom:4px;">Uppdatera arbetsorderstatus</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <select id="custOpsWoStatus_${eid}" style="flex:1; padding:6px 10px; font-size:12px; border-radius:6px; border:1px solid var(--border-med); background:var(--surface-2); color:var(--text);">
+            <option value="scheduled"${workOrder.status === 'scheduled' ? ' selected' : ''}>Schemalagd</option>
+            <option value="in_progress"${workOrder.status === 'in_progress' ? ' selected' : ''}>Pågår</option>
+            <option value="completed"${workOrder.status === 'completed' ? ' selected' : ''}>Slutförd</option>
+            <option value="blocked"${workOrder.status === 'blocked' ? ' selected' : ''}>Blockerad</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="_custOpsUpdateWoStatus('${eid}')">Spara</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <label style="font-size:11px; font-weight:600; color:var(--text-dim); display:block; margin-bottom:4px;">Lägg till tidslinjenotering</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input id="custOpsTimelineMsg_${eid}" type="text" placeholder="Beskriv händelse…" style="flex:1; padding:6px 10px; font-size:12px; border-radius:6px; border:1px solid var(--border-med); background:var(--surface-2); color:var(--text);" />
+          <button class="btn btn-primary btn-sm" onclick="_custOpsAddTimeline('${eid}')">Lägg till</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:6px;">
+        <label style="font-size:11px; font-weight:600; color:var(--text-dim); display:block; margin-bottom:4px;">Registrera tid/material</label>
+        <div style="display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:end;">
+          <div>
+            <div style="font-size:10px; color:var(--text-dim); margin-bottom:2px;">Beskrivning</div>
+            <input id="custOpsTmDesc_${eid}" type="text" placeholder="T.ex. kabelarbete" style="width:100%; padding:6px 10px; font-size:12px; border-radius:6px; border:1px solid var(--border-med); background:var(--surface-2); color:var(--text);" />
+          </div>
+          <div>
+            <div style="font-size:10px; color:var(--text-dim); margin-bottom:2px;">Timmar</div>
+            <input id="custOpsTmHours_${eid}" type="number" min="0" step="0.5" placeholder="0" style="width:70px; padding:6px 10px; font-size:12px; border-radius:6px; border:1px solid var(--border-med); background:var(--surface-2); color:var(--text);" />
+          </div>
+          <div>
+            <div style="font-size:10px; color:var(--text-dim); margin-bottom:2px;">Belopp (kr)</div>
+            <input id="custOpsTmAmount_${eid}" type="number" min="0" step="1" placeholder="0" style="width:90px; padding:6px 10px; font-size:12px; border-radius:6px; border:1px solid var(--border-med); background:var(--surface-2); color:var(--text);" />
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="_custOpsAddTimeMaterial('${eid}')">Registrera</button>
+      </div>
+
+      <div id="custOpsMsg_${eid}" class="cfg-save-msg" style="display:none; margin-top:10px;"></div>
+    </div>`;
+
+  return readOnlyHtml + guidedHtml;
+}
+
+function _showCustOpsMsg(jobId, ok, text) {
+  const el = document.getElementById('custOpsMsg_' + jobId);
+  if (!el) return;
+  el.style.display = 'block';
+  el.className = 'cfg-save-msg ' + (ok ? 'ok' : 'err');
+  el.textContent = text;
+}
+
+async function _custOpsUpdateWoStatus(jobId) {
+  const sel = document.getElementById('custOpsWoStatus_' + jobId);
+  if (!sel) return;
+  try {
+    await apiFetch('/cases/' + encodeURIComponent(jobId) + '/operations', {
+      method: 'PUT',
+      body: JSON.stringify({ workspace: { work_order: { status: sel.value } } }),
+    });
+    _showCustOpsMsg(jobId, true, 'Arbetsorderstatus uppdaterad.');
+    await _openCustomerCase(jobId);
+  } catch (e) {
+    _showCustOpsMsg(jobId, false, 'Kunde inte uppdatera: ' + e.message);
+  }
+}
+
+async function _custOpsAddTimeline(jobId) {
+  const inp = document.getElementById('custOpsTimelineMsg_' + jobId);
+  if (!inp || !inp.value.trim()) return;
+  try {
+    await apiFetch('/cases/' + encodeURIComponent(jobId) + '/operations/timeline', {
+      method: 'POST',
+      body: JSON.stringify({ message: inp.value.trim(), event_type: 'manual_update' }),
+    });
+    _showCustOpsMsg(jobId, true, 'Tidslinjenotering tillagd.');
+    await _openCustomerCase(jobId);
+  } catch (e) {
+    _showCustOpsMsg(jobId, false, 'Kunde inte lägga till: ' + e.message);
+  }
+}
+
+async function _custOpsAddTimeMaterial(jobId) {
+  const descEl   = document.getElementById('custOpsTmDesc_' + jobId);
+  const hoursEl  = document.getElementById('custOpsTmHours_' + jobId);
+  const amountEl = document.getElementById('custOpsTmAmount_' + jobId);
+  if (!descEl || !descEl.value.trim()) return;
+  const entry = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    description: descEl.value.trim(),
+    hours: parseFloat(hoursEl.value) || 0,
+    amount: parseFloat(amountEl.value) || 0,
+    created_at: new Date().toISOString(),
+  };
+  try {
+    const opsResp = await apiFetch('/cases/' + encodeURIComponent(jobId) + '/operations');
+    const current = (opsResp && opsResp.workspace) || {};
+    const timeMaterial = Array.isArray(current.time_material) ? current.time_material.slice() : [];
+    timeMaterial.push(entry);
+    await apiFetch('/cases/' + encodeURIComponent(jobId) + '/operations', {
+      method: 'PUT',
+      body: JSON.stringify({ workspace: { time_material: timeMaterial } }),
+    });
+    _showCustOpsMsg(jobId, true, 'Tid/material registrerat.');
+    await _openCustomerCase(jobId);
+  } catch (e) {
+    _showCustOpsMsg(jobId, false, 'Kunde inte registrera: ' + e.message);
   }
 }
 
@@ -6461,11 +6979,175 @@ async function _openAdminCase(jobId) {
     // Support Analysis panel (only for customer_inquiry type)
     const supportHtml = _renderSupportAnalysisPanel(c);
 
-    detailEl.innerHTML = automationWowHtml + operationsHtml + supportHtml + leadHtml + rpHtml + omHtml + extHtml + threadHtml + actHtml + errSectionHtml;
+    // Followup panel (P1) and closeout panel (P3) placeholders — loaded asynchronously
+    const followupPlaceholder = `<div id="followupPanel_${escapeHtml(c.job_id)}" class="detail-section" style="margin-bottom:14px;">
+      <div class="detail-section-title">Uppföljning</div>
+      <div style="font-size:12px;color:var(--text-dim);">Laddar uppföljningsstatus…</div>
+    </div>`;
+    const closeoutPlaceholder = `<div id="closeoutPanel_${escapeHtml(c.job_id)}" class="detail-section" style="margin-bottom:14px;">
+      <div class="detail-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Projektavslut</span>
+        <button class="btn btn-primary btn-sm" onclick="loadCloseoutPanel('${escapeHtml(c.job_id)}')">Sammanställ projekt</button>
+      </div>
+      <div id="closeoutPanelBody_${escapeHtml(c.job_id)}" style="font-size:12px;color:var(--text-dim);margin-top:8px;">Tryck på knappen för att generera sammanställning.</div>
+    </div>`;
+
+    detailEl.innerHTML = automationWowHtml + followupPlaceholder + closeoutPlaceholder + operationsHtml + supportHtml + leadHtml + rpHtml + omHtml + extHtml + threadHtml + actHtml + errSectionHtml;
+
+    // Load followup panel async (P1)
+    _loadFollowupPanel(c.job_id);
   } catch (e) {
     errEl.textContent = 'Kunde inte ladda ärendedetaljer: ' + escapeHtml(e.message);
     errEl.style.display = 'block';
     detailEl.innerHTML = '';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Follow-up panel (P1)
+// ---------------------------------------------------------------------------
+async function _loadFollowupPanel(jobId) {
+  const el = document.getElementById(`followupPanel_${jobId}`);
+  if (!el) return;
+  const FOLLOWUP_STATE_LABELS = {
+    new:                    'Ny — ingen kontakt ännu',
+    replied_waiting_customer: 'Väntar på kund — svar skickat',
+    waiting_internal:       'Intern åtgärd — kräver handläggning',
+    quote_sent:             'Offert skickad — inväntar beslut',
+    followup_due:           'Påminnelse förfallen — kontakta kunden',
+    closed_won:             'Avslutat — affär vunnen',
+    closed_lost:            'Avslutat — ingen affär',
+  };
+  const STATE_COLORS = {
+    new: 'var(--text-dim)', replied_waiting_customer: 'var(--warning)',
+    waiting_internal: 'var(--info)', quote_sent: 'var(--purple-light)',
+    followup_due: 'var(--danger)', closed_won: 'var(--success)', closed_lost: 'var(--text-dim)',
+  };
+  try {
+    const f = await apiFetch(`/cases/${encodeURIComponent(jobId)}/followup`);
+    const stateLabel = FOLLOWUP_STATE_LABELS[f.followup_state] || f.followup_state;
+    const stateColor = STATE_COLORS[f.followup_state] || 'var(--text-muted)';
+
+    const lastMsg = f.last_customer_message;
+    const lastMsgHtml = lastMsg && lastMsg.body
+      ? `<div style="margin-top:10px;">
+           <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin-bottom:4px;">Senaste kundmeddelande</div>
+           <div class="detail-msg-body" style="max-height:100px;">${escapeHtml(lastMsg.body)}</div>
+         </div>`
+      : '';
+
+    const suggestedReply = f.suggested_reply;
+    const replyHtml = suggestedReply
+      ? `<div style="margin-top:10px;">
+           <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin-bottom:4px;">Föreslaget svar</div>
+           <div class="detail-msg-body" style="max-height:140px; border-left:3px solid var(--purple-light);">${escapeHtml(suggestedReply)}</div>
+           ${f.pending_approval_id && f.pending_approval_type === 'email_send'
+             ? `<div style="margin-top:8px;display:flex;gap:8px;">
+                  <button class="btn btn-success btn-sm" onclick="doApprove('${f.pending_approval_id}', true)">✓ Godkänn och skicka</button>
+                  <button class="btn btn-danger btn-sm" onclick="doReject('${f.pending_approval_id}', true)">✗ Avvisa</button>
+                </div>`
+             : `<div style="margin-top:6px;font-size:11px;color:var(--text-dim);">Inget väntande godkännande — se godkännanden ovan för att skicka.</div>`
+           }
+         </div>`
+      : '';
+
+    el.innerHTML = `
+      <div class="detail-section-title">Uppföljning</div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+        <span style="font-size:13px;font-weight:700;color:${stateColor};">${escapeHtml(stateLabel)}</span>
+        ${f.customer_name ? `<span style="font-size:12px;color:var(--text-dim);">${escapeHtml(f.customer_name)}</span>` : ''}
+        ${f.customer_email ? `<a href="mailto:${escapeHtml(f.customer_email)}" style="font-size:11px;color:var(--purple-light);">${escapeHtml(f.customer_email)}</a>` : ''}
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">
+        <strong>Nästa steg:</strong> ${escapeHtml(f.next_action || '–')}
+      </div>
+      ${lastMsgHtml}
+      ${replyHtml}
+    `;
+  } catch (e) {
+    el.innerHTML = `<div class="detail-section-title">Uppföljning</div><div style="font-size:12px;color:var(--text-dim);">Kunde inte ladda uppföljning: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Project closeout panel (P3)
+// ---------------------------------------------------------------------------
+async function loadCloseoutPanel(jobId) {
+  const bodyEl = document.getElementById(`closeoutPanelBody_${jobId}`);
+  if (!bodyEl) return;
+  bodyEl.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">Genererar sammanställning…</div>`;
+  try {
+    const cl = await apiFetch(`/cases/${encodeURIComponent(jobId)}/closeout`);
+    const missing = cl.missing_fields || [];
+    const missingHtml = missing.length
+      ? `<div style="margin-top:10px;padding:10px 12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:6px;">
+           <div style="font-size:11px;font-weight:700;color:var(--danger);margin-bottom:4px;">Saknas för komplett underlag</div>
+           ${missing.map(m => `<div style="font-size:12px;color:var(--text-muted);">✗ ${escapeHtml(m)}</div>`).join('')}
+         </div>`
+      : `<div style="margin-top:8px;font-size:12px;color:var(--success);">✓ Allt verkar komplett</div>`;
+
+    const financeReadyBadge = cl.finance_ready
+      ? `<span style="background:rgba(16,185,129,.15);color:var(--success);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;">Underlag redo</span>`
+      : `<span style="background:rgba(239,68,68,.1);color:var(--danger);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;">Underlag ej redo</span>`;
+    const exportedBadge = cl.fortnox_exported
+      ? `<span style="background:rgba(16,185,129,.15);color:var(--success);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;">Exporterat till Fortnox</span>`
+      : '';
+
+    const matRows = (cl.material_lines || []).map(m =>
+      `<tr><td style="color:var(--text);">${escapeHtml(m.description || m.name || '–')}</td>
+       <td style="text-align:right;">${m.quantity || 1}</td>
+       <td style="text-align:right;">${m.unit_price != null ? (m.unit_price).toLocaleString('sv-SE') : '–'}</td>
+       <td style="text-align:right;">${m.total_price != null ? (m.total_price).toLocaleString('sv-SE') : '–'}</td></tr>`
+    ).join('');
+    const matHtml = matRows
+      ? `<table class="act-table" style="margin-top:8px;"><thead><tr><th>Material</th><th>Antal</th><th>Á-pris</th><th>Totalt</th></tr></thead><tbody>${matRows}</tbody></table>`
+      : `<div style="font-size:12px;color:var(--text-dim);">Inga material-rader registrerade.</div>`;
+
+    bodyEl.innerHTML = `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        ${financeReadyBadge} ${exportedBadge}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div>
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin-bottom:4px;">Kundsammanfattning</div>
+          <div class="detail-msg-body" style="white-space:pre-line;">${escapeHtml(cl.customer_summary || '–')}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin-bottom:4px;">Intern sammanfattning</div>
+          <div class="detail-msg-body" style="white-space:pre-line;">${escapeHtml(cl.internal_summary || '–')}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
+        <div style="padding:8px;background:var(--surface-3);border:1px solid var(--border);border-radius:6px;text-align:center;">
+          <div style="font-size:10px;color:var(--text-dim);">Checklista</div>
+          <div style="font-size:16px;font-weight:700;">${cl.checklist?.checked || 0}/${cl.checklist?.total || 0}</div>
+        </div>
+        <div style="padding:8px;background:var(--surface-3);border:1px solid var(--border);border-radius:6px;text-align:center;">
+          <div style="font-size:10px;color:var(--text-dim);">Dokument</div>
+          <div style="font-size:16px;font-weight:700;">${cl.documentation?.total || 0}</div>
+        </div>
+        <div style="padding:8px;background:var(--surface-3);border:1px solid var(--border);border-radius:6px;text-align:center;">
+          <div style="font-size:10px;color:var(--text-dim);">Material</div>
+          <div style="font-size:14px;font-weight:700;">${(cl.total_material_sek || 0).toLocaleString('sv-SE')} kr</div>
+        </div>
+        <div style="padding:8px;background:var(--surface-3);border:1px solid var(--border);border-radius:6px;text-align:center;">
+          <div style="font-size:10px;color:var(--text-dim);">Tid</div>
+          <div style="font-size:16px;font-weight:700;">${cl.total_hours || 0} h</div>
+        </div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin-bottom:6px;">Material-rader</div>
+        ${matHtml}
+      </div>
+      ${missingHtml}
+      ${!cl.fortnox_exported && cl.finance_ready
+        ? `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+             <button class="btn btn-primary btn-sm" onclick="window.open('/finance/invoices/${escapeHtml(jobId)}/fortnox/preview','_blank')">Förhandsvisa i Fortnox</button>
+           </div>`
+        : ''}
+    `;
+  } catch (e) {
+    bodyEl.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">Kunde inte generera sammanställning: ${escapeHtml(e.message)}</div>`;
   }
 }
 
@@ -6549,6 +7231,9 @@ function _renderOperationsWorkspacePanel(c) {
   const workOrder = ws.work_order || {};
   const project = ws.project || {};
   const delivery = ws.delivery_package || {};
+  const checklist = ws.checklist || {};
+  const clItems = checklist.items || [];
+  const checked = clItems.filter(i => i.checked).length;
   const summary = {
     work_order_status: workOrder.status || 'new',
     technician: workOrder.technician || project.technician || '–',
@@ -6560,28 +7245,93 @@ function _renderOperationsWorkspacePanel(c) {
   };
   const json = JSON.stringify(ws, null, 2);
 
+  // Finance draft badge
+  const finBadge = c.finance_draft_available
+    ? `<span style="background:rgba(16,185,129,.15);color:var(--success);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-left:8px;">Underlag redo</span>`
+    : '';
+
+  // Work order status → color
+  const woColors = {
+    new: 'var(--text-dim)', in_progress: 'var(--info)', on_hold: 'var(--warning)',
+    completed: 'var(--success)', blocked: 'var(--danger)', cancelled: 'var(--text-dim)',
+  };
+  const woStatusSv = {
+    new: 'Nytt', in_progress: 'Pågår', on_hold: 'Pausat',
+    completed: 'Avslutat', blocked: 'Blockerat', cancelled: 'Avbrutet',
+  };
+  const currentWoStatus = summary.work_order_status;
+  const woColor = woColors[currentWoStatus] || 'var(--text-muted)';
+
+  // Field action buttons (P2 - simplified field workflow)
+  const fieldBtns = [
+    { status: 'in_progress', label: '▶ Starta', color: 'btn-primary' },
+    { status: 'on_hold',     label: '⏸ Pausa',  color: 'btn-neutral' },
+    { status: 'completed',   label: '✓ Klart',  color: 'btn-success' },
+    { status: 'blocked',     label: '✗ Blockerad', color: 'btn-danger' },
+  ].map(b => {
+    const isActive = currentWoStatus === b.status;
+    return `<button class="btn ${b.color} btn-sm" style="flex:1; min-width:80px; ${isActive ? 'opacity:.5; cursor:default;' : ''}"
+      ${isActive ? 'disabled' : `onclick="_setWorkOrderStatus('${escapeHtml(c.job_id)}','${b.status}')"`}
+    >${b.label}</button>`;
+  }).join('');
+
   return `<div class="detail-section" style="margin-bottom:14px;">
-    <div class="detail-section-title">Arbetsorder & projekt v1</div>
-    <div style="display:grid; grid-template-columns:repeat(4, minmax(120px,1fr)); gap:8px; margin-bottom:10px;">
-      <div style="padding:8px; background:var(--surface-3); border:1px solid var(--border); border-radius:6px;"><div style="font-size:10px; color:var(--text-dim);">Arbetsorder</div><div style="font-size:12px; font-weight:600;">${escapeHtml(summary.work_order_status)}</div></div>
-      <div style="padding:8px; background:var(--surface-3); border:1px solid var(--border); border-radius:6px;"><div style="font-size:10px; color:var(--text-dim);">Projekt</div><div style="font-size:12px; font-weight:600;">${escapeHtml(summary.project_status)}</div></div>
-      <div style="padding:8px; background:var(--surface-3); border:1px solid var(--border); border-radius:6px;"><div style="font-size:10px; color:var(--text-dim);">Tekniker</div><div style="font-size:12px; font-weight:600;">${escapeHtml(summary.technician)}</div></div>
-      <div style="padding:8px; background:var(--surface-3); border:1px solid var(--border); border-radius:6px;"><div style="font-size:10px; color:var(--text-dim);">Leveranspaket</div><div style="font-size:12px; font-weight:600;">${escapeHtml(summary.delivery_status)}</div></div>
+    <div class="detail-section-title">Arbetsorder &amp; Fältflöde${finBadge}</div>
+
+    <!-- Status row -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+      <span style="font-size:14px;font-weight:700;color:${woColor};">${escapeHtml(woStatusSv[currentWoStatus] || currentWoStatus)}</span>
+      <span style="font-size:12px;color:var(--text-dim);">Tekniker: ${escapeHtml(summary.technician)}</span>
+      <span style="font-size:12px;color:var(--text-dim);">Leverans: ${escapeHtml(summary.delivery_status)}</span>
+      ${checked || clItems.length ? `<span style="font-size:12px;color:var(--text-muted);">Checklista: ${checked}/${clItems.length}</span>` : ''}
     </div>
-    <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">
-      Tidslinje: <strong style="color:var(--text);">${summary.timeline}</strong> ·
-      Uppgifter: <strong style="color:var(--text);">${summary.tasks}</strong> ·
-      Bilagor: <strong style="color:var(--text);">${summary.attachments}</strong>
+
+    <!-- Quick field action buttons (P2) -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+      ${fieldBtns}
     </div>
-    <textarea id="opsWsJson_${escapeHtml(c.job_id)}" rows="12" style="width:100%; font-family:monospace; font-size:12px; background:var(--surface-2); color:var(--text); border:1px solid var(--border-med); border-radius:6px; padding:8px; resize:vertical;">${escapeHtml(json)}</textarea>
-    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-      <button class="btn btn-primary btn-sm" onclick="_saveOperationsWorkspace('${escapeHtml(c.job_id)}')">Spara workspace</button>
+
+    <!-- Stats row -->
+    <div style="display:grid; grid-template-columns:repeat(4, minmax(100px,1fr)); gap:8px; margin-bottom:10px;">
+      <div style="padding:8px; background:var(--surface-3); border:1px solid var(--border); border-radius:6px; text-align:center;"><div style="font-size:10px; color:var(--text-dim);">Tidslinje</div><div style="font-size:18px; font-weight:700;">${summary.timeline}</div></div>
+      <div style="padding:8px; background:var(--surface-3); border:1px solid var(--border); border-radius:6px; text-align:center;"><div style="font-size:10px; color:var(--text-dim);">Uppgifter</div><div style="font-size:18px; font-weight:700;">${summary.tasks}</div></div>
+      <div style="padding:8px; background:var(--surface-3); border:1px solid var(--border); border-radius:6px; text-align:center;"><div style="font-size:10px; color:var(--text-dim);">Bilagor</div><div style="font-size:18px; font-weight:700;">${summary.attachments}</div></div>
+      <div style="padding:8px; background:var(--surface-3); border:1px solid var(--border); border-radius:6px; text-align:center;"><div style="font-size:10px; color:var(--text-dim);">Checklista</div><div style="font-size:18px; font-weight:700;">${checked}/${clItems.length || 0}</div></div>
+    </div>
+
+    <!-- Advanced: raw workspace JSON editor -->
+    <details style="margin-bottom:8px;">
+      <summary style="font-size:11px;color:var(--text-dim);cursor:pointer;margin-bottom:6px;">Avancerat: redigera workspace JSON</summary>
+      <textarea id="opsWsJson_${escapeHtml(c.job_id)}" rows="10" style="width:100%; font-family:monospace; font-size:12px; background:var(--surface-2); color:var(--text); border:1px solid var(--border-med); border-radius:6px; padding:8px; resize:vertical;">${escapeHtml(json)}</textarea>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+        <button class="btn btn-primary btn-sm" onclick="_saveOperationsWorkspace('${escapeHtml(c.job_id)}')">Spara workspace</button>
+      </div>
+    </details>
+
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
       <button class="btn btn-neutral btn-sm" onclick="_addOperationsTimeline('${escapeHtml(c.job_id)}')">+ Tidslinjehändelse</button>
       <button class="btn btn-neutral btn-sm" onclick="_addOperationsTask('${escapeHtml(c.job_id)}')">+ Uppgift</button>
       <button class="btn btn-neutral btn-sm" onclick="_markDeliveryReady('${escapeHtml(c.job_id)}')">Markera leverans redo</button>
     </div>
     <div id="opsWsMsg_${escapeHtml(c.job_id)}" class="cfg-save-msg" style="display:none; margin-top:8px;"></div>
   </div>`;
+}
+
+async function _setWorkOrderStatus(jobId, status) {
+  try {
+    const ws = await apiFetch(`/cases/${encodeURIComponent(jobId)}/operations`);
+    const workspace = ws.workspace || {};
+    const workOrder = Object.assign({}, workspace.work_order || {}, { status });
+    workspace.work_order = workOrder;
+    await apiFetch(`/cases/${encodeURIComponent(jobId)}/operations`, {
+      method: 'PUT',
+      body: JSON.stringify({ workspace }),
+    });
+    _showOpsMsg(jobId, true, `Arbetsorder: ${status}`);
+    setTimeout(() => _openAdminCase(jobId), 400);
+  } catch (e) {
+    _showOpsMsg(jobId, false, 'Kunde inte uppdatera status: ' + e.message);
+  }
 }
 
 function _showOpsMsg(jobId, ok, text) {

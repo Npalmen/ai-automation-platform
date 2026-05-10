@@ -72,27 +72,40 @@ Product SaaS Finish sprint ordering:
 - Remaining before paid rollout is operational validation against real production secrets/customers, not another architecture slice.
 - Frontend stack is locked: vanilla single-file HTML/CSS/JS. No React, Next.js, Tailwind, Vite, or build toolchain.
 
-## Active planning lock (Slice 0, 2026-05-06)
+## Product direction (2026-05-10)
 
-Before any new implementation starts, release scope is locked:
+The platform is an **operational system for installation and service companies** with **AI in the background** — covering the full flow from **incoming lead to invoice/bookkeeping preparation** (preparing documents, not performing bookkeeping).
 
-- **R1 (in):** productification light, lead-to-case core, and pilot operations/reliability slices
-- **R2 (deferred):** case/project workspace v1 and installer-specific vertical slices
-- **Later (deferred):** finance layer v1 slices
+All previously planned releases (R1 productification, R2 case/project workspace, finance layer v1, automation experience, SaaS product finish) are **implemented and verified**.
 
-Locked R1 KPIs:
+Implemented in this session (see `docs/14-product-north-star-installers.md` for full product anchor):
 
-- Setup readiness >= 90% in onboarding/setup checks
-- >= 95% lead first follow-up action coverage within SLA
-- 100% approval gate for AI-generated customer reply drafts before external send
-- Zero P0/P1 regressions in release-gate pilot E2E flow (`inbox -> classification -> approval -> dispatch`)
+- **Operational overview** — ✅ DONE — dashboard KPIs via `GET /dashboard/kpis` (email queue, dispatch queue, waiting customer, underlag ready, active ops); admin dashboard Driftstatus row (5 cards) + customer dashboard extended summary
+- **AI-powered operational insights** — ✅ DONE — `app/insights/engine.py` with 10 rule types; `GET /dashboard/operational-insights` endpoint; admin dashboard Operationella insikter section; wired into daily digest
+- **SLA and follow-up** — ✅ DONE — `app/insights/sla_reminders.py`; `GET /dashboard/sla-breaches` endpoint; scheduler integration; internal approval-record reminders
+- **Documentation** — ✅ DONE — `docs/14-product-north-star-installers.md` (north star), `docs/15-golden-path.md` (golden path), `docs/16-underlag-ready-checklist.md` (underlag checklist)
 
-Locked out-of-scope for R1:
+Also completed in this session:
 
-- Full frontend rewrite/replatforming
-- New architecture patterns outside current backend-first model
-- Full accounting/billing platforms, white-labeling, mobile app expansion
-- Broad integration expansion outside existing controlled MVP adapters
+- **Light project operations** — ✅ DONE — customer mode Projektöversikt panel (read-only) + Åtgärder guided edits (WO status, timeline note, time/material); admin panel regression-safe
+- **Invoice/bookkeeping preparation** — ✅ DONE — `material_lines` in finance draft; `finance_draft_available` + `finance_draft_url` in case detail (11 tests)
+- **Mobile field UX** — ✅ DONE — CSS touch target rules for ops forms, checklist, timeline; responsive 5-col KPI grid
+
+**All plan items complete. 2193 tests pass. R1 release gate passes.**
+
+Product Audit Roadmap items completed (2026-05-10):
+
+- **Pilot Cockpit (P0)** — ✅ DONE — `GET /dashboard/cockpit` aggregates daily action counts (actions_required, sla_risk, waiting_customer, underlag_ready, blocked, top_action_items); admin dashboard redesigned with cockpit section at the very top; title changed to "Operationscockpit"
+- **Follow-up Engine v1 (P1)** — ✅ DONE — `GET /cases/{job_id}/followup` with followup_state, suggested_reply, last_customer_message, pending_approval_id; Uppföljning panel in case detail with approve-and-send button
+- **Field Workflow (P2)** — ✅ DONE — large field action buttons (Starta/Pausa/Klart/Blockerad) in operations panel; status shown in bold with color; `_setWorkOrderStatus()` helper; raw JSON editor collapsed into details
+- **Project Closeout Packet (P3)** — ✅ DONE — `GET /cases/{job_id}/closeout` with customer_summary, internal_summary, material_lines, time_entries, documentation counts, finance_ready, missing_fields; "Sammanställ projekt" button in case detail
+- **Finance Export Status (P4)** — ✅ DONE — `GET /cases/{job_id}/finance/export-status` with Fortnox event history, material_lines, time_entries, direct preview/export URLs
+- **Pilot Ops Runbooks (P5)** — ✅ DONE — `docs/runbook-scheduler.md`, `docs/runbook-oauth.md`, `docs/runbook-pilot-support.md` covering operations, OAuth recovery, and pilot support playbook
+
+Explicitly out of scope:
+- Performing bookkeeping (only preparation of documents)
+- Full ERP, payroll, advanced dispatch/scheduling
+- Broad integration expansion beyond current adapters (Gmail, Monday, Fortnox)
 
 ## Read these first
 1. docs/02-mvp-scope.md

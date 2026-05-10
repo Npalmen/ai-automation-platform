@@ -1995,6 +1995,115 @@ def dashboard_activity(
     return {"items": items, "total": total}
 
 
+# ── Extended dashboard KPIs + operational insights ────────────────────────────
+
+@app.get("/dashboard/kpis")
+def dashboard_kpis(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Extended operational KPIs: approval queues, underlag ready, active ops cases."""
+    from app.insights.engine import compute_dashboard_kpis
+    return compute_dashboard_kpis(db, tenant_id)
+
+
+@app.get("/dashboard/operational-insights")
+def dashboard_operational_insights(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+    limit: int = 30,
+):
+    """Tenant-scoped operational insights — deterministic rule-based signals."""
+    from app.insights.engine import get_operational_insights
+    rows = get_operational_insights(db, tenant_id, limit=limit)
+    return {
+        "tenant_id": tenant_id,
+        "insights": rows,
+        "count": len(rows),
+    }
+
+
+@app.get("/dashboard/sla-breaches")
+def dashboard_sla_breaches(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """List leads that have breached or are approaching SLA window."""
+    from app.insights.sla_reminders import find_sla_breaches
+    breaches = find_sla_breaches(db, tenant_id)
+    return {
+        "tenant_id": tenant_id,
+        "breaches": breaches,
+        "count": len(breaches),
+    }
+
+
+@app.get("/dashboard/cockpit")
+def dashboard_cockpit(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Daily pilot cockpit: aggregated action-oriented counts and top items.
+
+    Returns five buckets a pilot operator needs to check every morning:
+      actions_required  — pending approvals, hot leads, escalations
+      sla_risk          — leads at or approaching SLA breach
+      waiting_customer  — jobs stalled on customer response
+      underlag_ready    — completed underlags not yet sent to Fortnox
+      blocked           — work orders with status 'blocked'
+    """
+    from app.insights.sla_reminders import find_sla_breaches
+    from app.insights.engine import (
+        compute_dashboard_kpis,
+        get_operational_insights,
+        SEVERITY_ORDER,
+    )
+    from app.repositories.postgres.approval_models import ApprovalRequestRecord
+
+    kpis = compute_dashboard_kpis(db, tenant_id)
+    breaches = find_sla_breaches(db, tenant_id)
+
+    pending_approvals = (
+        db.query(ApprovalRequestRecord)
+        .filter(
+            ApprovalRequestRecord.tenant_id == tenant_id,
+            ApprovalRequestRecord.state == "pending",
+        )
+        .all()
+    )
+
+    email_approvals   = [a for a in pending_approvals if a.next_on_approve == "email_send"]
+    dispatch_approvals = [a for a in pending_approvals if a.next_on_approve == "controlled_dispatch"]
+
+    # Top action items across all insight types
+    all_insights = get_operational_insights(db, tenant_id, limit=50)
+    high_priority = [
+        i for i in all_insights
+        if SEVERITY_ORDER.get(i["severity"], 99) <= 1  # critical + high
+    ][:5]
+
+    actions_required = (
+        len(email_approvals)
+        + len(dispatch_approvals)
+        + len([i for i in all_insights if i["type"] in ("hot_lead_pending", "stale_lead", "support_escalation", "work_order_blocked")])
+    )
+
+    return {
+        "tenant_id": tenant_id,
+        "cockpit": {
+            "actions_required":    actions_required,
+            "sla_risk":            len(breaches),
+            "waiting_customer":    kpis["waiting_customer"],
+            "underlag_ready":      kpis["underlag_ready"],
+            "blocked":             len([i for i in all_insights if i["type"] == "work_order_blocked"]),
+        },
+        "top_action_items": high_priority,
+        "sla_breaches":     breaches[:3],
+        "email_approvals_pending":    len(email_approvals),
+        "dispatch_approvals_pending": len(dispatch_approvals),
+    }
+
+
 # ── Control panel ─────────────────────────────────────────────────────────────
 
 _VALID_RUN_MODES = {"manual", "scheduled", "paused"}
@@ -2511,13 +2620,24 @@ def put_notification_settings(
     return _get_notif_settings(updated)
 
 
-def _build_digest_body(tenant_id: str, summary: dict, roi: dict) -> tuple[str, str]:
+def _build_digest_body(tenant_id: str, summary: dict, roi: dict, insights: list[dict] | None = None) -> tuple[str, str]:
     """Build (subject, body) for the daily digest email."""
     from datetime import date
     today_str = date.today().isoformat()
     subject   = f"AI Automation Report – {today_str}"
 
-    errors_today = 0  # could be extended to query failed jobs; kept simple for now
+    errors_today = 0
+
+    insights_section = ""
+    if insights:
+        top_items = insights[:5]
+        lines = []
+        for item in top_items:
+            severity = item.get("severity", "info").upper()
+            title = item.get("title", "")
+            lines.append(f"  [{severity}] {title}")
+        if lines:
+            insights_section = "\nViktigt just nu:\n" + "\n".join(lines) + "\n"
 
     body = f"""Daglig rapport för {tenant_id} – {today_str}
 
@@ -2531,7 +2651,7 @@ Sammanfattning:
 Uppskattat värde:
 - Sparad tid:              {roi.get('estimated_hours_saved', 0)} h
 - Uppskattat värde:        {roi.get('estimated_value_sek', 0)} SEK
-
+{insights_section}
 Status:
 - Fel idag:                {errors_today}
 
@@ -2605,6 +2725,7 @@ def _run_scheduler_pass(tenant_id: str, db: "Session", now_utc: "datetime") -> d
 
     inbox_sync_result: dict | None = None
     digest_result: dict | None = None
+    sla_result: dict | None = None
     error: str | None = None
 
     try:
@@ -2650,7 +2771,12 @@ def _run_scheduler_pass(tenant_id: str, db: "Session", now_utc: "datetime") -> d
             else:
                 summary = _compute_summary(db, tenant_id)
                 roi     = _compute_roi(db, tenant_id)
-                subject, body = _build_digest_body(tenant_id, summary, roi)
+                try:
+                    from app.insights.engine import get_operational_insights
+                    digest_insights = get_operational_insights(db, tenant_id, limit=5)
+                except Exception:
+                    digest_insights = []
+                subject, body = _build_digest_body(tenant_id, summary, roi, insights=digest_insights)
                 dispatch_action({
                     "type":      "send_email",
                     "tenant_id": tenant_id,
@@ -2660,6 +2786,17 @@ def _run_scheduler_pass(tenant_id: str, db: "Session", now_utc: "datetime") -> d
                 })
                 state["last_digest_sent_at"] = now_utc.isoformat()
                 digest_result = {"skipped": False, "recipient": recipient, "subject": subject}
+
+        # ── SLA reminders ────────────────────────────────────────────────────
+        try:
+            from app.insights.sla_reminders import run_sla_reminder_pass
+            sla_result = run_sla_reminder_pass(db, tenant_id, ctrl)
+            if sla_result and not sla_result.get("skipped"):
+                state["last_sla_reminder_at"] = now_utc.isoformat()
+        except Exception as sla_exc:
+            import logging as _sla_log
+            _sla_log.getLogger(__name__).exception("SLA reminder pass failed")
+            sla_result = {"skipped": False, "error": str(sla_exc)}
 
         state["last_scheduler_run_at"] = now_utc.isoformat()
         state["last_status"] = "success"
@@ -2681,6 +2818,7 @@ def _run_scheduler_pass(tenant_id: str, db: "Session", now_utc: "datetime") -> d
         "run_mode":         run_mode,
         "inbox_sync":       inbox_sync_result,
         "digest":           digest_result,
+        "sla_reminders":    sla_result,
         "error":            error,
     }
 
@@ -3000,6 +3138,15 @@ def list_cases(
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
+def _is_finance_draft_available(record, inp: dict) -> bool:
+    """True when a finance draft can meaningfully be generated for this case."""
+    if (record.status or "").lower() == "completed":
+        return True
+    workspace = inp.get("operations_workspace") or {}
+    wo_status = (workspace.get("work_order") or {}).get("status") or ""
+    return wo_status.lower() == "completed"
+
+
 @app.get("/cases/{job_id}")
 def get_case(
     job_id: str,
@@ -3239,6 +3386,8 @@ def get_case(
         "support_context_sources":      sa.get("context_sources"),
         "support_business_risk_reason": sp.get("business_risk_reason"),
         "operations_workspace":         _merge_operations_workspace(inp.get("operations_workspace")),
+        "finance_draft_available":      _is_finance_draft_available(r, inp),
+        "finance_draft_url":            f"/finance/invoices/{r.job_id}/draft",
         "automation_summary":           automation_case["summary"],
         "automation_risks":             automation_case["risks"],
         "wow_flows":                    automation_case["wow_flows"],
@@ -3854,6 +4003,414 @@ def update_case_delivery_package(
     workspace["delivery_package"] = delivery
     saved = _persist_operations_workspace(r, workspace, db)
     return {"status": "ok", "job_id": job_id, "delivery_package": saved["delivery_package"]}
+
+
+# ---------------------------------------------------------------------------
+# Follow-up engine (P1)
+# ---------------------------------------------------------------------------
+
+_FOLLOWUP_STATE_MAP = {
+    "new":                     "new",
+    "contacted":               "replied_waiting_customer",
+    "waiting_for_customer":    "replied_waiting_customer",
+    "info_received":           "waiting_internal",
+    "offer_ready":             "quote_sent",
+    "offer_sent":              "quote_sent",
+    "followup_due":            "followup_due",
+    "won":                     "closed_won",
+    "lost":                    "closed_lost",
+    "resolved":                "closed_won",
+    "closed":                  "closed_won",
+    "pending":                 "new",
+    "processing":              "waiting_internal",
+    "awaiting_approval":       "waiting_internal",
+    "manual_review":           "waiting_internal",
+    "completed":               "closed_won",
+    "failed":                  "closed_lost",
+}
+
+_FOLLOWUP_NEXT_ACTION = {
+    "new":                    "Svara kunden — ingen kontakt etablerad",
+    "replied_waiting_customer": "Invänta svar — kunden är kontaktad",
+    "waiting_internal":       "Intern åtgärd krävs — fyll i uppgifter eller godkänn",
+    "quote_sent":             "Följ upp om offert — vänta eller påminn kunden",
+    "followup_due":           "Påminnelse förfallen — kontakta kunden nu",
+    "closed_won":             "Avslutat med framgång — inga fler åtgärder",
+    "closed_lost":            "Avslutat utan affär — kan arkiveras",
+}
+
+
+@app.get("/cases/{job_id}/followup")
+def get_case_followup(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return follow-up state, suggested reply, and pending approval for a case.
+
+    Supports P1: productive follow-up engine with actionable reminders,
+    suggested reply text, and direct link to approval queue.
+    """
+    r = (
+        db.query(JobRecord)
+        .filter(JobRecord.job_id == job_id, JobRecord.tenant_id == tenant_id)
+        .first()
+    )
+    if r is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    inp = r.input_data or {}
+    result = r.result or {}
+    history = result.get("processor_history") or []
+
+    # Resolve lead/support status
+    lead_payload: dict = {}
+    support_payload: dict = {}
+    for entry in history:
+        proc = entry.get("processor", "")
+        p = (entry.get("result") or {}).get("payload") or {}
+        if proc == "lead_analyzer_processor":
+            lead_payload = p
+        elif proc == "support_analyzer_processor":
+            support_payload = p
+
+    raw_lead_status = (
+        inp.get("lead_status")
+        or lead_payload.get("lead_status")
+        or inp.get("support_status")
+        or support_payload.get("support_status")
+        or r.status
+        or "new"
+    )
+    followup_state = _FOLLOWUP_STATE_MAP.get(raw_lead_status, "new")
+    next_action_text = _FOLLOWUP_NEXT_ACTION.get(followup_state, "Kontrollera ärendet")
+
+    # Suggested reply: prefer pre-generated ai suggestions
+    action_dispatch_payload: dict = {}
+    for entry in reversed(history):
+        if entry.get("processor") == "action_dispatch_processor":
+            action_dispatch_payload = (entry.get("result") or {}).get("payload") or {}
+            break
+
+    ai_suggestions = action_dispatch_payload.get("ai_reply_suggestions") or []
+    offer_draft    = lead_payload.get("offer_draft") or {}
+    support_draft  = support_payload.get("support_response_draft") or {}
+    generated_q    = lead_payload.get("generated_question_message") or support_payload.get("support_generated_question_message")
+
+    suggested_reply: str | None = None
+    if ai_suggestions:
+        first = ai_suggestions[0] if isinstance(ai_suggestions[0], str) else (ai_suggestions[0].get("body") or ai_suggestions[0].get("text") or "")
+        suggested_reply = first
+    elif generated_q:
+        suggested_reply = generated_q if isinstance(generated_q, str) else generated_q.get("message_body")
+    elif isinstance(offer_draft, dict) and offer_draft.get("body"):
+        suggested_reply = offer_draft["body"]
+    elif isinstance(support_draft, dict) and support_draft.get("body"):
+        suggested_reply = support_draft["body"]
+    elif isinstance(support_draft, str) and support_draft:
+        suggested_reply = support_draft
+
+    # Latest customer message
+    msgs = inp.get("conversation_messages") or []
+    last_customer_msg: dict | None = None
+    for msg in reversed(msgs):
+        if (msg.get("source") or "") not in ("system", "outgoing"):
+            last_customer_msg = {
+                "body":    msg.get("message_text") or msg.get("body"),
+                "subject": msg.get("subject"),
+                "received_at": msg.get("received_at") or msg.get("created_at"),
+            }
+            break
+
+    # Pending approval for this job
+    pending_approval = (
+        db.query(ApprovalRequestRecord)
+        .filter(
+            ApprovalRequestRecord.tenant_id == tenant_id,
+            ApprovalRequestRecord.job_id == job_id,
+            ApprovalRequestRecord.state == "pending",
+        )
+        .order_by(ApprovalRequestRecord.requested_at.desc())
+        .first()
+    )
+
+    pending_approval_id = pending_approval.approval_id if pending_approval else None
+    pending_approval_type = pending_approval.next_on_approve if pending_approval else None
+
+    # Customer contact info
+    sender = inp.get("sender") or {}
+    customer_email = sender.get("email") or inp.get("sender_email")
+    customer_name  = sender.get("name") or inp.get("sender_name")
+    subject        = inp.get("subject") or inp.get("latest_message_subject")
+
+    return {
+        "job_id":                 job_id,
+        "job_type":               r.job_type,
+        "job_status":             r.status,
+        "followup_state":         followup_state,
+        "raw_status":             raw_lead_status,
+        "next_action":            next_action_text,
+        "suggested_reply":        suggested_reply,
+        "last_customer_message":  last_customer_msg,
+        "customer_email":         customer_email,
+        "customer_name":          customer_name,
+        "subject":                subject,
+        "pending_approval_id":    pending_approval_id,
+        "pending_approval_type":  pending_approval_type,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Project Closeout Packet (P3)
+# ---------------------------------------------------------------------------
+
+@app.get("/cases/{job_id}/closeout")
+def get_case_closeout(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return a project closeout packet: customer summary, internal status, materials, docs, finance.
+
+    Supports P3: 'Sammanställ projekt' — from messy job to finished underlag.
+    Read-only, deterministic, no side effects.
+    """
+    from app.repositories.postgres.action_execution_models import ActionExecutionRecord
+    from app.insights.engine import _is_underlag_ready
+    from app.domain.integrations.models import IntegrationEvent
+
+    r = (
+        db.query(JobRecord)
+        .filter(JobRecord.job_id == job_id, JobRecord.tenant_id == tenant_id)
+        .first()
+    )
+    if r is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    inp   = r.input_data or {}
+    result = r.result or {}
+    history = result.get("processor_history") or []
+    workspace = _merge_operations_workspace(inp.get("operations_workspace"))
+
+    # --- source payloads ---
+    lead_payload:    dict = {}
+    support_payload: dict = {}
+    for entry in history:
+        proc = entry.get("processor", "")
+        p = (entry.get("result") or {}).get("payload") or {}
+        if proc == "lead_analyzer_processor":
+            lead_payload = p
+        elif proc == "support_analyzer_processor":
+            support_payload = p
+
+    # --- core fields ---
+    sender   = inp.get("sender") or {}
+    customer_name = (
+        sender.get("name") or inp.get("sender_name")
+        or (lead_payload.get("lead_analysis") or {}).get("customer_name")
+        or "Okänd kund"
+    )
+    customer_email = sender.get("email") or inp.get("sender_email")
+    subject        = inp.get("subject") or inp.get("latest_message_subject") or "Okänt ärende"
+
+    # --- operations workspace data ---
+    project    = workspace.get("project") or {}
+    work_order = workspace.get("work_order") or {}
+    checklist  = workspace.get("checklist") or {}
+    docs       = workspace.get("documentation") or {}
+    finance    = workspace.get("finance") or {}
+    delivery   = workspace.get("delivery_package") or {}
+    tasks      = workspace.get("tasks") or []
+    timeline   = workspace.get("timeline") or []
+
+    # Checklist progress
+    items = checklist.get("items") or []
+    checked = sum(1 for i in items if i.get("checked"))
+
+    # Documentation counts
+    doc_count = sum(len(v or []) for v in docs.values() if isinstance(v, list))
+    photos     = len(docs.get("photos") or [])
+    receipts   = len(docs.get("receipts") or [])
+
+    # Material and time lines
+    material_lines = _extract_material_lines(inp)
+    time_entries   = finance.get("time_entries") or []
+    total_material = sum(
+        float(m.get("total_price") or m.get("unit_price", 0)) for m in material_lines
+        if isinstance(m.get("total_price") or m.get("unit_price"), (int, float))
+    )
+    total_hours = sum(
+        float(t.get("hours", 0)) for t in time_entries
+        if isinstance(t.get("hours"), (int, float))
+    )
+
+    # Missing fields list
+    missing: list[str] = []
+    if not customer_email:
+        missing.append("Kund-e-post")
+    if not customer_name or customer_name == "Okänd kund":
+        missing.append("Kundnamn")
+    if work_order.get("status") not in ("completed", "cancelled"):
+        missing.append("Arbetsorder ej avslutad")
+    if delivery.get("status") not in ("ready", "sent"):
+        missing.append("Leveransdokumentation ej redo")
+    if not material_lines:
+        missing.append("Material-rader (för underlag)")
+    if doc_count == 0:
+        missing.append("Bilder/dokument")
+
+    # Fortnox export status
+    fortnox_events = (
+        db.query(IntegrationEvent)
+        .filter(
+            IntegrationEvent.tenant_id == tenant_id,
+            IntegrationEvent.job_id == job_id,
+            IntegrationEvent.integration_type.ilike("%fortnox%"),
+        )
+        .all()
+    )
+    exported_ids = {row.job_id for row in fortnox_events if row.job_id}
+    finance_ready = _is_underlag_ready(r, workspace, exported_ids)
+    fortnox_exported = job_id in exported_ids
+
+    # Customer-friendly summary
+    wo_status_sv = {
+        "new": "Nytt", "in_progress": "Pågår", "on_hold": "Pausat",
+        "completed": "Avslutat", "blocked": "Blockerat", "cancelled": "Avbrutet",
+    }.get(work_order.get("status") or "", work_order.get("status") or "Okänd status")
+
+    customer_summary_lines = [
+        f"Ärende: {subject}",
+        f"Kund: {customer_name}",
+        f"Status: {wo_status_sv}",
+    ]
+    if checked and items:
+        customer_summary_lines.append(f"Slutfört: {checked} av {len(items)} punkter")
+    if delivery.get("status") == "sent":
+        customer_summary_lines.append("Leveransdokumentation: Skickad")
+    elif delivery.get("status") == "ready":
+        customer_summary_lines.append("Leveransdokumentation: Redo att skickas")
+    customer_summary = "\n".join(customer_summary_lines)
+
+    # Internal summary
+    internal_summary_lines = [
+        f"Jobbtyp: {r.job_type or 'okänd'}",
+        f"Jobbstatus: {r.status}",
+        f"Arbetsorderstatus: {work_order.get('status') or '—'}",
+        f"Projektstatus: {project.get('status') or '—'}",
+        f"Checklista: {checked}/{len(items)} klara",
+        f"Dokument: {doc_count} (foton: {photos}, kvitton: {receipts})",
+        f"Material-rader: {len(material_lines)}, total: {total_material:.0f} kr",
+        f"Tid: {total_hours:.1f} timmar",
+        f"Underlag redo: {'Ja' if finance_ready else 'Nej'}",
+        f"Fortnox exporterat: {'Ja' if fortnox_exported else 'Nej'}",
+    ]
+    if missing:
+        internal_summary_lines.append(f"Saknas: {', '.join(missing)}")
+    internal_summary = "\n".join(internal_summary_lines)
+
+    return {
+        "job_id":             job_id,
+        "job_type":           r.job_type,
+        "job_status":         r.status,
+        "customer_name":      customer_name,
+        "customer_email":     customer_email,
+        "subject":            subject,
+        "customer_summary":   customer_summary,
+        "internal_summary":   internal_summary,
+        "work_order_status":  work_order.get("status"),
+        "project_status":     project.get("status"),
+        "checklist": {
+            "total":   len(items),
+            "checked": checked,
+        },
+        "documentation": {
+            "total":    doc_count,
+            "photos":   photos,
+            "receipts": receipts,
+        },
+        "material_lines":   material_lines,
+        "time_entries":     time_entries,
+        "total_material_sek": total_material,
+        "total_hours":        total_hours,
+        "timeline_events":  timeline[-10:] if timeline else [],
+        "delivery_status":  delivery.get("status"),
+        "finance_ready":    finance_ready,
+        "fortnox_exported": fortnox_exported,
+        "missing_fields":   missing,
+        "risks":            [f"Saknas: {m}" for m in missing],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Finance export status (P4)
+# ---------------------------------------------------------------------------
+
+@app.get("/cases/{job_id}/finance/export-status")
+def get_case_finance_export_status(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return Fortnox export status for a case.
+
+    Supports P4 finance hardening: operators can see export state and history
+    without navigating away from the case.
+    """
+    from app.domain.integrations.models import IntegrationEvent
+    from app.insights.engine import _is_underlag_ready
+
+    r = (
+        db.query(JobRecord)
+        .filter(JobRecord.job_id == job_id, JobRecord.tenant_id == tenant_id)
+        .first()
+    )
+    if r is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    inp = r.input_data or {}
+    workspace = _merge_operations_workspace(inp.get("operations_workspace"))
+
+    fortnox_events = (
+        db.query(IntegrationEvent)
+        .filter(
+            IntegrationEvent.tenant_id == tenant_id,
+            IntegrationEvent.job_id == job_id,
+            IntegrationEvent.integration_type.ilike("%fortnox%"),
+        )
+        .order_by(IntegrationEvent.created_at.desc())
+        .all()
+    )
+
+    exported_ids = {e.job_id for e in fortnox_events if e.job_id}
+    finance_ready = _is_underlag_ready(r, workspace, exported_ids)
+    exported      = job_id in exported_ids
+
+    events_out = [
+        {
+            "event_id":         str(e.id) if hasattr(e, "id") else None,
+            "integration_type": e.integration_type,
+            "status":           e.status if hasattr(e, "status") else None,
+            "created_at":       e.created_at.isoformat() if e.created_at else None,
+        }
+        for e in fortnox_events[:10]
+    ]
+
+    material_lines = _extract_material_lines(inp)
+    finance_data   = workspace.get("finance") or {}
+
+    return {
+        "job_id":          job_id,
+        "finance_ready":   finance_ready,
+        "exported":        exported,
+        "export_count":    len(fortnox_events),
+        "export_events":   events_out,
+        "material_lines":  material_lines,
+        "time_entries":    finance_data.get("time_entries") or [],
+        "preview_url":     f"/finance/invoices/{job_id}/fortnox/preview",
+        "export_url":      f"/finance/invoices/{job_id}/fortnox/export",
+        "draft_url":       f"/finance/invoices/{job_id}/draft",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -4510,6 +5067,45 @@ def _resolve_finance_fortnox_approval(
     }
 
 
+def _extract_material_lines(input_data: dict) -> list[dict]:
+    """Extract normalised material line items from operations_workspace.finance."""
+    workspace = (input_data or {}).get("operations_workspace") or {}
+    finance = workspace.get("finance") or {}
+    raw_items = finance.get("material_costs") or finance.get("materials") or []
+    if not isinstance(raw_items, list):
+        return []
+    lines: list[dict] = []
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        desc = item.get("description") or item.get("name") or "Material"
+        qty = item.get("quantity") or 1
+        unit_price = (
+            item.get("unit_price")
+            or item.get("price")
+            or item.get("cost")
+            or item.get("amount")
+            or item.get("total")
+            or 0
+        )
+        try:
+            qty = float(qty)
+            unit_price = float(unit_price)
+        except (TypeError, ValueError):
+            qty = 1.0
+            unit_price = 0.0
+        total = round(qty * unit_price, 2)
+        vat_rate = item.get("vat_rate", 25)
+        lines.append({
+            "description": str(desc),
+            "quantity": qty,
+            "unit_price": unit_price,
+            "total": total,
+            "vat_rate": vat_rate,
+        })
+    return lines
+
+
 @app.post("/finance/invoices/{job_id}/draft")
 def build_finance_invoice_draft(
     job_id: str,
@@ -4527,7 +5123,8 @@ def build_finance_invoice_draft(
         input_data=record.input_data or {},
         invoice_payload=invoice_payload,
     )
-    return {"status": "ok", "draft": draft}
+    material_lines = _extract_material_lines(record.input_data or {})
+    return {"status": "ok", "draft": draft, "material_lines": material_lines}
 
 
 @app.post("/finance/invoices/{job_id}/fortnox/preview")

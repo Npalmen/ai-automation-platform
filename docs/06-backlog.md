@@ -233,31 +233,60 @@ Remaining before live sales is operational validation with real customer data an
 **Visual UI Refresh scope lock (DEC-005, 2026-05-07):** Sprint 5 (Visual UI Refresh) is scoped to polish on existing CSS tokens and dark shell only. No new design direction, no color scheme changes, no new typographic hierarchy. Allowed: spacing/padding adjustments, hover/focus polish, subtle transitions, contrast improvements, empty/loading/error state refinement, sparse `backdrop-filter` on modals, mobile/accessibility pass. Existing `:root` design tokens, CSS classes, element IDs, and JS selectors must be preserved. See `docs/07-decisions.md` DEC-005.
 
 ## Next (priority order)
-- [ ] **R1 scope lock (Slice 0, 2026-05-06)**
-  - **R1 (in scope for next release):**
-    - Produktifiering light: navigation + tenant context + onboarding wizard + demo/test-tenant mode
-    - Lead till arende core: SLA/reminders for unanswered leads, case communication timeline, AI reply drafts behind approval gate
-    - Pilot operations/reliability: integration setup validation UX, observability minimum, security hardening light
-  - **R2 (explicitly deferred):**
-    - Arende och projekt v1 (work-order statuses, project timeline, attachments v1)
-    - Installatorsspecifika funktioner (property/project structure, checklists, delivery package)
-  - **Later (explicitly deferred):**
-    - Finance layer v1 (invoice prep flow, VAT/category engine, profitability/export sync)
-  - **KPI lock for R1 release gate:**
-    - Setup readiness: >= 90% for pilot tenant in onboarding/status flows
-    - SLA follow-up: >= 95% of new lead jobs receive first follow-up action inside SLA window
-    - Approval safety: 100% of AI-generated customer reply drafts require explicit approval before send
-    - Reliability: zero P0/P1 defects in inbox -> classification -> approval -> dispatch pilot flow during release gate run
-  - **Out of scope for R1 (locked):**
-    - Full UI rewrite or frontend re-platforming
-    - New architecture patterns outside existing backend-first model
-    - Full accounting platform, billing platform, white-labeling, mobile app
-    - Broad integration expansion beyond controlled MVP adapters and already-wired flows
+
+Current product north star: **operational system for installation/service companies, lead → invoice/bookkeeping preparation, AI in background**.
+
+### Documentation
+- [x] DOC-C: Product north star document (`docs/14-product-north-star-installers.md`)
+- [x] P0: Golden path documentation (`docs/15-golden-path.md`)
+- [x] P2f: Document "AI in the background" definition in product docs + current-state
+- [x] P5a: Finance underlag-ready checklist (`docs/16-underlag-ready-checklist.md`)
+
+### Dashboard KPIs (P1)
+- [x] P1a: Email approval queue KPI (`compute_dashboard_kpis` in `app/insights/engine.py`)
+- [x] P1b: Waiting-on-customer KPI (`_count_waiting_customer`)
+- [x] P1c: Invoice/bookkeeping underlag ready KPI (`_count_underlag_ready` + `_is_underlag_ready`)
+- [x] P1d: Active light projects/work orders KPI (`_count_active_ops_cases`)
+- [x] P1e: Wire P1a–d into admin/customer dashboard UI — Driftstatus row (5 cards) + customer Ärendeöversikt
+
+### AI Operational Insights (P2)
+- [x] P2a: Insight row JSON schema (type, severity, title, detail, job_id, pipeline_stage, evidence)
+- [x] P2b: Rule pack 1 — lead/support signals (stale_lead, hot_lead_pending, missing_customer_info, support_escalation)
+- [x] P2c: Rule pack 2 — operations + finance signals (delivery_incomplete, work_order_blocked, underlag_ready, fortnox_export_pending)
+- [x] P2d: `GET /dashboard/operational-insights` endpoint + tenant-isolation tests (26 tests)
+- [x] P2e: Wire top insights into daily digest `_build_digest_body`
+
+### Communication + SLA (P3)
+- [x] P3a: Unanswered lead eligibility rules (status + time threshold + demo_mode blocker)
+- [x] P3b: Reminder notification path (internal approval-record; no customer mail without gate)
+- [x] P3c: Scheduler idempotent hook (`run_sla_reminder_pass` integrated into `_run_scheduler_pass`)
+
+### Light Project Operations (P4)
+- [x] P4a: Customer mode — read-only operations panel (Projektöversikt: project/WO badges, customer info, checklist X/Y, docs, timeline, delivery status)
+- [x] P4b: Customer mode — guided edits (WO status dropdown, timeline note, time/material entry via existing PUT/POST endpoints)
+- [x] P4c: Admin mode — no regression (admin operations panel untouched)
+
+### Finance Underlag (P5)
+- [x] P5b: `material_lines` in draft endpoint + `finance_draft_available`/`finance_draft_url` in case detail (11 tests)
+
+### Mobile Field UX (P6)
+- [x] P6: Touch target CSS (min-height 44px for form inputs/buttons), ops panel labels, 5-col → 2-col → 1-col responsive KPI grid; DEC-005 compliant
+
+### Product Audit Roadmap (completed 2026-05-10)
+- [x] Pilot Cockpit (P0) — `GET /dashboard/cockpit`, 5 KPI action cards, top action items; admin dashboard redesigned
+- [x] Follow-up Engine v1 (P1) — `GET /cases/{job_id}/followup`, followup_state, suggested_reply, pending_approval_id; Uppföljning panel in case detail
+- [x] Field Workflow (P2) — large field action buttons (Starta/Pausa/Klart/Blockerad); `_setWorkOrderStatus()`; raw JSON collapsed in details
+- [x] Project Closeout Packet (P3) — `GET /cases/{job_id}/closeout`, customer/internal summary, material/time, docs, finance_ready; "Sammanställ projekt" button
+- [x] Finance Export Status (P4) — `GET /cases/{job_id}/finance/export-status`, Fortnox event history, preview/export URLs
+- [x] Pilot Ops Runbooks (P5) — `docs/runbook-scheduler.md`, `docs/runbook-oauth.md`, `docs/runbook-pilot-support.md`
+- [x] Tests: 21 new tests, total 2193 passing
+
+### Remaining from earlier backlog
 - [x] Finance layer v1 — bookkeeping-assist foundation (invoice draft, VAT/category classification, project profitability, approval-gated/idempotent Fortnox preview/export controlled write path)
-- [ ] Finance integrations planning — define expanded Swedish finance sync scope beyond initial Fortnox pre-accounting export
-- [ ] OAuth hardening runbook — formalize live recovery playbook for refresh/invalid_grant scenarios
-- [ ] Scheduler / cron trigger — external periodic call to admin-protected `POST /scheduler/run-once`
-- [ ] Dashboard polish — date-range filters, charts, auto-refresh interval
+- [x] OAuth hardening runbook — see `docs/runbook-oauth.md`
+- [x] Scheduler / cron trigger — documented in `docs/runbook-scheduler.md`
+- [ ] Finance integrations planning — define expanded Swedish finance sync scope beyond initial Fortnox pre-accounting export (ROT/RUT if B2C required)
+- [ ] Visma integration — decision: pilot with Fortnox first; Visma only if a paying pilot explicitly requires it
 
 ## Future UI improvements (out of current scope)
 - [ ] Audit log view — surface `GET /audit-events` in the UI
