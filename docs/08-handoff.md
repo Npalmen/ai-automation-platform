@@ -4,9 +4,15 @@
 AI Automation Platform — multi-tenant backend-first plattform för AI-driven workflow automation.
 
 ## Current objective
-MVP is complete and stabilized. The platform is in a demonstrable state.
-Pipeline runs end-to-end, verification is deterministic, intake normalization is correct, and docs reflect actual behavior.
-Email response chapter 1 is now live-validated on server (personalized replies, approval-gated sends, no-reply relay handling, and Gmail thread-reply capability).
+Operational scalability phase complete. Platform is pilot-ready and operationally manageable.
+
+All four operational scalability slices shipped (2402 tests, R1 release gate passes):
+1. **Replay & Recovery Console** — admin can retry/replay/reclassify/re-extract/resend-approval/reprocess-gmail for any failed job via `POST /admin/recovery/{job_id}/{action}`. Audit-logged, tenant-safe.
+2. **Support Action Console** — per-tenant operational control: pause/resume automation, disable/enable scheduler, force inbox sync, ack/clear needs-help items, inspect full operational state. `GET|POST /admin/support/{tenant_id}/...`.
+3. **Production Alerting** — scheduler triggers alert pass per tenant. Six evaluators (failed jobs, Gmail OAuth failure, scheduler failure, dispatch failures, stale approvals, integration health critical). Email delivery, configurable thresholds, deduplication window. Config at `GET|PUT /alerts/config`.
+4. **Pilot Customer Onboarding Wizard** — customer-facing guided setup at "Kom igång" view. 8-step wizard aggregated by `GET /onboarding/wizard-state`. Customer/admin role separation enforced.
+
+Prior context: MVP is complete and stabilized. Email response chapter 1 is now live-validated on server (personalized replies, approval-gated sends, no-reply relay handling, and Gmail thread-reply capability).
 
 Latest reliability hardening for pilot drift handling:
 - `GET /integrations/health` now includes `runbook_signals` for deterministic operator next-steps.

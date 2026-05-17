@@ -288,9 +288,15 @@ Current product north star: **operational system for installation/service compan
 - [ ] Finance integrations planning — define expanded Swedish finance sync scope beyond initial Fortnox pre-accounting export (ROT/RUT if B2C required)
 - [ ] Visma integration — decision: pilot with Fortnox first; Visma only if a paying pilot explicitly requires it
 
+## Done (Operational Scalability — 2026-05-17)
+- [x] Slice 1: Replay & Recovery Console — retry_job, replay_dispatch, reclassify, re_extract, resend_approval, reprocess_gmail_source; admin-protected endpoints; audit logging; UI panel in case detail and needs-help view; 36 tests
+- [x] Slice 2: Support Action Console — pause/resume automation, disable/enable scheduler, force inbox sync, ack/clear needs-help, tenant operational state; admin-protected; dedicated Supportkonsol UI view; 29 tests
+- [x] Slice 3: Production Alerting — 6 evaluators (failed jobs/Gmail OAuth/scheduler/dispatch failures/stale approvals/integration health critical); email delivery; configurable thresholds; dedup window; scheduler-integrated; alert config UI in Notifieringar view; 33 tests
+- [x] Slice 4: Pilot Customer Onboarding Wizard — /onboarding/wizard-state aggregation endpoint; customer-facing "Kom igång" guided wizard (8 steps); suggestRouting() implemented; customer/admin role separation; 31 tests; 2402 total tests passing
+
 ## Future UI improvements (out of current scope)
 - [ ] Audit log view — surface `GET /audit-events` in the UI
-- [ ] Retries / re-run — trigger re-processing of failed jobs
+- [ ] Slack alerting channel — alert engine has email; Slack support via config shape extensible
 - [ ] Notifications — surface action failures inline without manual refresh
 
 ## Known risks
