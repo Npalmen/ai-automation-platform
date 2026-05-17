@@ -26,10 +26,12 @@ Plattformen använder OAuth 2.0 för Gmail-integration (läsning och skrivning).
 
 ```bash
 # Hälsostatus för integrationer (visar om Gmail är OK)
-GET /dashboard/integration-health
+GET /integrations/health
+Header: X-API-Key: <tenant-key>
 
 # Kontrollera pilot readiness
-GET /dashboard/pilot-readiness
+GET /pilot/readiness
+Header: X-API-Key: <tenant-key>
 ```
 
 Tecken på utgången token:
@@ -67,8 +69,9 @@ POST /auth/gmail/callback
 ### Steg 3: Verifiera
 
 ```bash
-GET /dashboard/integration-health
-# gmail.status ska vara "ok"
+GET /integrations/health
+Header: X-API-Key: <tenant-key>
+# systems.gmail.status ska vara "healthy"
 ```
 
 ## Vanliga Problem

@@ -20,29 +20,37 @@ Schedulern startas automatiskt när appen startar. Se `app/main.py` → `_run_sc
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 # Kontrollera att schedulern är igång
-curl -H "X-Tenant-ID: <tenant>" -H "X-API-Key: <key>" http://localhost:8000/dashboard/control
+curl -H "X-API-Key: <key>" http://localhost:8000/scheduler/status
 ```
 
 ## Kontrollera Scheduler-status
 
 ```bash
-# Se scheduler-run-mode (manual / scheduled / paused)
+# Se scheduler-run-mode (manual / scheduled / paused) och senaste körning
+GET /scheduler/status
+Header: X-API-Key: <tenant-key>
+
+# Kontrollpanel (automation + scheduler config)
 GET /dashboard/control
+Header: X-API-Key: <tenant-key>
 
 # Sätt till scheduled (aktiverar bakgrundskörning)
 PUT /dashboard/control
-{"scheduler": {"run_mode": "scheduled"}}
+Header: X-API-Key: <tenant-key>
+Body: {"scheduler": {"run_mode": "scheduled"}}
 
 # Sätt till paused (stoppar bakgrundskörning utan att döda appen)
 PUT /dashboard/control
-{"scheduler": {"run_mode": "paused"}}
+Header: X-API-Key: <tenant-key>
+Body: {"scheduler": {"run_mode": "paused"}}
 ```
 
 ## Manuell Scheduler-trigger (för test)
 
 ```bash
-# Trigga en scheduler-pass direkt via API
-POST /scheduler/trigger
+# Trigga en scheduler-pass för alla tenants direkt via API (kräver admin-nyckel)
+POST /scheduler/run-once
+Header: X-Admin-API-Key: <admin-key>
 ```
 
 ## Logs
@@ -75,18 +83,15 @@ tail -f storage/local_dev/logs/app.log | grep scheduler
 För produktion rekommenderas extern cron som ett komplement:
 
 ```bash
-# Trigga inbox-sync var 5:e minut
+# Trigga scheduler-pass var 5:e minut (kräver admin-nyckel)
 */5 * * * * curl -s -X POST \
-  -H "X-Tenant-ID: $TENANT_ID" \
-  -H "X-API-Key: $API_KEY" \
-  https://your-domain.com/scheduler/trigger
-
-# Daily digest kl 07:00
-0 7 * * * curl -s -X POST \
-  -H "X-Tenant-ID: $TENANT_ID" \
-  -H "X-API-Key: $API_KEY" \
-  https://your-domain.com/scheduler/digest
+  -H "X-Admin-API-Key: $ADMIN_API_KEY" \
+  https://your-domain.com/scheduler/run-once
 ```
+
+> **Notera:** `POST /scheduler/run-once` kör ett pass för alla aktiva tenants och kräver
+> `X-Admin-API-Key`. Extern cron ersätter den inbyggda bakgrundsloopen för
+> miljöer med strikta process-restriktioner.
 
 ## Återstart
 
@@ -95,7 +100,7 @@ För produktion rekommenderas extern cron som ett komplement:
 docker restart ai-platform
 
 # Kontrollera att schedulern återupptas
-curl -H "X-Tenant-ID: <tenant>" ... /dashboard/control
+curl -H "X-API-Key: <tenant-key>" https://your-domain.com/scheduler/status
 ```
 
 ## Eskalering

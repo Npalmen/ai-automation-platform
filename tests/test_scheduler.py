@@ -331,6 +331,32 @@ class TestSchedulerPassErrorHandling:
         _, mock_save = _pass(ctrl=ctrl, inbox_raises=RuntimeError("fail"))
         mock_save.assert_called_once()
 
+    def test_oauth_revocation_503_degrades_gracefully(self):
+        """
+        When Gmail OAuth token is revoked, _run_gmail_inbox_sync raises
+        HTTPException(503). The scheduler must catch it, persist last_status=failed
+        and NOT crash the whole scheduler pass (so other tenants are not affected).
+        """
+        ctrl = {"scheduler": {"run_mode": "scheduled"}}
+        http_exc = HTTPException(status_code=503, detail="Gmail list_messages failed: unauthorized")
+        result, mock_save = _pass(ctrl=ctrl, inbox_raises=http_exc)
+        # Scheduler must degrade gracefully
+        saved_state = mock_save.call_args[0][2]["scheduler_state"]
+        assert saved_state["last_status"] == "failed"
+        assert saved_state["last_error"] is not None
+        assert result["error"] is not None
+        # State must still be persisted so next scheduler pass knows about the failure
+        mock_save.assert_called_once()
+
+    def test_oauth_revocation_does_not_mask_error(self):
+        """The error message from OAuth revocation must be visible in last_error."""
+        ctrl = {"scheduler": {"run_mode": "scheduled"}}
+        http_exc = HTTPException(status_code=503, detail="Gmail list_messages failed: Token has been expired or revoked")
+        _, mock_save = _pass(ctrl=ctrl, inbox_raises=http_exc)
+        saved_state = mock_save.call_args[0][2]["scheduler_state"]
+        # last_error must contain something meaningful (not None or empty)
+        assert saved_state["last_error"]
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # POST /scheduler/run-once — aggregate behaviour

@@ -163,9 +163,119 @@ Use the workflow as the merge gate for `main`.
 
 ---
 
+---
+
+## Backup and restore
+
+### Backup schedule (recommended)
+
+| Frequency | Method | Retention |
+|-----------|--------|-----------|
+| Daily     | `pg_dump` snapshot to a separate volume or object storage (S3/GCS) | 14 days rolling |
+| Weekly    | Full `pg_dump` with schema included | 3 months |
+| Pre-deploy | Manual `pg_dump` snapshot before every production deploy | Keep until next successful deploy |
+
+Run daily backup (example cron — adapt path/credentials):
+
+```bash
+# cron: 02:00 daily
+pg_dump "$DATABASE_URL" | gzip > /backups/ai_platform_$(date +%Y%m%d_%H%M).sql.gz
+```
+
+### Restore procedure
+
+1. **Stop the application** (or put it in maintenance mode at the proxy layer).
+2. Drop and recreate the target database, or restore into a point-in-time recovery slot:
+   ```bash
+   psql "$DATABASE_URL" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'ai_platform' AND pid <> pg_backend_pid();"
+   dropdb ai_platform
+   createdb ai_platform
+   ```
+3. Restore from the backup:
+   ```bash
+   gunzip -c /backups/ai_platform_20260510_0200.sql.gz | psql "$DATABASE_URL"
+   ```
+4. Re-run the table creation script (idempotent — safe after restore):
+   ```bash
+   python scripts/create_tables.py
+   ```
+5. Restart the application and run the smoke check:
+   ```bash
+   python scripts/smoke_check.py --base-url https://api.krowolf.se --expect-production
+   ```
+6. Spot-check the super admin overview (`GET /admin/tenants/overview`) and confirm tenant count matches expectations.
+
+### Restore rehearsal (run monthly)
+
+Before going live with a customer, and every month thereafter, verify that backup/restore works end-to-end:
+
+1. Take a fresh `pg_dump` of the staging database.
+2. Create an isolated `ai_platform_restore_test` database.
+3. Restore the dump into that database.
+4. Run `python -m pytest` against the restored database to confirm all tests pass.
+5. Drop the test database.
+6. Record date, result, and who ran the rehearsal in the team's incident log.
+
+### Backup validation checklist (pre-launch and monthly)
+
+- [ ] At least one backup exists and is ≤ 24 h old
+- [ ] Restore rehearsal completed successfully (this month)
+- [ ] Backup files are on a separate volume/account from the application server
+- [ ] Backup retention policy is enforced (old backups are pruned)
+- [ ] Restore procedure documented above has been tested with this backup format
+
+---
+
+## Failed-job and failed-dispatch triage
+
+Use this checklist when the super admin needs-help queue (`GET /admin/operations/needs-help`) shows failed pipeline jobs or failed integration events.
+
+### Failed job triage
+
+1. Open the Super Admin "Behöver hjälp" queue — click "Öppna ärende" on the failed row.
+2. In the case detail, review the `result.error` or `result.message` field.
+3. Common root causes:
+
+   | Symptom | Likely cause | Resolution |
+   |---------|-------------|------------|
+   | `invalid_grant` / OAuth error | Gmail token expired | See `docs/runbook-oauth.md` |
+   | `401 Unauthorized` (Monday/Fortnox) | API key rotated/revoked | Update env var and restart |
+   | `No matching board` | Monday board not scanned | Re-run Monday scanner in Setup |
+   | `Customer not found in Fortnox` | Missing Fortnox customer record | Create customer in Fortnox, then retry export |
+   | `LLM quota exceeded` | OpenAI rate limit | Wait and re-trigger job |
+   | `DB connection error` | Database unreachable | Check `DATABASE_URL` and connectivity |
+
+4. If the job can be retried, use `POST /jobs/{job_id}/auto-dispatch` (requires tenant API key) or re-process via the UI.
+5. If the job is unrecoverable, set its status to `failed` (via the case detail status selector) and log the incident.
+
+### Failed integration event triage
+
+Integration events (dispatches to Monday, Fortnox exports) that show as `failed` in the triage queue:
+
+1. Note the `integration_type` and `last_error` from the triage row.
+2. Check integration credentials via the Integration Health admin view.
+3. Verify the tenant's integration scan (`GET /setup/verify`) still passes.
+4. For Monday: confirm `MONDAY_BOARD_ID` and `MONDAY_API_KEY` are valid. Re-run Monday scanner.
+5. For Fortnox: confirm `FORTNOX_ACCESS_TOKEN` is current. Re-run Fortnox scanner.
+6. Integration events are not automatically retried after 3 attempts (`dead` state). A supervisor must take a manual action (re-trigger from the case detail or create a manual record).
+
+### Stale approval triage
+
+Approvals pending > 24 h appear in the triage queue:
+
+1. Click "Godkänna" or "Öppna ärende" on the stale row.
+2. In the case detail, review the approval context.
+3. Either approve, reject, or notify the responsible operator.
+4. If the approval is orphaned (no responsible operator), reject it and re-trigger the job with updated routing.
+
+---
+
 ## What is NOT in scope for MVP
 
 - HTTPS termination — use a reverse proxy (nginx, Caddy, Traefik) in front.
 - Rate limiting — add at the proxy layer.
 - Multi-region — single-process, single-database.
 - Background worker — the scheduler runs on-demand via `POST /scheduler/run-once`. Wire a cron job or systemd timer to call it.
+- Automated backup — the cron command above must be wired externally (cron, systemd timer, cloud scheduler).
+- Automated restore rehearsal — run monthly by a named operator, not automated.
+- Job replay queue UI — re-triggering failed jobs requires the API or case detail UI; there is no bulk replay tool in the MVP.

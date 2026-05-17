@@ -3487,6 +3487,41 @@ label { color: var(--text-muted); }
     </div>
   </div>
 
+  <!-- Audit/Activity Explorer (Admin only) -->
+  <div class="cfg-section" style="max-width:1100px; margin-bottom:20px;" id="adminAuditSection">
+    <div class="cfg-section-title" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>Granskningslogg (Audit log)</span>
+      <button class="btn btn-neutral btn-sm" onclick="loadAdminAuditLog()">↻ Ladda om</button>
+    </div>
+    <div class="cfg-section-body" style="padding:12px 16px;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; align-items:center;">
+        <input id="auditTenantFilter" type="text" placeholder="Filtrera tenant-ID" style="width:160px; font-size:11px; padding:5px 8px;" />
+        <select id="auditCategoryFilter" style="font-size:11px; padding:5px 8px;">
+          <option value="">Alla kategorier</option>
+          <option value="tenant_management">tenant_management</option>
+          <option value="scheduler">scheduler</option>
+          <option value="inbox_sync">inbox_sync</option>
+          <option value="oauth">oauth</option>
+          <option value="job">job</option>
+          <option value="integration">integration</option>
+        </select>
+        <select id="auditStatusFilter" style="font-size:11px; padding:5px 8px;">
+          <option value="">Alla statusar</option>
+          <option value="success">success</option>
+          <option value="failed">failed</option>
+          <option value="warning">warning</option>
+        </select>
+        <button class="btn btn-neutral btn-sm" onclick="loadAdminAuditLog()">Sök</button>
+      </div>
+      <div id="adminAuditLog">
+        <div class="empty-state" style="padding:14px 0;">
+          <div class="empty-state-icon">◌</div>
+          <div class="empty-state-title">Klicka "Ladda om" för att visa granskningsloggen</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Provisioning: Skapa ny kund -->
   <div class="cfg-section" style="max-width:1100px; margin-bottom:20px;" id="provisionFormSection">
     <div class="cfg-section-title">Skapa ny kund</div>
@@ -4617,7 +4652,7 @@ async function loadCockpit() {
     let html = `<div style="display:flex; flex-direction:column; gap:6px;">`;
     items.slice(0,3).forEach(ins => {
       const sc = SEVERITY_COLORS[ins.severity] || 'var(--text-muted)';
-      const jLink = ins.job_id ? `<span style="font-size:10px;color:var(--purple-light);cursor:pointer;margin-left:8px;" onclick="switchView('cases');setTimeout(()=>loadCaseDetail('${ins.job_id}'),300);">Öppna →</span>` : '';
+      const jLink = ins.job_id ? `<span style="font-size:10px;color:var(--purple-light);cursor:pointer;margin-left:8px;" onclick="switchView('cases');setTimeout(()=>openCase('${ins.job_id}'),300);">Öppna →</span>` : '';
       html += `<div class="dash-card" style="padding:10px 14px;border-left:3px solid ${sc};display:flex;align-items:center;gap:8px;">
         <span style="font-size:11px;font-weight:700;color:${sc};min-width:52px;text-transform:uppercase;">${ins.severity === 'critical' ? 'KRITISK' : ins.severity === 'high' ? 'HÖG' : 'MEDEL'}</span>
         <span style="flex:1;font-size:12px;color:var(--text);">${escapeHtml(ins.title)}</span>
@@ -4625,7 +4660,7 @@ async function loadCockpit() {
       </div>`;
     });
     breaches.slice(0,2).forEach(b => {
-      const jLink = b.job_id ? `<span style="font-size:10px;color:var(--purple-light);cursor:pointer;margin-left:8px;" onclick="switchView('cases');setTimeout(()=>loadCaseDetail('${b.job_id}'),300);">Öppna →</span>` : '';
+      const jLink = b.job_id ? `<span style="font-size:10px;color:var(--purple-light);cursor:pointer;margin-left:8px;" onclick="switchView('cases');setTimeout(()=>openCase('${b.job_id}'),300);">Öppna →</span>` : '';
       html += `<div class="dash-card" style="padding:10px 14px;border-left:3px solid var(--danger);display:flex;align-items:center;gap:8px;">
         <span style="font-size:11px;font-weight:700;color:var(--danger);min-width:52px;text-transform:uppercase;">SLA</span>
         <span style="flex:1;font-size:12px;color:var(--text);">${escapeHtml(b.subject || 'Lead')}: ${b.hours_elapsed?.toFixed(0)}h utan svar</span>
@@ -4679,7 +4714,7 @@ async function loadOperationalInsights() {
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
           <span style="font-size:10px; font-weight:700; color:${sColor}; text-transform:uppercase; letter-spacing:.04em;">${sLabel}</span>
           ${stage ? `<span style="font-size:10px; color:var(--text-dim); background:var(--surface-3); padding:1px 6px; border-radius:3px;">${escapeHtml(stage)}</span>` : ''}
-          ${ins.job_id ? `<span style="font-size:10px; color:var(--text-dim); cursor:pointer;" onclick="switchView('cases'); setTimeout(()=>loadCaseDetail('${ins.job_id}'),300);" title="Öppna ärende">${ins.job_id.substring(0,8)}…</span>` : ''}
+          ${ins.job_id ? `<span style="font-size:10px; color:var(--text-dim); cursor:pointer;" onclick="switchView('cases'); setTimeout(()=>openCase('${ins.job_id}'),300);" title="Öppna ärende">${ins.job_id.substring(0,8)}…</span>` : ''}
         </div>
         <div style="font-size:13px; font-weight:600; color:var(--text); margin-bottom:2px;">${escapeHtml(ins.title)}</div>
         <div style="font-size:11px; color:var(--text-muted);">${escapeHtml(ins.detail)}</div>
@@ -5083,41 +5118,10 @@ async function loadAdminOverview() {
     const items = r.items || [];
     if (items.length === 0) {
       document.getElementById('adminTable').innerHTML = '<span class="empty">Inga kunder i databasen.</span>';
-      document.getElementById('adminNeedsHelp').innerHTML = '<div class="cust-card"><span class="empty">Inga kunder behöver hjälp.</span></div>';
-      return;
     }
 
-    const needsHelp = items.filter(t =>
-      t.status === 'error' ||
-      t.status === 'warning' ||
-      t.status === 'not_ready' ||
-      (t.recent_error_count || 0) > 0 ||
-      ((t.dispatch || {}).failed_30d || 0) > 0
-    ).slice(0, 6);
-    document.getElementById('adminNeedsHelp').innerHTML = needsHelp.length === 0
-      ? '<div class="cust-card"><span class="empty">Inga akuta åtgärder just nu.</span></div>'
-      : needsHelp.map(t => {
-          const integ = t.integrations || {};
-          const disp = t.dispatch || {};
-          const reasons = [];
-          if (t.status === 'error') reasons.push('Kundstatus fel');
-          if (t.status === 'not_ready') reasons.push('Ej redo för drift');
-          if ((t.recent_error_count || 0) > 0) reasons.push(`${t.recent_error_count} fel senaste 30d`);
-          if ((disp.failed_30d || 0) > 0) reasons.push(`${disp.failed_30d} misslyckade dispatches`);
-          if (integ.overall_status && integ.overall_status !== 'healthy') reasons.push('Integration behöver kontroll');
-          return `<div class="cust-card" style="margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-            <div>
-              <div style="font-size:13px; font-weight:700; color:var(--text);">${escapeHtml(t.name || t.tenant_id)}</div>
-              <div style="font-size:12px; color:var(--text-muted); margin-top:3px;">${escapeHtml(reasons.join(' · ') || 'Kontroll rekommenderas')}</div>
-            </div>
-            <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
-              <button class="btn btn-neutral btn-sm" onclick="openTenant(${JSON.stringify(t.tenant_id)})">Öppna kund</button>
-              <button class="btn btn-neutral btn-sm" onclick="_adminOpenCases(${JSON.stringify(t.tenant_id)})">Ärenden</button>
-              <button class="btn btn-neutral btn-sm" onclick="_adminOpenIntegrations(${JSON.stringify(t.tenant_id)})">Integrationer</button>
-              <button class="btn btn-neutral btn-sm" onclick="_adminOpenReadiness(${JSON.stringify(t.tenant_id)})">Readiness</button>
-            </div>
-          </div>`;
-        }).join('');
+    // Load the triage queue separately from the dedicated endpoint
+    loadAdminNeedsHelp();
 
     const rows = items.map(t => {
       const statusIcon  = _ADMIN_STATUS_ICON[t.status]  || t.status;
@@ -5171,6 +5175,99 @@ async function loadAdminOverview() {
     }
     el.style.display = 'block';
     document.getElementById('adminTable').innerHTML = '';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Unified admin operations triage queue
+// ---------------------------------------------------------------------------
+const _TRIAGE_SEVERITY_COLOR = {
+  critical: 'var(--danger)',
+  high:     'var(--danger)',
+  medium:   'var(--warning)',
+  info:     'var(--text-muted)',
+};
+const _TRIAGE_SEVERITY_LABEL = {
+  critical: 'KRITISK',
+  high:     'HÖG',
+  medium:   'MEDEL',
+  info:     'INFO',
+};
+
+async function loadAdminNeedsHelp() {
+  const wrap = document.getElementById('adminNeedsHelp');
+  if (!wrap) return;
+  wrap.innerHTML = '<div style="font-size:12px; color:var(--text-dim); padding:10px 0;">Laddar åtgärdskö…</div>';
+  try {
+    const data = await adminApiFetch('/admin/operations/needs-help?limit=15');
+    const items = data.items || [];
+    if (items.length === 0) {
+      wrap.innerHTML = `<div class="empty-state" style="padding:14px 0;">
+        <div class="empty-state-icon" style="font-size:20px;">✓</div>
+        <div class="empty-state-title">Inga akuta åtgärder just nu</div>
+        <div class="empty-state-sub">Alla kunder ser friska ut.</div>
+      </div>`;
+      return;
+    }
+
+    const cards = items.map(item => {
+      const sc    = _TRIAGE_SEVERITY_COLOR[item.severity] || 'var(--text-muted)';
+      const sl    = _TRIAGE_SEVERITY_LABEL[item.severity] || item.severity.toUpperCase();
+      const tid   = item.tenant_id;
+      const jid   = item.job_id;
+      const aid   = item.approval_id;
+      const area  = item.area || '';
+      const tsStr = item.created_at ? new Date(item.created_at).toLocaleString('sv-SE') : '';
+
+      // Build action buttons based on area type
+      let actionBtns = '';
+      if (jid) {
+        actionBtns += `<button class="btn btn-neutral btn-sm" onclick="_adminOpenCases(${JSON.stringify(tid)});setTimeout(()=>openCase(${JSON.stringify(jid)}),400);" title="Öppna ärende">Öppna ärende</button>`;
+      }
+      if (area === 'integration' || area === 'integration_event') {
+        actionBtns += `<button class="btn btn-neutral btn-sm" onclick="_adminOpenIntegrations(${JSON.stringify(tid)})" title="Integrationsstatus">Integrationer</button>`;
+      } else if (area.startsWith('approval')) {
+        actionBtns += `<button class="btn btn-neutral btn-sm" onclick="_adminOpenCases(${JSON.stringify(tid)})" title="Hantera godkännanden">Godkänna</button>`;
+      } else if (area === 'scheduler' || area === 'inbox_sync' || area === 'oauth') {
+        actionBtns += `<button class="btn btn-neutral btn-sm" onclick="openTenant(${JSON.stringify(tid)});setTimeout(()=>switchView('ctrl'),400);" title="Kontrollpanel">Kontrollpanel</button>`;
+      }
+      if (!actionBtns) {
+        actionBtns = `<button class="btn btn-neutral btn-sm" onclick="openTenant(${JSON.stringify(tid)})">Öppna kund</button>`;
+      }
+
+      return `<div style="border-left:3px solid ${sc}; padding:10px 14px; margin-bottom:8px; background:var(--surface-2); border-radius:var(--radius-sm); display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:0;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:3px; flex-wrap:wrap;">
+            <span style="font-size:10px; font-weight:700; color:${sc}; text-transform:uppercase; letter-spacing:.04em;">${sl}</span>
+            <span style="font-size:11px; color:var(--text-dim); background:var(--surface-3); padding:1px 7px; border-radius:3px;">${escapeHtml(area.replace(/_/g, ' '))}</span>
+            <span style="font-size:11px; font-weight:600; color:var(--purple-light);">${escapeHtml(item.tenant_name || tid)}</span>
+            ${tsStr ? `<span style="font-size:10px; color:var(--text-dim);">${tsStr}</span>` : ''}
+          </div>
+          <div style="font-size:13px; font-weight:600; color:var(--text); margin-bottom:2px;">${escapeHtml(item.title)}</div>
+          <div style="font-size:11px; color:var(--text-muted);">${escapeHtml(item.detail)}</div>
+          ${item.recommended_action ? `<div style="font-size:10px; color:var(--blue-light); margin-top:4px;">→ ${escapeHtml(item.recommended_action)}</div>` : ''}
+        </div>
+        <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:flex-start; padding-top:2px; flex-shrink:0;">
+          ${actionBtns}
+        </div>
+      </div>`;
+    }).join('');
+
+    const countSummary = `<div style="font-size:11px; color:var(--text-dim); margin-bottom:10px; display:flex; gap:12px; flex-wrap:wrap;">
+      ${data.critical > 0 ? `<span style="color:var(--danger); font-weight:700;">${data.critical} kritiska</span>` : ''}
+      ${data.high > 0     ? `<span style="color:var(--danger);">${data.high} höga</span>` : ''}
+      ${data.medium > 0   ? `<span style="color:var(--warning);">${data.medium} medel</span>` : ''}
+      <span style="color:var(--text-dim);">${data.total} totalt</span>
+    </div>`;
+
+    wrap.innerHTML = countSummary + cards;
+  } catch (e) {
+    const msg = e.message || '';
+    if (msg.includes('401') || msg.includes('403')) {
+      wrap.innerHTML = '<div style="font-size:12px; color:var(--text-dim); padding:10px 0;">Admin-nyckel krävs för åtgärdskön.</div>';
+    } else {
+      wrap.innerHTML = `<div style="font-size:12px; color:var(--text-dim); padding:10px 0;">Kunde inte ladda åtgärdskö: ${escapeHtml(msg)}</div>`;
+    }
   }
 }
 
@@ -7599,10 +7696,9 @@ async function _saveLeadStatus(jobId) {
   if (!sel) return;
   const newStatus = sel.value;
   try {
-    const r = await apiFetch(`/jobs/${jobId}/lead-status`, { method: 'PATCH', body: JSON.stringify({ lead_status: newStatus }) });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    await apiFetch(`/jobs/${jobId}/lead-status`, { method: 'PATCH', body: JSON.stringify({ lead_status: newStatus }) });
     showToast('Leadstatus uppdaterad');
-    loadCaseDetail(jobId);
+    openCase(jobId);
   } catch (e) {
     showToast('Fel: ' + e.message, 'error');
   }
@@ -7612,10 +7708,9 @@ async function _regenerateLeadAnalysis(jobId) {
   const btn = document.getElementById('regenBtn_' + jobId);
   if (btn) { btn.disabled = true; btn.textContent = '↻ Regenererar…'; }
   try {
-    const r = await apiFetch(`/jobs/${jobId}/lead-regenerate`, { method: 'POST' });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    await apiFetch(`/jobs/${jobId}/lead-regenerate`, { method: 'POST' });
     showToast('Analys regenererad');
-    loadCaseDetail(jobId);
+    openCase(jobId);
   } catch (e) {
     showToast('Fel: ' + e.message, 'error');
     if (btn) { btn.disabled = false; btn.textContent = '↻ Regenerera analys'; }
@@ -7624,6 +7719,73 @@ async function _regenerateLeadAnalysis(jobId) {
 
 function _copyToClipboard(text) {
   navigator.clipboard.writeText(text).then(() => showToast('Kopierat!')).catch(() => showToast('Kopiering misslyckades', 'error'));
+}
+
+// ---------------------------------------------------------------------------
+// Admin audit/activity explorer
+// ---------------------------------------------------------------------------
+const _AUDIT_STATUS_COLOR = {
+  success: 'var(--success)',
+  failed:  'var(--danger)',
+  warning: 'var(--warning)',
+};
+
+async function loadAdminAuditLog() {
+  const wrap = document.getElementById('adminAuditLog');
+  if (!wrap) return;
+  wrap.innerHTML = '<div style="font-size:12px; color:var(--text-dim); padding:8px 0;">Laddar granskningslogg…</div>';
+
+  const tenantFilter   = (document.getElementById('auditTenantFilter')   || {}).value || '';
+  const categoryFilter = (document.getElementById('auditCategoryFilter') || {}).value || '';
+  const statusFilter   = (document.getElementById('auditStatusFilter')   || {}).value || '';
+
+  const params = new URLSearchParams({ limit: '100', offset: '0' });
+  if (tenantFilter)   params.set('tenant_id_filter', tenantFilter);
+  if (categoryFilter) params.set('category', categoryFilter);
+  if (statusFilter)   params.set('status_filter', statusFilter);
+
+  try {
+    const data = await adminApiFetch(`/admin/audit-events?${params.toString()}`);
+    const items = data.items || [];
+    if (items.length === 0) {
+      wrap.innerHTML = '<div style="font-size:12px; color:var(--text-dim); padding:8px 0;">Inga händelser hittades.</div>';
+      return;
+    }
+
+    const rows = items.map(ev => {
+      const sc = _AUDIT_STATUS_COLOR[ev.status] || 'var(--text-dim)';
+      const ts = ev.created_at ? new Date(ev.created_at).toLocaleString('sv-SE') : '–';
+      const detail = ev.details && Object.keys(ev.details).length > 0
+        ? Object.entries(ev.details).map(([k,v]) => `${escapeHtml(k)}: ${escapeHtml(String(v))}`).join(', ')
+        : '';
+      return `<tr style="font-size:11px;">
+        <td style="color:var(--text-dim); white-space:nowrap;">${ts}</td>
+        <td style="font-weight:600; color:var(--purple-light);">${escapeHtml(ev.tenant_id)}</td>
+        <td style="color:var(--text-dim);">${escapeHtml(ev.category)}</td>
+        <td>${escapeHtml(ev.action)}</td>
+        <td style="color:${sc}; font-weight:700;">${escapeHtml(ev.status)}</td>
+        <td style="color:var(--text-dim); max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(detail)}">${escapeHtml(detail)}</td>
+      </tr>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      <div style="font-size:11px; color:var(--text-dim); margin-bottom:8px;">Visar ${items.length} av ${data.total} händelser</div>
+      <div style="overflow-x:auto;">
+        <table class="act-table" style="width:100%; font-size:11px;">
+          <thead><tr>
+            <th>Tidpunkt</th><th>Tenant</th><th>Kategori</th><th>Åtgärd</th><th>Status</th><th>Detaljer</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  } catch (e) {
+    const msg = e.message || '';
+    if (msg.includes('401') || msg.includes('403')) {
+      wrap.innerHTML = '<div style="font-size:12px; color:var(--text-dim);">Admin-nyckel krävs för granskningsloggen.</div>';
+    } else {
+      wrap.innerHTML = `<div style="font-size:12px; color:var(--danger);">Fel: ${escapeHtml(msg)}</div>`;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -7654,12 +7816,10 @@ async function provisionTenant() {
   msg.style.color = 'var(--text-muted)';
 
   try {
-    const resp = await adminApiFetch('/admin/tenants', {
+    const data = await adminApiFetch('/admin/tenants', {
       method: 'POST',
       body: JSON.stringify({ name, slug, enabled_job_types: jobTypes, allowed_integrations: integrations, auto_actions: {} }),
     });
-    const data = await resp.json();
-    if (!resp.ok) { msg.textContent = data.detail || 'Fel vid skapande.'; msg.style.color = 'var(--danger)'; btn.disabled = false; return; }
 
     // Show key banner
     document.getElementById('provKeyValue').textContent   = data.api_key;
@@ -7706,10 +7866,7 @@ async function loadProvisionedTenants() {
   const wrap = document.getElementById('provTenantList');
   wrap.innerHTML = '<span style="font-size:12px; color:var(--text-dim);">Laddar…</span>';
   try {
-    const resp = await adminApiFetch('/admin/tenants');
-    const data = await resp.json();
-    if (!resp.ok) { wrap.innerHTML = `<span style="color:var(--danger); font-size:12px;">${escapeHtml(data.detail || 'Kunde inte ladda.')}</span>`; return; }
-
+    const data = await adminApiFetch('/admin/tenants');
     const items = data.items || [];
     if (!items.length) { wrap.innerHTML = '<span class="empty" style="font-size:12px; color:var(--text-dim);">Inga kunder ännu.</span>'; return; }
 
@@ -7755,9 +7912,7 @@ async function loadProvisionedTenants() {
 async function _rotateKey(tenantId) {
   if (!confirm(`Rotera API-nyckel för ${tenantId}? Gamla nyckeln slutar fungera omedelbart.`)) return;
   try {
-    const resp = await adminApiFetch(`/admin/tenants/${tenantId}/rotate-key`, { method: 'POST' });
-    const data = await resp.json();
-    if (!resp.ok) { showToast(data.detail || 'Rotation misslyckades', 'error'); return; }
+    const data = await adminApiFetch(`/admin/tenants/${tenantId}/rotate-key`, { method: 'POST' });
 
     document.getElementById('rotateKeyValue').textContent    = data.api_key;
     document.getElementById('rotateKeyTenantId').textContent = data.tenant_id;
@@ -7774,12 +7929,10 @@ async function _setTenantStatus(tenantId, status) {
   const label = status === 'active' ? 'aktivera' : 'inaktivera';
   if (!confirm(`Vill du ${label} ${tenantId}?`)) return;
   try {
-    const resp = await adminApiFetch(`/admin/tenants/${tenantId}/status`, {
+    const data = await adminApiFetch(`/admin/tenants/${tenantId}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     });
-    const data = await resp.json();
-    if (!resp.ok) { showToast(data.detail || 'Kunde inte ändra status', 'error'); return; }
     showToast(`${tenantId} är nu ${data.status === 'active' ? 'aktiv' : 'inaktiv'}`);
     loadProvisionedTenants();
   } catch (e) {
@@ -7980,10 +8133,9 @@ async function _saveSupportStatus(jobId) {
   if (!sel) return;
   const newStatus = sel.value;
   try {
-    const r = await apiFetch(`/jobs/${jobId}/support-status`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    await apiFetch(`/jobs/${jobId}/support-status`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
     showToast('Ärendestatus uppdaterad');
-    loadCaseDetail(jobId);
+    openCase(jobId);
   } catch (e) {
     showToast('Fel: ' + e.message, 'error');
   }
@@ -7993,10 +8145,9 @@ async function _regenerateSupportAnalysis(jobId) {
   const btn = document.getElementById('supportRegenBtn_' + jobId);
   if (btn) { btn.disabled = true; btn.textContent = '↻ Regenererar…'; }
   try {
-    const r = await apiFetch(`/jobs/${jobId}/support-regenerate`, { method: 'POST' });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    await apiFetch(`/jobs/${jobId}/support-regenerate`, { method: 'POST' });
     showToast('Analys regenererad');
-    loadCaseDetail(jobId);
+    openCase(jobId);
   } catch (e) {
     showToast('Fel: ' + e.message, 'error');
     if (btn) { btn.disabled = false; btn.textContent = '↻ Regenerera analys'; }

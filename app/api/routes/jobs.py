@@ -1,10 +1,20 @@
+# ============================================================================
+# SECURITY WARNING — DO NOT MOUNT THIS MODULE
+# ============================================================================
+# This router is LEGACY / DORMANT and has NOT been attached to the main app
+# via app.include_router(). It accepts tenant_id from the request body with
+# no authentication, allowing any caller to create jobs under any tenant.
+# The production job endpoint lives in app/main.py and uses
+# Depends(get_verified_tenant) to bind tenant_id from the API key.
+# ============================================================================
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_db
 from app.domain.workflows.models import Job
-from app.domain.workflows.schemas import JobCreateRequest, JobResponse
-from app.repositories.postgres.job_repository import create_job, update_job
+from app.domain.workflows.schemas import JobCreateRequest
+from app.domain.workflows.response_schemas import JobResponse
+from app.repositories.postgres.job_repository import JobRepository
 from app.workflows.pipeline_runner import run_pipeline
 
 router = APIRouter()
@@ -18,14 +28,9 @@ def create_job_endpoint(request: JobCreateRequest, db: Session = Depends(get_db)
         input_data=request.input_data,
     )
 
-    # Spara initialt jobb
-    db_job = create_job(db, job)
-
-    # Kör pipeline
+    db_job = JobRepository.create_job(db, job)
     processed_job = run_pipeline(job, db)
-
-    # Uppdatera DB med resultat
-    updated_job = update_job(db, processed_job)
+    updated_job = JobRepository.update_job(db, processed_job)
 
     return JobResponse(
         job_id=updated_job.job_id,

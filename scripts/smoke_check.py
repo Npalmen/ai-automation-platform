@@ -33,6 +33,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Post-deploy smoke check")
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--admin-api-key", default="")
+    parser.add_argument("--tenant-api-key", default="",
+                        help="Tenant API key for authenticated smoke checks (optional).")
     parser.add_argument("--expect-production", action="store_true")
     args = parser.parse_args()
 
@@ -59,6 +61,38 @@ def main() -> int:
         )
         ok &= _check(admin_status == 200, "admin overview accepts ADMIN_API_KEY")
         ok &= _check("items" in admin_payload, "admin overview returns tenant items")
+
+        needs_help_status, _ = _request_json(
+            f"{base_url}/admin/operations/needs-help",
+            headers={"X-Admin-API-Key": args.admin_api_key},
+        )
+        ok &= _check(needs_help_status == 200, "admin needs-help endpoint reachable")
+
+    if args.tenant_api_key:
+        tenant_headers = {"X-API-Key": args.tenant_api_key}
+
+        health_status, health_payload = _request_json(
+            f"{base_url}/integrations/health",
+            headers=tenant_headers,
+        )
+        ok &= _check(health_status == 200, "tenant integration health endpoint reachable")
+        ok &= _check("overall_status" in health_payload,
+                     "integration health contains overall_status")
+
+        sched_status, sched_payload = _request_json(
+            f"{base_url}/scheduler/status",
+            headers=tenant_headers,
+        )
+        ok &= _check(sched_status == 200, "tenant scheduler status endpoint reachable")
+        ok &= _check("run_mode" in sched_payload, "scheduler status contains run_mode")
+
+        readiness_status, readiness_payload = _request_json(
+            f"{base_url}/pilot/readiness",
+            headers=tenant_headers,
+        )
+        ok &= _check(readiness_status == 200, "pilot readiness endpoint reachable")
+        ok &= _check("overall_status" in readiness_payload,
+                     "pilot readiness contains overall_status")
 
     return 0 if ok else 1
 

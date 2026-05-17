@@ -85,13 +85,25 @@ Ja. Plattformen läser data från Fortnox och skickar tillbaka förslag — men 
 - Godkänna-historik (vem godkände vad och när)
 
 ### Backup
-```bash
-# PostgreSQL backup (lokal dev)
-pg_dump ai_platform > backup_$(date +%Y%m%d).sql
 
-# Restore
-psql ai_platform < backup_20260510.sql
+```bash
+# Daglig backup (produktionsmiljö — kör som cron kl 02:00)
+pg_dump "$DATABASE_URL" | gzip > /backups/ai_platform_$(date +%Y%m%d_%H%M).sql.gz
+
+# Manuell backup inför driftsättning
+pg_dump "$DATABASE_URL" > /backups/pre_deploy_$(date +%Y%m%d_%H%M).sql
+
+# Restore (stoppa applikationen först)
+gunzip -c /backups/ai_platform_20260510_0200.sql.gz | psql "$DATABASE_URL"
+python scripts/create_tables.py   # idempotent — säkert att köra efter restore
+python scripts/smoke_check.py --base-url https://api.krowolf.se --expect-production
 ```
+
+**Rekommenderad backup-frekvens:** Dagligen automatiskt + manuellt inför varje driftsättning.
+**Retention:** 14 dagars rullande backup — äldre backuper tas bort automatiskt (eller manuellt).
+**Rehearsal:** Testa restore i en isolerad miljö en gång i månaden. Dokumentera datum och resultat.
+
+Se fullständig backup/restore-procedur i `docs/12-production-guide.md#backup-and-restore`.
 
 ### Dataretention
 - Jobb-records bevaras indefinit i MVP (retention policy planeras för v2)
@@ -118,6 +130,38 @@ Header: X-Admin-API-Key: <ADMIN_API_KEY>
 - [ ] Kör pilot readiness check: `GET /dashboard/pilot-readiness`
 - [ ] Verifiera att inbox-sync fungerar (skicka testmail)
 - [ ] Informera kunden om vad AI gör / inte gör
+
+## Misslyckade jobb — triage
+
+Misslyckade jobb och dispatchar visas i Super Admin "Behöver hjälp"-kön (`GET /admin/operations/needs-help`).
+
+### Steg 1 — Identifiera
+
+Öppna Super Admin → ladda om åtgärdskön. Välj en rad med `severity: high` eller `critical`.
+
+### Steg 2 — Diagnostisera
+
+| Felmeddelande | Trolig orsak | Åtgärd |
+|---------------|--------------|--------|
+| `invalid_grant` / OAuth-fel | Gmail-token utgånget | Se `docs/runbook-oauth.md` |
+| `401 Unauthorized` (Monday) | API-nyckel ogiltig | Uppdatera `MONDAY_API_KEY`, starta om |
+| `401 Unauthorized` (Fortnox) | Access-token utgånget | Uppdatera `FORTNOX_ACCESS_TOKEN`, starta om |
+| `No matching board` | Monday-scanner ej körd | Kör Monday-scanner i Setup |
+| `Customer not found in Fortnox` | Kund saknas i Fortnox | Skapa kund i Fortnox, försök igen |
+| `LLM quota exceeded` | OpenAI-ratelimit | Vänta och kör om jobbet |
+| `DB connection error` | Databas nåbar ej | Kontrollera `DATABASE_URL` och uppkoppling |
+
+### Steg 3 — Åtgärda
+
+- **Kör om jobbet:** Klicka "Öppna ärende" → i ärendevyn, byt status till `pending` och kör om via `POST /jobs/{job_id}/auto-dispatch`.
+- **Avsluta jobbet:** Byt status till `failed` i statusväljaren. Logga incidenten.
+- **Misslyckad dispatch (3 försök / dead):** Skicka manuellt via ärendedetaljen eller skapa en manuell åtgärd.
+
+### Steg 4 — Kontrollera
+
+Ladda om åtgärdskön och bekräfta att raden är borta. Kontrollera integrationshälsa.
+
+---
 
 ## Eskalering
 

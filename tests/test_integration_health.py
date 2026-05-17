@@ -26,6 +26,7 @@ import pytest
 
 from app.health.integration_health import (
     _build_runbook_signals,
+    _check_fortnox,
     _check_gmail,
     _check_monday,
     _overall_status,
@@ -38,10 +39,12 @@ from app.health.integration_health import (
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _app_settings(google_mail="", monday_api=""):
+def _app_settings(google_mail="", monday_api="", fortnox_token="", fortnox_secret=""):
     s = SimpleNamespace()
     s.GOOGLE_MAIL_ACCESS_TOKEN = google_mail
     s.MONDAY_API_KEY = monday_api
+    s.FORTNOX_ACCESS_TOKEN = fortnox_token
+    s.FORTNOX_CLIENT_SECRET = fortnox_secret
     return s
 
 
@@ -413,11 +416,13 @@ class TestGetIntegrationHealth:
         result = self._run()
         assert "gmail" in result["systems"]
         assert "monday" in result["systems"]
+        assert "fortnox" in result["systems"]
 
     def test_default_not_configured_both_systems(self):
         result = self._run()
         assert result["systems"]["gmail"]["status"] == "not_configured"
         assert result["systems"]["monday"]["status"] == "not_configured"
+        assert result["systems"]["fortnox"]["status"] == "not_configured"
 
     def test_overall_warning_when_both_not_configured(self):
         result = self._run()
@@ -447,27 +452,30 @@ class TestGetIntegrationHealth:
     def test_overall_healthy_when_both_healthy(self):
         audit = _audit_record(action="gmail_inbox_sync", status="success")
         dispatch = _dispatch_record(status="success")
-        # DB returns different things per query — use side_effect
+        # DB returns different things per query — use side_effect.
+        # Order: gmail inbox_sync first(), monday dispatch first(), fortnox event first()
         db = MagicMock()
         q = MagicMock()
         q.filter.return_value = q
         q.order_by.return_value = q
         q.limit.return_value = q
-        q.first.side_effect = [audit, dispatch]
+        q.first.side_effect = [audit, dispatch, None]  # None = no Fortnox event yet
         q.all.return_value = []
         db.query.return_value = q
 
         settings = {
             "workflow_scan": {
                 "summary": {
-                    "gmail":  {"status": "success"},
-                    "monday": {"status": "success"},
+                    "gmail":   {"status": "success"},
+                    "monday":  {"status": "success"},
+                    "fortnox": {"status": "success"},
                 }
             }
         }
         result = self._run(
             db=db,
-            app_settings=_app_settings(google_mail="tok", monday_api="key"),
+            app_settings=_app_settings(google_mail="tok", monday_api="key",
+                                        fortnox_token="tok", fortnox_secret="sec"),
             settings_return=settings,
         )
         assert result["overall_status"] == "healthy"
@@ -529,3 +537,150 @@ class TestGetIntegrationHealth:
                 _mock_db(), "t-1", app_settings=_app_settings()
             )
         assert result["overall_status"] == "error"
+
+
+# ---------------------------------------------------------------------------
+# _check_fortnox
+# ---------------------------------------------------------------------------
+
+def _fortnox_settings(token="", secret=""):
+    return _app_settings(fortnox_token=token, fortnox_secret=secret)
+
+
+class TestCheckFortnox:
+    def _run(self, db=None, app_settings=None, scan_settings=None):
+        if db is None:
+            db = _mock_db()
+        if app_settings is None:
+            app_settings = _fortnox_settings()
+        return _check_fortnox(scan_settings or {}, app_settings, db, "t-1")
+
+    def test_not_configured_when_no_token(self):
+        result = self._run()
+        assert result["status"] == "not_configured"
+
+    def test_not_configured_when_token_only_missing_secret(self):
+        result = self._run(app_settings=_fortnox_settings(token="tok", secret=""))
+        assert result["status"] == "not_configured"
+
+    def test_not_configured_when_secret_only_missing_token(self):
+        result = self._run(app_settings=_fortnox_settings(token="", secret="sec"))
+        assert result["status"] == "not_configured"
+
+    def test_warning_when_configured_but_no_scan(self):
+        result = self._run(app_settings=_fortnox_settings(token="tok", secret="sec"))
+        assert result["status"] == "warning"
+
+    def test_healthy_when_configured_scan_ok_and_export_ok(self):
+        event = MagicMock()
+        event.status = "success"
+        event.created_at = datetime.now(timezone.utc)
+        event.last_error = None
+        db = _mock_db(first_return=event)
+        scan = {"workflow_scan": {"summary": {"fortnox": {"status": "success"}}}}
+        result = self._run(db=db,
+                           app_settings=_fortnox_settings(token="tok", secret="sec"),
+                           scan_settings=scan)
+        assert result["status"] == "healthy"
+
+    def test_warning_when_export_failed(self):
+        event = MagicMock()
+        event.status = "failed"
+        event.created_at = datetime.now(timezone.utc)
+        event.last_error = "401 Unauthorized"
+        db = _mock_db(first_return=event)
+        scan = {"workflow_scan": {"summary": {"fortnox": {"status": "success"}}}}
+        result = self._run(db=db,
+                           app_settings=_fortnox_settings(token="tok", secret="sec"),
+                           scan_settings=scan)
+        assert result["status"] == "warning"
+        assert result["last_error_message"] == "401 Unauthorized"
+
+    def test_no_secrets_in_response(self):
+        result = self._run(app_settings=_fortnox_settings(token="super-secret-token",
+                                                           secret="super-secret-key"))
+        result_str = str(result)
+        assert "super-secret-token" not in result_str
+        assert "super-secret-key" not in result_str
+
+    def test_checks_list_has_required_keys(self):
+        result = self._run()
+        for c in result["checks"]:
+            assert "key" in c
+            assert "status" in c
+            assert "message" in c
+
+    def test_recommended_action_set_when_not_configured(self):
+        result = self._run()
+        assert result["recommended_action"] != ""
+
+    def test_recommended_action_empty_when_healthy(self):
+        event = MagicMock()
+        event.status = "success"
+        event.created_at = datetime.now(timezone.utc)
+        event.last_error = None
+        db = _mock_db(first_return=event)
+        scan = {"workflow_scan": {"summary": {"fortnox": {"status": "success"}}}}
+        result = self._run(db=db,
+                           app_settings=_fortnox_settings(token="tok", secret="sec"),
+                           scan_settings=scan)
+        assert result["recommended_action"] == ""
+
+    def test_systems_include_fortnox_in_health_response(self):
+        with patch(
+            "app.health.integration_health.TenantConfigRepository.get_settings",
+            return_value={},
+        ):
+            result = get_integration_health(
+                _mock_db(), "t-1",
+                app_settings=_app_settings(fortnox_token="tok", fortnox_secret="sec"),
+            )
+        assert "fortnox" in result["systems"]
+        assert result["systems"]["fortnox"]["status"] != "not_configured"
+
+
+class TestRunbookSignalsFortnox:
+    def test_critical_signal_for_fortnox_error(self):
+        systems = {
+            "gmail":   {"status": "healthy"},
+            "monday":  {"status": "healthy"},
+            "fortnox": {"status": "error"},
+        }
+        signals = _build_runbook_signals(systems, [])
+        areas = [s["area"] for s in signals]
+        assert "fortnox" in areas
+        fortnox_sig = next(s for s in signals if s["area"] == "fortnox")
+        assert fortnox_sig["severity"] == "critical"
+
+    def test_warning_signal_for_fortnox_warning(self):
+        systems = {
+            "gmail":   {"status": "healthy"},
+            "monday":  {"status": "healthy"},
+            "fortnox": {"status": "warning"},
+        }
+        signals = _build_runbook_signals(systems, [])
+        areas = [s["area"] for s in signals]
+        assert "fortnox" in areas
+        fortnox_sig = next(s for s in signals if s["area"] == "fortnox")
+        assert fortnox_sig["severity"] == "warning"
+
+    def test_no_fortnox_signal_when_healthy(self):
+        systems = {
+            "gmail":   {"status": "healthy"},
+            "monday":  {"status": "healthy"},
+            "fortnox": {"status": "healthy"},
+        }
+        signals = _build_runbook_signals(systems, [])
+        areas = [s["area"] for s in signals]
+        assert "fortnox" not in areas
+
+    def test_no_fortnox_signal_when_not_configured(self):
+        """not_configured Fortnox is not flagged as critical (it may not be in use)."""
+        systems = {
+            "gmail":   {"status": "healthy"},
+            "monday":  {"status": "healthy"},
+            "fortnox": {"status": "not_configured"},
+        }
+        signals = _build_runbook_signals(systems, [])
+        areas = [s["area"] for s in signals]
+        assert "fortnox" not in areas

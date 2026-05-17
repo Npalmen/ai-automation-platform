@@ -235,3 +235,74 @@ class TestMondayAdapterCreateItem:
         adapter = _adapter()
         with pytest.raises(ValueError, match="Unsupported monday action"):
             adapter.execute_action("delete_item", {})
+
+
+# ── HTTP-level failure handling ───────────────────────────────────────────────
+
+class TestMondayClientHttpErrors:
+    """HTTP-level errors (429, 403, 503) must surface as HTTPError, not be swallowed."""
+
+    def _error_response(self, status_code: int) -> MagicMock:
+        resp = MagicMock()
+        resp.status_code = status_code
+        from requests.exceptions import HTTPError
+        resp.raise_for_status.side_effect = HTTPError(
+            f"{status_code} Error", response=resp
+        )
+        return resp
+
+    def test_429_rate_limit_raises_http_error(self):
+        """Monday rate-limit (429) must propagate, not be silently ignored."""
+        from requests.exceptions import HTTPError
+        client = _client()
+        with patch("requests.post", return_value=self._error_response(429)):
+            with pytest.raises(HTTPError):
+                client.create_item(board_id=123, item_name="Test")
+
+    def test_403_permission_raises_http_error(self):
+        """Monday permission error (403) must propagate."""
+        from requests.exceptions import HTTPError
+        client = _client()
+        with patch("requests.post", return_value=self._error_response(403)):
+            with pytest.raises(HTTPError):
+                client.create_item(board_id=123, item_name="Test")
+
+    def test_503_service_unavailable_raises_http_error(self):
+        """Monday service unavailable (503) must propagate."""
+        from requests.exceptions import HTTPError
+        client = _client()
+        with patch("requests.post", return_value=self._error_response(503)):
+            with pytest.raises(HTTPError):
+                client.create_item(board_id=123, item_name="Test")
+
+    def test_bad_board_id_surfaces_as_monday_api_error(self):
+        """Monday returns an error payload for a non-existent board ID."""
+        client = _client()
+        error_response = {"errors": [{"message": "Board not found"}]}
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = error_response
+        with patch("requests.post", return_value=mock_resp):
+            with pytest.raises(RuntimeError, match="Board not found"):
+                client.create_item(board_id=99999999, item_name="Test")
+
+    def test_missing_column_in_payload_surfaces_as_monday_api_error(self):
+        """Monday returns an error if a required column is missing from column_values."""
+        client = _client()
+        error_response = {"errors": [{"message": "Column 'status' is required"}]}
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = error_response
+        with patch("requests.post", return_value=mock_resp):
+            with pytest.raises(RuntimeError, match="Column 'status' is required"):
+                client.create_item(board_id=123, item_name="Test", column_values={})
+
+    def test_adapter_propagates_http_error_from_client(self):
+        """Adapter must not swallow HTTPError from client — it propagates for route to handle."""
+        from requests.exceptions import HTTPError
+        adapter = _adapter()
+        adapter.client.create_item = MagicMock(
+            side_effect=HTTPError("429 Too Many Requests")
+        )
+        with pytest.raises(HTTPError):
+            adapter.execute_action("create_item", {"item_name": "Test"})

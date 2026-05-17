@@ -5,13 +5,13 @@ Computes per-system health signals from existing platform state.
 All checks are deterministic and read-only — no external API calls.
 No secrets are included in the response.
 
-Systems checked: gmail, monday
+Systems checked: gmail, monday, fortnox
 Overall status: healthy | warning | error
 
 Signal sources (internal only):
   - env/settings config presence
   - workflow_scan status + systems_scanned
-  - IntegrationEvent records (dispatch events)
+  - IntegrationEvent records (dispatch/export events)
   - AuditEventRecord records (inbox_sync, scheduler actions)
 """
 
@@ -219,6 +219,85 @@ def _check_monday(settings: dict, app_settings: Any, db: Session, tenant_id: str
     }
 
 
+def _check_fortnox(settings: dict, app_settings: Any, db: Session, tenant_id: str) -> dict:
+    checks = []
+    access_token  = (getattr(app_settings, "FORTNOX_ACCESS_TOKEN",  "") or "").strip()
+    client_secret = (getattr(app_settings, "FORTNOX_CLIENT_SECRET", "") or "").strip()
+    configured = bool(access_token and client_secret)
+    last_success_at = None
+    last_error_at = None
+    last_error_message = None
+
+    # Check 1: both credentials present
+    checks.append({
+        "key":     "config_present",
+        "status":  "pass" if configured else "fail",
+        "message": "FORTNOX_ACCESS_TOKEN och FORTNOX_CLIENT_SECRET konfigurerade." if configured
+                   else "FORTNOX_ACCESS_TOKEN eller FORTNOX_CLIENT_SECRET saknas.",
+    })
+
+    # Check 2: scanner ran
+    scan = settings.get("workflow_scan") or {}
+    summary = scan.get("summary") or {}
+    fortnox_scan = summary.get("fortnox") or {}
+    scanner_ok = fortnox_scan.get("status") == "success"
+    checks.append({
+        "key":     "scanner_ran",
+        "status":  "pass" if scanner_ok else "warning",
+        "message": "Fortnox-skanning lyckades." if scanner_ok
+                   else "Fortnox-skanning har inte körts eller misslyckades.",
+    })
+
+    # Check 3: successful Fortnox integration event (export/preview)
+    from app.domain.integrations.models import IntegrationEvent
+    fortnox_event = (
+        db.query(IntegrationEvent)
+        .filter(
+            IntegrationEvent.tenant_id == tenant_id,
+            IntegrationEvent.integration_type.ilike("%fortnox%"),
+        )
+        .order_by(IntegrationEvent.created_at.desc())
+        .first()
+    )
+    if fortnox_event:
+        if fortnox_event.status == "success":
+            last_success_at = fortnox_event.created_at.isoformat() if fortnox_event.created_at else None
+            checks.append({"key": "export_success", "status": "pass",
+                           "message": "Minst en lyckad Fortnox-export."})
+        elif fortnox_event.status == "failed":
+            last_error_at = fortnox_event.created_at.isoformat() if fortnox_event.created_at else None
+            last_error_message = fortnox_event.last_error or "Senaste Fortnox-export misslyckades."
+            checks.append({"key": "export_success", "status": "warning",
+                           "message": "Senaste Fortnox-export misslyckades."})
+
+    # Derive system status
+    failed_checks = [c for c in checks if c["status"] == "fail"]
+    warn_checks   = [c for c in checks if c["status"] == "warning"]
+
+    if not configured:
+        status = "not_configured"
+        action = "Konfigurera FORTNOX_ACCESS_TOKEN och FORTNOX_CLIENT_SECRET i miljövariabler."
+    elif failed_checks:
+        status = "error"
+        action = "Kontrollera Fortnox-konfigurationen."
+    elif warn_checks:
+        status = "warning"
+        action = "Kör Fortnox-skanning och testa en export."
+    else:
+        status = "healthy"
+        action = ""
+
+    return {
+        "status":               status,
+        "configured":           configured,
+        "last_success_at":      last_success_at,
+        "last_error_at":        last_error_at,
+        "last_error_message":   last_error_message,
+        "checks":               checks,
+        "recommended_action":   action,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Overall aggregation
 # ---------------------------------------------------------------------------
@@ -278,6 +357,24 @@ def _build_runbook_signals(systems: dict[str, dict], recent_errors: list[dict]) 
             "runbook_ref": "docs/12-production-guide.md#pre-launch-checklist",
         })
 
+    fortnox = systems.get("fortnox") or {}
+    if fortnox.get("status") in {"error"}:
+        signals.append({
+            "severity": "critical",
+            "area": "fortnox",
+            "title": "Fortnox integration error",
+            "action": "Check FORTNOX_ACCESS_TOKEN, FORTNOX_CLIENT_SECRET, and rerun Fortnox scan.",
+            "runbook_ref": "docs/12-production-guide.md#fortnox-integration",
+        })
+    elif fortnox.get("status") == "warning":
+        signals.append({
+            "severity": "warning",
+            "area": "fortnox",
+            "title": "Fortnox integration needs validation",
+            "action": "Run Fortnox scan and verify a draft or export.",
+            "runbook_ref": "docs/12-production-guide.md#pre-launch-checklist",
+        })
+
     if recent_errors:
         signals.append({
             "severity": "warning",
@@ -309,8 +406,9 @@ def get_integration_health(
     settings = TenantConfigRepository.get_settings(db, tenant_id)
 
     systems = {
-        "gmail":  _check_gmail(settings, app_settings, db, tenant_id),
-        "monday": _check_monday(settings, app_settings, db, tenant_id),
+        "gmail":   _check_gmail(settings, app_settings, db, tenant_id),
+        "monday":  _check_monday(settings, app_settings, db, tenant_id),
+        "fortnox": _check_fortnox(settings, app_settings, db, tenant_id),
     }
     recent_errors = _recent_errors(db, tenant_id)
 

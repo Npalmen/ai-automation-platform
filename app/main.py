@@ -513,7 +513,7 @@ def verify_tenant(
 ):
     """
     Run a deterministic verification job for any tenant by ID.
-    No auth required — operator bootstrap helper.
+    Requires X-Admin-API-Key header.
 
     Picks the first supported enabled job type from the tenant's DB config and
     runs a synthetic pipeline that bypasses LLM calls. Returns a meaningful
@@ -6087,6 +6087,20 @@ def admin_create_tenant(
 
     raw_key, _ = TenantApiKeyRepository.create_key(db, tenant_id)
 
+    try:
+        create_audit_event(
+            db=db,
+            tenant_id=tenant_id,
+            category="tenant_management",
+            action="tenant_created",
+            status="success",
+            details={"name": body.name, "slug": body.slug,
+                     "enabled_job_types": body.enabled_job_types,
+                     "allowed_integrations": body.allowed_integrations},
+        )
+    except Exception:
+        pass
+
     return {
         "tenant_id": tenant_id,
         "name": body.name,
@@ -6131,6 +6145,19 @@ def admin_rotate_tenant_key(
         raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found.")
 
     raw_key, _ = TenantApiKeyRepository.rotate_key(db, tenant_id)
+
+    try:
+        create_audit_event(
+            db=db,
+            tenant_id=tenant_id,
+            category="tenant_management",
+            action="api_key_rotated",
+            status="success",
+            details={},
+        )
+    except Exception:
+        pass
+
     return {"tenant_id": tenant_id, "api_key": raw_key}
 
 
@@ -6157,6 +6184,19 @@ def admin_set_tenant_status(
         raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found.")
 
     TenantConfigRepository.upsert(db=db, tenant_id=tenant_id, status=body.status)
+
+    try:
+        create_audit_event(
+            db=db,
+            tenant_id=tenant_id,
+            category="tenant_management",
+            action="status_changed",
+            status="success",
+            details={"new_status": body.status},
+        )
+    except Exception:
+        pass
+
     return {"tenant_id": tenant_id, "status": body.status}
 
 
@@ -6193,6 +6233,80 @@ def admin_usage_analytics(
     """
     from app.analytics.usage import get_usage_analytics
     return get_usage_analytics(db=db, range_=range)
+
+
+@app.get("/admin/audit-events")
+def admin_list_audit_events(
+    tenant_id_filter: str | None = None,
+    category: str | None = None,
+    status_filter: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Super Admin: browse audit events across all tenants.
+
+    Optional query params:
+      tenant_id_filter — filter to a specific tenant
+      category         — filter by event category
+      status_filter    — filter by event status (e.g. 'failed')
+
+    Read-only. No secrets in response. Requires X-Admin-API-Key.
+    """
+    from app.repositories.postgres.audit_models import AuditEventRecord
+
+    q = db.query(AuditEventRecord)
+    if tenant_id_filter:
+        q = q.filter(AuditEventRecord.tenant_id == tenant_id_filter)
+    if category:
+        q = q.filter(AuditEventRecord.category == category)
+    if status_filter:
+        q = q.filter(AuditEventRecord.status == status_filter)
+
+    total = q.count()
+    records = (
+        q.order_by(AuditEventRecord.created_at.desc())
+        .offset(offset)
+        .limit(min(limit, 500))
+        .all()
+    )
+
+    items = [
+        {
+            "event_id":  r.event_id,
+            "tenant_id": r.tenant_id,
+            "category":  r.category,
+            "action":    r.action,
+            "status":    r.status,
+            "details":   r.details or {},
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in records
+    ]
+    return {"items": items, "total": total, "offset": offset, "limit": min(limit, 500)}
+
+
+@app.get("/admin/operations/needs-help")
+def admin_operations_needs_help(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Super Admin: unified operational triage queue across all tenants.
+
+    Returns actionable rows ordered by severity (critical → high → medium),
+    covering integration errors, failed jobs, stale approvals, failed
+    dispatches, and scheduler/OAuth failures.
+
+    Read-only. No external API calls. No secrets in response.
+    Requires X-Admin-API-Key.
+    """
+    from app.admin.operations_triage import get_admin_needs_help
+    s = get_settings()
+    return get_admin_needs_help(db=db, app_settings=s, limit=min(limit, 200))
 
 
 @app.post("/jobs/{job_id}/auto-dispatch")

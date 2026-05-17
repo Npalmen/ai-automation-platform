@@ -1,3 +1,13 @@
+# ============================================================================
+# SECURITY WARNING — DO NOT MOUNT THIS MODULE
+# ============================================================================
+# This router is LEGACY / DORMANT and has NOT been attached to the main app
+# via app.include_router(). It uses X-Tenant-ID (unauthenticated, client-
+# controlled) instead of the production get_verified_tenant dependency.
+# Mounting it would bypass API-key auth and allow any caller to impersonate
+# any tenant. The production approval endpoints live in app/main.py and use
+# Depends(get_verified_tenant) exclusively.
+# ============================================================================
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 

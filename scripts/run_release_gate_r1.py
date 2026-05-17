@@ -35,6 +35,10 @@ REGRESSION_PHASE = GatePhase(
         "tests/test_dispatch_policy.py",
         "tests/test_dispatch_approval.py",
         "tests/test_auto_dispatch.py",
+        # Security and isolation gates (added in go-live validation)
+        "tests/test_tenant_isolation_http.py",
+        "tests/test_auth.py",
+        "tests/test_admin_operations_triage.py",
     ),
 )
 
