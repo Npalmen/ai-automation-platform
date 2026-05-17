@@ -5231,6 +5231,10 @@ async function loadAdminNeedsHelp() {
       } else if (area === 'scheduler' || area === 'inbox_sync' || area === 'oauth') {
         actionBtns += `<button class="btn btn-neutral btn-sm" onclick="openTenant(${JSON.stringify(tid)});setTimeout(()=>switchView('ctrl'),400);" title="Kontrollpanel">Kontrollpanel</button>`;
       }
+      // Recovery quick-actions for pipeline failures with a known job_id
+      if (area === 'pipeline' && item.job_id) {
+        actionBtns += `<button class="btn btn-neutral btn-sm" onclick="_needsHelpRetry(${JSON.stringify(tid)},${JSON.stringify(item.job_id)},this)" title="Försök igen">🔄 Försök igen</button>`;
+      }
       if (!actionBtns) {
         actionBtns = `<button class="btn btn-neutral btn-sm" onclick="openTenant(${JSON.stringify(tid)})">Öppna kund</button>`;
       }
@@ -5268,6 +5272,31 @@ async function loadAdminNeedsHelp() {
     } else {
       wrap.innerHTML = `<div style="font-size:12px; color:var(--text-dim); padding:10px 0;">Kunde inte ladda åtgärdskö: ${escapeHtml(msg)}</div>`;
     }
+  }
+}
+
+async function _needsHelpRetry(tenantId, jobId, btn) {
+  if (!confirm(`Återstarta pipeline för ärende ${jobId}?`)) return;
+  btn.disabled = true;
+  btn.textContent = '⏳…';
+  try {
+    const result = await adminApiFetch(`/admin/recovery/${encodeURIComponent(jobId)}/retry`, {
+      method: 'POST',
+      headers: { 'X-Tenant-ID': tenantId },
+      body: JSON.stringify({ actor: 'admin-needs-help' }),
+    });
+    if (result.status === 'success') {
+      btn.textContent = '✅ Klart';
+      setTimeout(() => loadAdminNeedsHelp(), 2000);
+    } else {
+      btn.textContent = '❌ Misslyckades';
+      btn.disabled = false;
+      alert('Återstart misslyckades: ' + (result.message || 'okänt fel'));
+    }
+  } catch (e) {
+    btn.textContent = '❌ Fel';
+    btn.disabled = false;
+    alert('Fel: ' + e.message);
   }
 }
 
@@ -7089,7 +7118,10 @@ async function _openAdminCase(jobId) {
       <div id="closeoutPanelBody_${escapeHtml(c.job_id)}" style="font-size:12px;color:var(--text-dim);margin-top:8px;">Tryck på knappen för att generera sammanställning.</div>
     </div>`;
 
-    detailEl.innerHTML = automationWowHtml + followupPlaceholder + closeoutPlaceholder + operationsHtml + supportHtml + leadHtml + rpHtml + omHtml + extHtml + threadHtml + actHtml + errSectionHtml;
+    // Recovery Console panel (Slice 1) — admin only
+    const recoveryHtml = _renderRecoveryPanel(c);
+
+    detailEl.innerHTML = automationWowHtml + followupPlaceholder + closeoutPlaceholder + operationsHtml + supportHtml + leadHtml + rpHtml + omHtml + extHtml + threadHtml + actHtml + errSectionHtml + recoveryHtml;
 
     // Load followup panel async (P1)
     _loadFollowupPanel(c.job_id);
@@ -8196,6 +8228,89 @@ async function dispatchPreview(jobId) {
   try {
     const result = await apiFetch(`/jobs/${encodeURIComponent(jobId)}/dispatch-preview`, { method: 'POST' });
     _showDispatchResult(jobId, result);
+  } catch (e) {
+    if (el) {
+      el.innerHTML = `<div class="msg msg-error" style="font-size:12px;">${escapeHtml(e.message)}</div>`;
+      el.style.display = 'block';
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Recovery Console (Slice 1) — admin-only
+// ---------------------------------------------------------------------------
+
+function _renderRecoveryPanel(c) {
+  if (_uiMode !== 'admin') return '';
+  const jid = escapeHtml(c.job_id);
+  const hasGmail = c.input_data && c.input_data.source && c.input_data.source.system === 'gmail';
+  const hasPending = (c.approvals || []).some(a => a.state === 'pending');
+  return `
+    <div class="detail-section" id="recoveryPanel_${jid}" style="margin-bottom:14px; border-color:rgba(168,85,247,.25);">
+      <div class="detail-section-title" style="color:var(--purple);">Återhämtning &amp; Återuppspelning</div>
+      <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Support/admin-åtgärder för misslyckade eller stuckna ärenden. Alla åtgärder loggas i audit-loggen.</div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+        <button class="btn btn-neutral btn-sm" onclick="recoveryAction('${jid}','retry')">🔄 Försök igen</button>
+        <button class="btn btn-neutral btn-sm" onclick="recoveryAction('${jid}','replay-dispatch')">📤 Reprisera dispatch</button>
+        <button class="btn btn-neutral btn-sm" onclick="recoveryAction('${jid}','reclassify')">🏷 Omklassificera</button>
+        <button class="btn btn-neutral btn-sm" onclick="recoveryAction('${jid}','re-extract')">🔍 Extrahera om</button>
+        ${hasPending ? `<button class="btn btn-neutral btn-sm" onclick="recoveryAction('${jid}','resend-approval')">📨 Skicka om godkännande</button>` : ''}
+        ${hasGmail ? `<button class="btn btn-neutral btn-sm" onclick="recoveryAction('${jid}','reprocess-gmail')">📥 Återbearbeta Gmail</button>` : ''}
+      </div>
+      <div id="recoveryResult_${jid}" style="display:none; margin-top:8px;"></div>
+    </div>`;
+}
+
+async function recoveryAction(jobId, action) {
+  const el = document.getElementById('recoveryResult_' + jobId);
+  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+
+  const labels = {
+    'retry':            'Försöker igen…',
+    'replay-dispatch':  'Repriserar dispatch…',
+    'reclassify':       'Omklassificerar…',
+    're-extract':       'Extraherar om…',
+    'resend-approval':  'Skickar om godkännande…',
+    'reprocess-gmail':  'Återbearbetar Gmail-meddelande…',
+  };
+
+  try {
+    const confirmMessages = {
+      'retry':           'Återstarta hela pipeline för detta ärende?',
+      'reclassify':      'Rensa all härledd data och omklassificera? Befintlig historik bevaras i audit-loggen.',
+      're-extract':      'Rensa och kör om entitetsextraktion? Klassificeringen bevaras.',
+      'reprocess-gmail': 'Hämta om och återbearbeta originalmeddelandet från Gmail?',
+    };
+    if (confirmMessages[action] && !confirm(confirmMessages[action])) return;
+
+    if (el) { el.innerHTML = `<div style="font-size:12px; color:var(--text-muted);">${labels[action] || 'Arbetar…'}</div>`; el.style.display = 'block'; }
+
+    const result = await adminApiFetch(`/admin/recovery/${encodeURIComponent(jobId)}/${action}`, {
+      method: 'POST',
+      headers: { 'X-Tenant-ID': _activeTenantId },
+      body: JSON.stringify({ actor: 'admin-ui' }),
+    });
+
+    const isOk    = result.status === 'success';
+    const icon    = isOk ? '✅' : '❌';
+    const color   = isOk ? 'var(--success)' : 'var(--danger)';
+    const bg      = isOk ? 'var(--success-bg)' : 'var(--danger-bg)';
+    const detailStr = result.details && Object.keys(result.details).length
+      ? Object.entries(result.details).map(([k,v]) => `<span style="opacity:.7;">${escapeHtml(k)}:</span> ${escapeHtml(String(v))}`).join(' · ')
+      : '';
+
+    if (el) {
+      el.innerHTML =
+        `<div style="background:${bg}; color:${color}; border-radius:var(--radius-sm); padding:10px 14px; border:1px solid rgba(255,255,255,.06);">
+          <div style="font-weight:700; margin-bottom:4px;">${icon} ${escapeHtml(result.message || '')}</div>
+          ${detailStr ? `<div style="font-size:12px; margin-top:4px;">${detailStr}</div>` : ''}
+        </div>`;
+      el.style.display = 'block';
+    }
+
+    // Reload case detail if action succeeded
+    if (isOk) setTimeout(() => openCase(jobId), 1800);
+
   } catch (e) {
     if (el) {
       el.innerHTML = `<div class="msg msg-error" style="font-size:12px;">${escapeHtml(e.message)}</div>`;

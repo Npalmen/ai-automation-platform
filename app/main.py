@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
@@ -6366,3 +6366,112 @@ def list_audit_events(
         items=events,
         total=total,
     )
+
+
+# ===========================================================================
+# Replay & Recovery Console — admin-protected endpoints
+# ===========================================================================
+
+class RecoveryActionRequest(_BaseModel):
+    actor: str = "admin"
+
+
+@app.post("/admin/recovery/{job_id}/retry")
+def admin_recovery_retry(
+    job_id: str,
+    body: RecoveryActionRequest = RecoveryActionRequest(),
+    x_tenant_id: str = Header(...),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Admin: retry a failed job by resetting state and rerunning the full pipeline.
+    Requires X-Admin-API-Key + X-Tenant-ID headers.
+    """
+    from app.admin.recovery_actions import retry_job
+    return retry_job(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=body.actor)
+
+
+@app.post("/admin/recovery/{job_id}/replay-dispatch")
+def admin_recovery_replay_dispatch(
+    job_id: str,
+    body: RecoveryActionRequest = RecoveryActionRequest(),
+    x_tenant_id: str = Header(...),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Admin: replay the controlled dispatch step only.
+    Idempotency protects against duplicate external sends.
+    Requires X-Admin-API-Key + X-Tenant-ID headers.
+    """
+    from app.admin.recovery_actions import replay_dispatch
+    return replay_dispatch(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=body.actor)
+
+
+@app.post("/admin/recovery/{job_id}/reclassify")
+def admin_recovery_reclassify(
+    job_id: str,
+    body: RecoveryActionRequest = RecoveryActionRequest(),
+    x_tenant_id: str = Header(...),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Admin: force re-run classification (clears all derived state and reruns full pipeline).
+    Overwrites prior classification result with audit trail.
+    Requires X-Admin-API-Key + X-Tenant-ID headers.
+    """
+    from app.admin.recovery_actions import reclassify
+    return reclassify(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=body.actor)
+
+
+@app.post("/admin/recovery/{job_id}/re-extract")
+def admin_recovery_re_extract(
+    job_id: str,
+    body: RecoveryActionRequest = RecoveryActionRequest(),
+    x_tenant_id: str = Header(...),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Admin: re-run entity extraction only (preserves classification result, replaces extraction state).
+    Requires X-Admin-API-Key + X-Tenant-ID headers.
+    """
+    from app.admin.recovery_actions import re_extract
+    return re_extract(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=body.actor)
+
+
+@app.post("/admin/recovery/{job_id}/resend-approval")
+def admin_recovery_resend_approval(
+    job_id: str,
+    body: RecoveryActionRequest = RecoveryActionRequest(),
+    x_tenant_id: str = Header(...),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Admin: resend the approval notification for a stale/lost pending approval.
+    Does not duplicate the approval record — clears delivery metadata and re-dispatches.
+    Requires X-Admin-API-Key + X-Tenant-ID headers.
+    """
+    from app.admin.recovery_actions import resend_approval
+    return resend_approval(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=body.actor)
+
+
+@app.post("/admin/recovery/{job_id}/reprocess-gmail")
+def admin_recovery_reprocess_gmail(
+    job_id: str,
+    body: RecoveryActionRequest = RecoveryActionRequest(),
+    force: bool = False,
+    x_tenant_id: str = Header(...),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Admin: re-fetch and reprocess the original Gmail source message for this job.
+    Uses safe thread-continuation path — no duplicate case creation.
+    Requires X-Admin-API-Key + X-Tenant-ID headers.
+    """
+    from app.admin.recovery_actions import reprocess_gmail_source
+    return reprocess_gmail_source(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=body.actor, force=force)
