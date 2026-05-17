@@ -1844,6 +1844,8 @@ label { color: var(--text-muted); }
 
     <!-- Super admin section -->
     <div class="sidebar-section admin-only" id="sideSecAdmin">Super Admin</div>
+    <div class="nav-item admin-only" id="viewTabSupport" onclick="switchView('support')"
+         style="color:var(--purple-light);">🛟 Supportkonsol</div>
     <div class="nav-item admin-only" id="viewTabAdmin" onclick="switchView('admin')">
       <span class="nav-icon">◎</span> Alla kunder
     </div>
@@ -3604,6 +3606,33 @@ label { color: var(--text-muted); }
 
 </div><!-- /viewAdmin -->
 
+<!-- ══════════════════════════════════════════════════════ SUPPORTKONSOL -->
+<div id="viewSupport" style="display:none; padding:24px; overflow-y:auto; flex:1; max-width:860px;">
+
+  <div class="dash-page-hdr" style="max-width:840px;">
+    <div>
+      <div class="dash-page-title">Supportkonsol</div>
+      <div class="dash-page-sub">Per-tenant operationell kontroll för support- och adminteamet</div>
+    </div>
+    <div class="dash-quick-actions">
+      <button class="btn btn-neutral btn-sm" onclick="loadSupportConsole()">↻ Uppdatera</button>
+    </div>
+  </div>
+
+  <div class="cfg-section" style="max-width:840px; margin-bottom:18px;">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+      <span style="font-size:13px; color:var(--text-muted);">Välj kund:</span>
+      <select id="supportTenantSelect" style="background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:6px 10px; color:var(--text); font-size:13px;"
+              onchange="loadSupportConsole()">
+        <option value="">– välj kund –</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="supportConsoleBody" style="max-width:840px;"></div>
+
+</div><!-- /viewSupport -->
+
 <!-- ══════════════════════════════════════════════════════ REDO FÖR DRIFT -->
 <div id="viewReadiness" style="display:none; padding:24px; overflow-y:auto; flex:1; max-width:800px;">
 
@@ -3917,7 +3946,7 @@ const LS_SESSION    = 'ui_session';      // 'admin' | 'customer' — set after s
 let _uiMode = 'admin';   // current role; initialised in initApiKey()
 
 // Admin-only tab names — hidden in customer mode
-const ADMIN_ONLY_VIEWS = ['ops', 'setup', 'ctrl', 'onboarding', 'integrations', 'notif', 'memory', 'readiness', 'admin'];
+const ADMIN_ONLY_VIEWS = ['ops', 'setup', 'ctrl', 'onboarding', 'integrations', 'notif', 'memory', 'readiness', 'admin', 'support'];
 const CUSTOMER_ONLY_VIEWS = ['results', 'activity', 'customerSettings', 'account'];
 // Views visible to customers
 const CUSTOMER_VIEWS   = ['dash', 'results', 'cases', 'activity', 'customerSettings', 'account'];
@@ -4163,7 +4192,7 @@ const _VIEW_DISPLAY = {
   dash: 'block', ops: 'flex', setup: 'block', ctrl: 'block',
   cases: 'block', results: 'block', activity: 'block', customerSettings: 'block', account: 'block',
   onboarding: 'block', notif: 'block', memory: 'block',
-  readiness: 'block', admin: 'block',
+  readiness: 'block', admin: 'block', support: 'block',
 };
 
 const _VIEW_TITLE = {
@@ -4172,6 +4201,7 @@ const _VIEW_TITLE = {
   customerSettings: 'Inställningar', account: 'Konto & Team',
   onboarding: 'Onboarding', notif: 'Notifieringar',
   memory: 'Kundminne', readiness: 'Redo för drift', admin: 'Alla kunder',
+  support: 'Supportkonsol',
 };
 
 function switchView(name) {
@@ -5272,6 +5302,196 @@ async function loadAdminNeedsHelp() {
     } else {
       wrap.innerHTML = `<div style="font-size:12px; color:var(--text-dim); padding:10px 0;">Kunde inte ladda åtgärdskö: ${escapeHtml(msg)}</div>`;
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Support Action Console (Slice 2)
+// ---------------------------------------------------------------------------
+
+async function loadSupportConsole() {
+  // Populate tenant dropdown from list
+  const sel = document.getElementById('supportTenantSelect');
+  if (sel && sel.options.length <= 1) {
+    try {
+      const data = await adminApiFetch('/tenants');
+      (data.items || []).forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.tenant_id;
+        opt.textContent = t.name || t.tenant_id;
+        sel.appendChild(opt);
+      });
+    } catch (_) {}
+    // Pre-select active tenant
+    if (_activeTenantId && sel) {
+      sel.value = _activeTenantId;
+    }
+  }
+
+  const tenantId = sel ? sel.value : _activeTenantId;
+  if (!tenantId) return;
+
+  const body = document.getElementById('supportConsoleBody');
+  if (!body) return;
+  body.innerHTML = '<div style="font-size:13px; color:var(--text-muted);">Laddar…</div>';
+
+  try {
+    const state = await adminApiFetch(`/admin/support/${encodeURIComponent(tenantId)}/state`);
+    body.innerHTML = _renderSupportConsoleBody(tenantId, state);
+  } catch (e) {
+    body.innerHTML = `<div class="msg msg-error">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function _renderSupportConsoleBody(tenantId, state) {
+  const autoEnabled = state.automation_enabled;
+  const schedMode  = state.scheduler_mode || 'manual';
+  const failedJobs = state.failed_jobs_48h || 0;
+  const staleAppr  = state.stale_approvals_24h || 0;
+  const health     = state.integrations_health || {};
+  const acks       = state.acknowledged_items || {};
+  const events     = state.recent_audit_events || [];
+  const tid        = escapeHtml(tenantId);
+
+  const autoColor = autoEnabled ? 'var(--success)' : 'var(--warning)';
+  const schedColor = schedMode === 'scheduled' ? 'var(--success)' : schedMode === 'paused' ? 'var(--danger)' : 'var(--text-muted)';
+
+  const ackCount = Object.keys(acks).length;
+  const ackRows = ackCount > 0 ? Object.entries(acks).map(([k, v]) =>
+    `<div style="font-size:12px; padding:4px 0; border-bottom:1px solid var(--border);">
+      <span style="font-weight:600; color:var(--text);">${escapeHtml(k)}</span>
+      <span style="color:var(--text-muted); margin-left:8px;">av ${escapeHtml(v.acknowledged_by||'?')} · ${escapeHtml((v.acknowledged_at||'').slice(0,16).replace('T',' '))} ${v.note ? '· ' + escapeHtml(v.note) : ''}</span>
+    </div>`
+  ).join('') : '<div style="font-size:12px; color:var(--text-dim);">Inga kvitterade poster.</div>';
+
+  const overallStatus = (health.overall_status || 'unknown');
+  const statusColor = overallStatus === 'healthy' ? 'var(--success)' : overallStatus === 'warning' ? 'var(--warning)' : 'var(--danger)';
+
+  return `
+  <div class="cfg-section" style="margin-bottom:16px;">
+    <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;">Operationell status</div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; margin-bottom:14px;">
+      <div class="kpi-card" style="padding:12px 14px;">
+        <div class="kpi-label">Automation</div>
+        <div class="kpi-value" style="font-size:14px; color:${autoColor};">${autoEnabled ? '✅ Aktiv' : '⚠ Pausad'}</div>
+      </div>
+      <div class="kpi-card" style="padding:12px 14px;">
+        <div class="kpi-label">Scheduler</div>
+        <div class="kpi-value" style="font-size:14px; color:${schedColor};">${escapeHtml(schedMode)}</div>
+      </div>
+      <div class="kpi-card" style="padding:12px 14px;">
+        <div class="kpi-label">Misslyckade jobb (48h)</div>
+        <div class="kpi-value" style="font-size:14px; color:${failedJobs > 0 ? 'var(--danger)' : 'var(--success)'};">${failedJobs}</div>
+      </div>
+      <div class="kpi-card" style="padding:12px 14px;">
+        <div class="kpi-label">Väntande godkänn. (>24h)</div>
+        <div class="kpi-value" style="font-size:14px; color:${staleAppr > 0 ? 'var(--warning)' : 'var(--success)'};">${staleAppr}</div>
+      </div>
+      <div class="kpi-card" style="padding:12px 14px;">
+        <div class="kpi-label">Integrationshälsa</div>
+        <div class="kpi-value" style="font-size:14px; color:${statusColor};">${escapeHtml(overallStatus)}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cfg-section" style="margin-bottom:16px;">
+    <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;">Åtgärder</div>
+    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+      ${autoEnabled
+        ? `<button class="btn btn-neutral btn-sm" onclick="supportAction('${tid}','pause-automation')">⏸ Pausa automation</button>`
+        : `<button class="btn btn-primary btn-sm" onclick="supportAction('${tid}','resume-automation')">▶ Återuppta automation</button>`
+      }
+      ${schedMode !== 'paused'
+        ? `<button class="btn btn-neutral btn-sm" onclick="supportAction('${tid}','disable-scheduler')">🛑 Stoppa scheduler</button>`
+        : `<button class="btn btn-primary btn-sm" onclick="supportAction('${tid}','enable-scheduler')">▶ Aktivera scheduler</button>`
+      }
+      <button class="btn btn-neutral btn-sm" onclick="supportAction('${tid}','force-inbox-sync')">📥 Forcera inkorg-sync</button>
+      ${ackCount > 0 ? `<button class="btn btn-neutral btn-sm" onclick="supportAction('${tid}','clear-acknowledged')">🗑 Rensa kvitton (${ackCount})</button>` : ''}
+    </div>
+    <div id="supportActionResult_${tid}" style="display:none; margin-top:10px;"></div>
+  </div>
+
+  <div class="cfg-section" style="margin-bottom:16px;">
+    <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;">Kvitterade poster (${ackCount})</div>
+    <div style="max-height:160px; overflow-y:auto;">${ackRows}</div>
+    <div style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <input id="ackItemKeyInput_${tid}" class="ob-input" placeholder="Nyckel, t.ex. pipeline:job-id" style="flex:1; min-width:180px; font-size:12px; padding:6px 8px;">
+      <input id="ackItemNoteInput_${tid}" class="ob-input" placeholder="Kommentar (valfri)" style="flex:1; min-width:120px; font-size:12px; padding:6px 8px;">
+      <button class="btn btn-neutral btn-sm" onclick="ackNeedsHelpItem('${tid}')">✓ Kvittera</button>
+    </div>
+  </div>
+
+  <div class="cfg-section" style="margin-bottom:16px;">
+    <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;">Senaste audit-händelser</div>
+    ${events.length === 0 ? '<div style="font-size:12px; color:var(--text-dim);">Inga händelser.</div>' :
+      events.map(e =>
+        `<div style="font-size:12px; padding:4px 0; border-bottom:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap;">
+          <span style="color:${e.status === 'failed' ? 'var(--danger)' : 'var(--text-muted)'}; font-weight:600;">${escapeHtml(e.category)}</span>
+          <span style="color:var(--text);">${escapeHtml(e.action)}</span>
+          <span style="color:var(--text-dim); margin-left:auto;">${escapeHtml((e.created_at||'').slice(0,16).replace('T',' '))}</span>
+        </div>`
+      ).join('')
+    }
+  </div>`;
+}
+
+async function supportAction(tenantId, action) {
+  const el = document.getElementById('supportActionResult_' + tenantId);
+  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+
+  const confirmMsgs = {
+    'pause-automation': 'Pausa automation för denna kund? Live-sändning och inkorgssynk blockeras.',
+    'resume-automation': 'Återuppta automation? Live-bearbetning aktiveras igen.',
+    'disable-scheduler': 'Stoppa schedulern för denna kund?',
+    'enable-scheduler':  'Aktivera schedulern för denna kund?',
+    'clear-acknowledged': 'Rensa alla kvitterade poster?',
+  };
+  if (confirmMsgs[action] && !confirm(confirmMsgs[action])) return;
+
+  if (el) { el.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">Arbetar…</div>'; el.style.display = 'block'; }
+
+  try {
+    const result = await adminApiFetch(`/admin/support/${encodeURIComponent(tenantId)}/${action}`, {
+      method: 'POST',
+      body: JSON.stringify({ actor: 'admin-ui' }),
+    });
+    const isOk  = result.status === 'success';
+    const color = isOk ? 'var(--success)' : 'var(--danger)';
+    if (el) {
+      el.innerHTML = `<div style="color:${color}; font-size:13px; font-weight:600;">${isOk ? '✅' : '❌'} ${escapeHtml(result.message || '')}</div>`;
+      el.style.display = 'block';
+    }
+    if (isOk) setTimeout(() => loadSupportConsole(), 1500);
+  } catch (e) {
+    if (el) {
+      el.innerHTML = `<div class="msg msg-error" style="font-size:12px;">${escapeHtml(e.message)}</div>`;
+      el.style.display = 'block';
+    }
+  }
+}
+
+async function ackNeedsHelpItem(tenantId) {
+  const keyEl  = document.getElementById(`ackItemKeyInput_${tenantId}`);
+  const noteEl = document.getElementById(`ackItemNoteInput_${tenantId}`);
+  const itemKey = keyEl ? keyEl.value.trim() : '';
+  if (!itemKey) { alert('Ange en nyckel för posten.'); return; }
+
+  const el = document.getElementById('supportActionResult_' + tenantId);
+  if (el) { el.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">Kvitterar…</div>'; el.style.display = 'block'; }
+
+  try {
+    const result = await adminApiFetch(`/admin/support/${encodeURIComponent(tenantId)}/ack-needs-help`, {
+      method: 'POST',
+      body: JSON.stringify({ item_key: itemKey, actor: 'admin-ui', note: noteEl ? noteEl.value.trim() : '' }),
+    });
+    const isOk = result.status === 'success';
+    if (el) {
+      el.innerHTML = `<div style="color:${isOk ? 'var(--success)' : 'var(--danger)'}; font-size:13px;">${isOk ? '✅' : '❌'} ${escapeHtml(result.message || '')}</div>`;
+      el.style.display = 'block';
+    }
+    if (isOk) { if (keyEl) keyEl.value = ''; if (noteEl) noteEl.value = ''; setTimeout(() => loadSupportConsole(), 1000); }
+  } catch (e) {
+    if (el) { el.innerHTML = `<div class="msg msg-error" style="font-size:12px;">${escapeHtml(e.message)}</div>`; el.style.display = 'block'; }
   }
 }
 

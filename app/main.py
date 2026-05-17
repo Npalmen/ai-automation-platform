@@ -6475,3 +6475,147 @@ def admin_recovery_reprocess_gmail(
     """
     from app.admin.recovery_actions import reprocess_gmail_source
     return reprocess_gmail_source(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=body.actor, force=force)
+
+
+# ===========================================================================
+# Support Action Console — admin-protected per-tenant operational controls
+# ===========================================================================
+
+class SupportActionRequest(_BaseModel):
+    actor: str = "admin"
+    note: str = ""
+
+
+@app.get("/admin/support/{tenant_id}/state")
+def admin_support_state(
+    tenant_id: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Admin: aggregate operational state for a tenant's support console.
+
+    Returns automation status, scheduler mode, integration health, failed job
+    count, stale approvals, acknowledged items, and recent audit events.
+    Requires X-Admin-API-Key.
+    """
+    from app.admin.support_console import get_tenant_ops_state
+    return get_tenant_ops_state(db=db, tenant_id=tenant_id, app_settings=get_settings())
+
+
+@app.post("/admin/support/{tenant_id}/pause-automation")
+def admin_support_pause_automation(
+    tenant_id: str,
+    body: SupportActionRequest = SupportActionRequest(),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Admin: pause tenant automation (enables demo_mode — blocks live sends and inbox sync).
+    Audited. Requires X-Admin-API-Key.
+    """
+    from app.admin.support_console import pause_automation
+    return pause_automation(db=db, tenant_id=tenant_id, actor=body.actor)
+
+
+@app.post("/admin/support/{tenant_id}/resume-automation")
+def admin_support_resume_automation(
+    tenant_id: str,
+    body: SupportActionRequest = SupportActionRequest(),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Admin: resume tenant automation (disables demo_mode).
+    Audited. Requires X-Admin-API-Key.
+    """
+    from app.admin.support_console import resume_automation
+    return resume_automation(db=db, tenant_id=tenant_id, actor=body.actor)
+
+
+@app.post("/admin/support/{tenant_id}/force-inbox-sync")
+def admin_support_force_inbox_sync(
+    tenant_id: str,
+    body: SupportActionRequest = SupportActionRequest(),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Admin: force an immediate Gmail inbox sync for the tenant.
+    Bypasses demo_mode guard — admin action is explicit.
+    Audited. Requires X-Admin-API-Key.
+    """
+    from app.admin.support_console import force_inbox_sync
+    return force_inbox_sync(db=db, tenant_id=tenant_id, actor=body.actor, app_settings=get_settings())
+
+
+@app.post("/admin/support/{tenant_id}/disable-scheduler")
+def admin_support_disable_scheduler(
+    tenant_id: str,
+    body: SupportActionRequest = SupportActionRequest(),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Admin: pause scheduler for the tenant (sets run_mode=paused).
+    Audited. Requires X-Admin-API-Key.
+    """
+    from app.admin.support_console import disable_scheduler
+    return disable_scheduler(db=db, tenant_id=tenant_id, actor=body.actor)
+
+
+@app.post("/admin/support/{tenant_id}/enable-scheduler")
+def admin_support_enable_scheduler(
+    tenant_id: str,
+    body: SupportActionRequest = SupportActionRequest(),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Admin: enable scheduler for the tenant (sets run_mode=scheduled).
+    Audited. Requires X-Admin-API-Key.
+    """
+    from app.admin.support_console import enable_scheduler
+    return enable_scheduler(db=db, tenant_id=tenant_id, actor=body.actor)
+
+
+class AckNeedsHelpRequest(_BaseModel):
+    item_key: str
+    actor: str = "admin"
+    note: str = ""
+
+
+@app.post("/admin/support/{tenant_id}/ack-needs-help")
+def admin_support_ack_needs_help(
+    tenant_id: str,
+    body: AckNeedsHelpRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Admin: acknowledge/claim a needs-help triage item for the tenant.
+    Persisted in tenant settings. Audited. Requires X-Admin-API-Key.
+    """
+    from app.admin.support_console import ack_needs_help
+    return ack_needs_help(
+        db=db,
+        tenant_id=tenant_id,
+        item_key=body.item_key,
+        actor=body.actor,
+        note=body.note,
+    )
+
+
+@app.post("/admin/support/{tenant_id}/clear-acknowledged")
+def admin_support_clear_acknowledged(
+    tenant_id: str,
+    body: SupportActionRequest = SupportActionRequest(),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Admin: clear all acknowledged needs-help markers for the tenant.
+    Audited. Requires X-Admin-API-Key.
+    """
+    from app.admin.support_console import clear_acknowledged
+    return clear_acknowledged(db=db, tenant_id=tenant_id, actor=body.actor)
