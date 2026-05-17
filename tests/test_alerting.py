@@ -406,21 +406,34 @@ class TestAlertConfig:
 # ---------------------------------------------------------------------------
 
 class TestAlertEndpointAuth:
+    """
+    Auth tests for alert endpoints.
+
+    We force a non-empty _API_KEY_MAP so that the tenant auth layer requires
+    an actual API key regardless of what previous tests may have set the
+    module-level cache to (e.g. test_admin_provisioning resets it to {}).
+    """
+
+    _KEY_MAP = {"TENANT_1001": "test-api-key-1"}
+
     def _client(self):
         from fastapi.testclient import TestClient
         from app.main import app
         return TestClient(app, raise_server_exceptions=False)
 
     def test_get_config_without_auth_returns_401_or_403(self):
-        resp = self._client().get("/alerts/config")
+        with patch("app.core.auth._API_KEY_MAP", self._KEY_MAP):
+            resp = self._client().get("/alerts/config")
         assert resp.status_code in (401, 403)
 
     def test_put_config_without_auth_returns_401_or_403(self):
-        resp = self._client().put("/alerts/config", json={"enabled": True, "recipient_email": "x@y.com"})
+        with patch("app.core.auth._API_KEY_MAP", self._KEY_MAP):
+            resp = self._client().put("/alerts/config", json={"enabled": True, "recipient_email": "x@y.com"})
         assert resp.status_code in (401, 403)
 
     def test_run_alerts_without_auth_returns_401_or_403(self):
-        resp = self._client().post("/alerts/run")
+        with patch("app.core.auth._API_KEY_MAP", self._KEY_MAP):
+            resp = self._client().post("/alerts/run")
         assert resp.status_code in (401, 403)
 
     def test_admin_run_all_requires_admin_key(self):

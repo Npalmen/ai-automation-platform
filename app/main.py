@@ -6649,6 +6649,74 @@ def admin_support_clear_acknowledged(
 
 
 # ===========================================================================
+# Onboarding Wizard State — customer-safe aggregated state for guided wizard
+# ===========================================================================
+
+@app.get("/onboarding/wizard-state")
+def onboarding_wizard_state(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Customer-safe aggregated wizard state for the guided onboarding flow.
+
+    Composes:
+      - onboarding readiness checklist (step completion)
+      - routing hint drafts (AI suggestions)
+      - pilot readiness (go-live check)
+      - setup status (connection + automation mode)
+
+    No admin internals are exposed.
+    """
+    from app.onboarding.readiness import get_onboarding_status
+    from app.workflows.scanners.routing_hint_drafts import generate_routing_hint_drafts
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    s = get_settings()
+
+    # Onboarding checklist
+    onboarding = get_onboarding_status(db=db, tenant_id=tenant_id, app_settings=s)
+
+    # Setup status — safe subset
+    setup_status: dict = {}
+    try:
+        ctrl = TenantConfigRepository.get_settings(db, tenant_id)
+        automation = ctrl.get("automation") or {}
+        scheduler = ctrl.get("scheduler") or {}
+        setup_status = {
+            "automation_enabled": not bool(automation.get("demo_mode", False)),
+            "scheduler_mode": scheduler.get("run_mode") or "manual",
+            "followups_enabled": bool(automation.get("followups_enabled", True)),
+        }
+    except Exception:
+        pass
+
+    # Routing hint drafts
+    routing_drafts: dict = {}
+    try:
+        memory = TenantConfigRepository.get_settings(db, tenant_id).get("memory") or {}
+        routing_drafts = generate_routing_hint_drafts(memory)
+    except Exception:
+        pass
+
+    # Applied routing hints
+    applied_hints: dict = {}
+    try:
+        memory = TenantConfigRepository.get_settings(db, tenant_id).get("memory") or {}
+        applied_hints = memory.get("routing_hints") or {}
+    except Exception:
+        pass
+
+    return {
+        "tenant_id": tenant_id,
+        "onboarding": onboarding,
+        "setup": setup_status,
+        "routing_drafts": routing_drafts,
+        "applied_hints": applied_hints,
+    }
+
+
+# ===========================================================================
 # Production Alerting — config endpoints (admin + tenant-scoped)
 # ===========================================================================
 

@@ -1811,6 +1811,8 @@ label { color: var(--text-muted); }
     <div class="nav-item customer-only" id="viewTabAccount" onclick="switchView('account')">
       <span class="nav-icon">◌</span> Konto &amp; Team
     </div>
+    <div class="nav-item customer-only" id="viewTabWizardflow" onclick="switchView('wizardflow')"
+         style="color:var(--blue-light);">🚀 Kom igång</div>
 
     <!-- Admin section -->
     <div class="sidebar-section admin-only" id="sideSecOps">Krowolf Admin</div>
@@ -3708,6 +3710,58 @@ label { color: var(--text-muted); }
 
 </div><!-- /viewSupport -->
 
+<!-- ═══════════════════════════════════════════════════ KOM IGÅNG WIZARD -->
+<div id="viewWizardflow" style="display:none; padding:24px; overflow-y:auto; flex:1; max-width:820px;">
+
+  <div class="dash-page-hdr" style="max-width:800px;">
+    <div>
+      <div class="dash-page-title">Kom igång</div>
+      <div class="dash-page-sub">Följ stegen nedan för att ansluta ditt konto och aktivera automation</div>
+    </div>
+    <div class="dash-quick-actions">
+      <button class="btn btn-neutral btn-sm" onclick="loadWizardFlow()">↻ Uppdatera</button>
+    </div>
+  </div>
+
+  <div id="wizardFlowError" class="msg msg-error" style="display:none; max-width:800px; margin-bottom:14px;"></div>
+
+  <!-- Progress bar -->
+  <div style="max-width:800px; margin-bottom:20px; background:var(--surface-2); border-radius:var(--radius); padding:16px 20px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+      <span id="wizardFlowStepLabel" style="font-size:13px; font-weight:700; color:var(--text);">Steg 1 av 8</span>
+      <span id="wizardFlowStatusPill" class="status-pill gray" style="font-size:11px;">Inte påbörjad</span>
+    </div>
+    <div style="background:var(--surface-3); border-radius:100px; height:6px; overflow:hidden;">
+      <div id="wizardFlowProgressBar" style="height:100%; background:var(--blue); border-radius:100px; transition:width .4s ease; width:0%;"></div>
+    </div>
+  </div>
+
+  <!-- Step cards -->
+  <div id="wizardFlowSteps" style="max-width:800px;"></div>
+
+  <!-- Routing suggestion section -->
+  <div id="wizardRoutingSection" style="display:none; max-width:800px; margin-bottom:20px;" class="cfg-section">
+    <div style="font-size:13px; font-weight:700; color:var(--text); margin-bottom:10px;">Föreslagna routings</div>
+    <div id="wizardRoutingBody" style="font-size:12px; color:var(--text-muted);">Laddar förslag…</div>
+    <div style="margin-top:10px; display:flex; gap:8px;">
+      <button class="btn btn-primary btn-sm" onclick="applyWizardRoutingHints()">✓ Använd förslag</button>
+    </div>
+    <div id="wizardRoutingResult" style="display:none; margin-top:8px;"></div>
+  </div>
+
+  <!-- Test lead section -->
+  <div id="wizardTestSection" style="display:none; max-width:800px; margin-bottom:20px;" class="cfg-section">
+    <div style="font-size:13px; font-weight:700; color:var(--text); margin-bottom:10px;">Skicka testlead</div>
+    <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Skicka ett testlead för att bekräfta att hela systemet fungerar korrekt.</div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <input id="wfTestEmail" class="ob-input" type="email" placeholder="din@email.com" value="test@demo.example.com" style="flex:1; min-width:180px;">
+      <button class="btn btn-primary btn-sm" onclick="sendWizardTestLead()">▶ Skicka testlead</button>
+    </div>
+    <div id="wizardTestResult" style="display:none; margin-top:10px;"></div>
+  </div>
+
+</div><!-- /viewWizardflow -->
+
 <!-- ══════════════════════════════════════════════════════ REDO FÖR DRIFT -->
 <div id="viewReadiness" style="display:none; padding:24px; overflow-y:auto; flex:1; max-width:800px;">
 
@@ -4267,7 +4321,7 @@ const _VIEW_DISPLAY = {
   dash: 'block', ops: 'flex', setup: 'block', ctrl: 'block',
   cases: 'block', results: 'block', activity: 'block', customerSettings: 'block', account: 'block',
   onboarding: 'block', notif: 'block', memory: 'block',
-  readiness: 'block', admin: 'block', support: 'block',
+  readiness: 'block', admin: 'block', support: 'block', wizardflow: 'block',
 };
 
 const _VIEW_TITLE = {
@@ -4276,7 +4330,7 @@ const _VIEW_TITLE = {
   customerSettings: 'Inställningar', account: 'Konto & Team',
   onboarding: 'Onboarding', notif: 'Notifieringar',
   memory: 'Kundminne', readiness: 'Redo för drift', admin: 'Alla kunder',
-  support: 'Supportkonsol',
+  support: 'Supportkonsol', wizardflow: 'Kom igång',
 };
 
 function switchView(name) {
@@ -4304,6 +4358,8 @@ function switchView(name) {
   if (name === 'customerSettings') loadCustomerSettings();
   if (name === 'account')    loadCustomerAccount();
   if (name === 'onboarding') { loadOnboarding(); if (_uiMode === 'admin') loadWizardStatus(); }
+  if (name === 'wizardflow') { loadWizardFlow(); }
+  if (name === 'support') { loadSupportConsole(); }
   if (name === 'notif')      loadNotifSettings();
   if (name === 'memory')     loadMemory();
   if (name === 'readiness')  loadReadiness();
@@ -5567,6 +5623,281 @@ async function ackNeedsHelpItem(tenantId) {
     if (isOk) { if (keyEl) keyEl.value = ''; if (noteEl) noteEl.value = ''; setTimeout(() => loadSupportConsole(), 1000); }
   } catch (e) {
     if (el) { el.innerHTML = `<div class="msg msg-error" style="font-size:12px;">${escapeHtml(e.message)}</div>`; el.style.display = 'block'; }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Guided Onboarding Wizard Flow (Slice 4)
+// ---------------------------------------------------------------------------
+
+const _WIZARD_STEP_LABELS_CUSTOMER = {
+  tenant_created:        'Ditt konto är skapat',
+  gmail_ready:           'Anslut din e-post (Gmail)',
+  monday_ready:          'Anslut ditt projektsystem (Monday)',
+  systems_scanned:       'Skanna anslutna system',
+  routing_hints_saved:   'Välj hur ärenden ska dirigeras',
+  automation_policy_set: 'Välj automationsnivå',
+  test_lead_created:     'Skicka ett testärende',
+  dispatch_verified:     'Bekräfta att allt fungerar',
+};
+
+const _WIZARD_STEP_HELP = {
+  tenant_created:        'Ditt konto är automatiskt skapat när du loggade in.',
+  gmail_ready:           'Vi behöver access till din Gmail-inkorg för att läsa och svara på meddelanden automatiskt. Kontakta supporten om du inte har gjort detta.',
+  monday_ready:          'Anslut ditt Monday-konto så att ärenden kan skapas i ditt workspace automatiskt. Kontakta supporten om du behöver hjälp.',
+  systems_scanned:       'Vi skannar dina anslutna system för att förstå din arbetsprocess. Klicka på "Uppdatera" för att köra scanningen.',
+  routing_hints_saved:   'Bestäm hur olika typer av ärenden ska hanteras — till exempel att säljleads skickas till din säljboard i Monday.',
+  automation_policy_set: 'Välj om du vill att systemet ska agera fullt automatiskt, halvautomatiskt (med din godkännande), eller enbart visa förslag.',
+  test_lead_created:     'Skicka ett testärende för att se hur flödet fungerar end-to-end.',
+  dispatch_verified:     'När ett testärende har skickats till Monday bekräftas att hela systemet fungerar.',
+};
+
+const _AUTOMATION_MODES = {
+  manual:    'Manuell — du godkänner varje åtgärd',
+  semi_auto: 'Halvautomatisk — lågrisks åtgärder körs automatiskt, högrisk kräver godkännande',
+  full_auto: 'Full automation — systemet agerar automatiskt baserat på dina regler',
+};
+
+let _wizardState = null;
+
+async function loadWizardFlow() {
+  const errEl = document.getElementById('wizardFlowError');
+  if (errEl) errEl.style.display = 'none';
+  const stepsEl = document.getElementById('wizardFlowSteps');
+  if (!stepsEl) return;
+  stepsEl.innerHTML = '<div style="font-size:13px; color:var(--text-muted);">Laddar…</div>';
+
+  try {
+    const state = await apiFetch('/onboarding/wizard-state');
+    _wizardState = state;
+    _renderWizardFlow(state);
+  } catch (e) {
+    if (errEl) { errEl.textContent = 'Kunde inte ladda wizard: ' + escapeHtml(e.message); errEl.style.display = 'block'; }
+    if (stepsEl) stepsEl.innerHTML = '';
+  }
+}
+
+function _renderWizardFlow(state) {
+  const onboarding = state.onboarding || {};
+  const score = onboarding.score || {};
+  const steps = onboarding.steps || [];
+  const overall = onboarding.status || 'not_started';
+
+  // Progress
+  const pct = score.percent || 0;
+  const completed = score.completed || 0;
+  const total = score.total || 8;
+  const barEl = document.getElementById('wizardFlowProgressBar');
+  if (barEl) { barEl.style.width = pct + '%'; barEl.style.background = overall === 'ready' ? 'var(--success)' : 'var(--blue)'; }
+  const stepLbl = document.getElementById('wizardFlowStepLabel');
+  if (stepLbl) stepLbl.textContent = `${completed} av ${total} steg klara`;
+  const pillEl = document.getElementById('wizardFlowStatusPill');
+  if (pillEl) {
+    const labels = { not_started: 'Inte påbörjad', in_progress: 'Pågår', ready: 'Redo för lansering' };
+    const classes = { not_started: 'gray', in_progress: 'blue', ready: 'green' };
+    pillEl.textContent = labels[overall] || overall;
+    pillEl.className = 'status-pill ' + (classes[overall] || 'gray');
+  }
+
+  // Step cards
+  const stepsEl = document.getElementById('wizardFlowSteps');
+  if (!stepsEl) return;
+  stepsEl.innerHTML = steps.map((step, i) => {
+    const isComplete = step.status === 'complete';
+    const label = _WIZARD_STEP_LABELS_CUSTOMER[step.key] || step.label;
+    const help  = _WIZARD_STEP_HELP[step.key] || '';
+    const bg    = isComplete ? 'var(--success-bg)' : 'var(--surface-2)';
+    const border = isComplete ? '1px solid rgba(34,197,94,.25)' : '1px solid var(--border)';
+    const icon  = isComplete ? '✅' : '○';
+    const color = isComplete ? 'var(--success)' : 'var(--text)';
+
+    // Action hints per step
+    let actionHtml = '';
+    if (!isComplete) {
+      if (step.key === 'systems_scanned') {
+        actionHtml = `<button class="btn btn-neutral btn-sm" style="margin-top:8px;" onclick="runWizardScan()">▶ Kör systemskanning</button>`;
+      } else if (step.key === 'routing_hints_saved') {
+        actionHtml = `<button class="btn btn-neutral btn-sm" style="margin-top:8px;" onclick="showWizardRoutingSuggestions()">◎ Visa routingförslag</button>`;
+      } else if (step.key === 'automation_policy_set') {
+        actionHtml = _renderAutomationModeSelector();
+      } else if (step.key === 'test_lead_created') {
+        actionHtml = `<button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="showWizardTestSection()">▶ Skicka testlead</button>`;
+      } else if (step.key === 'gmail_ready' || step.key === 'monday_ready') {
+        actionHtml = `<div style="font-size:11px; color:var(--text-muted); margin-top:6px; background:var(--surface-3); padding:8px 10px; border-radius:var(--radius-sm);">Kontakta support om du behöver hjälp med anslutningen.</div>`;
+      }
+    }
+
+    return `<div style="background:${bg}; border:${border}; border-radius:var(--radius); padding:16px 20px; margin-bottom:12px;">
+      <div style="display:flex; align-items:flex-start; gap:12px;">
+        <span style="font-size:18px; flex-shrink:0; line-height:1.4;">${icon}</span>
+        <div style="flex:1;">
+          <div style="font-size:14px; font-weight:600; color:${color}; margin-bottom:4px;">${escapeHtml(label)}</div>
+          ${help ? `<div style="font-size:12px; color:var(--text-muted);">${escapeHtml(help)}</div>` : ''}
+          ${actionHtml}
+        </div>
+        <span style="font-size:11px; color:var(--text-dim); flex-shrink:0; margin-top:2px;">Steg ${i+1}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Show routing section if routing step not complete
+  const routingStep = steps.find(s => s.key === 'routing_hints_saved');
+  if (routingStep && routingStep.status !== 'complete') {
+    _preloadWizardRoutingDrafts(state.routing_drafts);
+  }
+}
+
+function _renderAutomationModeSelector() {
+  return `<div style="margin-top:10px;">
+    <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">Välj automationsnivå:</div>
+    <div style="display:flex; flex-direction:column; gap:6px;">
+      <label style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; background:var(--surface-3); border-radius:var(--radius-sm); cursor:pointer;">
+        <input type="radio" name="wizardAutoMode" value="manual" style="margin-top:3px; flex-shrink:0;">
+        <div>
+          <div style="font-size:12px; font-weight:600; color:var(--text);">Manuell</div>
+          <div style="font-size:11px; color:var(--text-muted);">Du godkänner varje åtgärd</div>
+        </div>
+      </label>
+      <label style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; background:var(--surface-3); border-radius:var(--radius-sm); cursor:pointer;">
+        <input type="radio" name="wizardAutoMode" value="full_auto" style="margin-top:3px; flex-shrink:0;">
+        <div>
+          <div style="font-size:12px; font-weight:600; color:var(--text);">Full automation</div>
+          <div style="font-size:11px; color:var(--text-muted);">Systemet agerar automatiskt enligt dina regler</div>
+        </div>
+      </label>
+    </div>
+    <button class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="saveWizardAutomationMode()">Spara val</button>
+    <div id="wizardAutoModeResult" style="display:none; margin-top:6px; font-size:12px;"></div>
+  </div>`;
+}
+
+async function runWizardScan() {
+  try {
+    await apiFetch('/workflow-scan/gmail', { method: 'POST' });
+    await apiFetch('/workflow-scan/monday', { method: 'POST' });
+    setTimeout(() => loadWizardFlow(), 1500);
+  } catch (e) {
+    alert('Systemskanning misslyckades: ' + e.message);
+  }
+}
+
+function showWizardRoutingSuggestions() {
+  const section = document.getElementById('wizardRoutingSection');
+  if (section) section.style.display = 'block';
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  _preloadWizardRoutingDrafts((_wizardState || {}).routing_drafts);
+}
+
+function _preloadWizardRoutingDrafts(drafts) {
+  const bodyEl = document.getElementById('wizardRoutingBody');
+  if (!bodyEl) return;
+  if (!drafts || Object.keys(drafts).length === 0) {
+    bodyEl.innerHTML = '<div style="color:var(--text-dim);">Inga förslag tillgängliga. Kör systemskanning först.</div>';
+    return;
+  }
+  bodyEl.innerHTML = Object.entries(drafts).map(([jobType, draft]) => {
+    const system = (draft.system || '–').replace(/_/g, ' ');
+    const board  = (draft.target || {}).board_name || (draft.target || {}).board_id || '–';
+    return `<div style="padding:6px 0; border-bottom:1px solid var(--border);">
+      <span style="font-weight:600; color:var(--text);">${escapeHtml(jobType)}</span>
+      <span style="color:var(--text-muted); margin:0 6px;">→</span>
+      <span style="color:var(--blue-light);">${escapeHtml(system)} / ${escapeHtml(board)}</span>
+    </div>`;
+  }).join('');
+}
+
+async function applyWizardRoutingHints() {
+  const resEl = document.getElementById('wizardRoutingResult');
+  if (resEl) { resEl.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">Sparar…</div>'; resEl.style.display = 'block'; }
+  try {
+    const drafts = (_wizardState || {}).routing_drafts || {};
+    if (Object.keys(drafts).length === 0) {
+      if (resEl) resEl.innerHTML = '<div style="color:var(--warning); font-size:12px;">Inga förslag att spara.</div>';
+      return;
+    }
+    const fetcher = (_uiMode === 'admin') ? adminApiFetch : apiFetch;
+    await fetcher('/tenant/routing-hints/apply', {
+      method: 'POST',
+      body: JSON.stringify({ routing_hints: drafts }),
+    });
+    if (resEl) resEl.innerHTML = '<div style="color:var(--success); font-size:12px;">✅ Routings sparade!</div>';
+    setTimeout(() => loadWizardFlow(), 1500);
+  } catch (e) {
+    if (resEl) resEl.innerHTML = `<div style="color:var(--danger); font-size:12px;">❌ ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function saveWizardAutomationMode() {
+  const resEl = document.getElementById('wizardAutoModeResult');
+  const chosen = document.querySelector('input[name="wizardAutoMode"]:checked');
+  if (!chosen) { if (resEl) { resEl.textContent = 'Välj ett alternativ.'; resEl.style.display = 'block'; } return; }
+  const mode = chosen.value; // 'manual' or 'full_auto'
+
+  try {
+    const autoPayload = mode === 'full_auto'
+      ? { automation: { demo_mode: false, followups_enabled: true }, scheduler: { run_mode: 'scheduled' } }
+      : { automation: { demo_mode: false, followups_enabled: true }, scheduler: { run_mode: 'manual' } };
+    await apiFetch('/control-panel', { method: 'POST', body: JSON.stringify(autoPayload) });
+    if (resEl) { resEl.textContent = '✅ Automationsnivå sparad.'; resEl.style.color = 'var(--success)'; resEl.style.display = 'block'; }
+    setTimeout(() => loadWizardFlow(), 1500);
+  } catch (e) {
+    if (resEl) { resEl.textContent = '❌ ' + e.message; resEl.style.color = 'var(--danger)'; resEl.style.display = 'block'; }
+  }
+}
+
+function showWizardTestSection() {
+  const section = document.getElementById('wizardTestSection');
+  if (section) { section.style.display = 'block'; section.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+}
+
+async function sendWizardTestLead() {
+  const emailEl = document.getElementById('wfTestEmail');
+  const resEl = document.getElementById('wizardTestResult');
+  if (resEl) { resEl.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">Skickar testlead…</div>'; resEl.style.display = 'block'; }
+  try {
+    const body = {
+      company_name:  'Testbolag AB',
+      customer_name: 'Wizard Testperson',
+      email:         emailEl ? emailEl.value.trim() : 'test@example.com',
+      message:       'Testlead skickat via kom-igång-guiden för att verifiera systemet.',
+    };
+    const fetcher = (_uiMode === 'admin') ? adminApiFetch : apiFetch;
+    const r = await fetcher('/onboarding/test-lead', { method: 'POST', body: JSON.stringify(body) });
+    const isOk = r.status === 'completed' || r.status === 'success' || (r.job || {}).status === 'completed';
+    if (resEl) {
+      resEl.innerHTML = `<div style="color:${isOk ? 'var(--success)' : 'var(--text-muted)'}; font-size:13px; font-weight:600;">${isOk ? '✅ Testlead skapat!' : 'Testlead skickades'}</div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Jobb-ID: ${escapeHtml((r.job_id || (r.job||{}).job_id || '–'))}</div>`;
+    }
+    setTimeout(() => loadWizardFlow(), 2000);
+  } catch (e) {
+    if (resEl) resEl.innerHTML = `<div class="msg msg-error" style="font-size:12px;">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+// Also implement suggestRouting() referenced in admin onboarding panel
+async function suggestRouting() {
+  try {
+    const fetcher = (_uiMode === 'admin') ? adminApiFetch : apiFetch;
+    const drafts = await fetcher('/tenant/routing-hint-drafts');
+    if (!drafts || Object.keys(drafts).length === 0) {
+      alert('Inga routingförslag tillgängliga. Kör systemskanning först via Kundminne.');
+      return;
+    }
+    const lines = Object.entries(drafts).map(([jt, d]) => {
+      const sys = (d.system || '–');
+      const board = (d.target || {}).board_name || (d.target || {}).board_id || '–';
+      return `${jt} → ${sys} / ${board}`;
+    });
+    if (confirm('Föreslagna routings:\n\n' + lines.join('\n') + '\n\nAnvänd dessa förslag?')) {
+      await fetcher('/tenant/routing-hints/apply', {
+        method: 'POST',
+        body: JSON.stringify({ routing_hints: drafts }),
+      });
+      alert('✅ Routing-hints sparade.');
+      loadWizardStatus().catch(() => {});
+    }
+  } catch (e) {
+    alert('Fel vid routingförslag: ' + e.message);
   }
 }
 
