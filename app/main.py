@@ -2801,17 +2801,44 @@ def _run_scheduler_pass(tenant_id: str, db: "Session", now_utc: "datetime") -> d
         state["last_scheduler_run_at"] = now_utc.isoformat()
         state["last_status"] = "success"
         state["last_error"]  = None
+        # Emit scheduler audit event so health/triage/alerting can detect it
+        create_audit_event(
+            db=db,
+            tenant_id=tenant_id,
+            category="scheduler",
+            action="scheduler_run",
+            status="success",
+            details={"run_mode": run_mode, "inbox_synced": inbox_sync_result is not None and not (inbox_sync_result or {}).get("skipped")},
+        )
 
     except Exception as exc:
         error = str(exc)
         state["last_scheduler_run_at"] = now_utc.isoformat()
         state["last_status"] = "failed"
         state["last_error"]  = error
+        # Emit scheduler failure audit so alerting/triage can detect it
+        create_audit_event(
+            db=db,
+            tenant_id=tenant_id,
+            category="scheduler",
+            action="scheduler_run",
+            status="failed",
+            details={"run_mode": run_mode, "error": error[:300] if error else ""},
+        )
 
     # persist updated state
     updated = dict(ctrl)
     updated["scheduler_state"] = state
     TenantConfigRepository.update_settings(db, tenant_id, updated)
+
+    # ── Alert pass ──────────────────────────────────────────────────────────
+    # Run after state is persisted so evaluators see current scheduler state.
+    try:
+        from app.alerts.engine import run_alert_pass
+        run_alert_pass(db=db, tenant_id=tenant_id, app_settings=s)
+    except Exception:
+        import logging as _al
+        _al.getLogger(__name__).exception("Alert pass failed for tenant %s", tenant_id)
 
     return {
         "tenant_id":        tenant_id,
@@ -6619,3 +6646,82 @@ def admin_support_clear_acknowledged(
     """
     from app.admin.support_console import clear_acknowledged
     return clear_acknowledged(db=db, tenant_id=tenant_id, actor=body.actor)
+
+
+# ===========================================================================
+# Production Alerting — config endpoints (admin + tenant-scoped)
+# ===========================================================================
+
+class AlertConfigRequest(_BaseModel):
+    enabled: bool = True
+    recipient_email: str = ""
+    channel: str = "email"
+    dedup_window_hours: int = 4
+    thresholds: dict = {}
+
+
+@app.get("/alerts/config")
+def get_alert_config_endpoint(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Get current alert configuration for the authenticated tenant."""
+    from app.alerts.engine import get_alerts_config_for_tenant
+    return get_alerts_config_for_tenant(db=db, tenant_id=tenant_id)
+
+
+@app.put("/alerts/config")
+def put_alert_config_endpoint(
+    body: AlertConfigRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Save alert configuration for the authenticated tenant."""
+    from app.alerts.engine import save_alerts_config_for_tenant
+    return save_alerts_config_for_tenant(
+        db=db,
+        tenant_id=tenant_id,
+        enabled=body.enabled,
+        recipient_email=body.recipient_email,
+        channel=body.channel,
+        dedup_window_hours=body.dedup_window_hours,
+        thresholds=body.thresholds,
+    )
+
+
+@app.post("/alerts/run")
+def run_alerts_endpoint(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Manually trigger the alert pass for the authenticated tenant.
+
+    Useful for testing alert configuration without waiting for a scheduler run.
+    """
+    from app.alerts.engine import run_alert_pass
+    s = get_settings()
+    return run_alert_pass(db=db, tenant_id=tenant_id, app_settings=s)
+
+
+@app.get("/admin/alerts/run-all")
+def admin_run_all_alerts(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+):
+    """
+    Admin: trigger alert pass for all tenants.
+    Requires X-Admin-API-Key.
+    """
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    from app.alerts.engine import run_alert_pass
+    s = get_settings()
+    records = TenantConfigRepository.list_all(db)
+    results = []
+    for record in records:
+        try:
+            result = run_alert_pass(db=db, tenant_id=record.tenant_id, app_settings=s)
+            results.append(result)
+        except Exception as exc:
+            results.append({"tenant_id": record.tenant_id, "error": str(exc)})
+    return {"results": results, "total": len(results)}

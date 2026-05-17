@@ -3230,6 +3230,81 @@ label { color: var(--text-muted); }
     </div>
   </div>
 
+  <!-- ── PRODUKTIONSLARM ── -->
+  <div class="cfg-section" style="max-width:720px; margin-top:24px;">
+    <div class="cfg-section-hdr">
+      <div class="cfg-section-icon" style="background:rgba(168,85,247,.15); color:var(--purple);">🔔</div>
+      <div>
+        <div class="cfg-section-title">Produktionslarm</div>
+        <div class="cfg-section-sub">Automatiska larm vid kritiska drifthändelser</div>
+      </div>
+    </div>
+    <div class="cfg-section-body">
+
+      <div class="cfg-row">
+        <div>
+          <div style="font-size:13px; color:var(--text);">Aktivera larm</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Skickar e-post vid misslyckade jobb, OAuth-fel, scheduler-fel, inaktuella godkännanden och integrationsproblem</div>
+        </div>
+        <div class="toggle-switch" id="toggleAlertEnabled" onclick="_clickToggle('alertEnabled')"></div>
+        <input type="checkbox" id="alertEnabled" style="display:none;" onchange="_syncToggle(this)">
+      </div>
+
+      <div class="cfg-row">
+        <div style="flex:1;">
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-dim); margin-bottom:6px;">Mottagare (e-post)</div>
+          <input id="alertEmail" type="email" placeholder="ops@example.com" style="width:100%; max-width:320px;">
+        </div>
+      </div>
+
+      <div class="cfg-row">
+        <div style="flex:1;">
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-dim); margin-bottom:6px;">Dedup-fönster (timmar)</div>
+          <input id="alertDedupHours" type="number" min="1" max="168" value="4" style="width:80px;">
+          <div style="font-size:11px; color:var(--text-dim); margin-top:3px;">Samma larm skickas inte igen förrän detta antal timmar har gått</div>
+        </div>
+      </div>
+
+      <div class="cfg-row">
+        <div style="flex:1;">
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-dim); margin-bottom:6px;">Tröskel – misslyckade jobb</div>
+          <input id="alertThresholdJobs" type="number" min="1" max="100" value="3" style="width:80px;">
+          <div style="font-size:11px; color:var(--text-dim); margin-top:3px;">Antal misslyckade jobb (48h) som utlöser larm</div>
+        </div>
+      </div>
+
+      <div class="cfg-row">
+        <div style="flex:1;">
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-dim); margin-bottom:6px;">Tröskel – dispatch-fel</div>
+          <input id="alertThresholdDispatch" type="number" min="1" max="100" value="3" style="width:80px;">
+        </div>
+      </div>
+
+      <div class="cfg-row" style="border-bottom:none;">
+        <div style="flex:1;">
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-dim); margin-bottom:6px;">Tröskel – inaktuella godkännanden (timmar)</div>
+          <input id="alertThresholdApproval" type="number" min="1" max="168" value="24" style="width:80px;">
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="max-width:720px; margin-bottom:16px;">
+    <div class="cfg-save-row">
+      <button class="btn btn-primary" onclick="saveAlertConfig()">Spara larminställningar</button>
+      <button class="btn btn-neutral" onclick="runAlertPass()">🔔 Kör larmpass nu</button>
+      <span class="cfg-save-msg" id="alertSaveMsg"></span>
+    </div>
+    <div id="alertRunResult" style="display:none; margin-top:10px;"></div>
+  </div>
+
+  <!-- Senast skickade larm -->
+  <div id="alertLastSentWrap" style="display:none; max-width:720px;" class="cfg-section">
+    <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; padding:14px 14px 0;">Senaste larmutskick</div>
+    <div id="alertLastSentBody" class="cfg-section-body" style="font-size:12px; color:var(--text-muted);"></div>
+  </div>
+
 </div><!-- /viewNotif -->
 
 <!-- ═══════════════════════════════════════════════════════════ KUNDMINNE -->
@@ -8910,6 +8985,8 @@ async function loadNotifSettings() {
     errEl.textContent = 'Kunde inte ladda notifieringsinställningar: ' + escapeHtml(e.message);
     errEl.style.display = 'block';
   }
+  // Load alert config in parallel — silently ignore errors (auth/config may not be ready)
+  loadAlertConfig().catch(() => {});
 }
 
 async function saveNotifSettings() {
@@ -8953,6 +9030,86 @@ async function sendTestDigest() {
     resEl.innerHTML = `<div class="msg msg-error">${escapeHtml(e.message)}</div>`;
   } finally {
     btn.disabled = false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Alert Config (Slice 3)
+// ---------------------------------------------------------------------------
+
+async function loadAlertConfig() {
+  try {
+    const cfg = await apiFetch('/alerts/config');
+    const cb = document.getElementById('alertEnabled');
+    if (cb) { cb.checked = !!cfg.enabled; _syncToggle(cb); }
+    const emailEl = document.getElementById('alertEmail');
+    if (emailEl) emailEl.value = cfg.recipient_email || '';
+    const dedupEl = document.getElementById('alertDedupHours');
+    if (dedupEl) dedupEl.value = cfg.dedup_window_hours ?? 4;
+    const thresholds = cfg.thresholds || {};
+    const tj = document.getElementById('alertThresholdJobs');
+    if (tj) tj.value = thresholds.failed_jobs_count ?? 3;
+    const td = document.getElementById('alertThresholdDispatch');
+    if (td) td.value = thresholds.dispatch_failures ?? 3;
+    const ta = document.getElementById('alertThresholdApproval');
+    if (ta) ta.value = thresholds.stale_approval_hours ?? 24;
+
+    // Show last sent
+    const lastSent = cfg.last_sent || {};
+    const wrap = document.getElementById('alertLastSentWrap');
+    const body = document.getElementById('alertLastSentBody');
+    if (Object.keys(lastSent).length > 0 && wrap && body) {
+      body.innerHTML = Object.entries(lastSent).map(([k,v]) =>
+        `<div style="padding:3px 0;">${escapeHtml(k)}: ${escapeHtml(String(v).slice(0,16).replace('T',' '))}</div>`
+      ).join('');
+      wrap.style.display = 'block';
+    }
+  } catch (_) {}
+}
+
+async function saveAlertConfig() {
+  const msgEl = document.getElementById('alertSaveMsg');
+  msgEl.className = 'cfg-save-msg';
+  msgEl.textContent = 'Sparar…';
+  const body = {
+    enabled:            document.getElementById('alertEnabled')?.checked ?? true,
+    recipient_email:    document.getElementById('alertEmail')?.value.trim() || '',
+    channel:            'email',
+    dedup_window_hours: parseInt(document.getElementById('alertDedupHours')?.value, 10) || 4,
+    thresholds: {
+      failed_jobs_count:    parseInt(document.getElementById('alertThresholdJobs')?.value, 10) || 3,
+      dispatch_failures:    parseInt(document.getElementById('alertThresholdDispatch')?.value, 10) || 3,
+      stale_approval_hours: parseInt(document.getElementById('alertThresholdApproval')?.value, 10) || 24,
+    },
+  };
+  try {
+    await apiFetch('/alerts/config', { method: 'PUT', body: JSON.stringify(body) });
+    msgEl.className = 'cfg-save-msg ok';
+    msgEl.textContent = 'Larminställningar sparade.';
+  } catch (e) {
+    msgEl.className = 'cfg-save-msg err';
+    msgEl.textContent = 'Fel: ' + escapeHtml(e.message);
+  }
+}
+
+async function runAlertPass() {
+  const el = document.getElementById('alertRunResult');
+  if (el) { el.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">Kör larmpass…</div>'; el.style.display = 'block'; }
+  try {
+    const r = await apiFetch('/alerts/run', { method: 'POST' });
+    if (el) {
+      if (r.skipped) {
+        el.innerHTML = `<div style="color:var(--text-muted); font-size:12px;">Hoppades över: ${escapeHtml(r.reason || '')}</div>`;
+      } else {
+        const sentStr = (r.sent || []).join(', ') || '–';
+        const skipStr = (r.skipped_dedup || []).join(', ') || '–';
+        el.innerHTML = `<div style="font-size:12px; color:var(--success);">✅ Utvärderade ${r.evaluated || 0} villkor · Skickade: ${escapeHtml(sentStr)} · Dedup: ${escapeHtml(skipStr)}</div>`;
+      }
+    }
+    // Reload to show updated last_sent
+    setTimeout(() => loadAlertConfig(), 1000);
+  } catch (e) {
+    if (el) el.innerHTML = `<div class="msg msg-error" style="font-size:12px;">${escapeHtml(e.message)}</div>`;
   }
 }
 
