@@ -12,6 +12,8 @@ Covers:
   - Gmail list_messages failure raises HTTPException 503
   - max_results defaults to 5 and is forwarded
   - query is always "is:unread"
+  - thread continuation: new message attaches to existing job, continued=True
+  - missing/empty sender does not crash inbox processing
 """
 from __future__ import annotations
 
@@ -332,3 +334,260 @@ class TestGmailProcessInbox:
         )
 
         assert result["created_jobs"][0]["status"] == "completed"
+
+
+# ── thread continuation ───────────────────────────────────────────────────────
+
+class TestThreadContinuation:
+    """Gmail thread continuation: incoming message shares thread_id with existing job."""
+
+    def _existing_job(self):
+        job = MagicMock()
+        job.job_id = "job-original"
+        job.input_data = {
+            "subject": "Original subject",
+            "source": {"system": "gmail", "message_id": "msg-old", "thread_id": "tmsg1"},
+            "conversation_messages": [],
+        }
+        job.processor_history = []
+        job.status = MagicMock()
+        job.status.value = "completed"
+        return job
+
+    def test_continuation_attaches_new_message_and_marks_continued(self):
+        existing = self._existing_job()
+        captured_input: dict = {}
+
+        def fake_run_pipeline(job, db):
+            captured_input.update(job.input_data)
+            return job
+
+        def fake_execute(action, payload):
+            if action == "list_messages":
+                return _make_list_result(["msg1"])
+            if action == "get_message":
+                return _make_detail_result(payload["message_id"])
+            return {"status": "success"}
+
+        mock_adapter = MagicMock()
+        mock_adapter.execute_action.side_effect = fake_execute
+
+        with patch("app.main.get_integration_connection_config", return_value={}), \
+             patch("app.main.get_integration_adapter", return_value=mock_adapter), \
+             patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead", "invoice", "customer_inquiry"]}), \
+             patch("app.main.JobRepository.get_by_gmail_message_id", return_value=None), \
+             patch("app.main.JobRepository.get_by_source_thread_id", return_value=existing), \
+             patch("app.main.JobRepository.update_job") as mock_update, \
+             patch("app.main.run_pipeline", side_effect=fake_run_pipeline), \
+             patch("app.main.dispatch_action", return_value={"status": "success"}):
+            result = gmail_process_inbox(
+                request=GmailProcessInboxRequest(max_results=5),
+                db=MagicMock(),
+                tenant_id="TENANT_1001",
+            )
+
+        assert len(result["created_jobs"]) == 1
+        entry = result["created_jobs"][0]
+        assert entry["continued"] is True
+        assert entry["continuation_reason"] == "thread_id_match"
+        assert entry["job_id"] == "job-original"
+
+    def test_continuation_appends_conversation_message(self):
+        existing = self._existing_job()
+        captured_input: dict = {}
+
+        def fake_run_pipeline(job, db):
+            captured_input.update(job.input_data)
+            return job
+
+        def fake_execute(action, payload):
+            if action == "list_messages":
+                return _make_list_result(["msg1"])
+            if action == "get_message":
+                return _make_detail_result(payload["message_id"])
+            return {"status": "success"}
+
+        mock_adapter = MagicMock()
+        mock_adapter.execute_action.side_effect = fake_execute
+
+        with patch("app.main.get_integration_connection_config", return_value={}), \
+             patch("app.main.get_integration_adapter", return_value=mock_adapter), \
+             patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead", "invoice", "customer_inquiry"]}), \
+             patch("app.main.JobRepository.get_by_gmail_message_id", return_value=None), \
+             patch("app.main.JobRepository.get_by_source_thread_id", return_value=existing), \
+             patch("app.main.JobRepository.update_job"), \
+             patch("app.main.run_pipeline", side_effect=fake_run_pipeline), \
+             patch("app.main.dispatch_action", return_value={"status": "success"}):
+            gmail_process_inbox(
+                request=GmailProcessInboxRequest(max_results=5),
+                db=MagicMock(),
+                tenant_id="TENANT_1001",
+            )
+
+        assert "conversation_messages" in captured_input
+        assert len(captured_input["conversation_messages"]) == 1
+        new_msg = captured_input["conversation_messages"][0]
+        assert new_msg["message_id"] == "msg1"
+        assert new_msg["thread_id"] == "tmsg1"
+        assert "Body text for msg1" in new_msg["message_text"]
+
+    def test_continuation_resets_processor_history(self):
+        existing = self._existing_job()
+        existing.processor_history = [{"stage": "classification", "result": "lead"}]
+        history_at_pipeline: list = []
+
+        def fake_run_pipeline(job, db):
+            history_at_pipeline.extend(job.processor_history)
+            return job
+
+        def fake_execute(action, payload):
+            if action == "list_messages":
+                return _make_list_result(["msg1"])
+            if action == "get_message":
+                return _make_detail_result(payload["message_id"])
+            return {"status": "success"}
+
+        mock_adapter = MagicMock()
+        mock_adapter.execute_action.side_effect = fake_execute
+
+        with patch("app.main.get_integration_connection_config", return_value={}), \
+             patch("app.main.get_integration_adapter", return_value=mock_adapter), \
+             patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead", "invoice", "customer_inquiry"]}), \
+             patch("app.main.JobRepository.get_by_gmail_message_id", return_value=None), \
+             patch("app.main.JobRepository.get_by_source_thread_id", return_value=existing), \
+             patch("app.main.JobRepository.update_job"), \
+             patch("app.main.run_pipeline", side_effect=fake_run_pipeline), \
+             patch("app.main.dispatch_action", return_value={"status": "success"}):
+            gmail_process_inbox(
+                request=GmailProcessInboxRequest(max_results=5),
+                db=MagicMock(),
+                tenant_id="TENANT_1001",
+            )
+
+        assert history_at_pipeline == []
+
+    def test_continuation_calls_update_job(self):
+        existing = self._existing_job()
+
+        def fake_execute(action, payload):
+            if action == "list_messages":
+                return _make_list_result(["msg1"])
+            if action == "get_message":
+                return _make_detail_result(payload["message_id"])
+            return {"status": "success"}
+
+        mock_adapter = MagicMock()
+        mock_adapter.execute_action.side_effect = fake_execute
+
+        with patch("app.main.get_integration_connection_config", return_value={}), \
+             patch("app.main.get_integration_adapter", return_value=mock_adapter), \
+             patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead", "invoice", "customer_inquiry"]}), \
+             patch("app.main.JobRepository.get_by_gmail_message_id", return_value=None), \
+             patch("app.main.JobRepository.get_by_source_thread_id", return_value=existing), \
+             patch("app.main.JobRepository.update_job") as mock_update, \
+             patch("app.main.run_pipeline", return_value=existing), \
+             patch("app.main.dispatch_action", return_value={"status": "success"}):
+            gmail_process_inbox(
+                request=GmailProcessInboxRequest(max_results=5),
+                db=MagicMock(),
+                tenant_id="TENANT_1001",
+            )
+
+        mock_update.assert_called_once()
+
+    def test_empty_thread_id_creates_new_job_not_continuation(self):
+        """Empty thread_id means no continuation check — creates a new job."""
+        result = _call(
+            list_result={
+                "status": "success",
+                "messages": [{
+                    "message_id": "msg1",
+                    "thread_id": "",
+                    "from": "Sender <sender@example.com>",
+                    "subject": "Offert begäran",
+                    "received_at": "Mon, 21 Apr 2026 10:00:00 +0000",
+                    "snippet": "snippet",
+                    "label_ids": ["INBOX", "UNREAD"],
+                }],
+            },
+            detail_results={"msg1": {
+                "status": "success",
+                "message": {
+                    "message_id": "msg1",
+                    "thread_id": "",
+                    "from": "Sender <sender@example.com>",
+                    "subject": "Offert begäran",
+                    "body_text": "Jag vill ha en offert.",
+                },
+            }},
+            pipeline_jobs={"msg1": _make_job("job-new")},
+        )
+
+        assert result["processed"] == 1
+        assert result["created_jobs"][0]["continued"] is False
+
+
+# ── missing/empty sender ──────────────────────────────────────────────────────
+
+class TestMissingSenderInInbox:
+    def test_missing_from_header_does_not_crash(self):
+        """Message with no 'from' header is processed without crashing."""
+        detail_no_sender = {
+            "status": "success",
+            "message": {
+                "message_id": "msg1",
+                "thread_id": "t1",
+                "from": "",
+                "subject": "Offert begäran",
+                "body_text": "Offert för installation.",
+            },
+        }
+        result = _call(
+            list_result=_make_list_result(["msg1"]),
+            detail_results={"msg1": detail_no_sender},
+            pipeline_jobs={"msg1": _make_job("job-aaa")},
+        )
+        assert result["processed"] == 1
+        assert result["created_jobs"][0]["job_id"] == "job-aaa"
+
+    def test_missing_from_header_creates_empty_sender_fields(self):
+        """When 'from' is missing, sender name and email default to empty strings."""
+        captured: dict = {}
+
+        def fake_run_pipeline(job, db):
+            captured.update(job.input_data)
+            return _make_job("job-x")
+
+        detail_no_sender = {
+            "status": "success",
+            "message": {
+                "message_id": "msg1",
+                "thread_id": "t1",
+                "from": "",
+                "subject": "Offert begäran",
+                "body_text": "Offert för installation.",
+            },
+        }
+
+        mock_adapter = MagicMock()
+        mock_adapter.execute_action.side_effect = lambda action, payload: (
+            _make_list_result(["msg1"]) if action == "list_messages"
+            else detail_no_sender
+        )
+
+        with patch("app.main.get_integration_connection_config", return_value={}), \
+             patch("app.main.get_integration_adapter", return_value=mock_adapter), \
+             patch("app.main.get_tenant_config", return_value={"enabled_job_types": ["lead", "invoice", "customer_inquiry"]}), \
+             patch("app.main.JobRepository.get_by_gmail_message_id", return_value=None), \
+             patch("app.main.JobRepository.get_by_source_thread_id", return_value=None), \
+             patch("app.main.JobRepository.create_job", side_effect=lambda db, job: job), \
+             patch("app.main.run_pipeline", side_effect=fake_run_pipeline), \
+             patch("app.main.dispatch_action", return_value={"status": "success"}):
+            gmail_process_inbox(
+                request=GmailProcessInboxRequest(max_results=5),
+                db=MagicMock(),
+                tenant_id="TENANT_1001",
+            )
+
+        assert captured["sender"]["name"] == ""
+        assert captured["sender"]["email"] == ""
