@@ -80,7 +80,7 @@ UI levereras som en enda `app/ui/index.html` servad av FastAPI via `HTMLResponse
 ## DEC-005
 **Title:** Visual UI Refresh scoped to polish on existing CSS tokens and dark shell  
 **Date:** 2026-05-07  
-**Status:** Accepted
+**Status:** Superseded by DEC-006
 
 ### Context
 Sprint 5 (Visual UI Refresh) i den övergripande SaaS-planen beskriver en Apple/glassmorphism-inspirerad CSS-refresh. Samtidigt har den befintliga UI:n redan ett fullständigt dark premium SaaS-shell (Slice 22) med ett moget CSS custom property-designsystem: surface-hierarki (`--bg`/`--surface`/`--surface-2`/`--surface-3`), border-system (`--border`/`--border-med`/`--border-hi`), text-hierarki (`--text`/`--text-muted`/`--text-dim`), accent/glow-tokens (`--purple`/`--blue`/`--glow-*`), status-tokens (`--success`/`--warning`/`--danger` med `-bg`-varianter), form-tokens (`--radius`/`--radius-sm`/`--radius-lg`/`--shadow`/`--shadow-sm`) samt KPI-, card-, badge-, pill- och empty-state-klasser. Att bygga en ny designriktning från noll riskerar regressioner, scope creep och onödig omarbetning.
@@ -106,3 +106,30 @@ Sprint 5 Visual UI Refresh begränsas till en **polish-pass ovanpå befintliga C
 - Befintliga CSS-klasser och tokens som redan används av alla vyer behålls stabila
 - Agenter som arbetar med Sprint 5 vet exakt vilka ramar de har
 - Mobilvy och tillgänglighetspass (UI-07, UI-08) ingår fortfarande men bygger på befintligt designsystem
+
+---
+
+## DEC-006
+**Title:** Premium grayscale B2B SaaS design system replaces purple-heavy aesthetic  
+**Date:** 2026-05-18  
+**Status:** Accepted (supersedes DEC-005)
+
+### Context
+SaaS-produktifieringen (Slice 7) kräver en mer professionell och säljbar visuell identitet. Det befintliga UI:et har ett dominerande lila/purple-tema (--purple, --purple-light, --purple-glow) som upplevs som flashigt och icke-enterprise. En B2B-köpare förväntar sig ett återhållet, premium-utseende med konservativa färger och tydlig hierarki. Dessutom är det befintliga dark-only-UI ett hinder — enterprise-kunder förväntar sig alternativ.
+
+### Decision
+Ersätt den lila designriktningen med ett premium grayscale B2B SaaS-system:
+
+1. **Nytt primär-accent**: byt `--purple` → `--accent` med ett neutral blågrått värde (#4F7FFF eller liknande), behåll varianter för hover/glow
+2. **Grayscale-first surfaces**: behåll dark mode som default, lägg till light mode toggle via CSS-klass på `<html>`
+3. **Design tokens bevaras** — alla befintliga token-namn (`--bg`, `--surface-*`, `--border-*`, `--text-*`, `--success`, `--warning`, `--danger`) behålls men uppdateras i värde
+4. **Alla befintliga HTML-ID:n och JS-selectors bevaras** — ingen breaking change mot JS-logiken
+5. **Inga externa beroenden** — vanilla CSS, inline i befintlig single-file HTML (DEC-004 gäller)
+6. **Light mode**: vit/ljusgrå bakgrund, mörkgrå text, samma accentfärg, via `.light-mode` på `<html>`
+7. **Typography**: byt till system-font stack (`-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`) för native premium-känsla
+
+### Consequences
+- Enterprise-kunder uppfattar produkten som professionell och mogen
+- Light/dark toggle ger flexibilitet för olika arbetskontexter
+- Alla befintliga komponenter och vyer fungerar oförändrat (token-baserade)
+- DEC-005 polish-regler gäller fortfarande för spacing, transitions, och hover-states
