@@ -65,10 +65,18 @@ def _settings_with_key(key: str):
     return s
 
 
+def _make_empty_request():
+    """A minimal mock Request with no session cookie so session path falls through."""
+    req = MagicMock()
+    req.cookies = {}
+    return req
+
+
 def _call_dependency(header_value, configured_key):
     """Call require_admin_api_key with given header + configured key."""
     with patch("app.core.admin_auth.get_settings", return_value=_settings_with_key(configured_key)):
-        return require_admin_api_key(x_admin_api_key=header_value)
+        with patch("app.core.admin_session.get_settings", return_value=MagicMock(SESSION_SECRET_KEY="")):
+            return require_admin_api_key(request=_make_empty_request(), x_admin_api_key=header_value)
 
 
 class TestRequireAdminApiKey:
@@ -158,40 +166,46 @@ class TestAdminEndpointAuth:
 
     def test_no_key_returns_401(self):
         with patch("app.core.admin_auth.get_settings", return_value=_settings_with_key("admin-key")):
-            with pytest.raises(HTTPException) as exc_info:
-                require_admin_api_key(x_admin_api_key=None)
+            with patch("app.core.admin_session.get_settings", return_value=MagicMock(SESSION_SECRET_KEY="")):
+                with pytest.raises(HTTPException) as exc_info:
+                    require_admin_api_key(request=_make_empty_request(), x_admin_api_key=None)
             assert exc_info.value.status_code == 401
 
     def test_wrong_key_returns_401(self):
         with patch("app.core.admin_auth.get_settings", return_value=_settings_with_key("admin-key")):
-            with pytest.raises(HTTPException) as exc_info:
-                require_admin_api_key(x_admin_api_key="not-the-key")
+            with patch("app.core.admin_session.get_settings", return_value=MagicMock(SESSION_SECRET_KEY="")):
+                with pytest.raises(HTTPException) as exc_info:
+                    require_admin_api_key(request=_make_empty_request(), x_admin_api_key="not-the-key")
             assert exc_info.value.status_code == 401
 
     def test_correct_key_passes(self):
         with patch("app.core.admin_auth.get_settings", return_value=_settings_with_key("admin-key")):
-            result = require_admin_api_key(x_admin_api_key="admin-key")
+            with patch("app.core.admin_session.get_settings", return_value=MagicMock(SESSION_SECRET_KEY="")):
+                result = require_admin_api_key(request=_make_empty_request(), x_admin_api_key="admin-key")
         assert result is None
 
     def test_unconfigured_fails_closed_regardless_of_header(self):
         with patch("app.core.admin_auth.get_settings", return_value=_settings_with_key("")):
-            with pytest.raises(HTTPException) as exc_info:
-                require_admin_api_key(x_admin_api_key="any-value")
+            with patch("app.core.admin_session.get_settings", return_value=MagicMock(SESSION_SECRET_KEY="")):
+                with pytest.raises(HTTPException) as exc_info:
+                    require_admin_api_key(request=_make_empty_request(), x_admin_api_key="any-value")
             assert exc_info.value.status_code == 401
 
     def test_tenant_api_key_does_not_bypass_admin_auth(self):
         # Even if a tenant key happens to be provided, it must not satisfy admin auth
         tenant_key = "key-abc123"  # tenant key pattern
         with patch("app.core.admin_auth.get_settings", return_value=_settings_with_key("admin-secret")):
-            with pytest.raises(HTTPException) as exc_info:
-                require_admin_api_key(x_admin_api_key=tenant_key)
+            with patch("app.core.admin_session.get_settings", return_value=MagicMock(SESSION_SECRET_KEY="")):
+                with pytest.raises(HTTPException) as exc_info:
+                    require_admin_api_key(request=_make_empty_request(), x_admin_api_key=tenant_key)
             assert exc_info.value.status_code == 401
 
     def test_admin_key_not_exposed_in_401_response(self):
         secret = "very-secret-admin-key-xyz"
         with patch("app.core.admin_auth.get_settings", return_value=_settings_with_key(secret)):
-            with pytest.raises(HTTPException) as exc_info:
-                require_admin_api_key(x_admin_api_key="wrong")
+            with patch("app.core.admin_session.get_settings", return_value=MagicMock(SESSION_SECRET_KEY="")):
+                with pytest.raises(HTTPException) as exc_info:
+                    require_admin_api_key(request=_make_empty_request(), x_admin_api_key="wrong")
             assert secret not in str(exc_info.value.detail)
             assert secret not in str(exc_info.value.headers or {})
 
@@ -225,7 +239,8 @@ def _settings_with_keys(single: str = "", multi: str = ""):
 
 def _call_multi(header_value, *, single: str = "", multi: str = ""):
     with patch("app.core.admin_auth.get_settings", return_value=_settings_with_keys(single, multi)):
-        return require_admin_api_key(x_admin_api_key=header_value)
+        with patch("app.core.admin_session.get_settings", return_value=MagicMock(SESSION_SECRET_KEY="")):
+            return require_admin_api_key(request=_make_empty_request(), x_admin_api_key=header_value)
 
 
 class TestMultiKeySupport:

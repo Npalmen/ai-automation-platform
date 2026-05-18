@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     # Example: ADMIN_API_KEYS=key1,key2,key3
     ADMIN_API_KEYS: str = ""
 
+    # Admin session auth — username + password login via browser.
+    # Generate hash: python -c "from app.core.admin_session import hash_password; print(hash_password('pw'))"
+    # Generate secret: python -c "import secrets,base64; print(base64.b64encode(secrets.token_bytes(32)).decode())"
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD_HASH: str = ""
+    SESSION_SECRET_KEY: str = ""
+
     EMAIL_PROVIDER: str = "google_mail"
 
     CRM_WEBHOOK_URL: str = ""

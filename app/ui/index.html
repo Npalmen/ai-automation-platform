@@ -1753,13 +1753,35 @@ label { color: var(--text-muted); }
       <button class="login-tab"        id="loginTabCustomer" onclick="_loginSwitchTab('customer')">Kund</button>
     </div>
 
-    <div class="login-field">
-      <label id="loginKeyLabel">Admin API-nyckel</label>
-      <input id="loginKeyInput" type="password" class="login-input"
-             placeholder="Klistra in din API-nyckel"
-             onkeydown="if(event.key==='Enter')doLogin()"
-             autocomplete="current-password">
-      <div class="login-hint" id="loginHintText">Krävs för admin-åtkomst. Kontakta systemadministratören om du saknar nyckel.</div>
+    <!-- Admin fields: username + password -->
+    <div id="loginAdminFields">
+      <div class="login-field">
+        <label>Användarnamn</label>
+        <input id="loginUsernameInput" type="text" class="login-input"
+               placeholder="admin"
+               onkeydown="if(event.key==='Enter')document.getElementById('loginPasswordInput').focus()"
+               autocomplete="username">
+      </div>
+      <div class="login-field">
+        <label>Lösenord</label>
+        <input id="loginPasswordInput" type="password" class="login-input"
+               placeholder="••••••••"
+               onkeydown="if(event.key==='Enter')doLogin()"
+               autocomplete="current-password">
+        <div class="login-hint" id="loginHintText">Kontakta systemadministratören om du saknar inloggning.</div>
+      </div>
+    </div>
+
+    <!-- Customer fields: tenant API key -->
+    <div id="loginCustomerFields" style="display:none;">
+      <div class="login-field">
+        <label id="loginKeyLabel">Tenant API-nyckel</label>
+        <input id="loginKeyInput" type="password" class="login-input"
+               placeholder="Klistra in din API-nyckel"
+               onkeydown="if(event.key==='Enter')doLogin()"
+               autocomplete="current-password">
+        <div class="login-hint">Din tenant-nyckel för kundåtkomst. Kontakta oss om du saknar nyckel.</div>
+      </div>
     </div>
 
     <button class="login-btn" id="loginBtn" onclick="doLogin()">Logga in</button>
@@ -1767,7 +1789,7 @@ label { color: var(--text-muted); }
     <div class="login-error" id="loginError"></div>
 
     <div class="login-dev-note" id="loginDevNote" style="display:none;">
-      Dev-läge — servern accepterar valfri nyckel. Du kan lämna fältet tomt.
+      Dev-läge — servern accepterar valfri nyckel.
     </div>
   </div>
 </div>
@@ -1871,21 +1893,23 @@ label { color: var(--text-muted); }
   <!-- Topbar -->
   <div id="topbar">
     <div class="topbar-title" id="topbarTitle">Dashboard</div>
-    <!-- Tenant context -->
+
+    <!-- Tenant context (admin: dropdown, customer: static) -->
     <div id="topbarTenantCtx" class="topbar-tenant-ctx" style="display:none;">
-      <span class="tenant-label">Tenant</span>
+      <span class="tenant-label">Kund</span>
       <select id="topbarTenantSelect" class="topbar-tenant-select" onchange="_topbarSwitchTenant(this.value)" title="Byt aktiv tenant"></select>
       <span id="topbarTenantStatic" class="topbar-tenant-static" style="display:none;"></span>
       <span id="topbarDemoBadge" class="status-pill gray" style="display:none; margin-left:6px;">Demo</span>
     </div>
-    <div class="topbar-key-group">
-      <span class="topbar-key-label">API-nyckel</span>
-      <input id="apiKeyInput" type="password" class="topbar-input" placeholder="X-API-Key" oninput="onKeyInput()">
-    </div>
+
+    <!-- Hidden credential inputs — populated programmatically, not visible in topbar -->
+    <input id="apiKeyInput"   type="hidden" oninput="onKeyInput()">
+    <input id="adminKeyInput" type="hidden" oninput="onAdminKeyInput()">
+
     <button class="btn btn-neutral btn-sm" onclick="loadAll()" style="flex-shrink:0;">↻ Uppdatera</button>
   </div>
 
-  <div class="auth-banner" id="authBanner">
+  <div class="auth-banner" id="authBanner" style="display:none;">
     Ingen API-nyckel angiven — anrop misslyckas om servern inte kör i dev-läge.
   </div>
 
@@ -3366,8 +3390,8 @@ label { color: var(--text-muted); }
     </div>
   </div>
 
-  <!-- Fortnox Pilotverktyg -->
-  <div class="setup-card" style="margin-bottom:20px;">
+  <!-- Fortnox Pilotverktyg — hidden until Fortnox is configured and verified -->
+  <div class="setup-card" id="fortnoxPilotTools" style="display:none; margin-bottom:20px;">
     <h2 style="font-size:14px; font-weight:700; margin-bottom:12px;">Fortnox Pilotverktyg</h2>
     <p style="color:#666; font-size:12px; margin-bottom:12px;">Slå upp och skapa kunder och fakturor direkt mot Fortnox. Kräver att FORTNOX_ACCESS_TOKEN och FORTNOX_CLIENT_SECRET är konfigurerade.</p>
 
@@ -4076,9 +4100,9 @@ let _uiMode = 'admin';   // current role; initialised in initApiKey()
 
 // Admin-only tab names — hidden in customer mode
 const ADMIN_ONLY_VIEWS = ['ops', 'setup', 'ctrl', 'onboarding', 'integrations', 'notif', 'memory', 'readiness', 'admin', 'support'];
-const CUSTOMER_ONLY_VIEWS = ['results', 'activity', 'customerSettings', 'account'];
+const CUSTOMER_ONLY_VIEWS = ['results', 'activity', 'customerSettings', 'account', 'wizardflow'];
 // Views visible to customers
-const CUSTOMER_VIEWS   = ['dash', 'results', 'cases', 'activity', 'customerSettings', 'account'];
+const CUSTOMER_VIEWS   = ['dash', 'results', 'cases', 'activity', 'customerSettings', 'account', 'wizardflow'];
 
 function apiKey() {
   return document.getElementById('apiKeyInput').value.trim();
@@ -4129,64 +4153,113 @@ function _loginSwitchTab(mode) {
   _loginMode = mode;
   document.getElementById('loginTabAdmin').classList.toggle('active', mode === 'admin');
   document.getElementById('loginTabCustomer').classList.toggle('active', mode === 'customer');
-  document.getElementById('loginKeyLabel').textContent   = mode === 'admin' ? 'Admin API-nyckel' : 'Tenant API-nyckel';
-  document.getElementById('loginHintText').textContent   = mode === 'admin'
-    ? 'Krävs för admin-åtkomst. Kontakta systemadministratören om du saknar nyckel.'
-    : 'Din tenant-nyckel för kundåtkomst. Kontakta oss om du saknar nyckel.';
-  document.getElementById('loginError').style.display   = 'none';
-  document.getElementById('loginKeyInput').value        = '';
-  document.getElementById('loginKeyInput').focus();
+  document.getElementById('loginError').style.display = 'none';
+
+  const adminFields    = document.getElementById('loginAdminFields');
+  const customerFields = document.getElementById('loginCustomerFields');
+  if (adminFields)    adminFields.style.display    = mode === 'admin' ? '' : 'none';
+  if (customerFields) customerFields.style.display = mode === 'customer' ? '' : 'none';
+
+  if (mode === 'admin') {
+    const u = document.getElementById('loginUsernameInput');
+    if (u) { u.value = ''; u.focus(); }
+    const p = document.getElementById('loginPasswordInput');
+    if (p) p.value = '';
+  } else {
+    const k = document.getElementById('loginKeyInput');
+    if (k) { k.value = ''; k.focus(); }
+  }
 }
 
 async function doLogin() {
-  const key = document.getElementById('loginKeyInput').value.trim();
-  const btn = document.getElementById('loginBtn');
+  const btn   = document.getElementById('loginBtn');
   const errEl = document.getElementById('loginError');
   errEl.style.display = 'none';
   btn.disabled = true;
   btn.innerHTML = '<span class="login-spinner"></span>Loggar in…';
 
-  try {
-    const isAdmin = (_loginMode === 'admin');
-    const headers = isAdmin
-      ? { 'X-Admin-API-Key': key }
-      : { 'X-API-Key': key };
-    const endpoint = isAdmin ? '/admin/tenants/overview' : '/tenant';
-    const res = await fetch(endpoint, { headers });
+  const isAdmin = (_loginMode === 'admin');
 
-    if (res.ok || res.status === 200) {
-      // Success — store session
-      if (isAdmin) {
-        localStorage.setItem(LS_ADMIN_KEY, key);
+  try {
+    if (isAdmin) {
+      // --- Admin: username + password → POST /auth/admin/login ---
+      const username = (document.getElementById('loginUsernameInput') || {value:''}).value.trim();
+      const password = (document.getElementById('loginPasswordInput') || {value:''}).value.trim();
+
+      const res = await fetch('/auth/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ username: username || 'admin', password }),
+      });
+
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        // If mode is api_key, store the key for adminApiFetch fallback
+        if (data.mode === 'api_key') {
+          localStorage.setItem(LS_ADMIN_KEY, password);
+        } else {
+          localStorage.removeItem(LS_ADMIN_KEY); // session cookie handles auth
+        }
         localStorage.setItem(LS_ROLE_KEY, 'admin');
+        localStorage.setItem(LS_SESSION, 'admin');
+        _launchApp('admin', password);
+      } else if (res.status === 401 || res.status === 403) {
+        let msg = 'Fel inloggningsuppgifter.';
+        try { const d = await res.json(); msg = d.detail || msg; } catch (_) {}
+        errEl.textContent = msg;
+        errEl.style.display = 'block';
       } else {
+        errEl.textContent = 'Serverfel (' + res.status + '). Försök igen senare.';
+        errEl.style.display = 'block';
+      }
+
+    } else {
+      // --- Customer: tenant API key ---
+      const key = (document.getElementById('loginKeyInput') || {value:''}).value.trim();
+      const res = await fetch('/tenant', {
+        headers: { 'X-API-Key': key },
+        credentials: 'same-origin',
+      });
+
+      if (res.ok) {
         localStorage.setItem(LS_KEY, key);
         localStorage.setItem(LS_ROLE_KEY, 'customer');
-      }
-      localStorage.setItem(LS_SESSION, _loginMode);
-      _launchApp(_loginMode, key);
-    } else if (res.status === 401 || res.status === 403) {
-      // Try dev-mode: if server accepted empty key, allow login
-      if (!key) {
-        // Dev mode — no key needed
-        localStorage.setItem(LS_SESSION, _loginMode);
-        _launchApp(_loginMode, key);
+        localStorage.setItem(LS_SESSION, 'customer');
+        _launchApp('customer', key);
+      } else if (res.status === 401 || res.status === 403) {
+        if (!key) {
+          localStorage.setItem(LS_SESSION, 'customer');
+          _launchApp('customer', '');
+        } else {
+          errEl.textContent = 'Fel API-nyckel. Kontrollera och försök igen.';
+          errEl.style.display = 'block';
+        }
       } else {
-        errEl.textContent = 'Fel API-nyckel. Kontrollera och försök igen.';
+        errEl.textContent = 'Serverfel (' + res.status + '). Försök igen senare.';
+        errEl.style.display = 'block';
+      }
+    }
+  } catch (e) {
+    // Network / dev-mode fallback
+    if (isAdmin) {
+      const password = (document.getElementById('loginPasswordInput') || {value:''}).value.trim();
+      if (!password) {
+        localStorage.setItem(LS_SESSION, 'admin');
+        _launchApp('admin', '');
+      } else {
+        errEl.textContent = 'Kunde inte nå servern. Kontrollera anslutningen.';
         errEl.style.display = 'block';
       }
     } else {
-      errEl.textContent = 'Serverfel (' + res.status + '). Försök igen senare.';
-      errEl.style.display = 'block';
-    }
-  } catch (e) {
-    // Network error — could be dev mode without server, allow empty-key login
-    if (!key) {
-      localStorage.setItem(LS_SESSION, _loginMode);
-      _launchApp(_loginMode, key);
-    } else {
-      errEl.textContent = 'Kunde inte nå servern. Kontrollera anslutningen.';
-      errEl.style.display = 'block';
+      const key = (document.getElementById('loginKeyInput') || {value:''}).value.trim();
+      if (!key) {
+        localStorage.setItem(LS_SESSION, 'customer');
+        _launchApp('customer', '');
+      } else {
+        errEl.textContent = 'Kunde inte nå servern. Kontrollera anslutningen.';
+        errEl.style.display = 'block';
+      }
     }
   } finally {
     btn.disabled = false;
@@ -4220,16 +4293,28 @@ function _launchApp(mode, key) {
 }
 
 function logout() {
+  // Clear server-side session cookie (best-effort, fire-and-forget)
+  fetch('/auth/admin/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+
   localStorage.removeItem(LS_SESSION);
-  // Keep stored keys so user doesn't have to re-enter them (just clear session flag)
+  localStorage.removeItem(LS_ADMIN_KEY);
+
   document.getElementById('sidebar').style.display      = 'none';
   document.getElementById('mainContent').style.display  = 'none';
   const loginScreen = document.getElementById('loginScreen');
   loginScreen.style.display = 'flex';
+
   // Reset login form
-  document.getElementById('loginKeyInput').value = '';
+  const ki = document.getElementById('loginKeyInput');
+  if (ki) ki.value = '';
+  const ui = document.getElementById('loginUsernameInput');
+  if (ui) ui.value = '';
+  const pi = document.getElementById('loginPasswordInput');
+  if (pi) pi.value = '';
   document.getElementById('loginError').style.display = 'none';
   document.getElementById('loginBtn').textContent = 'Logga in';
+  // Always show admin tab on logout
+  _loginSwitchTab('admin');
 }
 
 function initApiKey() {
@@ -4682,8 +4767,11 @@ async function saveCustomerAccount() {
   }
 }
 
+function _safeHide(id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
+function _safeText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+
 async function _loadAdminDashboard() {
-  document.getElementById('dashError').style.display = 'none';
+  _safeHide('dashError');
 
   // Update subtitle with today's date
   const subEl = document.getElementById('adminDashSubtitle');
@@ -4720,16 +4808,15 @@ async function _loadAdminDashboard() {
   // Summary
   try {
     const s = await apiFetch('/dashboard/summary');
-    document.getElementById('dLeadsToday').textContent     = s.leads_today      ?? '–';
-    document.getElementById('dInquiriesToday').textContent = s.inquiries_today   ?? '–';
-    document.getElementById('dInvoicesToday').textContent  = s.invoices_today    ?? '–';
-    document.getElementById('dWaiting').textContent        = s.waiting_customer  ?? '–';
-    document.getElementById('dReady').textContent          = s.ready_cases       ?? '–';
-    document.getElementById('dCompleted').textContent      = s.completed_today   ?? '–';
+    _safeText('dLeadsToday',     s.leads_today      ?? '–');
+    _safeText('dInquiriesToday', s.inquiries_today   ?? '–');
+    _safeText('dInvoicesToday',  s.invoices_today    ?? '–');
+    _safeText('dWaiting',        s.waiting_customer  ?? '–');
+    _safeText('dReady',          s.ready_cases       ?? '–');
+    _safeText('dCompleted',      s.completed_today   ?? '–');
   } catch (e) {
     const el = document.getElementById('dashError');
-    el.textContent = 'Kunde inte ladda sammanfattning: ' + e.message;
-    el.style.display = 'block';
+    if (el) { el.textContent = 'Kunde inte ladda sammanfattning: ' + e.message; el.style.display = 'block'; }
   }
 
   // Activity
@@ -4784,11 +4871,11 @@ async function loadCockpit() {
   try {
     const c = await apiFetch('/dashboard/cockpit');
     const ck = c.cockpit || {};
-    document.getElementById('cpActions').textContent  = ck.actions_required ?? '–';
-    document.getElementById('cpSla').textContent      = ck.sla_risk          ?? '–';
-    document.getElementById('cpWaiting').textContent  = ck.waiting_customer  ?? '–';
-    document.getElementById('cpUnderlag').textContent = ck.underlag_ready    ?? '–';
-    document.getElementById('cpBlocked').textContent  = ck.blocked           ?? '–';
+    _safeText('cpActions',  ck.actions_required ?? '–');
+    _safeText('cpSla',      ck.sla_risk          ?? '–');
+    _safeText('cpWaiting',  ck.waiting_customer  ?? '–');
+    _safeText('cpUnderlag', ck.underlag_ready    ?? '–');
+    _safeText('cpBlocked',  ck.blocked           ?? '–');
 
     // Color code cards by urgency
     const cpActions = document.getElementById('cpActions');
@@ -4839,11 +4926,11 @@ async function loadCockpit() {
 async function loadOperationalKpis() {
   try {
     const k = await apiFetch('/dashboard/kpis');
-    document.getElementById('dEmailQueue').textContent    = k.email_approval_queue ?? '–';
-    document.getElementById('dDispatchQueue').textContent  = k.dispatch_approval_queue ?? '–';
-    document.getElementById('dWaitingCust').textContent    = k.waiting_customer ?? '–';
-    document.getElementById('dUnderlagReady').textContent  = k.underlag_ready ?? '–';
-    document.getElementById('dActiveOps').textContent      = k.active_ops_cases ?? '–';
+    _safeText('dEmailQueue',     k.email_approval_queue    ?? '–');
+    _safeText('dDispatchQueue',  k.dispatch_approval_queue ?? '–');
+    _safeText('dWaitingCust',    k.waiting_customer        ?? '–');
+    _safeText('dUnderlagReady',  k.underlag_ready          ?? '–');
+    _safeText('dActiveOps',      k.active_ops_cases        ?? '–');
   } catch (_) {}
 }
 
@@ -4889,19 +4976,19 @@ async function loadOperationalInsights() {
 }
 
 async function loadRoi() {
-  document.getElementById('roiError').style.display = 'none';
+  _safeHide('roiError');
   try {
     const r = await apiFetch('/dashboard/roi');
-    document.getElementById('rHours').textContent    = r.estimated_hours_saved ?? '–';
-    document.getElementById('rValue').textContent    = r.estimated_value_sek   != null
-      ? r.estimated_value_sek.toLocaleString('sv-SE') : '–';
-    document.getElementById('rLeads').textContent    = r.leads_created          ?? '–';
-    document.getElementById('rSupport').textContent  = r.support_cases_handled  ?? '–';
-    document.getElementById('rInvoices').textContent = r.invoices_processed      ?? '–';
-    document.getElementById('rFollowups').textContent= r.followups_sent          ?? '–';
+    _safeText('rHours',    r.estimated_hours_saved ?? '–');
+    _safeText('rValue',    r.estimated_value_sek != null ? r.estimated_value_sek.toLocaleString('sv-SE') : '–');
+    _safeText('rLeads',    r.leads_created          ?? '–');
+    _safeText('rSupport',  r.support_cases_handled  ?? '–');
+    _safeText('rInvoices', r.invoices_processed      ?? '–');
+    _safeText('rFollowups',r.followups_sent           ?? '–');
 
     const a = r.assumptions || {};
-    document.getElementById('roiAssumptions').innerHTML =
+    const assEl = document.getElementById('roiAssumptions');
+    if (assEl) assEl.innerHTML =
       `Lead: ${a.lead_minutes_saved ?? '?'} min &nbsp;|&nbsp; `
     + `Support: ${a.support_minutes_saved ?? '?'} min &nbsp;|&nbsp; `
     + `Faktura: ${a.invoice_minutes_saved ?? '?'} min &nbsp;|&nbsp; `
@@ -4909,8 +4996,7 @@ async function loadRoi() {
     + `Timvärde: ${a.hourly_value_sek ?? '?'} SEK/h`;
   } catch (e) {
     const el = document.getElementById('roiError');
-    el.textContent = 'Kunde inte ladda ROI: ' + e.message;
-    el.style.display = 'block';
+    if (el) { el.textContent = 'Kunde inte ladda ROI: ' + e.message; el.style.display = 'block'; }
   }
 }
 
@@ -5078,22 +5164,22 @@ function setDispatchRange(range) {
 }
 
 async function loadDispatchSummary() {
-  document.getElementById('dispatchSummaryError').style.display = 'none';
+  _safeHide('dispatchSummaryError');
   try {
     const d = await apiFetch('/dispatch/summary?range=' + encodeURIComponent(_dsRange));
     const RANGE_LABELS = {today:'Idag', '7d':'Senaste 7 dagarna', '30d':'Senaste 30 dagarna', all:'All tid'};
     const lbl = document.getElementById('dsRangeLabel');
     if (lbl) lbl.textContent = RANGE_LABELS[d.range] || d.range || '';
 
-    document.getElementById('dsTotal').textContent   = d.total_dispatches       ?? '–';
-    document.getElementById('dsSuccess').textContent = d.successful_dispatches  ?? '–';
-    document.getElementById('dsFailed').textContent  = d.failed_dispatches      ?? '–';
-    document.getElementById('dsSkipped').textContent = d.skipped_dispatches     ?? '–';
-    document.getElementById('dsMinutes').textContent = d.estimated_minutes_saved ?? '–';
+    _safeText('dsTotal',       d.total_dispatches        ?? '–');
+    _safeText('dsSuccess',     d.successful_dispatches   ?? '–');
+    _safeText('dsFailed',      d.failed_dispatches       ?? '–');
+    _safeText('dsSkipped',     d.skipped_dispatches      ?? '–');
+    _safeText('dsMinutes',     d.estimated_minutes_saved ?? '–');
     const m = d.by_mode || {};
-    document.getElementById('dsModeAuto').textContent     = m.full_auto          ?? '0';
-    document.getElementById('dsModeManual').textContent   = m.manual             ?? '0';
-    document.getElementById('dsModeApproval').textContent = m.approval_required  ?? '0';
+    _safeText('dsModeAuto',     m.full_auto         ?? '0');
+    _safeText('dsModeManual',   m.manual            ?? '0');
+    _safeText('dsModeApproval', m.approval_required ?? '0');
 
     const el = document.getElementById('dsRecent');
     if (!d.recent || d.recent.length === 0) {
@@ -5125,33 +5211,33 @@ async function loadDispatchSummary() {
     </table>`;
   } catch (e) {
     const el = document.getElementById('dispatchSummaryError');
-    el.textContent = 'Kunde inte ladda dispatchöversikt: ' + e.message;
-    el.style.display = 'block';
+    if (el) { el.textContent = 'Kunde inte ladda dispatchöversikt: ' + e.message; el.style.display = 'block'; }
   }
 }
 
 async function loadDispatchReport() {
-  document.getElementById('reportError').style.display = 'none';
+  _safeHide('reportError');
   try {
     const r = await apiFetch('/dispatch/report?range=' + encodeURIComponent(_dsRange));
     const h = r.headline || {};
-    document.getElementById('rpTotal').textContent   = h.dispatches_completed    ?? '–';
-    document.getElementById('rpHours').textContent   = h.time_saved_hours        ?? '–';
-    document.getElementById('rpSuccess').textContent = h.success_rate_percent    != null ? h.success_rate_percent + ' %' : '–';
-    document.getElementById('rpAuto').textContent    = h.automation_share_percent != null ? h.automation_share_percent + ' %' : '–';
+    _safeText('rpTotal',   h.dispatches_completed     ?? '–');
+    _safeText('rpHours',   h.time_saved_hours         ?? '–');
+    _safeText('rpSuccess', h.success_rate_percent    != null ? h.success_rate_percent + ' %' : '–');
+    _safeText('rpAuto',    h.automation_share_percent != null ? h.automation_share_percent + ' %' : '–');
     const msgEl = document.getElementById('reportMessage');
-    if (r.message) { msgEl.textContent = r.message; msgEl.style.display = 'block'; }
-    else            { msgEl.style.display = 'none'; }
+    if (msgEl) {
+      if (r.message) { msgEl.textContent = r.message; msgEl.style.display = 'block'; }
+      else            { msgEl.style.display = 'none'; }
+    }
   } catch (e) {
     const el = document.getElementById('reportError');
-    el.textContent = 'Kunde inte ladda ROI-rapport: ' + e.message;
-    el.style.display = 'block';
+    if (el) { el.textContent = 'Kunde inte ladda ROI-rapport: ' + e.message; el.style.display = 'block'; }
   }
 }
 
 
 async function loadIntegrationHealth() {
-  document.getElementById('healthError').style.display = 'none';
+  _safeHide('healthError');
   const _STATUS_ICON  = { healthy: '✅ Frisk', warning: '⚠ Varning', error: '✕ Fel', not_configured: '○ Ej konfigurerad' };
   const _STATUS_CSS   = { healthy: 'var(--success)', warning: 'var(--warning)', error: 'var(--danger)', not_configured: 'var(--text-dim)' };
   const _PILL_CLASS   = { healthy: 'ok', warning: 'warn', error: 'err', not_configured: 'gray' };
@@ -5200,14 +5286,13 @@ async function loadIntegrationHealth() {
     }
   } catch (e) {
     const el = document.getElementById('healthError');
-    el.textContent = 'Kunde inte ladda integrationshälsa: ' + e.message;
-    el.style.display = 'block';
+    if (el) { el.textContent = 'Kunde inte ladda integrationshälsa: ' + e.message; el.style.display = 'block'; }
   }
 }
 
 
 async function loadPilotReadiness() {
-  document.getElementById('pilotError').style.display = 'none';
+  _safeHide('pilotError');
   const _OVERALL = { ready: '✅ Redo för pilot', almost_ready: '⚠️ Nästan klar', not_ready: '❌ Ej redo' };
   const _OVERALL_COLOR = { ready: '#16a34a', almost_ready: '#d97706', not_ready: '#dc2626' };
   const _CHECK_ICON = { pass: '✅', warning: '⚠️', fail: '❌' };
@@ -5217,12 +5302,11 @@ async function loadPilotReadiness() {
 
     const ov = r.overall_status || 'not_ready';
     const ovEl = document.getElementById('pilotOverall');
-    ovEl.textContent = _OVERALL[ov] || ov;
-    ovEl.style.color = _OVERALL_COLOR[ov] || 'var(--text-muted)';
+    if (ovEl) { ovEl.textContent = _OVERALL[ov] || ov; ovEl.style.color = _OVERALL_COLOR[ov] || 'var(--text-muted)'; }
 
     const sc = r.score || {};
     const scEl = document.getElementById('pilotScore');
-    scEl.textContent = `${sc.passed ?? 0} / ${sc.warnings ?? 0} / ${sc.failures ?? 0}`;
+    if (scEl) scEl.textContent = `${sc.passed ?? 0} / ${sc.warnings ?? 0} / ${sc.failures ?? 0}`;
 
     const checksEl = document.getElementById('pilotChecks');
     const checks = r.checks || [];
@@ -5240,8 +5324,7 @@ async function loadPilotReadiness() {
       <tbody>${rows}</tbody></table>`;
   } catch (e) {
     const el = document.getElementById('pilotError');
-    el.textContent = 'Kunde inte ladda pilotberedskap: ' + e.message;
-    el.style.display = 'block';
+    if (el) { el.textContent = 'Kunde inte ladda pilotberedskap: ' + e.message; el.style.display = 'block'; }
   }
 }
 
@@ -5605,7 +5688,7 @@ async function ackNeedsHelpItem(tenantId) {
   const keyEl  = document.getElementById(`ackItemKeyInput_${tenantId}`);
   const noteEl = document.getElementById(`ackItemNoteInput_${tenantId}`);
   const itemKey = keyEl ? keyEl.value.trim() : '';
-  if (!itemKey) { alert('Ange en nyckel för posten.'); return; }
+  if (!itemKey) { showToast('Ange en nyckel för posten.', 'error'); return; }
 
   const el = document.getElementById('supportActionResult_' + tenantId);
   if (el) { el.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">Kvitterar…</div>'; el.style.display = 'block'; }
@@ -5715,7 +5798,7 @@ function _renderWizardFlow(state) {
     let actionHtml = '';
     if (!isComplete) {
       if (step.key === 'systems_scanned') {
-        actionHtml = `<button class="btn btn-neutral btn-sm" style="margin-top:8px;" onclick="runWizardScan()">▶ Kör systemskanning</button>`;
+        actionHtml = `<button class="btn btn-neutral btn-sm" style="margin-top:8px;" onclick="runWizardScan()">▶ Kör systemskanning</button><div id="wizardScanResult" style="display:none; margin-top:6px; font-size:12px;"></div>`;
       } else if (step.key === 'routing_hints_saved') {
         actionHtml = `<button class="btn btn-neutral btn-sm" style="margin-top:8px;" onclick="showWizardRoutingSuggestions()">◎ Visa routingförslag</button>`;
       } else if (step.key === 'automation_policy_set') {
@@ -5772,12 +5855,16 @@ function _renderAutomationModeSelector() {
 }
 
 async function runWizardScan() {
+  const resEl = document.getElementById('wizardScanResult');
+  if (resEl) { resEl.textContent = 'Skannar…'; resEl.style.color = 'var(--text-muted)'; resEl.style.display = 'block'; }
   try {
     await apiFetch('/workflow-scan/gmail', { method: 'POST' });
     await apiFetch('/workflow-scan/monday', { method: 'POST' });
+    if (resEl) { resEl.textContent = '✅ Systemskanning klar.'; resEl.style.color = 'var(--success)'; }
     setTimeout(() => loadWizardFlow(), 1500);
   } catch (e) {
-    alert('Systemskanning misslyckades: ' + e.message);
+    if (resEl) { resEl.textContent = '❌ Systemskanning misslyckades: ' + e.message; resEl.style.color = 'var(--danger)'; }
+    else showToast('Systemskanning misslyckades: ' + e.message, 'error');
   }
 }
 
@@ -5834,10 +5921,15 @@ async function saveWizardAutomationMode() {
   const mode = chosen.value; // 'manual' or 'full_auto'
 
   try {
-    const autoPayload = mode === 'full_auto'
-      ? { automation: { demo_mode: false, followups_enabled: true }, scheduler: { run_mode: 'scheduled' } }
-      : { automation: { demo_mode: false, followups_enabled: true }, scheduler: { run_mode: 'manual' } };
-    await apiFetch('/control-panel', { method: 'POST', body: JSON.stringify(autoPayload) });
+    // PUT /dashboard/control with ControlPanelRequest-compatible payload
+    const payload = {
+      leads_enabled: true,
+      support_enabled: true,
+      invoices_enabled: true,
+      followups_enabled: true,
+      run_mode: mode === 'full_auto' ? 'scheduled' : 'manual',
+    };
+    await apiFetch('/dashboard/control', { method: 'PUT', body: JSON.stringify(payload) });
     if (resEl) { resEl.textContent = '✅ Automationsnivå sparad.'; resEl.style.color = 'var(--success)'; resEl.style.display = 'block'; }
     setTimeout(() => loadWizardFlow(), 1500);
   } catch (e) {
@@ -5880,7 +5972,7 @@ async function suggestRouting() {
     const fetcher = (_uiMode === 'admin') ? adminApiFetch : apiFetch;
     const drafts = await fetcher('/tenant/routing-hint-drafts');
     if (!drafts || Object.keys(drafts).length === 0) {
-      alert('Inga routingförslag tillgängliga. Kör systemskanning först via Kundminne.');
+      showToast('Inga routingförslag tillgängliga. Kör systemskanning först via Kundminne.', 'error');
       return;
     }
     const lines = Object.entries(drafts).map(([jt, d]) => {
@@ -5893,11 +5985,11 @@ async function suggestRouting() {
         method: 'POST',
         body: JSON.stringify({ routing_hints: drafts }),
       });
-      alert('✅ Routing-hints sparade.');
+      showToast('Routing-hints sparade.');
       loadWizardStatus().catch(() => {});
     }
   } catch (e) {
-    alert('Fel vid routingförslag: ' + e.message);
+    showToast('Fel vid routingförslag: ' + e.message, 'error');
   }
 }
 
@@ -5917,12 +6009,12 @@ async function _needsHelpRetry(tenantId, jobId, btn) {
     } else {
       btn.textContent = '❌ Misslyckades';
       btn.disabled = false;
-      alert('Återstart misslyckades: ' + (result.message || 'okänt fel'));
+      showToast('Återstart misslyckades: ' + (result.message || 'okänt fel'), 'error');
     }
   } catch (e) {
     btn.textContent = '❌ Fel';
     btn.disabled = false;
-    alert('Fel: ' + e.message);
+    showToast('Fel: ' + e.message, 'error');
   }
 }
 
@@ -6085,19 +6177,73 @@ function statusBadge(status) {
 
 function setMsg(elId, text, isError) {
   const el = document.getElementById(elId);
+  if (!el) return;
   if (!text) { el.innerHTML = ''; return; }
   el.innerHTML = `<div class="msg ${isError ? 'msg-error' : 'msg-ok'}">${escapeHtml(text)}</div>`;
 }
 
 function spin(id, on) {
-  document.getElementById(id).style.display = on ? 'inline' : 'none';
+  const el = document.getElementById(id);
+  if (el) el.style.display = on ? 'inline' : 'none';
+}
+
+// Toast notification — shows a temporary message at the bottom of the screen
+let _toastTimer = null;
+function showToast(message, type) {
+  let toast = document.getElementById('_globalToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = '_globalToast';
+    toast.style.cssText = [
+      'position:fixed', 'bottom:24px', 'left:50%', 'transform:translateX(-50%)',
+      'padding:10px 20px', 'border-radius:8px', 'font-size:13px', 'font-weight:600',
+      'z-index:9999', 'pointer-events:none', 'transition:opacity 0.25s',
+      'max-width:420px', 'text-align:center', 'box-shadow:0 4px 16px rgba(0,0,0,.2)',
+    ].join(';');
+    document.body.appendChild(toast);
+  }
+  const isErr = type === 'error';
+  toast.style.background = isErr ? 'var(--danger-bg, rgba(239,68,68,.9))' : 'rgba(15,23,42,.92)';
+  toast.style.color = isErr ? '#fca5a5' : '#f1f5f9';
+  toast.style.border = isErr ? '1px solid rgba(239,68,68,.4)' : '1px solid rgba(255,255,255,.1)';
+  toast.textContent = message;
+  toast.style.opacity = '1';
+  toast.style.display = 'block';
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => { toast.style.display = 'none'; }, 260); }, 3200);
+}
+
+// Map well-known provider error codes to operator-friendly messages.
+function _friendlyError(status, body) {
+  const KNOWN = {
+    'invalid_grant':       'Autentiseringstokens har löpt ut. Koppla om integrationen.',
+    'Token has been expired': 'Autentiseringstokens har löpt ut. Koppla om integrationen.',
+    'token_refresh_failed': 'Kunde inte förnya autentiseringstokens. Koppla om integrationen.',
+    'insufficient_permission': 'Behörighet saknas. Kontrollera integrationsåtkomst.',
+    'not_configured':      'Integrationen är inte konfigurerad.',
+    'Connection refused':  'Kunde inte nå extern tjänst. Kontrollera anslutningen.',
+  };
+  for (const [key, msg] of Object.entries(KNOWN)) {
+    if (body.includes(key)) return msg;
+  }
+  const STATUS = {
+    400: 'Ogiltig förfrågan. Kontrollera inmatad data.',
+    401: 'Inte autentiserad. Kontrollera API-nyckel.',
+    403: 'Åtkomst nekad. Kontrollera behörigheter.',
+    404: 'Resursen hittades inte.',
+    422: 'Ogiltig data skickades.',
+    500: 'Serverfel. Försök igen eller kontakta support.',
+    502: 'Extern tjänst otillgänglig.',
+    503: 'Tjänsten tillfälligt otillgänglig.',
+  };
+  return STATUS[status] || `Fel ${status}.`;
 }
 
 async function apiFetch(path, opts) {
   const resp = await fetch(path, { headers: headers(), ...opts });
   if (!resp.ok) {
     const body = await resp.text();
-    throw new Error(`HTTP ${resp.status}: ${body}`);
+    throw new Error(_friendlyError(resp.status, body));
   }
   return resp.json();
 }
@@ -6105,11 +6251,14 @@ async function apiFetch(path, opts) {
 // Admin-authenticated fetch — merges X-Admin-API-Key into headers.
 // Use for endpoints that require require_admin_api_key dependency.
 async function adminApiFetch(path, opts) {
-  const merged = { ...headers(), ...adminHeaders() };
-  const resp = await fetch(path, { headers: merged, ...opts });
+  const h = { ...headers(), ...adminHeaders() };
+  // If admin session cookie is present, keep it via credentials: 'same-origin'
+  const fetchOpts = { headers: h, credentials: 'same-origin', ...opts };
+  if (opts && opts.headers) fetchOpts.headers = { ...h, ...opts.headers };
+  const resp = await fetch(path, fetchOpts);
   if (!resp.ok) {
     const body = await resp.text();
-    throw new Error(`HTTP ${resp.status}: ${body}`);
+    throw new Error(_friendlyError(resp.status, body));
   }
   return resp.json();
 }
@@ -6417,19 +6566,14 @@ async function loadAll() {
 // ---------------------------------------------------------------------------
 // Inställningar — kända konstanter (speglar backend-enum)
 // ---------------------------------------------------------------------------
+// Only include job types that are actually implemented in the backend pipeline
 const ALL_JOB_TYPES = [
   'lead', 'invoice', 'customer_inquiry',
-  'lead_qualification', 'quote', 'sales_followup', 'crm_update', 'opportunity_summary',
-  'support_triage', 'response_draft', 'escalation', 'case_summary', 'sla_monitoring',
-  'payment_followup', 'finance_summary', 'receipt', 'anomaly',
-  'kpi', 'exec_summary', 'risk', 'decision_support', 'report',
 ];
 
+// Only include integrations that are actually implemented
 const ALL_INTEGRATIONS = [
-  'google_mail', 'google_calendar',
-  'microsoft_mail', 'microsoft_calendar',
-  'crm', 'accounting', 'support',
-  'slack', 'monday', 'fortnox', 'visma',
+  'google_mail', 'monday', 'fortnox',
 ];
 
 // ---------------------------------------------------------------------------
@@ -8999,11 +9143,9 @@ const READINESS_LABELS = {
 const READINESS_COLORS = { ready: '#16a34a', almost_ready: '#d97706', needs_setup: '#dc2626' };
 
 const CONN_LABELS = {
-  google_mail:    'Google Mail',
-  microsoft_mail: 'Microsoft Mail',
-  monday:         'Monday',
-  fortnox:        'Fortnox',
-  visma:          'Visma',
+  google_mail: 'Google Mail',
+  monday:      'Monday',
+  fortnox:     'Fortnox',
 };
 
 async function loadOnboarding() {
@@ -9520,10 +9662,20 @@ async function loadMemory() {
 
     // Load routing readiness score (best-effort)
     loadRoutingReadiness();
+
+    // Show Fortnox pilot tools only if Fortnox has been scanned with data
+    const fortnoxTools = document.getElementById('fortnoxPilotTools');
+    if (fortnoxTools) {
+      const fs = (scan.summary || {}).fortnox;
+      fortnoxTools.style.display = (fs && !fs.error) ? 'block' : 'none';
+    }
   } catch (e) {
-    msg.className = 'msg msg-error';
-    msg.textContent = 'Kunde inte ladda kundminne: ' + e.message;
-    msg.style.display = 'block';
+    const msg2 = document.getElementById('memoryMsg');
+    if (msg2) {
+      msg2.className = 'msg msg-error';
+      msg2.textContent = 'Kunde inte ladda kundminne: ' + e.message;
+      msg2.style.display = 'block';
+    }
   }
 }
 
@@ -10473,10 +10625,38 @@ async function _intCardScan(system, btn) {
 // ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
-(function initSession() {
+(async function initSession() {
   const session = localStorage.getItem(LS_SESSION); // 'admin' | 'customer' | null
   if (session) {
-    // Restore previous session — skip login screen
+    // Validate admin session with server (cookie check)
+    if (session === 'admin') {
+      try {
+        const r = await fetch('/auth/admin/me', { credentials: 'same-origin' });
+        if (!r.ok) {
+          // Session cookie expired — check if we have a stored API key to re-validate
+          const storedKey = localStorage.getItem(LS_ADMIN_KEY) || '';
+          if (storedKey) {
+            const r2 = await fetch('/admin/tenants/overview', { headers: { 'X-Admin-API-Key': storedKey } });
+            if (!r2.ok) {
+              // Key also invalid — force re-login
+              localStorage.removeItem(LS_SESSION);
+              initApiKey();
+              _checkDevMode();
+              return;
+            }
+          } else {
+            // No fallback — force re-login
+            localStorage.removeItem(LS_SESSION);
+            initApiKey();
+            _checkDevMode();
+            return;
+          }
+        }
+      } catch (_) {
+        // Server unreachable in dev mode — proceed with stored session
+      }
+    }
+    // Restore session
     initApiKey();
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('sidebar').style.display     = '';
@@ -10486,7 +10666,7 @@ async function _intCardScan(system, btn) {
     if (apiKey() || _uiMode === 'admin') loadAll();
   } else {
     // No session — show login, detect dev mode
-    initApiKey(); // still restore keys/role in background
+    initApiKey();
     _checkDevMode();
   }
 })();

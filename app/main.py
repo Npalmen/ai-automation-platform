@@ -146,6 +146,74 @@ def operator_ui():
     return HTMLResponse(content=_operator_ui_html())
 
 
+# ---------------------------------------------------------------------------
+# Admin session auth — login / logout / me
+# ---------------------------------------------------------------------------
+
+import hmac as _hmac
+from fastapi.responses import JSONResponse as _JSONResponse
+from pydantic import BaseModel as _BaseModel
+
+
+class AdminLoginRequest(_BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/auth/admin/login", tags=["auth"])
+def admin_login(payload: AdminLoginRequest):
+    """
+    Validate admin username + password, set a signed HttpOnly session cookie.
+
+    Falls back to API key auth when session auth is not configured
+    (password is treated as the raw admin API key in that case).
+    """
+    from app.core.admin_session import (
+        is_session_auth_configured,
+        set_admin_session_cookie,
+        verify_admin_credentials,
+    )
+    from app.core.admin_auth import _resolve_admin_keys
+
+    resp = _JSONResponse(content={})
+
+    if is_session_auth_configured():
+        if not verify_admin_credentials(payload.username, payload.password):
+            raise HTTPException(status_code=401, detail="Fel användarnamn eller lösenord.")
+        set_admin_session_cookie(resp, payload.username)
+        resp.body = b'{"ok":true,"mode":"session"}'
+        return resp
+
+    # API key fallback — password field carries the raw admin API key
+    valid_keys = _resolve_admin_keys(get_settings())
+    if not valid_keys:
+        raise HTTPException(status_code=401, detail="Admin-autentisering är inte konfigurerad på servern.")
+    provided = payload.password.strip()
+    if not provided or not any(_hmac.compare_digest(k, provided) for k in valid_keys):
+        raise HTTPException(status_code=401, detail="Fel API-nyckel.")
+    resp.body = b'{"ok":true,"mode":"api_key"}'
+    return resp
+
+
+@app.post("/auth/admin/logout", tags=["auth"])
+def admin_logout():
+    """Clear the admin session cookie."""
+    from app.core.admin_session import clear_admin_session_cookie
+    resp = _JSONResponse(content={"ok": True})
+    clear_admin_session_cookie(resp)
+    return resp
+
+
+@app.get("/auth/admin/me", tags=["auth"])
+def admin_me(request: Request):
+    """Return current admin identity from session cookie, or 401."""
+    from app.core.admin_session import get_admin_from_session
+    admin_user = get_admin_from_session(request)
+    if not admin_user:
+        raise HTTPException(status_code=401, detail="Ingen aktiv adminsession.")
+    return {"username": admin_user, "authenticated": True}
+
+
 @app.get("/tenant")
 def tenant_info(
     db: Session = Depends(get_db),
