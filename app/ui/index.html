@@ -1772,15 +1772,15 @@ label { color: var(--text-muted); }
       </div>
     </div>
 
-    <!-- Customer fields: tenant API key -->
+    <!-- Customer fields: access key -->
     <div id="loginCustomerFields" style="display:none;">
       <div class="login-field">
-        <label id="loginKeyLabel">Tenant API-nyckel</label>
+        <label id="loginKeyLabel">Anslutningsnyckel</label>
         <input id="loginKeyInput" type="password" class="login-input"
-               placeholder="Klistra in din API-nyckel"
+               placeholder="Klistra in din anslutningsnyckel"
                onkeydown="if(event.key==='Enter')doLogin()"
                autocomplete="current-password">
-        <div class="login-hint">Din tenant-nyckel för kundåtkomst. Kontakta oss om du saknar nyckel.</div>
+        <div class="login-hint">Din personliga anslutningsnyckel. Kontakta oss om du saknar nyckel.</div>
       </div>
     </div>
 
@@ -1894,10 +1894,10 @@ label { color: var(--text-muted); }
   <div id="topbar">
     <div class="topbar-title" id="topbarTitle">Dashboard</div>
 
-    <!-- Tenant context (admin: dropdown, customer: static) -->
+    <!-- Tenant context (admin: dropdown with label, customer: company name only) -->
     <div id="topbarTenantCtx" class="topbar-tenant-ctx" style="display:none;">
-      <span class="tenant-label">Kund</span>
-      <select id="topbarTenantSelect" class="topbar-tenant-select" onchange="_topbarSwitchTenant(this.value)" title="Byt aktiv tenant"></select>
+      <span class="tenant-label" id="topbarTenantLabel">Kund</span>
+      <select id="topbarTenantSelect" class="topbar-tenant-select" onchange="_topbarSwitchTenant(this.value)" title="Byt aktiv kund"></select>
       <span id="topbarTenantStatic" class="topbar-tenant-static" style="display:none;"></span>
       <span id="topbarDemoBadge" class="status-pill gray" style="display:none; margin-left:6px;">Demo</span>
     </div>
@@ -1910,7 +1910,7 @@ label { color: var(--text-muted); }
   </div>
 
   <div class="auth-banner" id="authBanner" style="display:none;">
-    Ingen API-nyckel angiven — anrop misslyckas om servern inte kör i dev-läge.
+    Ingen aktiv anslutning — ladda om sidan och logga in igen.
   </div>
 
   <!-- All view panels mount here -->
@@ -3765,7 +3765,7 @@ label { color: var(--text-muted); }
 
   <!-- Routing suggestion section -->
   <div id="wizardRoutingSection" style="display:none; max-width:800px; margin-bottom:20px;" class="cfg-section">
-    <div style="font-size:13px; font-weight:700; color:var(--text); margin-bottom:10px;">Föreslagna routings</div>
+    <div style="font-size:13px; font-weight:700; color:var(--text); margin-bottom:10px;">Förslag på ärendehantering</div>
     <div id="wizardRoutingBody" style="font-size:12px; color:var(--text-muted);">Laddar förslag…</div>
     <div style="margin-top:10px; display:flex; gap:8px;">
       <button class="btn btn-primary btn-sm" onclick="applyWizardRoutingHints()">✓ Använd förslag</button>
@@ -4232,7 +4232,7 @@ async function doLogin() {
           localStorage.setItem(LS_SESSION, 'customer');
           _launchApp('customer', '');
         } else {
-          errEl.textContent = 'Fel API-nyckel. Kontrollera och försök igen.';
+          errEl.textContent = 'Fel anslutningsnyckel. Kontrollera och försök igen.';
           errEl.style.display = 'block';
         }
       } else {
@@ -5800,7 +5800,7 @@ function _renderWizardFlow(state) {
       if (step.key === 'systems_scanned') {
         actionHtml = `<button class="btn btn-neutral btn-sm" style="margin-top:8px;" onclick="runWizardScan()">▶ Kör systemskanning</button><div id="wizardScanResult" style="display:none; margin-top:6px; font-size:12px;"></div>`;
       } else if (step.key === 'routing_hints_saved') {
-        actionHtml = `<button class="btn btn-neutral btn-sm" style="margin-top:8px;" onclick="showWizardRoutingSuggestions()">◎ Visa routingförslag</button>`;
+        actionHtml = `<button class="btn btn-neutral btn-sm" style="margin-top:8px;" onclick="showWizardRoutingSuggestions()">◎ Visa hanteringsförslag</button>`;
       } else if (step.key === 'automation_policy_set') {
         actionHtml = _renderAutomationModeSelector();
       } else if (step.key === 'test_lead_created') {
@@ -6044,10 +6044,14 @@ function _renderTenantContext() {
   const name = _tenantContext && _tenantContext.name;
   const label = name ? `${tenantId} - ${name}` : tenantId;
 
+  const labelEl = document.getElementById('topbarTenantLabel');
   select.style.display = isAdmin ? '' : 'none';
   staticEl.style.display = isAdmin ? 'none' : '';
-  staticEl.textContent = label || 'Tenant okänd';
-  staticEl.title = label || '';
+  if (labelEl) labelEl.style.display = isAdmin ? '' : 'none';
+  // In customer mode: show only company name, never internal tenant ID
+  const customerLabel = name || '';
+  staticEl.textContent = isAdmin ? (label || '') : (customerLabel || 'Ditt konto');
+  staticEl.title = isAdmin ? (label || '') : (customerLabel || '');
 
   const isDemo = !!(_tenantContext && _tenantContext.demo_mode);
   badge.style.display = isDemo ? '' : 'none';
