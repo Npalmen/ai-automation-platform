@@ -175,13 +175,11 @@ def admin_login(payload: AdminLoginRequest):
     )
     from app.core.admin_auth import _resolve_admin_keys
 
-    resp = _JSONResponse(content={})
-
     if is_session_auth_configured():
         if not verify_admin_credentials(payload.username, payload.password):
             raise HTTPException(status_code=401, detail="Fel användarnamn eller lösenord.")
+        resp = _JSONResponse(content={"ok": True, "mode": "session"})
         set_admin_session_cookie(resp, payload.username)
-        resp.body = b'{"ok":true,"mode":"session"}'
         return resp
 
     # API key fallback — password field carries the raw admin API key
@@ -191,8 +189,7 @@ def admin_login(payload: AdminLoginRequest):
     provided = payload.password.strip()
     if not provided or not any(_hmac.compare_digest(k, provided) for k in valid_keys):
         raise HTTPException(status_code=401, detail="Fel API-nyckel.")
-    resp.body = b'{"ok":true,"mode":"api_key"}'
-    return resp
+    return _JSONResponse(content={"ok": True, "mode": "api_key"})
 
 
 @app.post("/auth/admin/logout", tags=["auth"])
