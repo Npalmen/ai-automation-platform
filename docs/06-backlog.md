@@ -294,6 +294,16 @@ Current product north star: **operational system for installation/service compan
 - [x] Slice 3: Production Alerting — 6 evaluators (failed jobs/Gmail OAuth/scheduler/dispatch failures/stale approvals/integration health critical); email delivery; configurable thresholds; dedup window; scheduler-integrated; alert config UI in Notifieringar view; 33 tests
 - [x] Slice 4: Pilot Customer Onboarding Wizard — /onboarding/wizard-state aggregation endpoint; customer-facing "Kom igång" guided wizard (8 steps); suggestRouting() implemented; customer/admin role separation; 31 tests; 2402 total tests passing
 
+## Done (SaaS Productization — 2026-05-18)
+- [x] Slice 0: UI Product Audit — full action matrix (38 Pass / 14 Fix / 8 Hide / 7 Remove); `docs/ui-product-audit.md`
+- [x] Slice 1: P0 UI Crash & Error Hygiene — `_safeHide`/`_safeText` guards (42 call sites), `_friendlyError` API error normalization, `saveWizardAutomationMode` endpoint fix, `runWizardScan` alert→toast, `wizardflow` in `CUSTOMER_ONLY_VIEWS`
+- [x] Slice 2: Remove/Hide Fake Surface — pruned `ALL_JOB_TYPES` (19 speculative types removed), `ALL_INTEGRATIONS` (7 unimplemented removed), `CONN_LABELS` (microsoft_mail removed), Fortnox pilot tools hidden until configured, Visma "coming soon" stubs deactivated
+- [x] Slice 3: Admin Session Auth — `/auth/admin/login`, `/auth/admin/logout`, `/auth/admin/me` endpoints; signed HttpOnly session cookies (stdlib only); `app/core/admin_session.py`; `require_admin_api_key` checks session first; UI: username/password login tab; topbar admin key hidden; logout calls server-side; 25+ tests
+- [x] Slice 4/5: Customer UX Cleanup — "Anslutningsnyckel" label, auth banner updated, tenant ID hidden in customer mode, friendly Swedish labels throughout, wizard terminology cleaned
+- [x] Slice 6: Integration Hardening — `tokenExpiredBanner` for OAuth reconnect, `_intFriendlyErr` helper for user-readable errors, `description` field in health checks, `_ACTION_LABELS`/`_CAT_LABELS` for friendly error table display; `_has_token_expiry_error` in `integration_health.py`; Fortnox `last_error_message` preserved; integration setup header role-aware
+- [x] Slice 7: Premium SaaS Design System — `:root` light-mode tokens (grayscale palette), `html.dark-mode` dark overrides, `@media prefers-color-scheme` fallback; blue accent #2563eb replaces purple #7c3aed; system-font stack; dark/light toggle (☀/☾) in topbar with `localStorage` persistence; all raw rgba(124,58,237) / rgba(139,92,246) / #c084fc values replaced; gradient backgrounds cleaned; DEC-006 logged
+- [x] Slice 8: Full Product Validation — duplicate `adminKeyInput` ID bug fixed; `adminKey()` localStorage fallback; Super Admin view pre-populates key; all 2457 tests passing
+
 ## Future UI improvements (out of current scope)
 - [ ] Audit log view — surface `GET /audit-events` in the UI
 - [ ] Slack alerting channel — alert engine has email; Slack support via config shape extensible

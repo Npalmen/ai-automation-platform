@@ -78,6 +78,16 @@ Product SaaS Finish sprint ordering:
 - Remaining before paid rollout is operational validation against real production secrets/customers, not another architecture slice.
 - Frontend stack is locked: vanilla single-file HTML/CSS/JS. No React, Next.js, Tailwind, Vite, or build toolchain.
 
+SaaS Productization pass (2026-05-18) — all 8 slices complete:
+- Slice 0: UI product audit (`docs/ui-product-audit.md`) — 38 Pass, 14 Fix, 8 Hide, 7 Remove.
+- Slice 1: P0 crash hygiene — `_safeHide`/`_safeText` DOM guards (42 sites), `_friendlyError` API normalization, `wizardflow` view guard, wizard endpoint fix.
+- Slice 2: Fake-surface removal — pruned speculative job types / integrations, Fortnox tools hidden, Visma stubs deactivated.
+- Slice 3: Admin session auth — username/password login, signed HttpOnly cookies, `/auth/admin/login|logout|me`, `app/core/admin_session.py`, `require_admin_api_key` checks session first.
+- Slice 4/5: Customer UX — Swedish labels, "anslutningsnyckel", tenant ID hidden in customer mode, friendly terminology.
+- Slice 6: Integration hardening — `tokenExpiredBanner`, `_intFriendlyErr`, `description` in health checks, `_ACTION_LABELS`/`_CAT_LABELS`.
+- Slice 7: Premium SaaS design system — `:root` light + `html.dark-mode` dark CSS tokens, `#2563eb` blue accent, system-font stack, dark/light mode toggle (☀/☾), all raw purple rgba values replaced.
+- Slice 8: Full product validation — duplicate `adminKeyInput` ID fixed, `adminKey()` localStorage fallback, docs updated. 2457 tests passing.
+
 ## Product direction (2026-05-10)
 
 The platform is an **operational system for installation and service companies** with **AI in the background** — covering the full flow from **incoming lead to invoice/bookkeeping preparation** (preparing documents, not performing bookkeeping).

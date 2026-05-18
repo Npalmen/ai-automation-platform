@@ -1952,9 +1952,8 @@ label { color: var(--text-muted); }
       <span id="topbarDemoBadge" class="status-pill gray" style="display:none; margin-left:6px;">Demo</span>
     </div>
 
-    <!-- Hidden credential inputs — populated programmatically, not visible in topbar -->
-    <input id="apiKeyInput"   type="hidden" oninput="onKeyInput()">
-    <input id="adminKeyInput" type="hidden" oninput="onAdminKeyInput()">
+    <!-- Hidden credential input — populated programmatically from localStorage -->
+    <input id="apiKeyInput" type="hidden" oninput="onKeyInput()">
 
     <button class="btn btn-neutral btn-sm" onclick="loadAll()" style="flex-shrink:0;">↻ Uppdatera</button>
     <button class="btn btn-neutral btn-sm" onclick="toggleTheme()" id="themeToggleBtn" title="Byt ljus/mörkt läge" style="flex-shrink:0; font-size:14px; padding:5px 9px;">☀</button>
@@ -4186,7 +4185,8 @@ function apiKey() {
 
 function adminKey() {
   const el = document.getElementById('adminKeyInput');
-  return el ? el.value.trim() : '';
+  if (el && el.value.trim()) return el.value.trim();
+  return localStorage.getItem(LS_ADMIN_KEY) || '';
 }
 
 function headers() {
@@ -4398,9 +4398,10 @@ function initApiKey() {
   document.getElementById('apiKeyInput').value = saved;
   document.getElementById('authBanner').style.display = saved ? 'none' : 'block';
 
+  // Admin key lives only in localStorage; the visible input in Super Admin tab syncs on load
   const savedAdmin = localStorage.getItem(LS_ADMIN_KEY) || '';
   const adminEl = document.getElementById('adminKeyInput');
-  if (adminEl) adminEl.value = savedAdmin;
+  if (adminEl && !adminEl.value.trim()) adminEl.value = savedAdmin;
 
   // Restore role mode
   const savedRole = localStorage.getItem(LS_ROLE_KEY) || 'admin';
@@ -5434,6 +5435,12 @@ const _ADMIN_INT_ICON     = { healthy: '✅', warning: '⚠', error: '✕', not_
 async function loadAdminOverview() {
   document.getElementById('adminError').style.display = 'none';
   document.getElementById('adminTable').innerHTML = '<span class="empty">Laddar…</span>';
+  // Pre-fill the visible key input from localStorage when switching to this view
+  const adminEl = document.getElementById('adminKeyInput');
+  if (adminEl && !adminEl.value.trim()) {
+    const saved = localStorage.getItem(LS_ADMIN_KEY) || '';
+    if (saved) adminEl.value = saved;
+  }
   const aKey = adminKey();
   if (!aKey) {
     const banner = document.getElementById('adminKeyBanner');
