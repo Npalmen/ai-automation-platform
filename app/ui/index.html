@@ -5271,17 +5271,36 @@ async function loadIntegrationHealth() {
     if (errors.length === 0) {
       errEl.innerHTML = '';
     } else {
+      const _ACTION_LABELS = {
+        gmail_inbox_sync:    'Gmail inkorgssynk',
+        dispatch_monday:     'Monday dispatch',
+        fortnox_export:      'Fortnox export',
+        send_email:          'Skicka e-post',
+        classify_job:        'Klassificering',
+        process_job:         'Jobbhantering',
+      };
+      const _CAT_LABELS = {
+        gmail:           'Gmail',
+        monday:          'Monday',
+        fortnox:         'Fortnox',
+        email:           'E-post',
+        classification:  'Klassificering',
+        workflow:        'Arbetsflöde',
+        tenant_management: 'Kundhantering',
+      };
       const rows = errors.map(e => {
         const ts = e.created_at ? new Date(e.created_at).toLocaleString('sv-SE') : '–';
+        const catLabel = _CAT_LABELS[e.category] || e.category || '–';
+        const actLabel = _ACTION_LABELS[e.action] || e.action || '–';
         return `<tr>
           <td style="color:var(--text-dim); font-size:11px; white-space:nowrap;">${ts}</td>
-          <td>${escapeHtml(e.category || '')}</td>
-          <td>${escapeHtml(e.action || '')}</td>
+          <td>${escapeHtml(catLabel)}</td>
+          <td>${escapeHtml(actLabel)}</td>
         </tr>`;
       }).join('');
       errEl.innerHTML =
         `<div style="font-size:11px; font-weight:600; color:var(--danger); margin-bottom:6px;">Senaste fel (${errors.length})</div>
-        <table class="act-table"><thead><tr><th>Tid</th><th>Kategori</th><th>Händelse</th></tr></thead>
+        <table class="act-table"><thead><tr><th>Tid</th><th>System</th><th>Händelse</th></tr></thead>
         <tbody>${rows}</tbody></table>`;
     }
   } catch (e) {
@@ -10465,10 +10484,13 @@ async function loadIntegrationSetup() {
   const subHdr = document.getElementById('intSetupHeaderSub');
 
   const tid = _intSetupTenantId;
-  badge.textContent  = tid ? `Tenant: ${tid}` : 'Ingen tenant vald';
-  subHdr.textContent = tid
-    ? `Integrationer för ${tid}`
-    : 'Konfigurera anslutna system för tenant';
+  // In admin mode show tenant ID; in customer mode show generic label
+  const _isAdminCtx = (_uiMode === 'admin');
+  badge.textContent  = _isAdminCtx ? (tid ? `Kund: ${tid}` : 'Ingen kund vald') : '';
+  badge.style.display = _isAdminCtx ? '' : 'none';
+  subHdr.textContent = _isAdminCtx
+    ? (tid ? `Integrationer för ${tid}` : 'Konfigurera anslutna system')
+    : 'Dina anslutna tjänster';
 
   body.innerHTML = '<div class="empty" style="padding:32px 0; text-align:center;">Laddar…</div>';
 
@@ -10508,15 +10530,23 @@ function _renderIntCard(def, sysData, verify, isAdmin) {
         ? `Senaste fel: ${new Date(sysData.last_error_at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}`
         : 'Aldrig verifierad');
 
+  // Token-expired banner (when OAuth reconnect needed)
+  const tokenExpiredBanner = sysData?.token_expired
+    ? `<div style="background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.3); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:8px; font-size:12px; color:var(--danger);">
+        <strong>🔑 Åtkomst upphörd</strong> — OAuth-token har löpt ut. Koppla om integrationen för att återuppta automationen.
+      </div>`
+    : '';
+
   // Build checks list from sysData.checks
   let checksHtml = '';
   if (sysData?.checks?.length) {
     checksHtml = `<div class="int-card-checks">` +
       sysData.checks.map(c => {
-        const dotClass = c.status === 'ok' ? 'ok' : c.status === 'warning' ? 'warn' : 'fail';
+        const dotClass = c.status === 'pass' ? 'ok' : c.status === 'warning' ? 'warn' : 'fail';
+        const label = c.description || c.message || c.check || '';
         return `<div class="int-card-check-row">
           <div class="int-card-check-dot ${dotClass}"></div>
-          <span>${escapeHtml(c.description || c.check || '')}</span>
+          <span>${escapeHtml(label)}</span>
         </div>`;
       }).join('') +
     `</div>`;
@@ -10524,7 +10554,7 @@ function _renderIntCard(def, sysData, verify, isAdmin) {
     checksHtml = `<div class="int-card-checks">
       <div class="int-card-check-row">
         <div class="int-card-check-dot gray"></div>
-        <span>Inga kontroller tillgängliga — konfigurera miljövariabler för att aktivera</span>
+        <span>Anslutning ej konfigurerad</span>
       </div>
     </div>`;
   }
@@ -10570,6 +10600,7 @@ function _renderIntCard(def, sysData, verify, isAdmin) {
     <div class="int-status-pill ${escapeHtml(status)}">${statusLabel}</div>
   </div>
   <div class="int-card-body">
+    ${tokenExpiredBanner}
     ${checksHtml}
     <div class="int-card-meta">
       <span>${escapeHtml(lastVerified)}</span>
@@ -10598,7 +10629,7 @@ async function _intCardVerify(intKey, btn) {
     // Refresh cards to reflect latest state
     setTimeout(() => loadIntegrationSetup(), 1200);
   } catch (e) {
-    if (msgEl) { msgEl.textContent = 'Fel: ' + e.message; msgEl.className = 'cfg-save-msg err'; }
+    if (msgEl) { msgEl.textContent = _intFriendlyErr(e.message); msgEl.className = 'cfg-save-msg err'; }
   } finally {
     btn.disabled = false;
     btn.textContent = prevText;
@@ -10619,11 +10650,29 @@ async function _intCardScan(system, btn) {
     }
     setTimeout(() => loadIntegrationSetup(), 1200);
   } catch (e) {
-    if (msgEl) { msgEl.textContent = 'Fel: ' + e.message; msgEl.className = 'cfg-save-msg err'; }
+    if (msgEl) { msgEl.textContent = _intFriendlyErr(e.message); msgEl.className = 'cfg-save-msg err'; }
   } finally {
     btn.disabled = false;
     btn.textContent = prevText;
   }
+}
+
+function _intFriendlyErr(msg) {
+  if (!msg) return 'Okänt fel.';
+  const m = msg.toLowerCase();
+  if (m.includes('invalid_grant') || m.includes('token expired') || m.includes('token har löpt'))
+    return 'OAuth-token har löpt ut — koppla om integrationen.';
+  if (m.includes('permission') || m.includes('unauthorized') || m.includes('forbidden'))
+    return 'Åtkomst nekad — kontrollera behörigheter.';
+  if (m.includes('rate limit') || m.includes('429'))
+    return 'För många anrop — vänta en stund och försök igen.';
+  if (m.includes('connection refused') || m.includes('network') || m.includes('econnrefused'))
+    return 'Tjänsten är inte nåbar — kontrollera anslutningen.';
+  if (m.includes('timeout'))
+    return 'Anslutningen tog för lång tid — försök igen.';
+  if (m.includes('not found') || m.includes('404'))
+    return 'Resursen hittades inte — kontrollera konfigurationen.';
+  return 'Verifiering misslyckades — se loggar för detaljer.';
 }
 
 // ---------------------------------------------------------------------------
