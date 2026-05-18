@@ -116,8 +116,24 @@ async def tenant_middleware(request: Request, call_next):
     return response
 
 
+_UI_HOSTS = {"app.krowolf.se", "admin.krowolf.se"}
+
+
+def _is_ui_host(host: str | None) -> bool:
+    if not host:
+        return False
+    hostname = host.split(",", 1)[0].split(":", 1)[0].strip().lower()
+    return hostname in _UI_HOSTS
+
+
+def _operator_ui_html() -> str:
+    return (Path(__file__).parent / "ui" / "index.html").read_text(encoding="utf-8")
+
+
 @app.get("/")
-def root():
+def root(request: Request):
+    if _is_ui_host(request.headers.get("host")):
+        return HTMLResponse(content=_operator_ui_html())
     return {
         "status": "ok",
         "app_name": settings.APP_NAME,
@@ -127,8 +143,7 @@ def root():
 
 @app.get("/ui", response_class=HTMLResponse, include_in_schema=False)
 def operator_ui():
-    html = (Path(__file__).parent / "ui" / "index.html").read_text(encoding="utf-8")
-    return HTMLResponse(content=html)
+    return HTMLResponse(content=_operator_ui_html())
 
 
 @app.get("/tenant")
