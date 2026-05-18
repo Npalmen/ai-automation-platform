@@ -15,6 +15,7 @@ Covers:
 - GET /admin/tenants/overview with correct key succeeds (mock service)
 - Normal tenant endpoints still accept X-API-Key (not broken)
 - Settings field ADMIN_API_KEY exists and defaults to empty string
+- ADMIN_API_KEYS multi-key support (backward-compatible)
 """
 from __future__ import annotations
 
@@ -60,6 +61,7 @@ class TestSettingsField:
 def _settings_with_key(key: str):
     s = MagicMock()
     s.ADMIN_API_KEY = key
+    s.ADMIN_API_KEYS = ""  # ensure multi-key field is always a string
     return s
 
 
@@ -208,3 +210,62 @@ class TestAdminEndpointAuth:
         with patch("app.core.auth._load_env_key_map", return_value={}):
             result = get_verified_tenant(x_api_key=None, x_tenant_id="TENANT_TEST", db=db)
         assert result == "TENANT_TEST"
+
+
+# ---------------------------------------------------------------------------
+# Multi-key support: ADMIN_API_KEYS (comma-separated)
+# ---------------------------------------------------------------------------
+
+def _settings_with_keys(single: str = "", multi: str = ""):
+    s = MagicMock()
+    s.ADMIN_API_KEY = single
+    s.ADMIN_API_KEYS = multi
+    return s
+
+
+def _call_multi(header_value, *, single: str = "", multi: str = ""):
+    with patch("app.core.admin_auth.get_settings", return_value=_settings_with_keys(single, multi)):
+        return require_admin_api_key(x_admin_api_key=header_value)
+
+
+class TestMultiKeySupport:
+    def test_existing_admin_api_key_still_works(self):
+        result = _call_multi("old-single-key", single="old-single-key", multi="")
+        assert result is None
+
+    def test_admin_api_keys_first_key_accepted(self):
+        result = _call_multi("key-alpha", single="", multi="key-alpha,key-beta,key-gamma")
+        assert result is None
+
+    def test_admin_api_keys_second_key_accepted(self):
+        result = _call_multi("key-beta", single="", multi="key-alpha,key-beta,key-gamma")
+        assert result is None
+
+    def test_wrong_key_rejected_when_multi_set(self):
+        with pytest.raises(HTTPException) as exc_info:
+            _call_multi("key-wrong", single="", multi="key-alpha,key-beta")
+        assert exc_info.value.status_code == 401
+
+    def test_empty_admin_api_keys_falls_back_to_admin_api_key(self):
+        result = _call_multi("fallback-key", single="fallback-key", multi="")
+        assert result is None
+
+    def test_whitespace_trimmed_in_multi_keys(self):
+        result = _call_multi("trimmed", single="", multi="  trimmed  , other ")
+        assert result is None
+
+    def test_admin_api_keys_takes_precedence_over_admin_api_key(self):
+        # When ADMIN_API_KEYS is set, ADMIN_API_KEY is ignored.
+        with pytest.raises(HTTPException) as exc_info:
+            _call_multi("only-in-single", single="only-in-single", multi="key-from-multi")
+        assert exc_info.value.status_code == 401
+
+    def test_keys_never_exposed_in_response(self):
+        secret1 = "super-secret-1"
+        secret2 = "super-secret-2"
+        try:
+            _call_multi("wrong", single="", multi=f"{secret1},{secret2}")
+        except HTTPException as exc:
+            detail = str(exc.detail) + str(exc.headers or {})
+            assert secret1 not in detail
+            assert secret2 not in detail

@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     # Use X-Admin-API-Key header. Tenant X-API-Key keys are NOT accepted.
     ADMIN_API_KEY: str = ""
 
+    # Optional comma-separated list of admin API keys.
+    # If set and non-empty, any key in this list is accepted.
+    # Takes precedence over ADMIN_API_KEY when non-empty.
+    # Example: ADMIN_API_KEYS=key1,key2,key3
+    ADMIN_API_KEYS: str = ""
+
     EMAIL_PROVIDER: str = "google_mail"
 
     CRM_WEBHOOK_URL: str = ""
