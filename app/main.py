@@ -82,6 +82,7 @@ app = FastAPI(title=settings.APP_NAME, **_openapi_urls_for(settings))
 @app.on_event("startup")
 async def on_startup():
     import app.repositories.postgres  # noqa: F401
+    import app.repositories.postgres.oauth_credential_models  # noqa: F401
     from app.repositories.postgres.schema_migrations import (
         ensure_runtime_schema,
         provision_tenant_defaults,
@@ -106,6 +107,22 @@ async def on_startup():
             "GOOGLE_OAUTH_CLIENT_SECRET) or none.",
             _refresh_set,
         )
+
+
+# Visma OAuth router
+from app.integrations.visma.oauth_routes import router as visma_oauth_router
+app.include_router(visma_oauth_router)
+
+
+@app.get("/callback", include_in_schema=False)
+def visma_oauth_callback_alias(
+    code: str,
+    state: str,
+    db: Session = Depends(get_db),
+):
+    """Alias for /integrations/visma/oauth/callback — matches VISMA_REDIRECT_URI."""
+    from app.integrations.visma.oauth_routes import visma_oauth_callback
+    return visma_oauth_callback(code=code, state=state, db=db)
 
 
 @app.middleware("http")

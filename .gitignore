@@ -18,3 +18,6 @@ Thumbs.db
 
 # Local dev runtime logs (do not commit)
 storage/local_dev/logs/
+
+# Dev HTTPS proxy certs (local only)
+scripts/.dev-certs/

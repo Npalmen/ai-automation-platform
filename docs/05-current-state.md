@@ -219,7 +219,16 @@ Visual UI Refresh scope lock (DEC-005, 2026-05-07):
 - `create_monday_item` (workflow via `input_data.actions`) — routes through action_dispatch → MondayAdapter → real board item
 - `column_values` serialized to JSON string internally; `board_id` is env-only (`MONDAY_BOARD_ID`)
 
-**All other integrations** (CRM, Slack, Fortnox, Visma, etc.) are stubbed or webhook-based and have not been live-tested.
+**Visma eAccounting OAuth2** — full OAuth2 flow implemented:
+- `GET /integrations/visma/oauth/start` — redirects to Visma identity provider
+- `GET /integrations/visma/oauth/callback` — exchanges code for tokens, persists per-tenant
+- `GET /integrations/visma/status` — connected/disconnected + token expiry
+- `POST /integrations/visma/disconnect` — removes stored tokens
+- `POST /integrations/visma/test-read` — safe read-only company lookup with auto-refresh
+- Per-tenant `oauth_credentials` table; automatic token refresh on expiry
+- UI: Visma integration card with Connect/Disconnect/Test buttons
+
+**All other integrations** (CRM, Slack, Fortnox, etc.) are stubbed or webhook-based and have not been live-tested.
 
 ### Deterministic execution path
 

@@ -87,6 +87,10 @@ def get_integration_connection_config(
         return {
             "access_token": settings.VISMA_ACCESS_TOKEN,
             "api_url": settings.VISMA_API_URL,
+            "client_id": settings.VISMA_CLIENT_ID,
+            "client_secret": settings.VISMA_CLIENT_SECRET,
+            "redirect_uri": settings.VISMA_REDIRECT_URI,
+            "scopes": settings.VISMA_SCOPES,
         }
 
     if integration_type == IntegrationType.GOOGLE_MAIL:

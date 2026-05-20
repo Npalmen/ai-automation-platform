@@ -59,6 +59,10 @@ class Settings(BaseSettings):
 
     VISMA_API_URL: str = "https://eaccountingapi.vismaonline.com/v2"
     VISMA_ACCESS_TOKEN: str = ""
+    VISMA_CLIENT_ID: str = ""
+    VISMA_CLIENT_SECRET: str = ""
+    VISMA_REDIRECT_URI: str = ""
+    VISMA_SCOPES: str = "ea:api, ea:sales, ea:purchase, ea:accounting, vls:api, offline_access"
 
     GOOGLE_MAIL_API_URL: str = "https://gmail.googleapis.com/gmail/v1"
     GOOGLE_MAIL_ACCESS_TOKEN: str = ""

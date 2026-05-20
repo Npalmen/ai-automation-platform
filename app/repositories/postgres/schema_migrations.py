@@ -33,6 +33,20 @@ _REQUIRED_TABLES: list[str] = [
     )
     """,
     "CREATE INDEX IF NOT EXISTS ix_tenant_api_keys_tenant_id ON tenant_api_keys (tenant_id)",
+    """
+    CREATE TABLE IF NOT EXISTS oauth_credentials (
+        tenant_id    VARCHAR      NOT NULL,
+        provider     VARCHAR      NOT NULL,
+        access_token TEXT         NOT NULL,
+        refresh_token TEXT,
+        expires_at   TIMESTAMPTZ,
+        scopes       VARCHAR,
+        metadata_json JSON,
+        connected_at TIMESTAMPTZ  DEFAULT NOW(),
+        updated_at   TIMESTAMPTZ,
+        PRIMARY KEY (tenant_id, provider)
+    )
+    """,
 ]
 
 

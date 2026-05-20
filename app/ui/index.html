@@ -10168,7 +10168,7 @@ const WIZ_INTEGRATIONS = [
   { key: 'monday',      label: 'Monday.com',   available: true  },
   { key: 'fortnox',     label: 'Fortnox',      available: true  },
   { key: 'slack',       label: 'Slack',        available: true  },
-  { key: 'visma',       label: 'Visma',        available: false },
+  { key: 'visma',       label: 'Visma',        available: true  },
 ];
 const WIZ_AUTO_DEFAULTS = {
   lead:             'semi',
@@ -10535,13 +10535,14 @@ const INT_CARD_DEFS = [
   {
     key:     'visma',
     name:    'Visma',
-    desc:    'Ekonomisystem — kommer snart',
+    desc:    'Ekonomisystem via Visma eAccounting OAuth',
     logo:    '⊞',
     logoClass: 'visma',
-    keys:    ['VISMA_ACCESS_TOKEN'],
+    keys:    ['VISMA_CLIENT_ID', 'VISMA_CLIENT_SECRET', 'VISMA_REDIRECT_URI'],
     scanSystem: null,
-    docsUrl: null,
-    coming:  true,
+    docsUrl: 'https://developer.visma.com',
+    coming:  false,
+    oauth:   true,
   },
 ];
 
@@ -10577,18 +10578,40 @@ async function loadIntegrationSetup() {
 
   body.innerHTML = '<div class="empty" style="padding:32px 0; text-align:center;">Laddar…</div>';
 
-  // Fetch health + verify data in parallel
-  let health = null, verify = null;
+  // Fetch health + verify + Visma OAuth status in parallel
+  let health = null, verify = null, vismaStatus = null;
   try {
-    [health, verify] = await Promise.allSettled([
+    [health, verify, vismaStatus] = await Promise.allSettled([
       adminApiFetch('/integrations/health'),
       adminApiFetch('/setup/verify', { method: 'POST', body: '{}' }),
+      adminApiFetch('/integrations/visma/status'),
     ]);
     health = health.status === 'fulfilled' ? health.value : null;
     verify = verify.status === 'fulfilled' ? verify.value : null;
+    vismaStatus = vismaStatus.status === 'fulfilled' ? vismaStatus.value : null;
   } catch (_) {}
 
   const systems = health?.systems || {};
+
+  // Merge Visma OAuth status into systems for the card renderer
+  if (vismaStatus && vismaStatus.connected) {
+    systems.visma = {
+      status: vismaStatus.token_expired ? 'error' : 'healthy',
+      configured: true,
+      connected: true,
+      token_expired: vismaStatus.token_expired || false,
+      last_success_at: vismaStatus.connected_at,
+      checks: [
+        { status: 'pass', description: 'OAuth-anslutning aktiv' },
+        ...(vismaStatus.token_expired ? [{ status: 'fail', description: 'Token har löpt ut — koppla om' }] : []),
+        ...(vismaStatus.scopes ? [{ status: 'pass', description: `Scopes: ${vismaStatus.scopes}` }] : []),
+      ],
+      recommended_action: vismaStatus.token_expired ? 'Koppla om Visma-integrationen — token har löpt ut.' : '',
+    };
+  } else {
+    systems.visma = systems.visma || { status: 'not_configured', configured: false, connected: false, checks: [] };
+  }
+
   const isAdmin = (_uiMode === 'admin');
 
   body.innerHTML = INT_CARD_DEFS.map(def => _renderIntCard(def, systems[def.key], verify, isAdmin)).join('');
@@ -10659,17 +10682,34 @@ function _renderIntCard(def, sysData, verify, isAdmin) {
   // Action buttons
   let actionsHtml = '';
   if (!coming) {
-    const scanBtn = (def.scanSystem && isAdmin)
-      ? `<button class="btn btn-neutral btn-sm" onclick="_intCardScan('${escapeHtml(def.scanSystem)}', this)">⟳ Skanna</button>`
-      : '';
-    const testBtn = isAdmin
-      ? `<button class="btn btn-neutral btn-sm" onclick="_intCardVerify('${escapeHtml(def.key)}', this)">✓ Testa</button>`
-      : '';
-    const docsBtn = def.docsUrl
-      ? `<a class="btn btn-neutral btn-sm" href="${escapeHtml(def.docsUrl)}" target="_blank" rel="noopener">↗ Dokumentation</a>`
-      : '';
-    const msgSpan = `<span class="cfg-save-msg" id="intMsg_${escapeHtml(def.key)}"></span>`;
-    actionsHtml = `<div class="int-card-actions">${testBtn}${scanBtn}${docsBtn}${msgSpan}</div>`;
+    if (def.oauth) {
+      const oauthConnectBtn = !sysData?.connected
+        ? `<button class="btn btn-primary btn-sm" onclick="_vismaOAuthConnect(this)">⚡ Anslut Visma</button>`
+        : '';
+      const oauthDisconnectBtn = sysData?.connected
+        ? `<button class="btn btn-danger btn-sm" onclick="_vismaOAuthDisconnect(this)">✕ Koppla från</button>`
+        : '';
+      const oauthTestBtn = sysData?.connected
+        ? `<button class="btn btn-neutral btn-sm" onclick="_vismaOAuthTest(this)">✓ Testa anslutning</button>`
+        : '';
+      const docsBtn = def.docsUrl
+        ? `<a class="btn btn-neutral btn-sm" href="${escapeHtml(def.docsUrl)}" target="_blank" rel="noopener">↗ Dokumentation</a>`
+        : '';
+      const msgSpan = `<span class="cfg-save-msg" id="intMsg_${escapeHtml(def.key)}"></span>`;
+      actionsHtml = `<div class="int-card-actions">${oauthConnectBtn}${oauthTestBtn}${oauthDisconnectBtn}${docsBtn}${msgSpan}</div>`;
+    } else {
+      const scanBtn = (def.scanSystem && isAdmin)
+        ? `<button class="btn btn-neutral btn-sm" onclick="_intCardScan('${escapeHtml(def.scanSystem)}', this)">⟳ Skanna</button>`
+        : '';
+      const testBtn = isAdmin
+        ? `<button class="btn btn-neutral btn-sm" onclick="_intCardVerify('${escapeHtml(def.key)}', this)">✓ Testa</button>`
+        : '';
+      const docsBtn = def.docsUrl
+        ? `<a class="btn btn-neutral btn-sm" href="${escapeHtml(def.docsUrl)}" target="_blank" rel="noopener">↗ Dokumentation</a>`
+        : '';
+      const msgSpan = `<span class="cfg-save-msg" id="intMsg_${escapeHtml(def.key)}"></span>`;
+      actionsHtml = `<div class="int-card-actions">${testBtn}${scanBtn}${docsBtn}${msgSpan}</div>`;
+    }
   }
 
   return `
@@ -10756,6 +10796,51 @@ function _intFriendlyErr(msg) {
   if (m.includes('not found') || m.includes('404'))
     return 'Resursen hittades inte — kontrollera konfigurationen.';
   return 'Verifiering misslyckades — se loggar för detaljer.';
+}
+
+// --- Visma OAuth card actions ---
+async function _vismaOAuthConnect(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Ansluter…';
+  try {
+    window.location.href = _apiBase() + '/integrations/visma/oauth/start';
+  } catch (e) {
+    const msgEl = document.getElementById('intMsg_visma');
+    if (msgEl) { msgEl.textContent = _intFriendlyErr(e.message); msgEl.className = 'cfg-save-msg err'; }
+    btn.disabled = false;
+    btn.textContent = '⚡ Anslut Visma';
+  }
+}
+
+async function _vismaOAuthDisconnect(btn) {
+  if (!confirm('Koppla från Visma? Du kommer behöva auktorisera igen.')) return;
+  const msgEl = document.getElementById('intMsg_visma');
+  btn.disabled = true;
+  try {
+    await adminApiFetch('/integrations/visma/disconnect', { method: 'POST' });
+    if (msgEl) { msgEl.textContent = 'Frånkopplad'; msgEl.className = 'cfg-save-msg ok'; }
+    setTimeout(() => loadIntegrationSetup(), 800);
+  } catch (e) {
+    if (msgEl) { msgEl.textContent = _intFriendlyErr(e.message); msgEl.className = 'cfg-save-msg err'; }
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function _vismaOAuthTest(btn) {
+  const msgEl = document.getElementById('intMsg_visma');
+  if (msgEl) { msgEl.textContent = 'Testar…'; msgEl.className = 'cfg-save-msg'; }
+  btn.disabled = true;
+  const prevText = btn.textContent;
+  try {
+    const res = await adminApiFetch('/integrations/visma/test-read', { method: 'POST' });
+    if (msgEl) { msgEl.textContent = 'Anslutning OK'; msgEl.className = 'cfg-save-msg ok'; }
+  } catch (e) {
+    if (msgEl) { msgEl.textContent = _intFriendlyErr(e.message); msgEl.className = 'cfg-save-msg err'; }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevText;
+  }
 }
 
 // ---------------------------------------------------------------------------
