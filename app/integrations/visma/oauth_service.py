@@ -17,9 +17,15 @@ VISMA_AUTHORIZE_URL = "https://identity.vismaonline.com/connect/authorize"
 VISMA_TOKEN_URL = "https://identity.vismaonline.com/connect/token"
 
 
+def _normalize_scopes(raw: str) -> str:
+    """Convert comma-separated or space-separated scope string to OAuth2 space-separated format."""
+    parts = [s.strip() for s in raw.replace(",", " ").split() if s.strip()]
+    return " ".join(parts)
+
+
 def get_auth_url(tenant_id: str) -> str:
     settings = get_settings()
-    scopes = settings.VISMA_SCOPES.strip()
+    scopes = _normalize_scopes(settings.VISMA_SCOPES)
 
     params = {
         "client_id": settings.VISMA_CLIENT_ID,

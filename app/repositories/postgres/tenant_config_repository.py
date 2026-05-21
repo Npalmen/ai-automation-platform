@@ -7,6 +7,15 @@ from sqlalchemy.orm import Session
 from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 
 
+def _deep_merge(base: dict, override: dict) -> None:
+    """Recursively merge *override* into *base* in-place."""
+    for key, value in override.items():
+        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+            _deep_merge(base[key], value)
+        else:
+            base[key] = value
+
+
 class TenantConfigRepository:
     @staticmethod
     def get(db: Session, tenant_id: str) -> TenantConfigRecord | None:
@@ -65,7 +74,15 @@ class TenantConfigRepository:
         return (record.settings or {}) if record else {}
 
     @staticmethod
-    def update_settings(db: Session, tenant_id: str, settings: dict) -> TenantConfigRecord:
+    def update_settings(db: Session, tenant_id: str, settings: dict, merge: bool = True) -> TenantConfigRecord:
+        """Persist settings for a tenant.
+
+        When *merge* is True (default) the incoming dict is deep-merged into the
+        existing settings so callers that only update a sub-section (e.g. the
+        Control Panel updating ``automation``) do not accidentally erase other
+        top-level keys such as ``memory``, ``workflow_scan``, or
+        ``notifications``.
+        """
         now = datetime.now(timezone.utc)
         record = (
             db.query(TenantConfigRecord)
@@ -75,7 +92,12 @@ class TenantConfigRepository:
         if record is None:
             record = TenantConfigRecord(tenant_id=tenant_id, created_at=now)
             db.add(record)
-        record.settings = settings
+        if merge:
+            existing = dict(record.settings or {})
+            _deep_merge(existing, settings)
+            record.settings = existing
+        else:
+            record.settings = settings
         record.updated_at = now
         db.commit()
         db.refresh(record)

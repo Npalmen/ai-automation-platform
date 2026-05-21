@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 TENANT_CONFIGS = {
     "TENANT_1001": {
-        "name": "Default Tenant",
+        "name": "Krowolf Default",
         "auto_actions": {
             JobType.LEAD.value: True,
             JobType.INVOICE.value: False,
@@ -36,7 +36,7 @@ TENANT_CONFIGS = {
         ],
     },
     "TENANT_2001": {
-        "name": "Sales Tenant",
+        "name": "Elit Gruppen",
         "auto_actions": {
             JobType.LEAD.value: True,
             JobType.CUSTOMER_INQUIRY.value: True,
@@ -52,41 +52,6 @@ TENANT_CONFIGS = {
             IntegrationType.GOOGLE_CALENDAR.value,
             IntegrationType.MICROSOFT_MAIL.value,
             IntegrationType.MICROSOFT_CALENDAR.value,
-        ],
-    },
-    "TENANT_2002": {
-        "name": "Sales Tenant 2",
-        "auto_actions": {
-            JobType.LEAD.value: True,
-            JobType.CUSTOMER_INQUIRY.value: True,
-        },
-        "enabled_job_types": [
-            "lead",
-            "customer_inquiry",
-        ],
-        "allowed_integrations": [
-            IntegrationType.CRM.value,
-            IntegrationType.MONDAY.value,
-            IntegrationType.GOOGLE_MAIL.value,
-            IntegrationType.GOOGLE_CALENDAR.value,
-            IntegrationType.MICROSOFT_MAIL.value,
-            IntegrationType.MICROSOFT_CALENDAR.value,
-        ],
-    },
-    "TENANT_3001": {
-        "name": "Finance Tenant",
-        "auto_actions": {
-            JobType.INVOICE.value: True,
-        },
-        "enabled_job_types": [
-            "invoice",
-        ],
-        "allowed_integrations": [
-            IntegrationType.ACCOUNTING.value,
-            IntegrationType.FORTNOX.value,
-            IntegrationType.VISMA.value,
-            IntegrationType.GOOGLE_MAIL.value,
-            IntegrationType.MICROSOFT_MAIL.value,
         ],
     },
 }

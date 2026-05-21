@@ -42,6 +42,23 @@ def visma_oauth_start(
     return RedirectResponse(url=url, status_code=302)
 
 
+@router.get("/oauth/url")
+def visma_oauth_url(
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return Visma OAuth URL as JSON (for UI fetch with auth headers)."""
+    settings = get_settings()
+
+    if not settings.VISMA_CLIENT_ID or not settings.VISMA_REDIRECT_URI:
+        raise HTTPException(
+            status_code=503,
+            detail="Visma OAuth is not configured (VISMA_CLIENT_ID and VISMA_REDIRECT_URI required).",
+        )
+
+    url = get_auth_url(tenant_id)
+    return {"url": url}
+
+
 @router.get("/oauth/callback")
 def visma_oauth_callback(
     code: str,
@@ -58,10 +75,10 @@ def visma_oauth_callback(
         tokens = exchange_code(code)
     except Exception as exc:
         logger.error("Visma OAuth token exchange failed for tenant %s: %s", tenant_id, type(exc).__name__)
-        raise HTTPException(
-            status_code=502,
-            detail="Failed to exchange authorization code with Visma.",
-        ) from exc
+        return RedirectResponse(
+            url="/ui?tab=integrations&visma=error",
+            status_code=302,
+        )
 
     OAuthCredentialRepository.upsert(
         db=db,
@@ -75,12 +92,8 @@ def visma_oauth_callback(
     )
 
     logger.info("Visma OAuth connected for tenant %s", tenant_id)
-    return {
-        "status": "connected",
-        "provider": "visma",
-        "tenant_id": tenant_id,
-        "message": "Visma integration connected successfully.",
-    }
+
+    return RedirectResponse(url="/ui?tab=integrations&visma=connected", status_code=302)
 
 
 @router.get("/status")
@@ -187,13 +200,29 @@ def visma_test_read(
         result = test_connection(access_token)
     except Exception as exc:
         logger.error("Visma test-read failed for tenant %s: %s", tenant_id, type(exc).__name__)
-        raise HTTPException(
-            status_code=502,
-            detail="Visma API test-read failed. Check connection.",
-        ) from exc
+        err_str = str(exc)
+        # Classify the failure so UI can show a useful message
+        if "401" in err_str or "Unauthorized" in err_str:
+            detail = "Visma OAuth-token är inte giltig. Koppla om Visma-integrationen."
+            code = 401
+        elif "403" in err_str or "Forbidden" in err_str:
+            detail = "Behörighet nekad av Visma API. Kontrollera att scopes är rätt."
+            code = 403
+        elif "404" in err_str:
+            detail = "Visma API-resursen hittades inte. Kontrollera VISMA_API_URL."
+            code = 502
+        elif "timeout" in err_str.lower() or "Timeout" in err_str:
+            detail = "Visma API svarade inte i tid. Försök igen om en stund."
+            code = 504
+        else:
+            detail = "Visma API-anrop misslyckades. OAuth-token finns men API-läsning misslyckades."
+            code = 502
+        raise HTTPException(status_code=code, detail=detail) from exc
 
     return {
         "status": "success",
+        "oauth_connected": True,
+        "api_readable": True,
         "provider": "visma",
         "tenant_id": tenant_id,
         "data": result,

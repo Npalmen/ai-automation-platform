@@ -19,6 +19,7 @@ import os
 import ssl
 import subprocess
 import sys
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -169,39 +170,44 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         self._proxy()
 
     def _proxy(self):
+        import http.client as _http_client
         upstream_url = f"{UPSTREAM}{self.path}"
         try:
             # Read request body if present
             content_length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_length) if content_length else None
 
-            req = urllib.request.Request(upstream_url, data=body, method=self.command)
-            # Forward relevant headers
+            # Use http.client directly so we can inspect the raw response
+            # without urllib following redirects automatically.
+            parsed = urllib.parse.urlparse(upstream_url)
+            conn = _http_client.HTTPConnection(parsed.netloc, timeout=30)
+            forward_headers = {}
             for header in ("Content-Type", "X-API-Key", "X-Admin-API-Key", "X-Tenant-ID", "Authorization"):
                 if header in self.headers:
-                    req.add_header(header, self.headers[header])
+                    forward_headers[header] = self.headers[header]
 
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                status = resp.status
-                response_body = resp.read()
-                content_type = resp.headers.get("Content-Type", "application/json")
+            conn.request(self.command, parsed.path + (("?" + parsed.query) if parsed.query else ""),
+                         body=body, headers=forward_headers)
+            resp = conn.getresponse()
+            status = resp.status
+            response_body = resp.read()
+            conn.close()
 
             self.send_response(status)
-            self.send_header("Content-Type", content_type)
+            # Forward all headers from upstream (especially Location for redirects)
+            content_type = "application/json"
+            for header, value in resp.getheaders():
+                lh = header.lower()
+                if lh in ("content-type", "location", "cache-control", "set-cookie"):
+                    self.send_header(header, value)
+                if lh == "content-type":
+                    content_type = value
             self.send_header("Content-Length", str(len(response_body)))
             self.end_headers()
             self.wfile.write(response_body)
 
-        except urllib.error.HTTPError as e:
-            body = e.read()
-            self.send_response(e.code)
-            self.send_header("Content-Type", e.headers.get("Content-Type", "application/json"))
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
         except Exception as e:
-            error_msg = f'{{"detail":"Proxy error: upstream unreachable"}}'.encode()
+            error_msg = f'{{"detail":"Proxy error: upstream unreachable ({e})"}}'.encode()
             self.send_response(502)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(error_msg)))

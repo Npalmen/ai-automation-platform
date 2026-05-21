@@ -4,6 +4,82 @@
 AI Automation Platform — multi-tenant backend-first plattform för AI-driven workflow automation.
 
 ## Current objective
+Visma OAuth redirect fix, Kunduppsättning/Onboarding improvements, dynamic Kundminne scan buttons, settings deep-merge, automation policy detection, and premium monochrome SaaS UI refresh complete (2026-05-21).
+
+## Latest: Visma, Onboarding & Premium UI Pass (2026-05-21)
+
+### Backend fixes
+
+**`app/integrations/visma/oauth_routes.py`:**
+- OAuth callback now redirects to `/ui?tab=integrations&visma=connected` (was `/`) so the browser lands on the UI instead of the JSON root endpoint
+- `test-read` endpoint returns structured diagnostic errors (401/403/504) instead of generic 502; response includes `oauth_connected` and `api_readable` fields for two-level UI status display
+
+**`scripts/dev_https_proxy.py`:**
+- Proxy now uses `http.client` directly instead of `urllib.request.urlopen()` which was following 302s automatically; the browser now receives the `302 Location` response and redirects itself to `/ui`
+
+**`app/repositories/postgres/tenant_config_repository.py`:**
+- `update_settings()` now deep-merges incoming settings dict into the existing record instead of overwriting it; prevents Control Panel save from erasing `memory`, `workflow_scan`, `notifications`, or `scheduler_state`
+- Added `_deep_merge()` helper; `merge=False` parameter available when a full overwrite is intentional
+
+**`app/onboarding/readiness.py`:**
+- `_check_automation_policy()` now accepts both legacy `auto_actions` dict and the Control Panel's `settings.automation` block (`run_mode: scheduled/realtime` or `*_enabled: true` fields); "Automation vald" will now complete correctly after saving from Kontrollpanel
+
+### UI fixes (`app/ui/index.html`)
+
+- **Visma OAuth callback:** `window.history.replaceState({}, '', '/')` changed to `/ui` so clean URL after OAuth return is correct
+- **Visma test connection:** `_vismaOAuthTest()` now shows two-level status: "OAuth OK · API-läsning OK" or "OAuth OK · Visma API read failar" with structured error detail from backend
+- **Kunduppsättning scan buttons:** Removed hardcoded Gmail/Monday buttons; scan buttons are now rendered dynamically by `renderOnboardingActions()` based on `_tenantAllowedIntegrations`; wrapped in `runOnboardingScan()` which calls `scanWorkflowSystem()` + `loadWizardStatus()` so checklist updates without page reload
+- **Kundminne scan buttons:** Static buttons replaced by `<div id="memoryScanBtns">` rendered dynamically in `loadMemory()` from `_tenantAllowedIntegrations`; Fortnox pilot tools only shown when Fortnox is in `allowed_integrations` AND has scan data
+- **`scanWorkflowSystem()`:** Refactored to disable/re-enable all `.scan-btn` elements by class instead of by hardcoded IDs; returns result for callers
+- **`saveControl()`:** Calls `loadWizardStatus()` after successful save so "Automation vald" step updates immediately
+- **Global `_tenantAllowedIntegrations`:** Added; populated by `renderSetup()` so scan button renderers always have fresh integration context
+
+### CSS — Premium monochrome SaaS
+
+New CSS override block appended at end of `<style>`:
+- Default `:root` tokens changed to deep charcoal (near-black `#141414`) background with glass surfaces
+- `html.light-mode` variant provides warm-gray neutral light theme
+- Sculptural background via `radial-gradient` on `body`
+- Sidebar: backdrop-filter glass panel
+- Nav active state: white/light pill (dark bg) or black pill (light bg) — no blue
+- Buttons: monochrome primary (white text on dark surface, black text on light)
+- Cards (`.setup-card`, `.cfg-section`, `.kpi-card`, `.int-card`): `border-radius: 14px`, elevated shadows, hover lift
+- Status accents: green/amber/red only for status indicators, not standard UI
+- Scrollbars: 4px thin monochrome
+- All existing view IDs and component structure preserved — no HTML restructuring
+
+### Tests
+- `tests/test_visma_oauth.py` — 19/19 passed
+- Full suite (excluding 3 pre-existing httpx/starlette collection errors): 2383 passed, 0 new failures
+
+---
+
+## Previous objective
+Local UI audit and cleanup complete (2026-05-21). Platform is smoke-tested end-to-end with 86/86 tests passing. Two backend bugs fixed, UI dead-code removed.
+
+## Previous: Local UI Test & Cleanup Pass (2026-05-21)
+
+Full local smoke test run against `http://127.0.0.1:8000` with tenants TENANT_1001 + TENANT_2001.
+
+**Backend fixes (app/main.py):**
+- `GET /dashboard/support` — 500 fixed: `r.processor_history` attribute does not exist on `JobRecord`; changed to `(r.result or {}).get("processor_history")`
+- `GET /cases/{id}/followup` — 500 fixed: `ApprovalRequestRecord` was not imported in function scope; now imported locally as `_ApprReqRec`
+
+**UI fixes (app/ui/index.html):**
+- `ops` view now auto-loads jobs + pending approvals on navigation (`switchView('ops')`)
+- `custCasesPagination` duplicate `display:` style attribute removed
+- `const jobId = c.id` → `c.job_id` fixed in both lead analysis panel and support analysis panel
+- `'integrations'` removed from `ADMIN_ONLY_VIEWS` (overlay, not a `switchView` target)
+
+**UI cleanups (app/ui/index.html):**
+- `slack` removed from `WIZ_INTEGRATIONS` and provisioning form (no backend implementation)
+- `partnership` + `supplier` removed from `WIZ_JOB_TYPES` (no pipeline classification)
+
+**Audit doc:** `docs/ui-product-audit.md` updated with full smoke test results and change log.
+
+---
+
+## Previous objective
 Operational scalability phase complete. Platform is pilot-ready and operationally manageable.
 
 All four operational scalability slices shipped (2402 tests, R1 release gate passes):

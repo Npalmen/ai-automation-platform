@@ -1969,7 +1969,7 @@ def dashboard_support(
     for r in support_records:
         # support_status from input_data (operator-set) or from processor payload
         support_payload: dict = {}
-        history = list(r.processor_history or [])
+        history = list((r.result or {}).get("processor_history") or [])
         for entry in history:
             if entry.get("processor") == "support_analyzer_processor":
                 support_payload = (entry.get("result") or {}).get("payload") or {}
@@ -4247,14 +4247,15 @@ def get_case_followup(
             break
 
     # Pending approval for this job
+    from app.repositories.postgres.approval_models import ApprovalRequestRecord as _ApprReqRec
     pending_approval = (
-        db.query(ApprovalRequestRecord)
+        db.query(_ApprReqRec)
         .filter(
-            ApprovalRequestRecord.tenant_id == tenant_id,
-            ApprovalRequestRecord.job_id == job_id,
-            ApprovalRequestRecord.state == "pending",
+            _ApprReqRec.tenant_id == tenant_id,
+            _ApprReqRec.job_id == job_id,
+            _ApprReqRec.state == "pending",
         )
-        .order_by(ApprovalRequestRecord.requested_at.desc())
+        .order_by(_ApprReqRec.requested_at.desc())
         .first()
     )
 

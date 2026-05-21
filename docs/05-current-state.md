@@ -224,9 +224,10 @@ Visual UI Refresh scope lock (DEC-005, 2026-05-07):
 - `GET /integrations/visma/oauth/callback` — exchanges code for tokens, persists per-tenant
 - `GET /integrations/visma/status` — connected/disconnected + token expiry
 - `POST /integrations/visma/disconnect` — removes stored tokens
-- `POST /integrations/visma/test-read` — safe read-only company lookup with auto-refresh
+- `POST /integrations/visma/test-read` — safe read-only company lookup with auto-refresh; returns structured `oauth_connected`/`api_readable` fields and classified error messages (401/403/504) instead of generic 502
 - Per-tenant `oauth_credentials` table; automatic token refresh on expiry
-- UI: Visma integration card with Connect/Disconnect/Test buttons
+- OAuth callback redirects to `/ui?tab=integrations&visma=connected` (or `visma=error`); local HTTPS proxy forwards raw 302 to browser without following redirect
+- UI: Visma integration card with Connect/Disconnect/Test buttons; test result shows two-level status (OAuth OK · API-läsning OK/misslyckades)
 
 **All other integrations** (CRM, Slack, Fortnox, etc.) are stubbed or webhook-based and have not been live-tested.
 

@@ -1781,6 +1781,283 @@ label { color: var(--text-muted); }
   border-radius: var(--radius-sm); padding: 4px 10px;
   font-family: 'SF Mono','Fira Code',monospace;
 }
+
+/* ═══════════════════════════════════════════════════════
+   PREMIUM MONOCHROME SaaS OVERRIDE
+   Applied on top of the base design system.
+   Targets: layout shell, sidebar, topbar, cards, nav.
+═══════════════════════════════════════════════════════ */
+
+/* ── Override root tokens → charcoal luxury palette ── */
+:root {
+  --bg:           #141414;
+  --surface:      rgba(28,28,30,.95);
+  --surface-2:    rgba(38,38,40,.88);
+  --surface-3:    rgba(22,22,24,.95);
+  --surface-hover:rgba(44,44,46,.98);
+
+  --border:       rgba(255,255,255,.07);
+  --border-med:   rgba(255,255,255,.11);
+  --border-hi:    rgba(255,255,255,.18);
+
+  --text:         #f5f5f7;
+  --text-muted:   #aeaeb2;
+  --text-dim:     #6e6e73;
+
+  /* Accent stripped to near-monochrome; blue only for active/data */
+  --purple:       #e8e8ed;
+  --purple-light: #c7c7cc;
+  --purple-glow:  rgba(232,232,237,.06);
+  --blue:         #e8e8ed;
+  --blue-light:   #c7c7cc;
+  --blue-glow:    rgba(232,232,237,.06);
+
+  /* Status accents — restrained */
+  --success:      #30d158;
+  --success-bg:   rgba(48,209,88,.10);
+  --warning:      #ffd60a;
+  --warning-bg:   rgba(255,214,10,.10);
+  --danger:       #ff453a;
+  --danger-bg:    rgba(255,69,58,.10);
+
+  --shadow:       0 8px 40px rgba(0,0,0,.55);
+  --shadow-sm:    0 4px 18px rgba(0,0,0,.38);
+  --glow-purple:  0 4px 20px rgba(0,0,0,.40);
+  --glow-blue:    0 4px 20px rgba(0,0,0,.40);
+
+  --radius:       14px;
+  --radius-sm:    8px;
+  --radius-lg:    20px;
+}
+
+/* Light-mode override — keeps a neutral warm-gray variation if user toggles light */
+html.light-mode {
+  --bg:           #f2f2f7;
+  --surface:      rgba(255,255,255,.98);
+  --surface-2:    rgba(242,242,247,.88);
+  --surface-3:    rgba(248,248,253,.97);
+  --surface-hover:rgba(255,255,255,1);
+  --border:       rgba(15,15,15,.07);
+  --border-med:   rgba(15,15,15,.12);
+  --border-hi:    rgba(15,15,15,.19);
+  --text:         #1c1c1e;
+  --text-muted:   #48484a;
+  --text-dim:     #aeaeb2;
+  --purple:       #1c1c1e;
+  --purple-light: #48484a;
+  --purple-glow:  rgba(0,0,0,.06);
+  --blue:         #1c1c1e;
+  --blue-glow:    rgba(0,0,0,.06);
+  --shadow:       0 6px 28px rgba(0,0,0,.10);
+  --shadow-sm:    0 3px 12px rgba(0,0,0,.07);
+}
+
+/* ── Sculptural background ── */
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  background: var(--bg);
+  background-image:
+    radial-gradient(ellipse 120% 80% at 15% 0%, rgba(255,255,255,.025) 0%, transparent 60%),
+    radial-gradient(ellipse 80% 60% at 85% 100%, rgba(255,255,255,.018) 0%, transparent 55%);
+  background-attachment: fixed;
+}
+html.light-mode body {
+  background: #f2f2f7;
+  background-image:
+    radial-gradient(ellipse 100% 60% at 10% 0%, rgba(200,200,220,.25) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 90% 100%, rgba(180,180,200,.15) 0%, transparent 50%);
+}
+
+/* ── Sidebar — soft floating glass panel ── */
+#sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+}
+
+.sidebar-logo-icon {
+  background: #e8e8ed;
+  color: #1c1c1e;
+  box-shadow: none;
+}
+html.light-mode .sidebar-logo-icon { background: #1c1c1e; color: #f5f5f7; }
+
+/* ── Navigation — black active pill ── */
+.nav-item {
+  color: var(--text-muted);
+  transition: background 0.14s ease, color 0.14s ease;
+  border-radius: var(--radius-sm);
+}
+.nav-item:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.nav-item.active {
+  background: #e8e8ed;
+  color: #1c1c1e;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(0,0,0,.35);
+}
+html.light-mode .nav-item.active {
+  background: #1c1c1e;
+  color: #f5f5f7;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+.nav-item.active::before { background: transparent; }
+.nav-icon { color: inherit; }
+
+/* ── Topbar — minimal utility bar ── */
+#topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ── Cards — floating, rounded, generous padding ── */
+.setup-card,
+.cfg-section,
+.kpi-card,
+.ob-progress-card,
+.int-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+.setup-card:hover,
+.cfg-section:hover,
+.kpi-card:hover {
+  box-shadow: var(--shadow);
+}
+
+/* ── Buttons — refined monochrome ── */
+.btn {
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  transition: background 0.12s, box-shadow 0.12s, transform 0.1s;
+  letter-spacing: 0.01em;
+}
+.btn:active { transform: scale(0.98); }
+
+.btn-primary {
+  background: #e8e8ed;
+  color: #1c1c1e;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
+}
+.btn-primary:hover:not(:disabled) {
+  background: #f5f5f7;
+  box-shadow: 0 4px 16px rgba(0,0,0,.35);
+}
+html.light-mode .btn-primary {
+  background: #1c1c1e;
+  color: #f5f5f7;
+  box-shadow: 0 2px 6px rgba(0,0,0,.18);
+}
+html.light-mode .btn-primary:hover:not(:disabled) {
+  background: #2c2c2e;
+}
+
+.btn-neutral {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-neutral:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-med);
+}
+
+/* ── Status pills — restrained color use ── */
+.status-pill.ok, .int-status-pill.healthy { background: var(--success-bg); color: var(--success); border-color: var(--success); }
+.status-pill.warn, .int-status-pill.warning { background: var(--warning-bg); color: var(--warning); border-color: var(--warning); }
+.status-pill.err, .int-status-pill.error { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
+.status-pill.gray, .int-status-pill { background: var(--surface-2); color: var(--text-muted); border-color: var(--border); }
+
+/* ── KPI cards ── */
+.kpi-card { border-radius: var(--radius); padding: 18px 20px; }
+.kpi-number { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+.kpi-label  { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+.kpi-delta  { font-size: 11px; font-weight: 600; }
+.kpi-delta.up   { color: var(--success); }
+.kpi-delta.down { color: var(--danger); }
+
+/* ── Integration cards ── */
+.int-card {
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+/* ── Onboarding / wizard ── */
+.ob-step-dot.complete  { background: var(--success); border-color: var(--success); color: #fff; }
+.ob-step-dot.incomplete{ background: var(--surface-2); border-color: var(--border-med); color: var(--text-muted); }
+.ob-progress-fill      { background: var(--success); transition: width 0.5s ease; }
+
+/* ── Inputs & textareas ── */
+input[type="text"],
+input[type="email"],
+input[type="number"],
+input[type="password"],
+select,
+textarea {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border-med);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--border-hi);
+  box-shadow: 0 0 0 3px rgba(255,255,255,.05);
+}
+html.light-mode input:focus,
+html.light-mode select:focus,
+html.light-mode textarea:focus {
+  box-shadow: 0 0 0 3px rgba(0,0,0,.06);
+}
+
+/* ── Login screen — centered glass card ── */
+#loginScreen {
+  background: var(--bg);
+  background-image:
+    radial-gradient(ellipse 120% 70% at 20% 10%, rgba(255,255,255,.03) 0%, transparent 60%),
+    radial-gradient(ellipse 80% 60% at 80% 90%, rgba(255,255,255,.02) 0%, transparent 50%);
+}
+.login-box {
+  background: var(--surface);
+  border: 1px solid var(--border-med);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+/* ── Integration setup overlay ── */
+#intSetupOverlay { background: rgba(0,0,0,.65); backdrop-filter: blur(4px); }
+#intSetupPanel   { background: var(--surface); border-left: 1px solid var(--border); }
+
+/* ── Misc refinements ── */
+.msg-success { background: var(--success-bg); color: var(--success); border-color: var(--success); }
+.msg-error   { background: var(--danger-bg);  color: var(--danger);  border-color: var(--danger); }
+.cfg-save-msg.ok  { color: var(--success); }
+.cfg-save-msg.err { color: var(--danger); }
+
+/* Scrollbars — thin monochrome */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* ── Micro interactions ── */
+.int-card, .setup-card, .cfg-section, .kpi-card {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+/* Tables / job lists */
+.job-row:hover { background: var(--surface-2); }
 </style>
 </head>
 <body>
@@ -2765,7 +3042,7 @@ label { color: var(--text-muted); }
     </div>
 
     <!-- Pagination -->
-    <div id="custCasesPagination" style="display:none; margin-top:14px; display:flex; align-items:center; gap:10px;">
+    <div id="custCasesPagination" style="display:none; margin-top:14px; align-items:center; gap:10px;">
       <button id="custCasesPrev" class="btn btn-neutral btn-sm" onclick="casesPrevPage()" disabled>← Föregående</button>
       <span id="custCasesPageInfo" style="font-size:12px; color:var(--text-dim); flex:1; text-align:center;">–</span>
       <button id="custCasesNext" class="btn btn-neutral btn-sm" onclick="casesNextPage()" disabled>Nästa →</button>
@@ -3186,13 +3463,12 @@ label { color: var(--text-muted); }
           </div>
         </div>
 
-        <!-- Actions -->
-        <div class="ob-action-grid">
-          <button class="btn btn-neutral btn-sm" onclick="scanWorkflowSystem('gmail')">⊡ Skanna Gmail</button>
-          <button class="btn btn-neutral btn-sm" onclick="scanWorkflowSystem('monday')">⊡ Skanna Monday</button>
+        <!-- Actions — rendered dynamically by renderOnboardingActions() on load -->
+        <div class="ob-action-grid" id="obActionGrid">
           <button class="btn btn-neutral btn-sm" onclick="suggestRouting()">◎ Föreslå routing</button>
           <button class="btn btn-neutral btn-sm" onclick="applyRoutingHints()">✓ Spara routing-hints</button>
         </div>
+        <div id="obActionMsg" style="font-size:12px; color:var(--text-muted); margin-top:8px;"></div>
       </div>
     </div>
 
@@ -3396,11 +3672,7 @@ label { color: var(--text-muted); }
   <div class="setup-card" style="margin-bottom:20px;">
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
       <h2 style="font-size:14px; font-weight:700; margin:0;">Senaste scanning</h2>
-      <div style="display:flex; gap:8px;">
-        <button class="btn btn-primary btn-sm" id="scanGmailBtn" onclick="scanGmail()">Skanna Gmail</button>
-        <button class="btn btn-primary btn-sm" id="scanMondayBtn" onclick="scanMonday()">Skanna Monday</button>
-        <button class="btn btn-primary btn-sm" id="scanFortnoxBtn" onclick="scanFortnox()">Skanna Fortnox</button>
-      </div>
+      <div id="memoryScanBtns" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
     </div>
     <div id="scanRunning" style="display:none; font-size:12px; color:#6b7280; margin-bottom:8px;">Skannar…</div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:13px; margin-bottom:12px;">
@@ -3704,7 +3976,6 @@ label { color: var(--text-muted); }
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <label style="font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" value="google_mail" class="provIntegration"> Gmail</label>
             <label style="font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" value="monday" class="provIntegration"> Monday</label>
-            <label style="font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" value="slack" class="provIntegration"> Slack</label>
           </div>
         </div>
       </div>
@@ -4140,6 +4411,7 @@ function intLabel(key)   { return INTEGRATION_LABELS[key] || key; }
 let selectedJobId   = null;
 let _activeTenantId = null;   // the tenant whose config is currently loaded
 let _tenantContext  = null;
+let _tenantAllowedIntegrations = [];  // cached from last renderSetup() / loadSetup()
 
 const LS_KEY        = 'ui_api_key';
 const LS_ADMIN_KEY  = 'ui_admin_api_key';
@@ -4174,7 +4446,7 @@ function toggleTheme() {
 let _uiMode = 'admin';   // current role; initialised in initApiKey()
 
 // Admin-only tab names — hidden in customer mode
-const ADMIN_ONLY_VIEWS = ['ops', 'setup', 'ctrl', 'onboarding', 'integrations', 'notif', 'memory', 'readiness', 'admin', 'support'];
+const ADMIN_ONLY_VIEWS = ['ops', 'setup', 'ctrl', 'onboarding', 'notif', 'memory', 'readiness', 'admin', 'support'];
 const CUSTOMER_ONLY_VIEWS = ['results', 'activity', 'customerSettings', 'account', 'wizardflow'];
 // Views visible to customers
 const CUSTOMER_VIEWS   = ['dash', 'results', 'cases', 'activity', 'customerSettings', 'account', 'wizardflow'];
@@ -4521,6 +4793,7 @@ function switchView(name) {
   if (name === 'account')    loadCustomerAccount();
   if (name === 'onboarding') { loadOnboarding(); if (_uiMode === 'admin') loadWizardStatus(); }
   if (name === 'wizardflow') { loadWizardFlow(); }
+  if (name === 'ops')        { loadJobs(); loadPendingApprovals(); }
   if (name === 'support') { loadSupportConsole(); }
   if (name === 'notif')      loadNotifSettings();
   if (name === 'memory')     loadMemory();
@@ -6867,6 +7140,7 @@ function renderSetup(cfg) {
   const enabledJobTypes     = new Set(cfg.enabled_job_types || []);
   const allowedIntegrations = new Set(cfg.allowed_integrations || []);
   const autoActions         = cfg.auto_actions || {};
+  _tenantAllowedIntegrations = cfg.allowed_integrations || [];
 
   // Aktiv tenant info
   document.getElementById('setupTenantInfo').innerHTML =
@@ -7173,6 +7447,8 @@ async function saveControl() {
     msgEl.textContent = 'Inställningar sparade.';
     msgEl.className = 'msg msg-success';
     msgEl.style.display = 'block';
+    // Refresh onboarding checklist so "Automation vald" reflects the save
+    if (typeof loadWizardStatus === 'function') loadWizardStatus().catch(() => {});
   } catch (e) {
     msgEl.textContent = 'Fel vid sparning: ' + escapeHtml(e.message);
     msgEl.className = 'msg msg-error';
@@ -8431,7 +8707,7 @@ function _renderLeadAnalysisPanel(c) {
   const matchedService = c.matched_service;
   const schemaSource = c.schema_source;
   const businessFitReason = c.business_fit_reason;
-  const jobId = c.id;
+  const jobId = c.job_id;
 
   const catColors = { hot: 'var(--danger)', warm: 'var(--warning)', cold: 'var(--text-dim)' };
   const catColor  = catColors[cat] || 'var(--text-muted)';
@@ -8866,7 +9142,7 @@ function _renderSupportAnalysisPanel(c) {
   const tenantUsed = c.support_tenant_context_used;
   const contextSources = c.support_context_sources || [];
   const businessRisk = c.support_business_risk_reason;
-  const jobId = c.id;
+  const jobId = c.job_id;
 
   const prioCatColors = { critical: 'var(--danger)', urgent: 'var(--warning)', normal: 'var(--text-dim)' };
   const prioCatColor = prioCatColors[prioCat] || 'var(--text-muted)';
@@ -9510,6 +9786,8 @@ async function loadWizardStatus() {
         </div>
       </div>`;
     }).join('');
+    // Render dynamic scan buttons in onboarding action grid
+    renderOnboardingActions();
   } catch (e) {
     errEl.textContent = 'Kunde inte ladda kunduppsättning: ' + escapeHtml(e.message);
     errEl.style.display = 'block';
@@ -9748,12 +10026,38 @@ async function loadMemory() {
     const scan = await adminApiFetch('/workflow-scan/status');
     _renderScanStatus(scan);
 
+    // Build dynamic scan buttons from tenant's allowed_integrations
+    const scanBtnsEl = document.getElementById('memoryScanBtns');
+    if (scanBtnsEl) {
+      const integrations = _tenantAllowedIntegrations.length
+        ? _tenantAllowedIntegrations
+        : (scan.supported_systems || ['gmail', 'monday']);
+      const SCANNER_MAP = {
+        google_mail: { label: 'Skanna Gmail',   system: 'gmail' },
+        gmail:       { label: 'Skanna Gmail',   system: 'gmail' },
+        monday:      { label: 'Skanna Monday',  system: 'monday' },
+        fortnox:     { label: 'Skanna Fortnox', system: 'fortnox' },
+      };
+      const seen = new Set();
+      const btns = [];
+      for (const int of integrations) {
+        const entry = SCANNER_MAP[int.toLowerCase()];
+        if (entry && !seen.has(entry.system)) {
+          seen.add(entry.system);
+          btns.push(`<button class="btn btn-primary btn-sm scan-btn" id="scanBtn_${entry.system}" onclick="scanWorkflowSystem('${entry.system}')">${entry.label}</button>`);
+        }
+      }
+      scanBtnsEl.innerHTML = btns.length ? btns.join('') : '<span style="font-size:12px;color:var(--text-muted);">Inga skanningsbara integrationer aktiverade.</span>';
+    }
+
     // Discovered systems from summary (JSON view)
     const discovered = document.getElementById('memDiscoveredSystems');
-    if (scan.summary && Object.keys(scan.summary).length > 0) {
-      discovered.textContent = JSON.stringify(scan.summary, null, 2);
-    } else {
-      discovered.textContent = 'Ingen scanningsdata ännu.';
+    if (discovered) {
+      if (scan.summary && Object.keys(scan.summary).length > 0) {
+        discovered.textContent = JSON.stringify(scan.summary, null, 2);
+      } else {
+        discovered.textContent = 'Ingen scanningsdata ännu.';
+      }
     }
 
     // Load memory
@@ -9769,11 +10073,12 @@ async function loadMemory() {
     // Load routing readiness score (best-effort)
     loadRoutingReadiness();
 
-    // Show Fortnox pilot tools only if Fortnox has been scanned with data
+    // Show Fortnox pilot tools only when Fortnox is an allowed integration AND has scan data
     const fortnoxTools = document.getElementById('fortnoxPilotTools');
     if (fortnoxTools) {
+      const fortnoxAllowed = _tenantAllowedIntegrations.some(i => i.toLowerCase() === 'fortnox');
       const fs = (scan.summary || {}).fortnox;
-      fortnoxTools.style.display = (fs && !fs.error) ? 'block' : 'none';
+      fortnoxTools.style.display = (fortnoxAllowed && fs && !fs.error) ? 'block' : 'none';
     }
   } catch (e) {
     const msg2 = document.getElementById('memoryMsg');
@@ -9786,16 +10091,13 @@ async function loadMemory() {
 }
 
 async function scanWorkflowSystem(system) {
-  const gmailBtn   = document.getElementById('scanGmailBtn');
-  const mondayBtn  = document.getElementById('scanMondayBtn');
-  const fortnoxBtn = document.getElementById('scanFortnoxBtn');
-  const running    = document.getElementById('scanRunning');
+  const running = document.getElementById('scanRunning');
   const msg = document.getElementById('memoryMsg');
-  msg.style.display = 'none';
-  if (gmailBtn)   gmailBtn.disabled   = true;
-  if (mondayBtn)  mondayBtn.disabled  = true;
-  if (fortnoxBtn) fortnoxBtn.disabled = true;
-  running.style.display = 'block';
+  // Disable all scan buttons during scan
+  const allScanBtns = document.querySelectorAll('.scan-btn');
+  allScanBtns.forEach(b => { b.disabled = true; });
+  if (msg) msg.style.display = 'none';
+  if (running) running.style.display = 'block';
   try {
     const result = await adminApiFetch(`/workflow-scan/${system}`, { method: 'POST' });
     _renderScanStatus(result);
@@ -9808,28 +10110,76 @@ async function scanWorkflowSystem(system) {
         : system === 'fortnox'
           ? `${s.customers_scanned ?? 0} kunder skannade`
           : 'klart';
-    msg.className = 'msg msg-success';
-    msg.textContent = `Scanning klar (${system}). ${detail}.`;
-    msg.style.display = 'block';
+    if (msg) {
+      msg.className = 'msg msg-success';
+      msg.textContent = `Scanning klar (${system}). ${detail}.`;
+      msg.style.display = 'block';
+    }
+    return result;
   } catch (e) {
-    msg.className = 'msg msg-error';
-    msg.textContent = 'Scanning misslyckades: ' + e.message;
-    msg.style.display = 'block';
+    if (msg) {
+      msg.className = 'msg msg-error';
+      msg.textContent = 'Scanning misslyckades: ' + e.message;
+      msg.style.display = 'block';
+    }
     try {
       const status = await adminApiFetch('/workflow-scan/status');
       _renderScanStatus(status);
     } catch (_) {}
+    throw e;
   } finally {
-    if (gmailBtn)   gmailBtn.disabled   = false;
-    if (mondayBtn)  mondayBtn.disabled  = false;
-    if (fortnoxBtn) fortnoxBtn.disabled = false;
-    running.style.display = 'none';
+    allScanBtns.forEach(b => { b.disabled = false; });
+    if (running) running.style.display = 'none';
   }
 }
 
 async function scanGmail()   { return scanWorkflowSystem('gmail');   }
 async function scanMonday()  { return scanWorkflowSystem('monday');  }
 async function scanFortnox() { return scanWorkflowSystem('fortnox'); }
+
+// Onboarding-specific scan wrapper — runs scan then refreshes wizard status
+async function runOnboardingScan(system, btn) {
+  const msgEl = document.getElementById('obActionMsg');
+  if (msgEl) { msgEl.textContent = `Skannar ${system}…`; msgEl.style.color = 'var(--text-muted)'; }
+  if (btn) btn.disabled = true;
+  try {
+    await scanWorkflowSystem(system);
+    if (msgEl) { msgEl.textContent = `✓ Skanning klar: ${system}`; msgEl.style.color = 'var(--success)'; }
+    await loadWizardStatus();
+  } catch (e) {
+    if (msgEl) { msgEl.textContent = `Scanning misslyckades: ${e.message}`; msgEl.style.color = 'var(--danger)'; }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Render dynamic scan buttons in Kunduppsättning based on allowed integrations
+function renderOnboardingActions() {
+  const grid = document.getElementById('obActionGrid');
+  if (!grid) return;
+  const SCANNER_MAP = {
+    google_mail: { label: '⊡ Skanna Gmail',   system: 'gmail' },
+    gmail:       { label: '⊡ Skanna Gmail',   system: 'gmail' },
+    monday:      { label: '⊡ Skanna Monday',  system: 'monday' },
+    fortnox:     { label: '⊡ Skanna Fortnox', system: 'fortnox' },
+  };
+  const integrations = _tenantAllowedIntegrations.length ? _tenantAllowedIntegrations : ['google_mail', 'monday'];
+  const seen = new Set();
+  // Remove old scan buttons, keep static routing buttons
+  grid.querySelectorAll('.ob-scan-btn').forEach(b => b.remove());
+  const routingBtns = Array.from(grid.children);
+  for (const int of integrations) {
+    const entry = SCANNER_MAP[int.toLowerCase()];
+    if (entry && !seen.has(entry.system)) {
+      seen.add(entry.system);
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-neutral btn-sm ob-scan-btn';
+      btn.textContent = entry.label;
+      btn.onclick = function() { runOnboardingScan(entry.system, btn); };
+      grid.insertBefore(btn, routingBtns[0] || null);
+    }
+  }
+}
 
 async function fortnoxLookupCustomer() {
   const email = document.getElementById('fortnoxLookupEmail').value.trim();
@@ -10160,14 +10510,11 @@ const WIZ_JOB_TYPES = [
   { key: 'lead',             label: 'Leads',               defaultOn: true  },
   { key: 'customer_inquiry', label: 'Supportärenden',       defaultOn: true  },
   { key: 'invoice',          label: 'Fakturor',             defaultOn: false },
-  { key: 'partnership',      label: 'Samarbeten',           defaultOn: false },
-  { key: 'supplier',         label: 'Leverantörsfrågor',    defaultOn: false },
 ];
 const WIZ_INTEGRATIONS = [
   { key: 'google_mail', label: 'Gmail',        available: true  },
   { key: 'monday',      label: 'Monday.com',   available: true  },
   { key: 'fortnox',     label: 'Fortnox',      available: true  },
-  { key: 'slack',       label: 'Slack',        available: true  },
   { key: 'visma',       label: 'Visma',        available: true  },
 ];
 const WIZ_AUTO_DEFAULTS = {
@@ -10742,15 +11089,12 @@ async function _intCardVerify(intKey, btn) {
   btn.disabled = true;
   try {
     const res = await adminApiFetch('/setup/verify', { method: 'POST', body: '{}' });
-    // Find check relevant to this integration
     const checks = res.checks || [];
     const ok = checks.length === 0 || checks.every(c => c.status !== 'fail');
     if (msgEl) {
-      msgEl.textContent = ok ? 'OK' : (res.message || 'Verifiering klar med varningar');
+      msgEl.textContent = ok ? '✓ OK' : (res.message || 'Varningar');
       msgEl.className = 'cfg-save-msg ' + (ok ? 'ok' : 'err');
     }
-    // Refresh cards to reflect latest state
-    setTimeout(() => loadIntegrationSetup(), 1200);
   } catch (e) {
     if (msgEl) { msgEl.textContent = _intFriendlyErr(e.message); msgEl.className = 'cfg-save-msg err'; }
   } finally {
@@ -10768,10 +11112,37 @@ async function _intCardScan(system, btn) {
   try {
     const res = await adminApiFetch(`/workflow-scan/${encodeURIComponent(system)}`, { method: 'POST', body: '{}' });
     if (msgEl) {
-      msgEl.textContent = res.message || `Skanning av ${system} klar`;
+      const summary = res.summary?.[system];
+      let label = `✓ Skanning klar`;
+      if (summary) {
+        const count = summary.messages_scanned || summary.boards_scanned || summary.customers_found || 0;
+        if (count) label += ` (${count} objekt)`;
+      }
+      msgEl.textContent = label;
       msgEl.className = 'cfg-save-msg ok';
     }
-    setTimeout(() => loadIntegrationSetup(), 1200);
+    // Update the card's check dots inline without full re-render
+    const card = btn.closest('.int-card');
+    if (card) {
+      const checkRows = card.querySelectorAll('.int-card-check-row');
+      checkRows.forEach(row => {
+        const dot = row.querySelector('.int-card-check-dot');
+        const span = row.querySelector('span');
+        if (span && span.textContent.includes('skanning ej genomförd')) {
+          dot.className = 'int-card-check-dot ok';
+          span.textContent = `${system.charAt(0).toUpperCase() + system.slice(1)}-skanning genomförd.`;
+        }
+      });
+      const pill = card.querySelector('.int-status-pill');
+      if (pill && pill.classList.contains('warning')) {
+        const allDots = card.querySelectorAll('.int-card-check-dot');
+        const allOk = [...allDots].every(d => d.classList.contains('ok'));
+        if (allOk) {
+          pill.className = 'int-status-pill healthy';
+          pill.textContent = '● Aktiv';
+        }
+      }
+    }
   } catch (e) {
     if (msgEl) { msgEl.textContent = _intFriendlyErr(e.message); msgEl.className = 'cfg-save-msg err'; }
   } finally {
@@ -10802,10 +11173,17 @@ function _intFriendlyErr(msg) {
 async function _vismaOAuthConnect(btn) {
   btn.disabled = true;
   btn.textContent = 'Ansluter…';
+  const msgEl = document.getElementById('intMsg_visma');
   try {
-    window.location.href = _apiBase() + '/integrations/visma/oauth/start';
+    const res = await adminApiFetch('/integrations/visma/oauth/url');
+    if (res && res.url) {
+      window.location.href = res.url;
+    } else {
+      if (msgEl) { msgEl.textContent = 'Kunde inte hämta OAuth-URL.'; msgEl.className = 'cfg-save-msg err'; }
+      btn.disabled = false;
+      btn.textContent = '⚡ Anslut Visma';
+    }
   } catch (e) {
-    const msgEl = document.getElementById('intMsg_visma');
     if (msgEl) { msgEl.textContent = _intFriendlyErr(e.message); msgEl.className = 'cfg-save-msg err'; }
     btn.disabled = false;
     btn.textContent = '⚡ Anslut Visma';
@@ -10834,9 +11212,30 @@ async function _vismaOAuthTest(btn) {
   const prevText = btn.textContent;
   try {
     const res = await adminApiFetch('/integrations/visma/test-read', { method: 'POST' });
-    if (msgEl) { msgEl.textContent = 'Anslutning OK'; msgEl.className = 'cfg-save-msg ok'; }
+    // Show two-level result: OAuth + API read
+    if (msgEl) {
+      const oauthOk = res.oauth_connected !== false;
+      const apiOk   = res.api_readable   !== false;
+      if (oauthOk && apiOk) {
+        msgEl.textContent = '✓ OAuth OK · API-läsning OK';
+        msgEl.className = 'cfg-save-msg ok';
+      } else if (oauthOk) {
+        msgEl.textContent = '○ OAuth OK · API-läsning misslyckades';
+        msgEl.className = 'cfg-save-msg err';
+      } else {
+        msgEl.textContent = 'Ej ansluten';
+        msgEl.className = 'cfg-save-msg err';
+      }
+    }
   } catch (e) {
-    if (msgEl) { msgEl.textContent = _intFriendlyErr(e.message); msgEl.className = 'cfg-save-msg err'; }
+    // Show the structured error message from backend without generic fallback
+    if (msgEl) {
+      const detail = e.message || 'Anslutning misslyckades';
+      // If the error contains a status code hint, parse out the detail text
+      const match = detail.match(/:\s*(.+)$/);
+      msgEl.textContent = match ? match[1].trim() : detail;
+      msgEl.className = 'cfg-save-msg err';
+    }
   } finally {
     btn.disabled = false;
     btn.textContent = prevText;
@@ -10892,6 +11291,25 @@ async function _vismaOAuthTest(btn) {
   }
   // Sync theme toggle button label now that DOM is ready
   _applyTheme(document.documentElement.classList.contains('dark-mode'));
+
+  // Handle Visma OAuth return query params
+  const urlParams = new URLSearchParams(window.location.search);
+  const vismaParam = urlParams.get('visma');
+  if (vismaParam === 'connected') {
+    setTimeout(() => {
+      openIntegrationSetup(_activeTenantId);
+      const msgEl = document.getElementById('intMsg_visma');
+      if (msgEl) { msgEl.textContent = '✓ Visma ansluten!'; msgEl.className = 'cfg-save-msg ok'; }
+    }, 600);
+    window.history.replaceState({}, '', '/ui');
+  } else if (vismaParam === 'error') {
+    setTimeout(() => {
+      openIntegrationSetup(_activeTenantId);
+      const msgEl = document.getElementById('intMsg_visma');
+      if (msgEl) { msgEl.textContent = 'Anslutning misslyckades — försök igen.'; msgEl.className = 'cfg-save-msg err'; }
+    }, 600);
+    window.history.replaceState({}, '', '/ui');
+  }
 })();
 
 async function _checkDevMode() {

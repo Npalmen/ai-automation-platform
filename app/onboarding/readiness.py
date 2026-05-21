@@ -114,11 +114,24 @@ def _check_routing_hints_saved(settings: dict) -> tuple[str, str]:
 
 
 def _check_automation_policy(settings: dict) -> tuple[str, str]:
+    # Accept either legacy auto_actions dict or the Control Panel's automation block.
     auto_actions = settings.get("auto_actions") or {}
     configured = {k: v for k, v in auto_actions.items() if v not in (None, False, "")}
     if configured:
         return "complete", f"Automationsnivå satt för: {', '.join(configured.keys())}."
-    return "incomplete", "Sätt automationsnivå i Kontrollpanel → auto_actions."
+
+    # Control Panel saves under settings.automation
+    automation = settings.get("automation") or {}
+    run_mode = automation.get("run_mode") or ""
+    enabled_keys = [
+        k for k, v in automation.items()
+        if k.endswith("_enabled") and v not in (None, False, "")
+    ]
+    if run_mode in ("scheduled", "realtime") or enabled_keys:
+        labels = enabled_keys or [run_mode]
+        return "complete", f"Automationsnivå satt via Kontrollpanel: {', '.join(labels)}."
+
+    return "incomplete", "Sätt automationsnivå i Kontrollpanel."
 
 
 def _check_test_lead(db: Session, tenant_id: str) -> tuple[str, str]:
