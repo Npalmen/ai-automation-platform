@@ -1783,281 +1783,665 @@ label { color: var(--text-muted); }
 }
 
 /* ═══════════════════════════════════════════════════════
-   PREMIUM MONOCHROME SaaS OVERRIDE
-   Applied on top of the base design system.
-   Targets: layout shell, sidebar, topbar, cards, nav.
+   BLACK / WHITE FROSTED UI
+   Pure black background. Frosted white floating cards.
+   Responsive centered shell. Monochrome controls.
 ═══════════════════════════════════════════════════════ */
 
-/* ── Override root tokens → charcoal luxury palette ── */
+/* ── 1. Design Tokens ── */
 :root {
-  --bg:           #141414;
-  --surface:      rgba(28,28,30,.95);
-  --surface-2:    rgba(38,38,40,.88);
-  --surface-3:    rgba(22,22,24,.95);
-  --surface-hover:rgba(44,44,46,.98);
+  /* Pure black base */
+  --bg:           #000000;
+  --bg-subtle:    #0a0a0a;
 
-  --border:       rgba(255,255,255,.07);
-  --border-med:   rgba(255,255,255,.11);
-  --border-hi:    rgba(255,255,255,.18);
+  /* Frosted white surfaces — placed on black */
+  --surface:      rgba(255,255,255,.90);
+  --surface-2:    rgba(255,255,255,.70);
+  --surface-3:    rgba(255,255,255,.55);
+  --surface-hover:rgba(255,255,255,.97);
 
-  --text:         #f5f5f7;
-  --text-muted:   #aeaeb2;
-  --text-dim:     #6e6e73;
+  /* Text — black inside cards, white on black bg */
+  --text:         #080808;
+  --text-muted:   #444444;
+  --text-dim:     #888888;
+  --text-on-dark: #f0f0f0;
+  --text-dim-on-dark: rgba(255,255,255,.45);
 
-  /* Accent stripped to near-monochrome; blue only for active/data */
-  --purple:       #e8e8ed;
-  --purple-light: #c7c7cc;
-  --purple-glow:  rgba(232,232,237,.06);
-  --blue:         #e8e8ed;
-  --blue-light:   #c7c7cc;
-  --blue-glow:    rgba(232,232,237,.06);
+  /* Borders */
+  --border:       rgba(0,0,0,.10);
+  --border-med:   rgba(0,0,0,.18);
+  --border-hi:    rgba(0,0,0,.30);
+  --border-white: rgba(255,255,255,.12);
+  --border-white-hi: rgba(255,255,255,.22);
 
-  /* Status accents — restrained */
-  --success:      #30d158;
-  --success-bg:   rgba(48,209,88,.10);
-  --warning:      #ffd60a;
-  --warning-bg:   rgba(255,214,10,.10);
-  --danger:       #ff453a;
-  --danger-bg:    rgba(255,69,58,.10);
-
-  --shadow:       0 8px 40px rgba(0,0,0,.55);
-  --shadow-sm:    0 4px 18px rgba(0,0,0,.38);
-  --glow-purple:  0 4px 20px rgba(0,0,0,.40);
-  --glow-blue:    0 4px 20px rgba(0,0,0,.40);
-
-  --radius:       14px;
-  --radius-sm:    8px;
-  --radius-lg:    20px;
-}
-
-/* Light-mode override — keeps a neutral warm-gray variation if user toggles light */
-html.light-mode {
-  --bg:           #f2f2f7;
-  --surface:      rgba(255,255,255,.98);
-  --surface-2:    rgba(242,242,247,.88);
-  --surface-3:    rgba(248,248,253,.97);
-  --surface-hover:rgba(255,255,255,1);
-  --border:       rgba(15,15,15,.07);
-  --border-med:   rgba(15,15,15,.12);
-  --border-hi:    rgba(15,15,15,.19);
-  --text:         #1c1c1e;
-  --text-muted:   #48484a;
-  --text-dim:     #aeaeb2;
-  --purple:       #1c1c1e;
-  --purple-light: #48484a;
-  --purple-glow:  rgba(0,0,0,.06);
-  --blue:         #1c1c1e;
+  /* Monochrome accent — strip all color from non-status elements */
+  --purple:       #000;
+  --purple-light: #333;
+  --purple-glow:  rgba(0,0,0,.08);
+  --blue:         #000;
+  --blue-light:   #333;
   --blue-glow:    rgba(0,0,0,.06);
-  --shadow:       0 6px 28px rgba(0,0,0,.10);
-  --shadow-sm:    0 3px 12px rgba(0,0,0,.07);
+  --cyan:         #444;
+
+  /* Status — keep functional colors for data only */
+  --success:      #16a34a;
+  --success-bg:   rgba(22,163,74,.10);
+  --warning:      #b45309;
+  --warning-bg:   rgba(180,83,9,.10);
+  --danger:       #dc2626;
+  --danger-bg:    rgba(220,38,38,.10);
+
+  /* Elevation */
+  --shadow:       0 12px 48px rgba(0,0,0,.60);
+  --shadow-sm:    0 4px 20px rgba(0,0,0,.25);
+  --shadow-card:  0 2px 12px rgba(0,0,0,.14), 0 0 0 1px rgba(0,0,0,.06);
+
+  /* Shape */
+  --radius:       18px;
+  --radius-sm:    10px;
+  --radius-lg:    24px;
+
+  /* Layout */
+  --sidebar-w:    220px;
+  --content-max:  860px;
 }
 
-/* ── Sculptural background ── */
+/* ── 2. Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
-  background: var(--bg);
-  background-image:
-    radial-gradient(ellipse 120% 80% at 15% 0%, rgba(255,255,255,.025) 0%, transparent 60%),
-    radial-gradient(ellipse 80% 60% at 85% 100%, rgba(255,255,255,.018) 0%, transparent 55%);
-  background-attachment: fixed;
-}
-html.light-mode body {
-  background: #f2f2f7;
-  background-image:
-    radial-gradient(ellipse 100% 60% at 10% 0%, rgba(200,200,220,.25) 0%, transparent 55%),
-    radial-gradient(ellipse 70% 50% at 90% 100%, rgba(180,180,200,.15) 0%, transparent 50%);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  background: #000;
+  color: var(--text-on-dark);
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
 }
 
-/* ── Sidebar — soft floating glass panel ── */
+/* ── 3. Sidebar — frosted dark glass on black ── */
 #sidebar {
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  width: var(--sidebar-w);
+  background: rgba(18,18,18,.92);
+  border-right: 1px solid var(--border-white);
+  backdrop-filter: blur(30px) saturate(160%);
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+  color: var(--text-on-dark);
 }
+
+.sidebar-logo { border-bottom: 1px solid var(--border-white); }
+.sidebar-logo-text { color: #fff; font-weight: 700; }
+.sidebar-logo-sub  { color: var(--text-dim-on-dark); }
 
 .sidebar-logo-icon {
-  background: #e8e8ed;
-  color: #1c1c1e;
+  background: #fff;
+  color: #000;
+  border-radius: var(--radius-sm);
   box-shadow: none;
 }
-html.light-mode .sidebar-logo-icon { background: #1c1c1e; color: #f5f5f7; }
 
-/* ── Navigation — black active pill ── */
+.sidebar-section { color: rgba(255,255,255,.35); }
+
+.sidebar-footer { border-top: 1px solid var(--border-white); }
+
+/* Nav items — white text on dark sidebar */
 .nav-item {
-  color: var(--text-muted);
-  transition: background 0.14s ease, color 0.14s ease;
+  color: rgba(255,255,255,.55);
   border-radius: var(--radius-sm);
+  transition: background 0.12s ease, color 0.12s ease;
 }
 .nav-item:hover {
-  background: var(--surface-2);
-  color: var(--text);
+  background: rgba(255,255,255,.08);
+  color: #fff;
 }
+/* Active nav — solid white pill, black text */
 .nav-item.active {
-  background: #e8e8ed;
-  color: #1c1c1e;
+  background: #fff;
+  color: #000 !important;
   font-weight: 600;
-  box-shadow: 0 2px 10px rgba(0,0,0,.35);
+  box-shadow: 0 2px 12px rgba(255,255,255,.18);
 }
-html.light-mode .nav-item.active {
-  background: #1c1c1e;
-  color: #f5f5f7;
-  box-shadow: 0 2px 8px rgba(0,0,0,.15);
-}
-.nav-item.active::before { background: transparent; }
-.nav-icon { color: inherit; }
+.nav-item.active::before { display: none; }
+.nav-icon { color: inherit; font-size: 14px; }
 
-/* ── Topbar — minimal utility bar ── */
+/* ── 4. Topbar — frosted dark glass ── */
 #topbar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(12,12,12,.90);
+  border-bottom: 1px solid var(--border-white);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  color: var(--text-on-dark);
+}
+.topbar-title { color: #fff; }
+.topbar-key-label { color: var(--text-dim-on-dark); }
+
+/* ── 5. Main Content — responsive centered shell ── */
+#mainContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  background: transparent;
 }
 
-/* ── Cards — floating, rounded, generous padding ── */
+/* Scrollable view panels — center content with comfortable max-width */
+#viewCtrl,
+#viewSetup,
+#viewMemory,
+#viewOnboarding,
+#viewNotif,
+#viewReadiness,
+#viewOps,
+#viewSupport,
+#viewAdmin,
+#viewCases {
+  padding: 28px 32px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Unified content wrapper — center all content, remove inline max-widths */
+#viewCtrl > *,
+#viewSetup > *,
+#viewMemory > *,
+#viewNotif > *,
+#viewReadiness > * {
+  max-width: var(--content-max);
+  width: 100%;
+}
+
+/* Dashboard panel */
+#adminDash,
+#custDash {
+  padding: 28px 32px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Override inline max-width constraints so cards fill available space */
+.cfg-section,
+.setup-card,
+.readiness-card,
+.ob-test-card {
+  max-width: 100% !important;
+}
+
+/* ── 6. Frosted White Cards ── */
 .setup-card,
 .cfg-section,
 .kpi-card,
 .ob-progress-card,
-.int-card {
+.int-card,
+.readiness-card,
+.ob-test-card,
+.login-box,
+.login-card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(0,0,0,.08);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow 0.18s ease, transform 0.18s ease;
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  color: var(--text);
+  transition: box-shadow 0.18s ease;
 }
 .setup-card:hover,
 .cfg-section:hover,
-.kpi-card:hover {
-  box-shadow: var(--shadow);
+.kpi-card:hover { box-shadow: var(--shadow-sm); }
+
+/* Card text — black on white frosted card */
+.setup-card *,
+.cfg-section *,
+.kpi-card *,
+.ob-progress-card *,
+.int-card *,
+.readiness-card * {
+  color: inherit;
 }
 
-/* ── Buttons — refined monochrome ── */
-.btn {
-  border-radius: var(--radius-sm);
-  font-weight: 500;
-  transition: background 0.12s, box-shadow 0.12s, transform 0.1s;
-  letter-spacing: 0.01em;
-}
-.btn:active { transform: scale(0.98); }
-
-.btn-primary {
-  background: #e8e8ed;
-  color: #1c1c1e;
-  border: none;
-  box-shadow: 0 2px 8px rgba(0,0,0,.3);
-}
-.btn-primary:hover:not(:disabled) {
-  background: #f5f5f7;
-  box-shadow: 0 4px 16px rgba(0,0,0,.35);
-}
-html.light-mode .btn-primary {
-  background: #1c1c1e;
-  color: #f5f5f7;
-  box-shadow: 0 2px 6px rgba(0,0,0,.18);
-}
-html.light-mode .btn-primary:hover:not(:disabled) {
-  background: #2c2c2e;
+/* cfg-section header — slightly less opaque */
+.cfg-section-hdr {
+  background: rgba(0,0,0,.04);
+  border-bottom: 1px solid rgba(0,0,0,.07);
 }
 
-.btn-neutral {
-  background: var(--surface-2);
-  color: var(--text);
-  border: 1px solid var(--border);
-}
-.btn-neutral:hover:not(:disabled) {
-  background: var(--surface-hover);
-  border-color: var(--border-med);
-}
+/* cfg-section icon badges — neutral dark on white */
+.cfg-section-icon { background: rgba(0,0,0,.07) !important; color: #000; }
 
-/* ── Status pills — restrained color use ── */
-.status-pill.ok, .int-status-pill.healthy { background: var(--success-bg); color: var(--success); border-color: var(--success); }
-.status-pill.warn, .int-status-pill.warning { background: var(--warning-bg); color: var(--warning); border-color: var(--warning); }
-.status-pill.err, .int-status-pill.error { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
-.status-pill.gray, .int-status-pill { background: var(--surface-2); color: var(--text-muted); border-color: var(--border); }
-
-/* ── KPI cards ── */
-.kpi-card { border-radius: var(--radius); padding: 18px 20px; }
-.kpi-number { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
-.kpi-label  { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
-.kpi-delta  { font-size: 11px; font-weight: 600; }
+/* ── 7. KPI Cards ── */
+.kpi-card { padding: 20px 22px; border-radius: var(--radius); }
+.kpi-number { font-size: 28px; font-weight: 700; color: #000; letter-spacing: -0.03em; }
+.kpi-label  { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
 .kpi-delta.up   { color: var(--success); }
 .kpi-delta.down { color: var(--danger); }
 
-/* ── Integration cards ── */
-.int-card {
-  border-radius: var(--radius);
-  background: var(--surface);
-  border: 1px solid var(--border);
+/* ── 8. Buttons ── */
+.btn {
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  transition: background 0.12s, box-shadow 0.12s, transform 0.08s;
+  cursor: pointer;
+}
+.btn:active { transform: scale(0.975); }
+
+/* Primary — solid black, white text */
+.btn-primary {
+  background: #000 !important;
+  color: #fff !important;
+  border: none;
+  box-shadow: 0 2px 10px rgba(0,0,0,.25);
+}
+.btn-primary:hover:not(:disabled) {
+  background: #1a1a1a !important;
+  box-shadow: 0 4px 18px rgba(0,0,0,.30);
+}
+.btn-primary:disabled { opacity: .45; }
+
+/* Neutral — white/glass on dark backgrounds; outlined on white cards */
+.btn-neutral {
+  background: rgba(255,255,255,.10);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.20);
+}
+.btn-neutral:hover:not(:disabled) {
+  background: rgba(255,255,255,.18);
+  border-color: rgba(255,255,255,.30);
 }
 
-/* ── Onboarding / wizard ── */
-.ob-step-dot.complete  { background: var(--success); border-color: var(--success); color: #fff; }
-.ob-step-dot.incomplete{ background: var(--surface-2); border-color: var(--border-med); color: var(--text-muted); }
-.ob-progress-fill      { background: var(--success); transition: width 0.5s ease; }
+/* Neutral button inside a frosted white card — invert to dark */
+.cfg-section .btn-neutral,
+.setup-card .btn-neutral,
+.kpi-card .btn-neutral,
+.ob-test-card .btn-neutral,
+.ob-progress-card .btn-neutral,
+.int-card .btn-neutral,
+.readiness-card .btn-neutral,
+.login-card .btn-neutral {
+  background: rgba(0,0,0,.06);
+  color: #000;
+  border: 1px solid rgba(0,0,0,.14);
+}
+.cfg-section .btn-neutral:hover:not(:disabled),
+.setup-card .btn-neutral:hover:not(:disabled),
+.int-card .btn-neutral:hover:not(:disabled),
+.readiness-card .btn-neutral:hover:not(:disabled) {
+  background: rgba(0,0,0,.11);
+  border-color: rgba(0,0,0,.22);
+}
 
-/* ── Inputs & textareas ── */
+/* ── 9. Toggles — black/white instead of blue ── */
+input[type="checkbox"].toggle-cb:checked + .toggle-switch-track,
+.toggle-switch.on,
+.toggle-switch[data-on="true"] {
+  background: #000 !important;
+}
+/* Override the base toggle blue with black */
+.toggle-switch { background: rgba(0,0,0,.18); }
+.toggle-switch.on { background: #000 !important; }
+
+/* ── 10. Inputs ── */
 input[type="text"],
 input[type="email"],
 input[type="number"],
 input[type="password"],
 select,
 textarea {
-  background: var(--surface-2);
-  color: var(--text);
-  border: 1px solid var(--border-med);
+  background: rgba(0,0,0,.05);
+  color: #000;
+  border: 1px solid rgba(0,0,0,.16);
   border-radius: var(--radius-sm);
   transition: border-color 0.12s, box-shadow 0.12s;
 }
 input:focus, select:focus, textarea:focus {
   outline: none;
-  border-color: var(--border-hi);
-  box-shadow: 0 0 0 3px rgba(255,255,255,.05);
-}
-html.light-mode input:focus,
-html.light-mode select:focus,
-html.light-mode textarea:focus {
+  border-color: rgba(0,0,0,.40);
   box-shadow: 0 0 0 3px rgba(0,0,0,.06);
 }
+input::placeholder, textarea::placeholder { color: rgba(0,0,0,.35); }
 
-/* ── Login screen — centered glass card ── */
-#loginScreen {
-  background: var(--bg);
-  background-image:
-    radial-gradient(ellipse 120% 70% at 20% 10%, rgba(255,255,255,.03) 0%, transparent 60%),
-    radial-gradient(ellipse 80% 60% at 80% 90%, rgba(255,255,255,.02) 0%, transparent 50%);
+/* ── 11. Status Pills ── */
+.status-pill, .int-status-pill, .cust-pill {
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border: 1px solid currentColor;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
-.login-box {
-  background: var(--surface);
-  border: 1px solid var(--border-med);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-}
+.status-pill.ok,    .int-status-pill.healthy  { background: var(--success-bg); color: var(--success); }
+.status-pill.warn,  .int-status-pill.warning  { background: var(--warning-bg); color: var(--warning); }
+.status-pill.err,   .int-status-pill.error    { background: var(--danger-bg);  color: var(--danger); }
+.status-pill.gray,  .int-status-pill          { background: rgba(0,0,0,.06); color: #555; border-color: rgba(0,0,0,.14); }
 
-/* ── Integration setup overlay ── */
-#intSetupOverlay { background: rgba(0,0,0,.65); backdrop-filter: blur(4px); }
-#intSetupPanel   { background: var(--surface); border-left: 1px solid var(--border); }
+/* Status pills on dark backgrounds (sidebar/topbar areas) */
+.int-status-pill.healthy  { background: var(--success-bg); color: var(--success); }
+.int-status-pill.warning  { background: var(--warning-bg); color: var(--warning); }
+.int-status-pill.error    { background: var(--danger-bg);  color: var(--danger); }
 
-/* ── Misc refinements ── */
-.msg-success { background: var(--success-bg); color: var(--success); border-color: var(--success); }
-.msg-error   { background: var(--danger-bg);  color: var(--danger);  border-color: var(--danger); }
+/* ── 12. Message/alert boxes ── */
+.msg-success, .msg.msg-success { background: var(--success-bg); color: var(--success); border-color: var(--success); }
+.msg-error,   .msg.msg-error   { background: var(--danger-bg);  color: var(--danger);  border-color: var(--danger); }
 .cfg-save-msg.ok  { color: var(--success); }
 .cfg-save-msg.err { color: var(--danger); }
 
-/* Scrollbars — thin monochrome */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+/* ── 13. Integration cards ── */
+.int-card {
+  background: var(--surface);
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: var(--radius);
+}
+.int-card-check-dot.ok  { background: var(--success) !important; }
+.int-card-check-dot.err { background: var(--danger)  !important; }
 
-/* ── Micro interactions ── */
-.int-card, .setup-card, .cfg-section, .kpi-card {
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+/* ── 14. Onboarding / wizard ── */
+.ob-step-dot.complete   { background: #000; border-color: #000; color: #fff; }
+.ob-step-dot.incomplete { background: rgba(0,0,0,.08); border-color: rgba(0,0,0,.20); color: #888; }
+.ob-progress-fill       { background: #000; transition: width 0.4s ease; }
+.ob-progress-bar        { background: rgba(0,0,0,.10); }
+
+/* ── 15. Login screen ── */
+#loginScreen {
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.login-card, .login-box {
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(0,0,0,.10);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 80px rgba(0,0,0,.65);
+  color: #000;
+}
+.login-logo-text, .login-logo-sub { color: #000; }
+.login-logo-icon  { background: #000; color: #fff; }
+.login-tabs       { border-bottom: 1px solid rgba(0,0,0,.10); }
+.login-tab        { color: #555; }
+.login-tab.active { color: #000; border-bottom-color: #000; }
+.login-label      { color: #333; }
+input.login-input { background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.15); color: #000; }
+input.login-input::placeholder { color: rgba(0,0,0,.35); }
+input.login-input:focus { border-color: rgba(0,0,0,.40); }
+
+/* ── 16. Integration overlay ── */
+#intSetupOverlay { background: rgba(0,0,0,.75); backdrop-filter: blur(6px); }
+#intSetupPanel {
+  background: rgba(18,18,18,.95);
+  border-left: 1px solid var(--border-white);
+  backdrop-filter: blur(30px);
+  color: var(--text-on-dark);
+}
+#intSetupPanel .int-card {
+  background: rgba(255,255,255,.88);
+  color: #000;
 }
 
-/* Tables / job lists */
-.job-row:hover { background: var(--surface-2); }
+/* ── 17. Dashboard text & misc elements on black bg ── */
+.dash-page-title { color: #fff; }
+.dash-page-sub   { color: rgba(255,255,255,.50); }
+.dash-section-hdr .dash-section-title { color: rgba(255,255,255,.70); }
+.empty-state-title { color: rgba(255,255,255,.55); }
+.empty-state-sub   { color: rgba(255,255,255,.35); }
+.empty-state-icon  { color: rgba(255,255,255,.22); }
+
+/* ── 18. Tables & job rows ── */
+.job-row:hover { background: rgba(255,255,255,.05); }
+
+/* ── 19. Scrollbars — ultra thin ── */
+::-webkit-scrollbar       { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,.18); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.35); }
+
+/* ── 20. Responsive breakpoints ── */
+
+/* Large desktop (≥1300px): generous padding, wider content */
+@media (min-width: 1300px) {
+  :root { --content-max: 960px; }
+  #viewCtrl, #viewSetup, #viewMemory, #viewOnboarding,
+  #viewNotif, #viewReadiness, #viewOps, #viewAdmin {
+    padding: 32px 48px;
+  }
+  #adminDash, #custDash { padding: 32px 48px; }
+}
+
+/* Medium desktop (900px–1299px): standard */
+@media (min-width: 900px) and (max-width: 1299px) {
+  :root { --content-max: 820px; }
+  #viewCtrl, #viewSetup, #viewMemory, #viewOnboarding,
+  #viewNotif, #viewReadiness { padding: 24px 28px; }
+}
+
+/* Tablet/narrow (≤900px): reduce sidebar, full-width cards */
+@media (max-width: 900px) {
+  :root { --sidebar-w: 190px; --content-max: 100%; }
+  #viewCtrl, #viewSetup, #viewMemory, #viewOnboarding,
+  #viewNotif, #viewReadiness, #viewOps, #viewAdmin {
+    padding: 18px 18px;
+  }
+  .cfg-section, .setup-card { max-width: 100% !important; margin-right: 0; }
+}
+
+/* Mobile (≤680px): stack layout */
+@media (max-width: 680px) {
+  body { flex-direction: column; height: auto; overflow: visible; }
+  #sidebar { width: 100%; max-height: 60px; overflow: hidden; flex-direction: row; }
+  #mainContent { overflow: visible; min-height: 100vh; }
+  #topbar { height: auto; min-height: 52px; }
+  #viewCtrl, #viewSetup, #viewMemory, #viewOnboarding,
+  #viewNotif, #viewReadiness, #viewOps, #viewAdmin,
+  #adminDash, #custDash { padding: 14px 12px; }
+}
+
+/* ── 21. Micro-interactions ── */
+.int-card, .setup-card, .cfg-section, .kpi-card {
+  transition: box-shadow 0.18s ease;
+}
+.btn { transition: background 0.12s, box-shadow 0.12s, transform 0.08s; }
+
+/* ── 22. View-level text tokens — black background areas ──
+   Override --text to white for direct children of dark view panels,
+   then re-override back to black inside frosted white card components.
+── */
+#viewDash, #adminDash, #custDash,
+#viewCtrl, #viewSetup, #viewMemory, #viewOnboarding,
+#viewNotif, #viewReadiness, #viewOps, #viewSupport,
+#viewAdmin, #viewCases,
+#mainContent, #topbar, #sidebar {
+  --text: #f0f0f0;
+  --text-muted: rgba(255,255,255,.55);
+  --text-dim:   rgba(255,255,255,.35);
+  --border:     rgba(255,255,255,.10);
+  --border-med: rgba(255,255,255,.16);
+}
+
+/* Re-override to black inside frosted white card components */
+.cfg-section, .setup-card, .kpi-card, .ob-progress-card,
+.int-card, .readiness-card, .ob-test-card, .login-card, .login-box {
+  --text:       #080808;
+  --text-muted: #444444;
+  --text-dim:   #888888;
+  --border:     rgba(0,0,0,.10);
+  --border-med: rgba(0,0,0,.18);
+  --border-hi:  rgba(0,0,0,.30);
+  --surface-2:  rgba(0,0,0,.05);
+  --surface-3:  rgba(0,0,0,.08);
+  --purple:     #000;
+  --blue:       #000;
+}
+
+/* Dashboard large numbers, labels on dark bg */
+.dash-value, .kpi-value, .cust-big-num { color: #fff !important; }
+.cust-big-label, .cust-activity-type { color: rgba(255,255,255,.70) !important; }
+.cust-activity-subject { color: rgba(255,255,255,.55) !important; }
+.cust-activity-time    { color: rgba(255,255,255,.35) !important; }
+.dash-section-title    { color: rgba(255,255,255,.55) !important; }
+
+/* Range chips (dispatch selector) on dark bg */
+.range-chip       { color: rgba(255,255,255,.55); border-color: rgba(255,255,255,.15); background: rgba(255,255,255,.06); }
+.range-chip:hover { color: #fff; background: rgba(255,255,255,.12); }
+.range-chip.active { background: #fff; color: #000; border-color: #fff; }
+
+/* Wizard chips (tenant creation) */
+.wiz-chip { color: rgba(255,255,255,.65); border-color: rgba(255,255,255,.18); background: rgba(255,255,255,.06); }
+.wiz-chip:hover { color: #fff; border-color: rgba(255,255,255,.35); background: rgba(255,255,255,.12); }
+.wiz-chip.on    { background: #fff; color: #000; border-color: #fff; }
+
+/* Toggle switch background when off — visible on white card */
+.cfg-section .toggle-switch,
+.setup-card  .toggle-switch,
+.ob-progress-card .toggle-switch,
+.ob-test-card .toggle-switch {
+  background: rgba(0,0,0,.15) !important;
+  border-color: rgba(0,0,0,.22) !important;
+}
+.cfg-section .toggle-switch::after,
+.setup-card  .toggle-switch::after {
+  background: rgba(0,0,0,.40);
+}
+.cfg-section .toggle-switch.on,
+.setup-card  .toggle-switch.on,
+.ob-progress-card .toggle-switch.on {
+  background: #000 !important;
+  border-color: #000 !important;
+}
+.cfg-section .toggle-switch.on::after,
+.setup-card  .toggle-switch.on::after {
+  background: #fff;
+}
+
+/* Table/list text in dark bg */
+.job-list-row td, .job-row, .cases-table td { color: rgba(255,255,255,.80); }
+.job-row:hover { background: rgba(255,255,255,.05); }
+
+/* Inline style overrides for common hardcoded colors in HTML */
+[style*="color:#374151"], [style*="color: #374151"] { color: rgba(255,255,255,.75) !important; }
+[style*="color:#6b7280"], [style*="color: #6b7280"] { color: rgba(255,255,255,.50) !important; }
+[style*="color:#1f2937"], [style*="color: #1f2937"] { color: rgba(255,255,255,.85) !important; }
+[style*="color:#111"],    [style*="color: #111"]     { color: rgba(255,255,255,.90) !important; }
+[style*="color:#888"],    [style*="color: #888"]     { color: rgba(255,255,255,.45) !important; }
+
+/* But not inside white cards */
+.cfg-section [style*="color:#374151"],
+.setup-card  [style*="color:#374151"],
+.int-card    [style*="color:#374151"] { color: #374151 !important; }
+.cfg-section [style*="color:#6b7280"],
+.setup-card  [style*="color:#6b7280"],
+.int-card    [style*="color:#6b7280"] { color: #6b7280 !important; }
+.cfg-section [style*="color:#111"],
+.setup-card  [style*="color:#111"],
+.int-card    [style*="color:#111"]    { color: #111 !important; }
+
+/* Approval cards and case detail panels inherit from frosted cards */
+.approval-card { background: var(--surface); border: 1px solid rgba(0,0,0,.08);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+  backdrop-filter: blur(24px); color: #000;
+  --text: #080808; --text-muted: #444; --text-dim: #888;
+}
+
+/* Admin tenant overview table */
+.admin-tenant-table { color: rgba(255,255,255,.80); }
+.admin-tenant-table th { color: rgba(255,255,255,.45); }
+
+/* Pilot readiness list outside cards */
+#readinessResult { color: rgba(255,255,255,.80); }
+
+/* ── Customer hero sections → black frosted glass ── */
+.cust-hero, .ob-cust-hero {
+  background: rgba(255,255,255,.10) !important;
+  border: 1px solid rgba(255,255,255,.16) !important;
+  border-radius: var(--radius) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  box-shadow: none !important;
+  color: #fff !important;
+}
+.cust-hero h1, .ob-cust-hero h1,
+.cust-hero p,  .ob-cust-hero p  { color: #fff !important; }
+
+/* ── Case cards on dark bg → frosted white ── */
+.case-card {
+  background: rgba(255,255,255,.88);
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: var(--radius);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: #000;
+  --text: #080808; --text-muted: #444; --text-dim: #888;
+}
+.case-card:hover { background: rgba(255,255,255,.96); box-shadow: var(--shadow-sm); }
+.case-card-subject  { color: #000; }
+.case-card-customer { color: #555; }
+.case-card-footer   { color: #888; }
+.case-card-snippet  { color: #666; }
+
+/* ── Onboarding int cards, status cards → frosted white ── */
+.ob-int-card, .ob-status-card {
+  background: rgba(255,255,255,.88);
+  border-color: rgba(0,0,0,.08);
+  border-radius: var(--radius);
+  backdrop-filter: blur(20px);
+  color: #000;
+  --text: #080808; --text-muted: #444; --text-dim: #888;
+}
+.ob-int-name { color: #000; }
+
+/* ── Approval cards → frosted white with amber accent border ── */
+.approval-card {
+  background: rgba(255,255,255,.88);
+  border: 1px solid rgba(180,83,9,.30);
+  border-radius: var(--radius);
+  backdrop-filter: blur(20px);
+  color: #000;
+}
+.approval-card .approval-meta { color: #555; }
+
+/* ── Action cards → frosted white ── */
+.action-card {
+  background: rgba(255,255,255,.78);
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: var(--radius-sm);
+  color: #000;
+}
+
+/* ── Detail sections in case view → frosted white ── */
+.detail-section {
+  background: rgba(255,255,255,.88) !important;
+  border: 1px solid rgba(0,0,0,.08) !important;
+  border-radius: var(--radius) !important;
+  backdrop-filter: blur(20px) !important;
+  color: #000 !important;
+}
+.detail-section-title { color: #000 !important; }
+
+/* ── Thread messages → frosted ── */
+.thread-message { background: rgba(255,255,255,.80); border-radius: var(--radius-sm); color: #000; }
+.thread-message.outgoing { background: rgba(0,0,0,.75); color: #fff; }
+
+/* ── Next step card ── */
+.next-step-card {
+  background: rgba(255,255,255,.88);
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: var(--radius);
+  backdrop-filter: blur(20px);
+  color: #000;
+}
+
+/* ── Support console, ops area ── */
+#viewSupport, #viewOps { color: rgba(255,255,255,.80); }
+
+/* ── Inline color overrides inside non-card areas (only on dark bg) ── */
+#adminDash .kpi-card { --text: #080808; --text-muted: #444; }
+#custDash  .kpi-card { --text: #080808; --text-muted: #444; }
 </style>
 </head>
 <body>

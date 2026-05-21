@@ -4,9 +4,30 @@
 AI Automation Platform — multi-tenant backend-first plattform för AI-driven workflow automation.
 
 ## Current objective
-Visma OAuth redirect fix, Kunduppsättning/Onboarding improvements, dynamic Kundminne scan buttons, settings deep-merge, automation policy detection, and premium monochrome SaaS UI refresh complete (2026-05-21).
+Black/white frosted glassmorphism UI refresh complete (2026-05-21). Supersedes previous "premium charcoal" pass. Pure black background, frosted white cards, responsive centered shell.
 
-## Latest: Visma, Onboarding & Premium UI Pass (2026-05-21)
+## Latest: Black/White Frosted UI (2026-05-21)
+
+CSS-only redesign. Replaces previous charcoal-dark pass with a strict black/white frosted glassmorphism system.
+
+**Design principles:**
+- Background: pure `#000` everywhere; no dark-gray, no charcoal
+- Cards (`cfg-section`, `setup-card`, `kpi-card`, `int-card`, `case-card`, etc.): `rgba(255,255,255,.88-.92)` with `backdrop-filter: blur(24px)`, `border-radius: 18px`, thin `rgba(0,0,0,.08)` border
+- Sidebar/topbar: `rgba(18,18,18,.92)` frosted dark with white text; active nav = solid white pill with black text
+- All blue/purple accent variables remapped to `#000`/`#fff`; status colors (success/warning/danger) kept functional
+- CSS custom properties overridden at view-panel level (`--text: #f0f0f0`) then re-overridden inside card components (`--text: #080808`) so card text is always black and background text is always white
+- Toggles: off = `rgba(0,0,0,.15)`, on = `#000` with white knob
+- Buttons: primary = solid black with white text; neutral = frosted glass (context-aware)
+- Responsive: `--content-max` variable drives max-width; overrides inline `max-width: 720px/760px/800px` on cards; breakpoints at 1300/900/680px
+
+**Files changed:**
+- `app/ui/index.html` — CSS override block replaced (~360 lines → ~420 lines of new CSS)
+
+**Tests:** 19/19 Visma OAuth, no linter errors.
+
+---
+
+## Previous: Visma, Onboarding & Premium UI Pass (2026-05-21)
 
 ### Backend fixes
 
