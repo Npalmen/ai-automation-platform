@@ -1,3 +1,5 @@
+﻿> Archived document. Historical reference only. Current governing source is docs/00-master-plan.md.
+
 # Roadmap
 
 ## Phase 1 — Stabilize official MVP backend flow

@@ -1,6 +1,22 @@
 
 # CLAUDE.md
 
+## Mandatory governance
+
+Before performing any work, read:
+
+1. `docs/00-master-plan.md`
+2. `docs/01-current-truth.md`
+3. `docs/04-execution-rules.md`
+
+`docs/00-master-plan.md` is the governing document. If any file conflicts with it, the master plan wins.
+
+Execution agents may choose implementation details but may not change product direction, roadmap, phase order, integration priority or automation risk policy.
+
+If the plan appears wrong, pause and report. Do not adjust strategy inside an execution task.
+
+---
+
 ## Project Mission
 
 You are working on a backend-first, multi-tenant AI automation platform.
@@ -17,17 +33,15 @@ The goal is to build a **deployable MVP** where:
 
 ## Source of Truth (READ FIRST)
 
-You MUST follow these documents:
+You MUST follow these documents in this order:
 
-1. docs/02-mvp-scope.md
-2. docs/03-system-architecture.md
-3. docs/05-current-state.md
-4. docs/06-backlog.md
-5. docs/07-decisions.md
-6. docs/08-handoff.md
+1. `docs/00-master-plan.md` — highest authority
+2. `docs/01-current-truth.md` — verified system state
+3. `docs/04-execution-rules.md` — how to execute work
+4. The specific document related to your current task
 
 If something conflicts:
-→ follow these docs, NOT assumptions.
+→ `docs/00-master-plan.md` wins, NOT assumptions, NOT chat history.
 
 ---
 
@@ -83,14 +97,13 @@ Never leave logic unverified.
 
 ## Documentation Rules
 
-If your changes affect behavior, you MUST propose updates to:
+If your changes affect behavior, you MUST update:
 
-- docs/05-current-state.md
-- docs/06-backlog.md
-- docs/08-handoff.md
+- `docs/01-current-truth.md` — when something is verified
+- `docs/06-backlog.md` — when a task is completed or added
+- `docs/07-decisions.md` — when a locked decision is referenced or a new one is made
 
-If architecture changes:
-- update docs/07-decisions.md
+Do not update `docs/00-master-plan.md` as part of an execution task.
 
 ---
 

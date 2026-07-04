@@ -1,0 +1,318 @@
+﻿> Archived document. Historical reference only. Current governing source is docs/00-master-plan.md.
+
+# Backlog
+
+## Done (schema and table bootstrap hardening — 2026-04-09)
+- [x] `JobListResponse` redefined as `{items, total}` to match main.py return shape
+- [x] `main.py` Base import changed from `base.Base` (empty) to `database.Base` (all models) — all tables now created on startup
+
+## Done (read endpoint hardening — 2026-04-09)
+- [x] Root-cause all 500s on read endpoints: six missing repository alias methods
+- [x] Add `JobRepository.list_jobs` / `count_jobs`
+- [x] Add `AuditRepository.list_events` / `count_events`
+- [x] Add `IntegrationRepository.list_events` / `count_events` (static)
+- [x] Add `tests/test_repository_aliases.py` (10 tests); 46/46 pass
+
+## Done (MVP flow slice — 2026-04-09)
+- [x] Trace official lead flow end-to-end
+- [x] Patch: remove asyncio.run() wrapping synchronous run_pipeline (main.py)
+- [x] Patch: fix send_email to use IntegrationType.GOOGLE_MAIL not missing EMAIL
+- [x] Patch: is_integration_configured now recognises token-based integrations
+- [x] Fix: remove duplicate assertion block in test_invoice_duplicate_detection
+- [x] Add tests/test_mvp_flow.py (23 tests, 36/36 total pass)
+- [x] Update docs/05-current-state.md and docs/08-handoff.md
+
+## Done (action error handling hardening — 2026-04-09)
+- [x] `action_dispatch_processor`: result `status="failed"` when any action fails; audit event emitted with error detail
+- [x] `orchestrator._finalize_success`: routes to `FAILED` (not `MANUAL_REVIEW`) when `failed_count > 0` in action_dispatch payload
+- [x] `get_db`: added `except: db.rollback(); raise` for defensive session handling
+- [x] `tests/test_action_failure.py` (11 tests); 68/68 pass
+
+## Done (thin operator/admin UI — 2026-04-10)
+- [x] `app/ui/index.html` — single-file UI, no build toolchain
+- [x] `GET /ui` route in `app/main.py` — serves HTML directly via FastAPI
+- [x] Jobs list, job detail (approvals + actions), pending approvals tab
+- [x] Approve/Reject buttons call existing endpoints; UI refreshes after decision
+- [x] `X-Tenant-ID` sent on every request via editable tenant field
+- [x] 74/74 tests pass; no backend business logic changed (DEC-003)
+
+## Done (operability and docs hardening — 2026-04-10)
+- [x] `requirements.txt` created with all pinned runtime + test dependencies
+- [x] `docker-compose.yml` written — Postgres 15, port 5432, correct DB name
+- [x] `env.example` created — full template with all env vars documented
+- [x] `scripts/create_tables.py` fixed — imports all four model modules; all tables confirmed via output
+- [x] README fully rewritten — setup, DB verification, full curl smoke test, Gmail notes, API table, limitations
+- [x] `force_approval_test` flag documented as the official golden-path trigger
+- [x] 74/74 tests pass; no code logic changed
+
+## Done (auth / API key enforcement — 2026-04-11)
+- [x] `app/core/auth.py` — `get_verified_tenant` dependency; key map loaded from `TENANT_API_KEYS` env var
+- [x] All protected endpoints use `Depends(get_verified_tenant)`; `X-Tenant-ID` no longer trusted directly
+- [x] Auth disabled (empty `TENANT_API_KEYS`) → dev mode with warning; auth enabled → 401/403 on bad keys
+- [x] `tests/test_auth.py` (14 tests); 88/88 pass
+- [x] `env.example`, README, and docs updated
+
+## Done (UI auth alignment — 2026-04-11)
+- [x] `app/ui/index.html` — API key input replaces tenant ID input
+- [x] All fetch calls send `X-API-Key`; key persisted to `localStorage`
+- [x] Warning banner when no key set; auto-load skipped on fresh open without key
+- [x] 88/88 tests pass; no backend changes
+
+## Done (DB-driven tenant config — 2026-04-12)
+- [x] `app/repositories/postgres/tenant_config_models.py` — `TenantConfigRecord` SQLAlchemy model (`tenant_configs` table)
+- [x] `app/repositories/postgres/tenant_config_repository.py` — `TenantConfigRepository.get`, `upsert`, `to_dict`
+- [x] `app/core/config.py` — `get_tenant_config(tenant_id, db=None)` reads from DB when `db` provided; falls back to `TENANT_CONFIGS` when no row or DB unavailable
+- [x] `app/main.py` `/tenant` endpoint — passes `db` session to `get_tenant_config`; now returns DB row when present
+- [x] `app/repositories/postgres/__init__.py` — `TenantConfigRecord` imported so `create_all` creates the table
+- [x] `scripts/create_tables.py` — `tenant_config_models` import added
+- [x] `tests/test_tenant_config.py` — 17 new tests; 105/105 pass
+- [x] No change to policy logic, API contract, or existing test flows
+
+## Done (integration event persistence — 2026-04-12)
+- [x] `app/domain/integrations/models.py` — `IntegrationEvent` base changed from `base.Base` (orphaned) to `database.Base`; table now included in `create_all`
+- [x] `app/repositories/postgres/__init__.py` — side-effect import of `app.domain.integrations.models` registers table with shared metadata
+- [x] `scripts/create_tables.py` — `integration_models` import added
+- [x] `app/main.py` `POST /integrations/{type}/execute` — synthetic dict replaced with real `IntegrationEvent` record persisted via `IntegrationRepository.create`; response built from saved record via `model_validate`
+- [x] `tests/test_integration_event_persistence.py` — 11 new tests; 122/122 pass
+
+## Done (Gmail OAuth token refresh — 2026-04-12)
+- [x] `app/core/settings.py` — `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` settings added
+- [x] `app/integrations/service.py` — refresh credentials included in `GOOGLE_MAIL` connection config
+- [x] `app/integrations/google/mail_client.py` — `refresh_access_token()` function; `GoogleMailClient` accepts refresh credentials; on 401, refreshes token and retries once; 403 is not retried
+- [x] `app/integrations/google/adapter.py` — refresh credentials threaded from `connection_config` to `GoogleMailClient`
+- [x] `env.example` — `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` documented
+- [x] `tests/test_gmail_oauth_refresh.py` — 19 new tests; 141/141 pass
+
+## Done (sellable MVP intake flows — 2026-04-23)
+
+### DEL 1: Customer inquiry flow
+- [x] `_build_inquiry_default_actions(job)` — `create_monday_item` + `send_email` to support
+- [x] `normalize_sender()`, `extract_phone()`, `classify_inquiry_priority()` shared helpers
+- [x] HIGH/NORMAL priority surfaced in item name, email subject, column_values, body
+- [x] `tests/test_inquiry_default_actions.py` — 76 tests
+
+### DEL 2: Invoice flow
+- [x] `_INVOICE_KEYWORDS` + `classify_email_type()` public function — invoice > lead > customer_inquiry
+- [x] `_build_invoice_default_actions(job)` — `create_monday_item` + `create_internal_task`
+- [x] `extract_invoice_amount`, `extract_invoice_number`, `extract_due_date`, `extract_invoice_data`
+- [x] Extraction wired into invoice default actions (amount, invoice_number, due_date, supplier_name, raw_text)
+- [x] `tests/test_invoice_default_actions.py` — 32 tests; `tests/test_invoice_extraction.py` — 47 tests
+
+### Inbox type inference
+- [x] `/gmail/process-inbox` infers `job_type` from message content via `classify_email_type`
+- [x] Per-type tenant gate — skips with `"{type}_disabled"` if not enabled
+- [x] Job created with inferred `JobType`; no hardcoded `actions` in `input_data`
+- [x] `tests/test_gmail_tenant_config_gate.py` — rewritten (17 tests)
+
+**702/702 tests pass. Sellable MVP complete.**
+
+## Done (follow-up question engine — 2026-04-24)
+- [x] `evaluate_information_completeness(job_type, input_data)` — deterministic completeness check for lead, customer_inquiry, invoice
+- [x] `_build_lead_default_actions(job)` — new first-class builder (previously fell through to generic fallback)
+- [x] `_build_follow_up_email(sender_email, questions)` — follow-up `send_email` using existing action type; no new integration
+- [x] `_build_inquiry_default_actions` + `_build_invoice_default_actions` updated: completeness fields in column_values and task metadata
+- [x] Explicit `input_data.actions` still overrides defaults (override behavior preserved)
+- [x] `tests/test_followup_engine.py` — 23 tests; `tests/test_inquiry_default_actions.py` fix (1 test)
+- [x] 725/725 tests pass
+
+## Done (Customer Auto-Reply + Internal Handoff — 2026-04-25)
+- [x] `send_customer_auto_reply` + `send_internal_handoff` injected for lead + inquiry fallback pipelines
+- [x] Gated by `followups_enabled` + presence of customer email; skipped conditions produce `_skip` sentinel
+- [x] `skipped_actions` / `skipped_count` in dispatch result payload
+- [x] UI action label map: Kundsvar / Intern notifiering / Monday-objekt / Slack-notis / etc.
+- [x] `tests/test_auto_reply_handoff.py` — 22 tests; 1022/1022 pass
+
+## Done (Classification v2 / Better Inbox Taxonomy — 2026-04-25)
+- [x] 9-type taxonomy: lead, customer_inquiry, invoice, partnership, supplier, newsletter, internal, spam, unknown
+- [x] Priority order (deterministic): spam > newsletter > internal > invoice > supplier > partnership > lead > customer_inquiry
+- [x] Visibility-only types (partnership/supplier/newsletter/internal/spam): only skipped sentinels — no customer emails
+- [x] `AllowedJobType` extended in AI schema; 5 new `JobType` enum values
+- [x] Swedish labels in UI `JOB_TYPE_LABELS` + `CASE_TYPE_LABELS`
+- [x] `tests/test_classification_v2.py` — 52 new tests; 1074/1074 pass
+
+## Done (Cases UX Upgrade — 2026-04-25)
+- [x] `GET /cases`: q (ILIKE search on job_id + input_data), type, status, sort_by, sort_dir, limit, offset
+- [x] Response includes: received_at, processed_at, customer_email, limit, offset
+- [x] `received_at` stored in `input_data` during Gmail inbox ingestion (from Gmail Date header)
+- [x] `GET /cases/{job_id}` includes received_at + processed_at
+- [x] Ärenden tab UI: search/filter/sort/pagination controls; Swedish labels; received_at as primary timestamp
+- [x] 33 new tests in test_cases.py; 1107/1107 pass
+
+## Done (live email response chapter 1 — 2026-05-05)
+- [x] Server live verification completed against `api.krowolf.se` for lead/support flow with real inbox messages
+- [x] Personalized customer auto-replies deployed (more human tone + targeted info questions)
+- [x] Removed static summary block from customer reply templates
+- [x] Added Gmail subject cleanup to strip UI helper text pollution
+- [x] Added Gmail thread-reply support (`thread_id`, `In-Reply-To`, `References`) in send path
+- [x] Added no-reply relay handling (Webflow-style): extract real customer email from body/payload and send a new message to customer
+- [x] Approval workflow validated end-to-end after deploy (create → pending → approve → sent)
+- [x] Regression subset passed locally after patch (`test_auto_reply_handoff.py`, `test_tenant_branding.py`, `test_email_approval.py`)
+
+## Done (slice3 pilot reliability runbook signals — 2026-05-06)
+- [x] `GET /integrations/health` now returns `runbook_signals` with deterministic remediation hints per system and operations state
+- [x] `POST /setup/verify` now returns `runbook_signal` when status is `warning` or `failed` (null when `ok`)
+- [x] Updated tests for integration health + setup verify response shape and severity behavior
+
+## Done (R1 consolidated release gate — 2026-05-06)
+- [x] Added `scripts/run_release_gate_r1.py` to run one combined R1 gate instead of repeated full-suite runs during slice work
+- [x] Gate phases locked:
+  - Regression: setup/onboarding/integration health/cases/control panel/dispatch policy+approval+auto-dispatch
+  - E2E pilot matrix: inbox -> classification -> approval -> dispatch (+ dispatch observability checks)
+- [x] Command interface:
+  - `python -m scripts.run_release_gate_r1` (full gate)
+  - `python -m scripts.run_release_gate_r1 --phase regression`
+  - `python -m scripts.run_release_gate_r1 --phase e2e`
+- [x] Process intent aligned with Slice plan: fast local loops use focused tests; full regression+e2e run is centralized into release gate execution
+
+## Done (R2 slice4-5 operations + installer vertical v1 — 2026-05-06)
+- [x] Added case-scoped operations workspace persisted in `input_data.operations_workspace` with default v1 shape
+- [x] Added deterministic installer checklist templates (`general`, `solar`, `ev_charger`) and a tenant-scoped template seed/replace endpoint
+- [x] Added first-class documentation bucket mutation for before images, after images, and project documents
+- [x] Implemented API endpoints:
+  - `GET /cases/{job_id}/operations`
+  - `PUT /cases/{job_id}/operations`
+  - `POST /cases/{job_id}/operations/timeline`
+  - `POST /cases/{job_id}/operations/tasks`
+  - `POST /cases/{job_id}/operations/attachments`
+  - `PATCH /cases/{job_id}/operations/checklists`
+  - `POST /cases/{job_id}/operations/checklists/template`
+  - `POST /cases/{job_id}/operations/documentation`
+  - `POST /cases/{job_id}/operations/delivery-package`
+- [x] Included operations workspace in `GET /cases/{job_id}` response
+- [x] Added admin case-detail panel in UI for operations workspace (summary + JSON editor + quick actions)
+- [x] Added focused tests in `tests/test_operations_workspace.py` (9 tests)
+
+## Done (Fas 1 slices 1.3-1.5 — onboarding, demo mode, mobile polish)
+- [x] Onboarding wizard v2 kept as tenant-scoped progress/checklist flow with setup verification and synthetic test lead creation.
+- [x] Demo/test tenant mode now blocks live inbox sync and scheduler-driven external sends when `demo_mode` is active.
+- [x] Added safe demo-data seeding via `/demo/seed` and `/admin/tenants/{tenant_id}/demo/seed`; jobs use the deterministic verification pipeline only.
+- [x] Added mobile-first CSS for core dashboard, cases, onboarding/setup, tables, overlays, sidebar and topbar.
+
+## Done (Fas 1 Gate — productification verification)
+- [x] Verified Phase 1 gate criteria: desktop/mobile core UI, onboarding, active tenant context, admin/customer separation, demo/test mode, and docs.
+- [x] Fixed admin tenant-context auth alignment for admin tooling: tenant-scoped endpoints now accept a valid `X-Admin-API-Key` together with the active `X-Tenant-ID`; normal tenant API-key behavior is unchanged.
+- [x] Rewired onboarding UI calls so customer mode uses tenant auth and admin mode uses admin auth with the selected tenant context.
+- [x] Gate evidence: focused Phase 1 suite passed (`146 passed`); consolidated R1 gate passed (`338 passed` regression + `145 passed` E2E).
+
+## Done (Fas 6 — Automationsupplevelse och wow-floden)
+- [x] Added deterministic case automation summary with status, next step, confidence, evidence, and sources.
+- [x] Added risk detection for failed jobs/actions, pending approvals, missing customer info, blocked projects, incomplete delivery package, low margin, and stale active cases.
+- [x] Added three preview-only wow flows: approved customer reply, case-to-project handoff, and project-to-invoice-ready package.
+- [x] Exposed `GET /cases/{job_id}/automation-wow` and embedded `automation_summary`, `automation_risks`, and `wow_flows` in `GET /cases/{job_id}`.
+- [x] Added admin case-detail UI panel for automation overview, risk signals, and safe flow previews.
+- [x] Added focused tests in `tests/test_automation_wow.py`; updated case shape tests.
+
+## Done (Fas 7 — Ready-to-market usage analytics)
+- [x] Added `app/analytics/usage.py` for read-only pilot usage analytics across DB tenants.
+- [x] Added admin-protected `GET /admin/usage/analytics?range=today|7d|30d|all`.
+- [x] Aggregates active tenants, jobs created/completed, pending approvals, blocked flows, dispatch success/failure, automation rate, and estimated time saved.
+- [x] Keeps Phase 7 hardening inside existing backend-first architecture: no schema changes, no external calls, no secrets in responses.
+- [x] Added focused tests in `tests/test_usage_analytics.py`.
+
+## Done (Product SaaS Finish — Sprint 1 P0 hardening)
+- [x] `POST /scheduler/run-once` is admin-only because it runs all-tenant scheduler work.
+- [x] Production tenant auth fails closed when no tenant API credentials are configured.
+- [x] Pilot readiness recognizes DB-backed tenant API keys, not only `TENANT_API_KEYS`.
+- [x] Public FastAPI docs/OpenAPI are disabled when `ENV=production`.
+- [x] Admin browser/localStorage key model documented as pilot-only; protect `/ui` with VPN/IP allowlist or trusted operator access.
+- [x] Server `server-local-hotfix-backup` reviewed; it is an older checkpoint branch retained only as historical backup. Do not merge it over `main`.
+- [x] Focused P0 hardening tests passed (`tests/test_auth.py`, `tests/test_scheduler.py`, `tests/test_production_readiness.py`, `tests/test_production_hardening.py`).
+
+## Done (Product SaaS Finish — Sprints 2-7 product readiness)
+
+Completed product-readiness pass for 5 controlled customers:
+
+- [x] IA-01–IA-06: customer/admin navigation audited and fixed only where gaps existed.
+- [x] Customer surfaces: Resultat/ROI, Aktivitetslogg, Inställningar, Konto & Team.
+- [x] Customer settings map: notifications, support/account metadata and team metadata stored in `tenant_configs.settings`.
+- [x] Admin control tower: Super Admin start page, needs-help queue, health table and quick actions.
+- [x] Apple/glassmorphism-inspired CSS refresh on existing single-file UI; no frontend rewrite.
+- [x] CI/deploy hardening: GitHub Actions release gate, Dockerfile, production compose config and smoke-check script.
+- [x] Sales readiness checklist: `docs/13-5-customer-launch-checklist.md`.
+
+Remaining before live sales is operational validation with real customer data and real production secrets, not new product architecture.
+
+**Visual UI Refresh scope lock (DEC-005, 2026-05-07):** Sprint 5 (Visual UI Refresh) is scoped to polish on existing CSS tokens and dark shell only. No new design direction, no color scheme changes, no new typographic hierarchy. Allowed: spacing/padding adjustments, hover/focus polish, subtle transitions, contrast improvements, empty/loading/error state refinement, sparse `backdrop-filter` on modals, mobile/accessibility pass. Existing `:root` design tokens, CSS classes, element IDs, and JS selectors must be preserved. See `docs/07-decisions.md` DEC-005.
+
+## Next (priority order)
+
+Current product north star: **operational system for installation/service companies, lead → invoice/bookkeeping preparation, AI in background**.
+
+### Documentation
+- [x] DOC-C: Product north star document (`docs/14-product-north-star-installers.md`)
+- [x] P0: Golden path documentation (`docs/15-golden-path.md`)
+- [x] P2f: Document "AI in the background" definition in product docs + current-state
+- [x] P5a: Finance underlag-ready checklist (`docs/16-underlag-ready-checklist.md`)
+
+### Dashboard KPIs (P1)
+- [x] P1a: Email approval queue KPI (`compute_dashboard_kpis` in `app/insights/engine.py`)
+- [x] P1b: Waiting-on-customer KPI (`_count_waiting_customer`)
+- [x] P1c: Invoice/bookkeeping underlag ready KPI (`_count_underlag_ready` + `_is_underlag_ready`)
+- [x] P1d: Active light projects/work orders KPI (`_count_active_ops_cases`)
+- [x] P1e: Wire P1a–d into admin/customer dashboard UI — Driftstatus row (5 cards) + customer Ärendeöversikt
+
+### AI Operational Insights (P2)
+- [x] P2a: Insight row JSON schema (type, severity, title, detail, job_id, pipeline_stage, evidence)
+- [x] P2b: Rule pack 1 — lead/support signals (stale_lead, hot_lead_pending, missing_customer_info, support_escalation)
+- [x] P2c: Rule pack 2 — operations + finance signals (delivery_incomplete, work_order_blocked, underlag_ready, fortnox_export_pending)
+- [x] P2d: `GET /dashboard/operational-insights` endpoint + tenant-isolation tests (26 tests)
+- [x] P2e: Wire top insights into daily digest `_build_digest_body`
+
+### Communication + SLA (P3)
+- [x] P3a: Unanswered lead eligibility rules (status + time threshold + demo_mode blocker)
+- [x] P3b: Reminder notification path (internal approval-record; no customer mail without gate)
+- [x] P3c: Scheduler idempotent hook (`run_sla_reminder_pass` integrated into `_run_scheduler_pass`)
+
+### Light Project Operations (P4)
+- [x] P4a: Customer mode — read-only operations panel (Projektöversikt: project/WO badges, customer info, checklist X/Y, docs, timeline, delivery status)
+- [x] P4b: Customer mode — guided edits (WO status dropdown, timeline note, time/material entry via existing PUT/POST endpoints)
+- [x] P4c: Admin mode — no regression (admin operations panel untouched)
+
+### Finance Underlag (P5)
+- [x] P5b: `material_lines` in draft endpoint + `finance_draft_available`/`finance_draft_url` in case detail (11 tests)
+
+### Mobile Field UX (P6)
+- [x] P6: Touch target CSS (min-height 44px for form inputs/buttons), ops panel labels, 5-col → 2-col → 1-col responsive KPI grid; DEC-005 compliant
+
+### Product Audit Roadmap (completed 2026-05-10)
+- [x] Pilot Cockpit (P0) — `GET /dashboard/cockpit`, 5 KPI action cards, top action items; admin dashboard redesigned
+- [x] Follow-up Engine v1 (P1) — `GET /cases/{job_id}/followup`, followup_state, suggested_reply, pending_approval_id; Uppföljning panel in case detail
+- [x] Field Workflow (P2) — large field action buttons (Starta/Pausa/Klart/Blockerad); `_setWorkOrderStatus()`; raw JSON collapsed in details
+- [x] Project Closeout Packet (P3) — `GET /cases/{job_id}/closeout`, customer/internal summary, material/time, docs, finance_ready; "Sammanställ projekt" button
+- [x] Finance Export Status (P4) — `GET /cases/{job_id}/finance/export-status`, Fortnox event history, preview/export URLs
+- [x] Pilot Ops Runbooks (P5) — `docs/runbook-scheduler.md`, `docs/runbook-oauth.md`, `docs/runbook-pilot-support.md`
+- [x] Tests: 21 new tests, total 2193 passing
+
+### Remaining from earlier backlog
+- [x] Finance layer v1 — bookkeeping-assist foundation (invoice draft, VAT/category classification, project profitability, approval-gated/idempotent Fortnox preview/export controlled write path)
+- [x] OAuth hardening runbook — see `docs/runbook-oauth.md`
+- [x] Scheduler / cron trigger — documented in `docs/runbook-scheduler.md`
+- [ ] Finance integrations planning — define expanded Swedish finance sync scope beyond initial Fortnox pre-accounting export (ROT/RUT if B2C required)
+- [ ] Visma integration — decision: pilot with Fortnox first; Visma only if a paying pilot explicitly requires it
+
+## Done (Operational Scalability — 2026-05-17)
+- [x] Slice 1: Replay & Recovery Console — retry_job, replay_dispatch, reclassify, re_extract, resend_approval, reprocess_gmail_source; admin-protected endpoints; audit logging; UI panel in case detail and needs-help view; 36 tests
+- [x] Slice 2: Support Action Console — pause/resume automation, disable/enable scheduler, force inbox sync, ack/clear needs-help, tenant operational state; admin-protected; dedicated Supportkonsol UI view; 29 tests
+- [x] Slice 3: Production Alerting — 6 evaluators (failed jobs/Gmail OAuth/scheduler/dispatch failures/stale approvals/integration health critical); email delivery; configurable thresholds; dedup window; scheduler-integrated; alert config UI in Notifieringar view; 33 tests
+- [x] Slice 4: Pilot Customer Onboarding Wizard — /onboarding/wizard-state aggregation endpoint; customer-facing "Kom igång" guided wizard (8 steps); suggestRouting() implemented; customer/admin role separation; 31 tests; 2402 total tests passing
+
+## Done (SaaS Productization — 2026-05-18)
+- [x] Slice 0: UI Product Audit — full action matrix (38 Pass / 14 Fix / 8 Hide / 7 Remove); `docs/ui-product-audit.md`
+- [x] Slice 1: P0 UI Crash & Error Hygiene — `_safeHide`/`_safeText` guards (42 call sites), `_friendlyError` API error normalization, `saveWizardAutomationMode` endpoint fix, `runWizardScan` alert→toast, `wizardflow` in `CUSTOMER_ONLY_VIEWS`
+- [x] Slice 2: Remove/Hide Fake Surface — pruned `ALL_JOB_TYPES` (19 speculative types removed), `ALL_INTEGRATIONS` (7 unimplemented removed), `CONN_LABELS` (microsoft_mail removed), Fortnox pilot tools hidden until configured, Visma "coming soon" stubs deactivated
+- [x] Slice 3: Admin Session Auth — `/auth/admin/login`, `/auth/admin/logout`, `/auth/admin/me` endpoints; signed HttpOnly session cookies (stdlib only); `app/core/admin_session.py`; `require_admin_api_key` checks session first; UI: username/password login tab; topbar admin key hidden; logout calls server-side; 25+ tests
+- [x] Slice 4/5: Customer UX Cleanup — "Anslutningsnyckel" label, auth banner updated, tenant ID hidden in customer mode, friendly Swedish labels throughout, wizard terminology cleaned
+- [x] Slice 6: Integration Hardening — `tokenExpiredBanner` for OAuth reconnect, `_intFriendlyErr` helper for user-readable errors, `description` field in health checks, `_ACTION_LABELS`/`_CAT_LABELS` for friendly error table display; `_has_token_expiry_error` in `integration_health.py`; Fortnox `last_error_message` preserved; integration setup header role-aware
+- [x] Slice 7: Premium SaaS Design System — `:root` light-mode tokens (grayscale palette), `html.dark-mode` dark overrides, `@media prefers-color-scheme` fallback; blue accent #2563eb replaces purple #7c3aed; system-font stack; dark/light toggle (☀/☾) in topbar with `localStorage` persistence; all raw rgba(124,58,237) / rgba(139,92,246) / #c084fc values replaced; gradient backgrounds cleaned; DEC-006 logged
+- [x] Slice 8: Full Product Validation — duplicate `adminKeyInput` ID bug fixed; `adminKey()` localStorage fallback; Super Admin view pre-populates key; all 2457 tests passing
+
+## Future UI improvements (out of current scope)
+- [ ] Audit log view — surface `GET /audit-events` in the UI
+- [ ] Slack alerting channel — alert engine has email; Slack support via config shape extensible
+- [ ] Notifications — surface action failures inline without manual refresh
+
+## Known risks
+- `app/api/routes/jobs.py` is dead code (not mounted in main.py) — remove or wire up
+- No DB migration tooling yet (tables created via SQLAlchemy `create_all` on startup)
+- Gmail token is short-lived; onboarding flow for OAuth refresh not built
+- `create_internal_task` is stubbed — no persistence beyond the job result payload

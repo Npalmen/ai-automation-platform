@@ -1,3 +1,5 @@
+﻿> Archived document. Historical reference only. Current governing source is docs/00-master-plan.md.
+
 # UI Product Audit
 
 Generated: 2026-05-21 (updated from 2026-05-18 baseline)  

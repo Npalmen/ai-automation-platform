@@ -1,3 +1,5 @@
+﻿> Archived document. Historical reference only. Current governing source is docs/00-master-plan.md.
+
 # Golden Path — Lead to Invoice Preparation
 
 This guide walks through the complete end-to-end flow that the platform supports: from an incoming lead to prepared invoice/bookkeeping documents. It can be followed manually against a running instance with a test tenant.

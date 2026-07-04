@@ -1,3 +1,5 @@
+﻿> Archived document. Historical reference only. Current governing source is docs/00-master-plan.md.
+
 # Current State
 
 ## Real-world validation results

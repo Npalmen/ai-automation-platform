@@ -1,3 +1,5 @@
+﻿> Archived document. Historical reference only. Current governing source is docs/00-master-plan.md.
+
 # 5-Customer Launch Checklist
 
 This checklist is the final go/no-go gate for selling the MVP to 5 controlled customers.

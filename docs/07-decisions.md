@@ -1,135 +1,225 @@
-# Decisions Log
+# Decisions
 
-## DEC-001
-**Title:** Multi-tenant via API key auth  
-**Date:** 2026-04-07 (revised 2026-04-11)  
-**Status:** Accepted (revised)
+Each decision records a locked product or execution decision. Execution agents may reference decisions but may not change them unless explicitly instructed by the user via a master plan update.
 
-### Context
-Plattformen behöver tenant-separation tidigt utan att först bygga full auth-plattform.
-
-### Original decision (superseded)
-Tenant identifierades via request header `X-Tenant-ID` — client-controlled, ingen validering.
-
-### Revised decision (current)
-Tenant identifieras via `X-API-Key`-header. Nyckeln mappas server-side till `tenant_id` via `TENANT_API_KEYS`-env-variabeln (JSON-mapping). `X-Tenant-ID`-headern ignoreras i autentiserat läge.
-
-**Dev mode:** om `TENANT_API_KEYS` är tom faller systemet tillbaka på `X-Tenant-ID` med en varning — acceptabelt enbart lokalt.
-
-### Consequences
-- Tenant är inte längre client-controlled i produktion
-- API-nycklar konfigureras via `.env`, inte i kod
-- `X-Tenant-ID` kvar som dev-fallback utan breaking change
-- Adminverktyg får använda giltig `X-Admin-API-Key` tillsammans med explicit `X-Tenant-ID` för tenant-scopade endpoints när en operatör arbetar med vald kund; vanlig kund-/tenantåtkomst använder fortsatt `X-API-Key`
+> Historical technical ADRs (DEC-001 to DEC-006 from earlier sessions) are preserved in `docs/archive/legacy-07-technical-decisions.md`.
 
 ---
 
-## DEC-002
-**Title:** Stateless processors, stateful jobs  
-**Date:** 2026-04-07  
-**Status:** Accepted
+## DEC-001 — Product category
 
-### Context
-AI-delen ska inte styra systemflödet fritt.
-
-### Decision
-Processors hålls stateless, medan jobb bär historik och tillstånd genom pipeline och persistence.
-
-### Consequences
-- Mer deterministisk orchestration
-- Bättre spårbarhet
-- Lättare att pausa/resume via approval-flöde
+**Status:** Locked  
+**Decision:** The product is an operational AI control system for installation and service companies.  
+**Reason:** This is the chosen product direction.  
+**Consequence:** Features must support operational control, not generic chatbot behavior.  
+**Can change if:** The master plan is explicitly revised.
 
 ---
 
-## DEC-003
-**Title:** Backend-first before broader UI expansion  
-**Date:** 2026-04-07  
-**Status:** Accepted
+## DEC-002 — Core value proposition
 
-### Context
-Backend-kärnan är redan långt fram och bär den verkliga produktlogiken.
-
-### Decision
-Fokus ligger först på att stabilisera officiellt MVP-flöde och dokumentation, därefter tunt operator/admin UI.
-
-### Consequences
-- Mindre risk att UI byggs ovanpå rörlig logik
-- Snabbare väg till demonstrerbar teknisk MVP
+**Status:** Locked  
+**Decision:** The product shall reduce administrative work around the company's actual occupation.  
+**Reason:** Customers should spend time on their core work, not administration.  
+**Consequence:** Features that add administrative overhead rather than remove it are out of scope.  
+**Can change if:** The master plan is explicitly revised.
 
 ---
 
-## DEC-004
-**Title:** Single-file operator UI, no frontend build toolchain  
-**Date:** 2026-04-10  
-**Status:** Accepted
+## DEC-003 — First customer strategy
 
-### Context
-Operatörs-UI behövdes för approval-flöde och jobbvisning utan att introducera separat frontend-projekt.
-
-### Decision
-UI levereras som en enda `app/ui/index.html` servad av FastAPI via `HTMLResponse`. Ingen React, Vite eller separat build-process.
-
-### Consequences
-- Inget frontend-beroende att underhålla
-- UI fungerar ur lådan med `uvicorn`
-- Skalbarhet begränsad — acceptabelt för MVP-operatörs-UI
+**Status:** Locked  
+**Decision:** First customer strategy is: internal test → friends/pilot → paying customer → lead list presentation.  
+**Reason:** Risk-controlled entry to market. Learn before selling broadly.  
+**Consequence:** Do not optimize for self-serve before the first paying customer.  
+**Can change if:** The master plan is explicitly revised.
 
 ---
 
-## DEC-005
-**Title:** Visual UI Refresh scoped to polish on existing CSS tokens and dark shell  
-**Date:** 2026-05-07  
-**Status:** Superseded by DEC-006
+## DEC-004 — Scope of first version
 
-### Context
-Sprint 5 (Visual UI Refresh) i den övergripande SaaS-planen beskriver en Apple/glassmorphism-inspirerad CSS-refresh. Samtidigt har den befintliga UI:n redan ett fullständigt dark premium SaaS-shell (Slice 22) med ett moget CSS custom property-designsystem: surface-hierarki (`--bg`/`--surface`/`--surface-2`/`--surface-3`), border-system (`--border`/`--border-med`/`--border-hi`), text-hierarki (`--text`/`--text-muted`/`--text-dim`), accent/glow-tokens (`--purple`/`--blue`/`--glow-*`), status-tokens (`--success`/`--warning`/`--danger` med `-bg`-varianter), form-tokens (`--radius`/`--radius-sm`/`--radius-lg`/`--shadow`/`--shadow-sm`) samt KPI-, card-, badge-, pill- och empty-state-klasser. Att bygga en ny designriktning från noll riskerar regressioner, scope creep och onödig omarbetning.
-
-### Decision
-Sprint 5 Visual UI Refresh begränsas till en **polish-pass ovanpå befintliga CSS tokens och det befintliga dark premium shell**. Följande regler gäller:
-
-1. **Inga nya design tokens utöver befintliga** — nya tokens får bara läggas till om ett konkret gap identifieras och motiveras (t.ex. `--glass-bg` om frosted panels krävs för specifik vy). Befintliga tokens (surfaces, borders, text, accents, status, shape, shadows) ska återanvändas.
-2. **Ingen ny designriktning från noll** — inget färgschema-byte, ingen ny typografisk hierarki, ingen ny layout-approach. Förbättringar bygger vidare på det som redan finns.
-3. **Polishåtgärder som är tillåtna:**
-   - Justera spacing, padding, margin för bättre luft och fokus
-   - Förbättra hover/focus/active-states med befintliga tokens
-   - Lägga till subtila transitions/animationer (max 200ms)
-   - Förbättra kontrast och läsbarhet inom befintlig färgpalett
-   - Polisha empty states, loading states och error states
-   - Finslipa mobilvy med befintliga responsive-regler
-   - Lägga till `backdrop-filter: blur()` sparsamt på modaler/overlays (undvik på scroll-tunga vyer)
-4. **Alla befintliga ID:n och JS-selectors ska behållas** — inga breaking changes mot JavaScript-logiken.
-5. **Frontend-stack-lås (DEC-004) gäller fortsatt** — vanilla single-file HTML/CSS/JS, ingen build-toolchain.
-
-### Consequences
-- Sprint 5 blir ett snabbare, tryggare polish-pass istället för en riskfylld visuell omgörning
-- Befintliga CSS-klasser och tokens som redan används av alla vyer behålls stabila
-- Agenter som arbetar med Sprint 5 vet exakt vilka ramar de har
-- Mobilvy och tillgänglighetspass (UI-07, UI-08) ingår fortfarande men bygger på befintligt designsystem
+**Status:** Locked  
+**Decision:** The first version shall not be a total complete solution for all niche companies.  
+**Reason:** Scope must be contained to ship quickly and learn from real use.  
+**Consequence:** Narrow niche features are out of scope until explicitly decided.  
+**Can change if:** The master plan is explicitly revised.
 
 ---
 
-## DEC-006
-**Title:** Premium grayscale B2B SaaS design system replaces purple-heavy aesthetic  
-**Date:** 2026-05-18  
-**Status:** Accepted (supersedes DEC-005)
+## DEC-005 — Task-driven system
 
-### Context
-SaaS-produktifieringen (Slice 7) kräver en mer professionell och säljbar visuell identitet. Det befintliga UI:et har ett dominerande lila/purple-tema (--purple, --purple-light, --purple-glow) som upplevs som flashigt och icke-enterprise. En B2B-köpare förväntar sig ett återhållet, premium-utseende med konservativa färger och tydlig hierarki. Dessutom är det befintliga dark-only-UI ett hinder — enterprise-kunder förväntar sig alternativ.
+**Status:** Locked  
+**Decision:** The system shall be task-driven, not a single linear workflow.  
+**Reason:** Different case types (lead/support/invoice) need different flows.  
+**Consequence:** Architecture must support multiple pipelines, not one monolithic flow.  
+**Can change if:** The master plan is explicitly revised.
 
-### Decision
-Ersätt den lila designriktningen med ett premium grayscale B2B SaaS-system:
+---
 
-1. **Nytt primär-accent**: byt `--purple` → `--accent` med ett neutral blågrått värde (#4F7FFF eller liknande), behåll varianter för hover/glow
-2. **Grayscale-first surfaces**: behåll dark mode som default, lägg till light mode toggle via CSS-klass på `<html>`
-3. **Design tokens bevaras** — alla befintliga token-namn (`--bg`, `--surface-*`, `--border-*`, `--text-*`, `--success`, `--warning`, `--danger`) behålls men uppdateras i värde
-4. **Alla befintliga HTML-ID:n och JS-selectors bevaras** — ingen breaking change mot JS-logiken
-5. **Inga externa beroenden** — vanilla CSS, inline i befintlig single-file HTML (DEC-004 gäller)
-6. **Light mode**: vit/ljusgrå bakgrund, mörkgrå text, samma accentfärg, via `.light-mode` på `<html>`
-7. **Typography**: byt till system-font stack (`-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`) för native premium-känsla
+## DEC-006 — Automation risk control
 
-### Consequences
-- Enterprise-kunder uppfattar produkten som professionell och mogen
-- Light/dark toggle ger flexibilitet för olika arbetskontexter
-- Alla befintliga komponenter och vyer fungerar oförändrat (token-baserade)
-- DEC-005 polish-regler gäller fortfarande för spacing, transitions, och hover-states
+**Status:** Locked  
+**Decision:** Automation is allowed early but risk must be limited through customer policy, approval gates, and limited external actions.  
+**Reason:** Customer trust depends on controlled, reversible automation.  
+**Consequence:** High-risk actions must be approval-gated. Low-risk actions may be configured per customer.  
+**Can change if:** The master plan is explicitly revised.
+
+---
+
+## DEC-007 — Admin config is sufficient for first version
+
+**Status:** Locked  
+**Decision:** Admin configuration is sufficient for the first version. Full self-service onboarding is not required before first customer.  
+**Reason:** Simpler to ship; customers can be onboarded with assistance.  
+**Consequence:** Self-service onboarding is a later-phase feature.  
+**Can change if:** The master plan is explicitly revised.
+
+---
+
+## DEC-008 — Customer UI wow-statistics
+
+**Status:** Locked  
+**Decision:** Pilot customer UI should show wow-statistics, especially saved time and status.  
+**Reason:** Demonstrates value visibly to the customer.  
+**Consequence:** ROI/dashboard view is required for pilot. Deep analytics are not.  
+**Can change if:** The master plan is explicitly revised.
+
+---
+
+## DEC-009 — Primary integration areas
+
+**Status:** Locked  
+**Decision:** Primary integration areas are mail, economics/finance, and CRM/operations.  
+**Reason:** These cover the core administrative friction for the target customer.  
+**Consequence:** Integrations outside these areas are deprioritized.  
+**Can change if:** The master plan is explicitly revised.
+
+---
+
+## DEC-010 — Broad integrations before narrow
+
+**Status:** Locked  
+**Decision:** Broad integrations are prioritized before narrow niche integrations.  
+**Reason:** Broad integrations serve more customers; narrow ones serve edge cases.  
+**Consequence:** Do not build a narrow niche integration before broad coverage is adequate.  
+**Can change if:** The master plan is explicitly revised.
+
+---
+
+## DEC-011 — Execution agents choose technical path
+
+**Status:** Locked  
+**Decision:** Execution bots may choose the best technical path but may not change product strategy, prioritization or roadmap.  
+**Reason:** Technical decisions belong to the execution agent; strategic decisions belong to the master plan.  
+**Consequence:** Any strategic change must go through master plan update and this decisions log.  
+**Can change if:** The master plan is explicitly revised.
+
+---
+
+## DEC-012 — Pause and report on plan issues
+
+**Status:** Locked  
+**Decision:** If a bot discovers the plan appears wrong, it shall pause and report, not adjust the plan itself.  
+**Reason:** Prevents uncontrolled strategic drift by execution agents.  
+**Consequence:** Execution agents have a defined stop condition; see `docs/04-execution-rules.md`.  
+**Can change if:** The master plan is explicitly revised.
+
+---
+
+## DEC-013 — Aggressive documentation cleanup before building
+
+**Status:** Locked  
+**Decision:** Documentation shall be cleaned aggressively before continued building, but without losing verified technical history.  
+**Reason:** Stale conflicting docs cause execution agents to drift.  
+**Consequence:** Old docs go to archive; new governing structure is the source of truth.  
+**Can change if:** The master plan is explicitly revised.
+
+---
+
+## DEC-014 — Keep existing codebase
+
+**Status:** Locked  
+**Decision:** The current codebase is kept. No major rewrite before first customer.  
+**Reason:** Rewriting delays shipping and destroys verified working behavior.  
+**Consequence:** Improve incrementally; refactor only what is broken and within task scope.  
+**Can change if:** The master plan is explicitly revised.
+
+---
+
+## DEC-015 — Frontend only where needed for pilot
+
+**Status:** Locked  
+**Decision:** Frontend is improved only where needed for pilot, wow-statistics and understandability. No new frontend stack before first customer.  
+**Reason:** Frontend stack change introduces large risk and scope creep.  
+**Consequence:** Single-file `app/ui/index.html` (vanilla HTML/CSS/JS) remains the frontend. No React, Vite, Tailwind.  
+**Can change if:** The master plan is explicitly revised.
+
+---
+
+## DEC-016 — No new large integrations before first customer
+
+**Status:** Locked  
+**Decision:** New large integrations are forbidden before first customer, except integrations required for the chosen first customer.  
+**Reason:** Integration work is large scope; must be deferred until customer needs are confirmed.  
+**Consequence:** Only Gmail, Monday and Fortnox/Visma read-only are in scope for first customer.  
+**Can change if:** The master plan is explicitly revised.
+
+---
+
+## DEC-017 — Automatic actions allowed if low-risk and reversible
+
+**Status:** Locked  
+**Decision:** Automatic external actions are allowed if they are customer-configured, low-risk and reversible. High-risk actions shall be approval-gated.  
+**Reason:** Automation must be safe and controllable.  
+**Consequence:** See automation risk policy in `docs/00-master-plan.md`.  
+**Can change if:** The master plan is explicitly revised.
+
+---
+
+## DEC-018 — Fortnox/Visma read/preview/approval-gated
+
+**Status:** Locked  
+**Decision:** Fortnox and Visma shall initially be read/preview/underlag/approval-gated. Not free bookkeeping automation.  
+**Reason:** Bookkeeping errors are high-risk and hard to reverse.  
+**Consequence:** Any Fortnox write path must go through an approval gate. Dry-run preview is always available without write.  
+**Can change if:** The master plan is explicitly revised.
+
+---
+
+## DEC-019 — Gmail first intake channel
+
+**Status:** Locked  
+**Decision:** Gmail is the first prioritized intake channel because it already exists in the repo. Outlook/Microsoft Mail comes next.  
+**Reason:** Existing implementation is the fastest path to first customer.  
+**Consequence:** Do not build Outlook intake before Gmail is stable in pilot.  
+**Can change if:** The master plan is explicitly revised.
+
+---
+
+## DEC-020 — Monday as primary operations channel
+
+**Status:** Locked  
+**Decision:** Monday is the primary operations/project channel until another CRM/operations system is chosen for a paying customer.  
+**Reason:** Monday integration is already live-verified.  
+**Consequence:** Build Monday depth before broad CRM expansion.  
+**Can change if:** First paying customer explicitly requires a different system.
+
+---
+
+## DEC-021 — Krowolf brand retained
+
+**Status:** Locked  
+**Decision:** Krowolf is used until further notice technically. Brand rename is out of scope before first customer.  
+**Reason:** Brand work is a distraction from shipping.  
+**Consequence:** All technical references to Krowolf remain unchanged until a brand decision is made.  
+**Can change if:** A separate strategic brand decision is made.
+
+---
+
+## DEC-022 — Pricing in roadmap but not blocking
+
+**Status:** Locked  
+**Decision:** Pricing strategy shall be added to the roadmap but shall not block technical first-customer work.  
+**Reason:** Price discovery happens through pilot; it should not delay shipping.  
+**Consequence:** First customer may be unpaid/pilot. Pricing model is defined in a later decision.  
+**Can change if:** A separate pricing decision is made and documented here.

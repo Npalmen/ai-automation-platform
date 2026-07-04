@@ -1,42 +1,36 @@
 # AI Automation Platform
 
+## Read this first
+
+Product direction, execution order and scope control are governed by:
+
+- [`docs/00-master-plan.md`](docs/00-master-plan.md)
+
+If README or any other document conflicts with `docs/00-master-plan.md`, the master plan wins.
+
+README is for project overview and setup. It is not the strategic source of truth.
+
+---
+
 Backend-first, multi-tenant platform for AI-driven workflow automation.
 
 Jobs are received, classified, processed through a pipeline, paused for human approval when required, and resumed to execute integration actions. Everything is auditable.
 
 ---
 
-## Verified Capabilities (Live Tested)
-
-The following has been confirmed through real API calls against a running instance — not assumptions.
-
-| Capability | Status | Verified via |
-|-----------|--------|-------------|
-| Gmail send (`send_email`) | ✅ LIVE | `POST /integrations/google_mail/execute` |
-| Gmail OAuth token refresh | ✅ LIVE | access + refresh token flow end-to-end |
-| Monday item creation (`create_item`) | ✅ LIVE | `POST /integrations/monday/execute` → real board |
-| Full pipeline (intake → action_dispatch) | ✅ LIVE | `/jobs` end-to-end with real data |
-| Approval pause and resume | ✅ LIVE | job enters `awaiting_approval`; approve resumes; action executes |
-| Action persistence | ✅ LIVE | `GET /jobs/{job_id}/actions` returns real records |
-| Multi-tenant auth | ✅ LIVE | `X-API-Key` + `tenant_id` in body, both required |
-| 326 tests passing | ✅ | `python -m pytest` |
-
----
-
 ## Current Status
 
-MVP is complete and live-validated:
+*Historical test counts and live-validation claims have been moved to [`docs/01-current-truth.md`](docs/01-current-truth.md). Run `py -3.10 -m pytest` to get the current verified count.*
+
+Core capabilities (verified historically — see `docs/01-current-truth.md` for current state):
 
 - FastAPI backend with PostgreSQL persistence
 - Multi-tenant with per-tenant API key auth (`X-API-Key`)
 - Workflow orchestrator with AI processors and deterministic fallbacks
-- Approval flow (pause / resume)
+- Approval flow (pause / resume) for high-risk actions
 - Action dispatch with error handling and audit
-- Gmail and Monday.com integrations live-tested
-- Operator UI at `/ui` (Swedish, tenant-aware)
-- 326 tests passing
-
-See [docs/05-current-state.md](docs/05-current-state.md) for the full status.
+- Gmail, Monday, and Fortnox integrations (see `docs/05-architecture.md` for status)
+- Operator/customer UI at `/ui` (Swedish, role-aware)
 
 ---
 
@@ -670,11 +664,15 @@ These are real behaviors that have caused failures during live testing.
 
 | File | Description |
 |------|-------------|
-| [docs/02-mvp-scope.md](docs/02-mvp-scope.md) | MVP scope and success criteria |
-| [docs/03-system-architecture.md](docs/03-system-architecture.md) | Architecture overview |
-| [docs/05-current-state.md](docs/05-current-state.md) | Current implementation status |
-| [docs/06-backlog.md](docs/06-backlog.md) | Completed and upcoming work |
-| [docs/07-decisions.md](docs/07-decisions.md) | Architectural decisions log |
-| [docs/08-handoff.md](docs/08-handoff.md) | Handoff notes and session history |
-| [docs/10-test-strategy.md](docs/10-test-strategy.md) | Test strategy |
-| [docs/11-release-checklist.md](docs/11-release-checklist.md) | Release checklist |
+| [docs/00-master-plan.md](docs/00-master-plan.md) | **Governing document — read first** |
+| [docs/01-current-truth.md](docs/01-current-truth.md) | Verified system status |
+| [docs/02-first-customer-plan.md](docs/02-first-customer-plan.md) | First customer go/no-go plan |
+| [docs/03-product-roadmap.md](docs/03-product-roadmap.md) | Product roadmap |
+| [docs/04-execution-rules.md](docs/04-execution-rules.md) | Rules for AI/execution agents |
+| [docs/05-architecture.md](docs/05-architecture.md) | Technical architecture |
+| [docs/06-backlog.md](docs/06-backlog.md) | Backlog (Now / Next / Later / Not Now) |
+| [docs/07-decisions.md](docs/07-decisions.md) | Locked product decisions |
+| [docs/08-runbook.md](docs/08-runbook.md) | Operations runbook |
+| [docs/09-testing-and-release.md](docs/09-testing-and-release.md) | Test and release procedures |
+| [docs/90-cursor-prompt-template.md](docs/90-cursor-prompt-template.md) | Execution prompt template |
+| [docs/archive/](docs/archive/) | Historical documents |

@@ -1,3 +1,5 @@
+﻿> Archived document. Historical reference only. Current governing source is docs/00-master-plan.md.
+
 # Product North Star — Installation & Service Companies
 
 ## What this platform is

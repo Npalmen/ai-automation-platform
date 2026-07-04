@@ -1,27 +1,32 @@
+﻿> Archived document. Historical reference only. Current governing source is docs/00-master-plan.md.
+
 # Handoff
 
 ## Project
 AI Automation Platform — multi-tenant backend-first plattform för AI-driven workflow automation.
 
 ## Current objective
-Black/white frosted glassmorphism UI refresh complete (2026-05-21). Supersedes previous "premium charcoal" pass. Pure black background, frosted white cards, responsive centered shell.
+Frosted UI Correction complete (2026-05-21). Resolves remaining blue/dark tint on dashboard cards by replacing the CSS variable cascade approach with explicit `!important` rules that cannot be overridden by base styles.
 
-## Latest: Black/White Frosted UI (2026-05-21)
+## Latest: Frosted UI Correction v3 (2026-05-21)
 
-CSS-only redesign. Replaces previous charcoal-dark pass with a strict black/white frosted glassmorphism system.
+CSS-only fix. Root cause of previous visual failures was that `kpi-value`, `dash-value`, etc. had `color: #fff !important` applied globally while also being inside a card that tried to re-assign the `--text` CSS variable — explicit `!important` beats variable cascading.
 
-**Design principles:**
-- Background: pure `#000` everywhere; no dark-gray, no charcoal
-- Cards (`cfg-section`, `setup-card`, `kpi-card`, `int-card`, `case-card`, etc.): `rgba(255,255,255,.88-.92)` with `backdrop-filter: blur(24px)`, `border-radius: 18px`, thin `rgba(0,0,0,.08)` border
-- Sidebar/topbar: `rgba(18,18,18,.92)` frosted dark with white text; active nav = solid white pill with black text
-- All blue/purple accent variables remapped to `#000`/`#fff`; status colors (success/warning/danger) kept functional
-- CSS custom properties overridden at view-panel level (`--text: #f0f0f0`) then re-overridden inside card components (`--text: #080808`) so card text is always black and background text is always white
-- Toggles: off = `rgba(0,0,0,.15)`, on = `#000` with white knob
-- Buttons: primary = solid black with white text; neutral = frosted glass (context-aware)
-- Responsive: `--content-max` variable drives max-width; overrides inline `max-width: 720px/760px/800px` on cards; breakpoints at 1300/900/680px
+**What changed (all in `app/ui/index.html`):**
+- Replaced the entire `/* BLACK / WHITE FROSTED UI */` override block (~420 lines) with a clean `v3` block (~300 lines)
+- All card types (`.dash-card`, `.kpi-card`, `.cust-card`, `.setup-card`, `.cfg-section`, `.int-card`, `.case-card`, `.approval-card`, `.ob-int-card`, `.ob-status-card`, `.action-card`, `.detail-section`, `.next-step-card`) use `background: rgba(255,255,255,.92) !important` with `backdrop-filter: blur(28px)`
+- All `* { color: #0a0a0a !important }` scoped to card selectors — no global variable cascade needed
+- `.kpi-value`, `.dash-value`, `.cust-big-num` are now explicitly **black** inside cards (were white due to previous `!important` conflict)
+- `.kpi-card.accent-*` and `.kpi-icon.blue/purple/cyan` fully monochrome — no colored borders, no colored icon backgrounds
+- Sidebar and topbar use `background: rgba(14,14,14,.95) !important` to ensure they stay black-frosted even if base CSS has different values
+- All `#viewSupport`, `#viewOps`, etc. set to `color: rgba(255,255,255,.80)` on the transparent black background
 
-**Files changed:**
-- `app/ui/index.html` — CSS override block replaced (~360 lines → ~420 lines of new CSS)
+**Design system summary:**
+- Background: pure `#000`
+- Cards: `rgba(255,255,255,.92)` frosted white, black text, no accent borders
+- Sidebar/topbar: near-black frosted glass, white text, solid white active pill
+- Buttons: primary = solid black/white; neutral = dark on white card, glass on dark bg
+- Functional status colors (green/amber/red) preserved
 
 **Tests:** 19/19 Visma OAuth, no linter errors.
 

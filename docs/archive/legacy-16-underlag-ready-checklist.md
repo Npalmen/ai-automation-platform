@@ -1,3 +1,5 @@
+﻿> Archived document. Historical reference only. Current governing source is docs/00-master-plan.md.
+
 # Underlag Ready Checklist — Invoice/Bookkeeping Preparation
 
 This checklist defines what "underlag redo" (preparation ready) means in the platform. A case/job is considered to have ready invoice/bookkeeping preparation when the following criteria are met.
