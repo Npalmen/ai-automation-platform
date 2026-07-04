@@ -185,10 +185,11 @@ def test_sla_pass_demo_mode_skips():
 
 def test_sla_pass_already_run_today_skips():
     from app.insights.sla_reminders import run_sla_reminder_pass
-    from datetime import date
     db = MagicMock()
+    # Use UTC date to match the production code (datetime.now(timezone.utc))
+    today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     result = run_sla_reminder_pass(db, TENANT, {
-        "scheduler_state": {"last_sla_reminder_at": date.today().isoformat() + "T08:00:00"},
+        "scheduler_state": {"last_sla_reminder_at": today_utc + "T08:00:00"},
     })
     assert result["skipped"] is True
     assert result["reason"] == "already_run_today"

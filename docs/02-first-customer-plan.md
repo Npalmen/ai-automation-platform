@@ -95,6 +95,21 @@ Systemet ska minst kunna:
 
 ---
 
+## Live verification requirement
+
+**Live verification must be green before the first sharp pilot starts.**
+
+The complete live verification plan is in `docs/10-live-verification-plan.md`.
+It covers production health, admin/auth, tenant provisioning, customer endpoints,
+integration health, Gmail OAuth, Monday/Fortnox/Visma safe checks, approval queue,
+customer UI, and smoke check.
+
+All 16 go/no-go gates in Phase L of the live verification plan must pass before
+declaring Fas 2 pilot ready. Initial setup may be done admin/manually — full
+self-service onboarding is not required for the first customer.
+
+---
+
 ## Go/no-go checklist
 
 Minst följande måste vara sant innan pilot:
@@ -114,6 +129,82 @@ Minst följande måste vara sant innan pilot:
 - [ ] OAuth/token issues are visible before they cause silent failures.
 - [ ] Scheduler runs correctly (or manual trigger is documented and viable).
 - [ ] At least one backup has been completed and verified.
+
+---
+
+## Local pre-live setup checklist
+
+Run these steps locally before any live tenant onboarding. No live tokens required.
+All commands use the local dev server (`http://localhost:8000`).
+
+- [ ] **Provision pilot tenant via admin API**
+  ```bash
+  POST /admin/tenants
+  Header: X-Admin-API-Key: <ADMIN_API_KEY>
+  Body: {"name": "Intern Pilot AB", "slug": "intern-pilot",
+         "enabled_job_types": ["lead", "customer_inquiry"],
+         "allowed_integrations": ["google_mail", "monday"],
+         "auto_actions": {"lead": false, "customer_inquiry": false}}
+  # → tenant_id: T_INTERN_PILOT  |  api_key: kw_xxx... (store immediately, shown once)
+  ```
+- [ ] **Generate tenant API key** — included in the create response above. Rotate if needed:
+  ```bash
+  POST /admin/tenants/T_INTERN_PILOT/rotate-key
+  Header: X-Admin-API-Key: <ADMIN_API_KEY>
+  ```
+- [ ] **Verify tenant API key accesses customer endpoints**
+  ```bash
+  GET /tenant
+  Header: X-API-Key: kw_xxx...
+  # → {"current_tenant": "T_INTERN_PILOT", ...}
+  ```
+- [ ] **Verify tenant key cannot access admin endpoints**
+  ```bash
+  GET /admin/tenants
+  Header: X-API-Key: kw_xxx...    # wrong key type
+  # → 401 or 403
+  ```
+- [ ] **Verify admin can inspect tenant**
+  ```bash
+  GET /admin/tenants
+  Header: X-Admin-API-Key: <ADMIN_API_KEY>
+  # → T_INTERN_PILOT listed
+  ```
+- [ ] **Verify pilot readiness reports missing live integrations**
+  ```bash
+  GET /pilot/readiness
+  Header: X-API-Key: kw_xxx...
+  # → overall_status: not_ready or almost_ready (expected before live)
+  # → check which of 11 items are failing
+  ```
+- [ ] **Verify integration health reports disconnected/not configured state safely**
+  ```bash
+  GET /integrations/health
+  Header: X-API-Key: kw_xxx...
+  # → overall_status: not_configured (expected — no live tokens)
+  # → no secrets in response
+  ```
+- [ ] **Verify customer dashboard loads with empty state (no crash)**
+  ```bash
+  GET /customer/results
+  GET /customer/health
+  Header: X-API-Key: kw_xxx...
+  # → empty or zero-state response, HTTP 200
+  ```
+- [ ] **Verify test lead creation works (no external calls)**
+  ```bash
+  POST /onboarding/test-lead
+  Header: X-API-Key: kw_xxx...
+  # → job created, status: completed or awaiting_approval
+  ```
+- [ ] **Verify approval queue behavior with test action**
+  ```bash
+  GET /approvals/pending
+  Header: X-API-Key: kw_xxx...
+  # → [] for new tenant, or pending item if test lead triggered approval
+  ```
+- [ ] **Verify no live credentials are required for above steps** — all should complete
+  without `GOOGLE_MAIL_ACCESS_TOKEN`, `MONDAY_API_KEY`, or live OAuth tokens.
 
 ---
 

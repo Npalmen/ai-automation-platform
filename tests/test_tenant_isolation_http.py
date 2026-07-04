@@ -438,3 +438,202 @@ class TestAdminEndpointsRejectTenantKeys:
                    return_value=SimpleNamespace(ADMIN_API_KEY=ADMIN_KEY)):
             r = self.client.get("/admin/operations/needs-help")
         assert r.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Customer endpoints require API key
+# ---------------------------------------------------------------------------
+
+class TestCustomerEndpointAuth:
+    """
+    Customer-facing endpoints (/customer/*) must require a valid tenant API key.
+    Without a key, they must return 401 or 403.
+    """
+
+    def setup_method(self):
+        self.client = TestClient(app, raise_server_exceptions=False)
+
+    def _check_requires_key(self, path: str, method: str = "GET"):
+        with patch("app.core.auth._load_env_key_map", return_value={"T": "k"}):
+            fn = getattr(self.client, method.lower())
+            r = fn(path)
+        assert r.status_code in (401, 403), (
+            f"{method} {path} returned {r.status_code} without a key"
+        )
+
+    def test_customer_account_requires_key(self):
+        self._check_requires_key("/customer/account")
+
+    def test_customer_activity_requires_key(self):
+        self._check_requires_key("/customer/activity")
+
+    def test_customer_results_requires_key(self):
+        self._check_requires_key("/customer/results")
+
+    def test_customer_health_requires_key(self):
+        self._check_requires_key("/customer/health")
+
+    def test_customer_account_put_requires_key(self):
+        self._check_requires_key("/customer/account", method="PUT")
+
+    def test_integration_events_requires_key(self):
+        """Integration events list is tenant-scoped and must require a key."""
+        self._check_requires_key("/integration-events")
+
+    def test_tenant_memory_requires_key(self):
+        self._check_requires_key("/tenant/memory")
+
+    def test_tenant_context_requires_key(self):
+        self._check_requires_key("/tenant/context")
+
+
+# ---------------------------------------------------------------------------
+# Additional admin endpoints reject wrong or missing keys
+# ---------------------------------------------------------------------------
+
+class TestAdminEndpointsAdditional:
+    """
+    Extends TestAdminEndpointsRejectTenantKeys with coverage of more admin routes.
+    All /admin/* endpoints must require a valid X-Admin-API-Key.
+    """
+
+    def setup_method(self):
+        self.client = TestClient(app, raise_server_exceptions=False)
+
+    def _admin_settings(self):
+        return SimpleNamespace(ADMIN_API_KEY=ADMIN_KEY, ADMIN_API_KEYS="")
+
+    def _check_admin_required(self, path: str, method: str = "GET", extra_headers=None):
+        headers = {"X-Admin-API-Key": "wrong-key"}
+        if extra_headers:
+            headers.update(extra_headers)
+        with patch("app.core.admin_auth.get_settings", return_value=self._admin_settings()):
+            with patch("app.core.admin_session.get_settings", return_value=MagicMock(SESSION_SECRET_KEY="")):
+                fn = getattr(self.client, method.lower())
+                r = fn(path, headers=headers)
+        assert r.status_code == 401, (
+            f"{method} {path} returned {r.status_code} with wrong admin key"
+        )
+
+    def test_admin_usage_analytics_rejects_wrong_key(self):
+        self._check_admin_required("/admin/usage/analytics")
+
+    def test_admin_audit_events_rejects_wrong_key(self):
+        self._check_admin_required("/admin/audit-events")
+
+    def test_admin_tenant_context_rejects_wrong_key(self):
+        self._check_admin_required("/admin/tenant-context/TENANT_1001")
+
+    def test_admin_support_state_rejects_wrong_key(self):
+        self._check_admin_required("/admin/support/TENANT_1001/state")
+
+    def test_admin_recovery_retry_rejects_wrong_key(self):
+        self._check_admin_required(
+            "/admin/recovery/some-job-id/retry",
+            method="POST",
+            extra_headers={"X-Tenant-ID": "TENANT_1001"},
+        )
+
+    def test_admin_alerts_run_all_rejects_wrong_key(self):
+        self._check_admin_required("/admin/alerts/run-all")
+
+    def test_admin_tenants_rotate_key_rejects_wrong_key(self):
+        self._check_admin_required("/admin/tenants/TENANT_1001/rotate-key", method="POST")
+
+
+# ---------------------------------------------------------------------------
+# Cross-tenant isolation for audit events and integration events
+# ---------------------------------------------------------------------------
+
+class TestCrossTenantAuditEventScoping:
+    """
+    /audit-events must be scoped to the authenticated tenant.
+    The AuditRepository must be called with the verified tenant_id, not any
+    arbitrary tenant_id provided in headers or query params.
+    """
+
+    def setup_method(self):
+        from app.core.auth import get_verified_tenant
+        from app.api.dependencies import get_db
+        self._orig_overrides = dict(app.dependency_overrides)
+        app.dependency_overrides[get_verified_tenant] = lambda: TENANT_A_ID
+        app.dependency_overrides[get_db] = lambda: MagicMock()
+        self.client = TestClient(app, raise_server_exceptions=False)
+
+    def teardown_method(self):
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(self._orig_overrides)
+
+    def test_audit_events_scoped_to_authenticated_tenant(self):
+        """AuditRepository.list_events must receive the authenticated tenant_id."""
+        with (
+            patch("app.main.AuditRepository.list_events", return_value=[]) as list_mock,
+            patch("app.main.AuditRepository.count_events", return_value=0),
+        ):
+            r = self.client.get("/audit-events")
+
+        assert r.status_code == 200
+        if list_mock.called:
+            kwargs = list_mock.call_args.kwargs if list_mock.call_args else {}
+            tenant = kwargs.get("tenant_id")
+            if tenant is not None:
+                assert tenant == TENANT_A_ID, (
+                    f"Audit events were fetched for {tenant!r} instead of {TENANT_A_ID!r}"
+                )
+
+    def test_audit_events_no_cross_tenant_query_param_bypass(self):
+        """
+        A tenant must not be able to add ?tenant_id_filter= to /audit-events to
+        read another tenant's events. The /audit-events endpoint does NOT accept
+        tenant_id_filter — only /admin/audit-events (admin-protected) does.
+        The verified tenant_id is always used.
+        """
+        with (
+            patch("app.main.AuditRepository.list_events", return_value=[]) as list_mock,
+            patch("app.main.AuditRepository.count_events", return_value=0),
+        ):
+            r = self.client.get("/audit-events?tenant_id_filter=TENANT_B")
+
+        assert r.status_code == 200
+        if list_mock.called:
+            kwargs = list_mock.call_args.kwargs if list_mock.call_args else {}
+            tenant = kwargs.get("tenant_id")
+            if tenant is not None:
+                assert tenant == TENANT_A_ID, (
+                    "Query param tenant_id_filter bypassed tenant isolation in /audit-events"
+                )
+
+
+class TestCrossTenantIntegrationEventScoping:
+    """
+    /integration-events must be scoped to the authenticated tenant.
+    """
+
+    def setup_method(self):
+        from app.core.auth import get_verified_tenant
+        from app.api.dependencies import get_db
+        self._orig_overrides = dict(app.dependency_overrides)
+        app.dependency_overrides[get_verified_tenant] = lambda: TENANT_A_ID
+        app.dependency_overrides[get_db] = lambda: MagicMock()
+        self.client = TestClient(app, raise_server_exceptions=False)
+
+    def teardown_method(self):
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(self._orig_overrides)
+
+    def test_integration_events_scoped_to_authenticated_tenant(self):
+        """IntegrationRepository.list_events must receive the authenticated tenant_id."""
+        with (
+            patch("app.main.IntegrationRepository.list_events", return_value=[]) as list_mock,
+            patch("app.main.IntegrationRepository.count_events", return_value=0),
+        ):
+            r = self.client.get("/integration-events")
+
+        assert r.status_code == 200
+        if list_mock.called:
+            kwargs = list_mock.call_args.kwargs if list_mock.call_args else {}
+            tenant = kwargs.get("tenant_id")
+            if tenant is not None:
+                assert tenant == TENANT_A_ID, (
+                    f"Integration events were fetched for {tenant!r} instead of {TENANT_A_ID!r}"
+                )

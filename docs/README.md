@@ -30,6 +30,7 @@
 | [`05-architecture.md`](05-architecture.md) | System architecture — layers, pipelines, integrations, data stores, risk boundaries |
 | [`08-runbook.md`](08-runbook.md) | Operations — failed jobs, integration health, OAuth, scheduler, approvals, escalation |
 | [`09-testing-and-release.md`](09-testing-and-release.md) | Test commands, release gate, smoke check, pre-launch checklist |
+| [`10-live-verification-plan.md`](10-live-verification-plan.md) | **Live verification plan** — sequential production verification for first pilot tenant (not yet run) |
 
 ---
 

@@ -54,11 +54,35 @@ TENANT_CONFIGS = {
             IntegrationType.MICROSOFT_CALENDAR.value,
         ],
     },
+    "TENANT_3001": {
+        "name": "Finance Tenant",
+        "auto_actions": {
+            JobType.INVOICE.value: False,
+        },
+        "enabled_job_types": [
+            "invoice",
+        ],
+        "allowed_integrations": [
+            IntegrationType.ACCOUNTING.value,
+            IntegrationType.FORTNOX.value,
+            IntegrationType.VISMA.value,
+        ],
+    },
+}
+
+# Fail-closed config returned for unknown/unconfigured tenant IDs.
+# An unknown tenant must not inherit any job type or integration permissions.
+_UNKNOWN_TENANT_CONFIG: dict = {
+    "name": "Unknown Tenant",
+    "enabled_job_types": [],
+    "auto_actions": {},
+    "allowed_integrations": [],
 }
 
 
 def _tenant_config_from_static(tenant_id: str) -> dict:
-    return TENANT_CONFIGS.get(tenant_id, TENANT_CONFIGS["TENANT_1001"])
+    # Fail-closed: unknown tenant IDs receive no permissions, not a default set.
+    return TENANT_CONFIGS.get(tenant_id, _UNKNOWN_TENANT_CONFIG)
 
 
 def get_tenant_config(tenant_id: str, db: "Session | None" = None) -> dict:

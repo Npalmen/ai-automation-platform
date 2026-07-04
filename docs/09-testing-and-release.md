@@ -2,20 +2,26 @@
 
 > Governed by `docs/00-master-plan.md`.
 > Historical test strategy and release checklists are in `docs/archive/legacy-10-test-strategy.md`, `docs/archive/legacy-11-release-checklist.md`, `docs/archive/legacy-12-production-guide.md`, `docs/archive/legacy-13-5-customer-launch-checklist.md`.
+> **Live verification plan (first pilot go-live):** see `docs/10-live-verification-plan.md`.
 
 ---
 
 ## Local test command
 
 ```bash
-# Full test suite (Windows Python 3.10)
-py -3.10 -m pytest
-
-# Or on Unix/macOS
+# Full test suite
 python -m pytest
+
+# Quiet mode (faster output)
+python -m pytest --tb=no -q
 ```
 
+**Note:** `httpx` must be installed for the test client to work. It is in `requirements.txt`.
+Run `pip install -r requirements.txt` if tests fail with `ModuleNotFoundError: No module named 'httpx'`.
+
 Record the pass count in `docs/01-current-truth.md` after each run.
+
+**Verified 2026-07-04:** Python 3.14.3 — 2475 passed, 1 failed, 9.55s.
 
 ---
 

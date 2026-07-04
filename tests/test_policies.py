@@ -74,3 +74,34 @@ class TestIsJobTypeEnabledForTenant:
         assert result_with_reversed_args is False, (
             "Swapped args unexpectedly returned True — the regression guard is broken."
         )
+
+
+class TestUnknownTenantFailClosed:
+    """
+    Regression tests: unknown tenant IDs must fail-closed for all policy checks.
+
+    An unknown tenant must not inherit any permissions from a default tenant.
+    This prevents misconfigured or unprovisioned tenant IDs from gaining access
+    to job types or integrations they were never explicitly granted.
+    """
+
+    def test_unknown_tenant_lead_disabled(self):
+        assert is_job_type_enabled_for_tenant(JobType.LEAD, "TENANT_UNKNOWN") is False
+
+    def test_unknown_tenant_invoice_disabled(self):
+        assert is_job_type_enabled_for_tenant(JobType.INVOICE, "TENANT_UNKNOWN") is False
+
+    def test_unknown_tenant_customer_inquiry_disabled(self):
+        assert is_job_type_enabled_for_tenant(JobType.CUSTOMER_INQUIRY, "TENANT_UNKNOWN") is False
+
+    def test_unknown_tenant_string_job_type_disabled(self):
+        assert is_job_type_enabled_for_tenant("lead", "TENANT_UNKNOWN") is False
+
+    def test_known_tenants_unaffected(self):
+        """Fix must not change behavior for known tenants."""
+        assert is_job_type_enabled_for_tenant(JobType.LEAD, "TENANT_1001") is True
+        assert is_job_type_enabled_for_tenant(JobType.INVOICE, "TENANT_1001") is True
+        assert is_job_type_enabled_for_tenant(JobType.LEAD, "TENANT_2001") is True
+        assert is_job_type_enabled_for_tenant(JobType.INVOICE, "TENANT_2001") is False
+        assert is_job_type_enabled_for_tenant(JobType.INVOICE, "TENANT_3001") is True
+        assert is_job_type_enabled_for_tenant(JobType.LEAD, "TENANT_3001") is False

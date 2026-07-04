@@ -2,6 +2,165 @@
 
 > Operational procedures for the platform. For strategy and product decisions, see `docs/00-master-plan.md`.
 > Detailed historical runbooks are in `docs/archive/legacy-runbook-*.md`.
+> **Live verification plan (first pilot tenant go-live):** see `docs/10-live-verification-plan.md`.
+
+---
+
+## First internal pilot tenant setup — local/pre-live
+
+Complete this sequence before any live tenant onboarding.
+No live tokens are needed. All steps work against the local dev server.
+
+### Prerequisites
+- Local server running (`uvicorn app.main:app --reload` or Docker).
+- `ADMIN_API_KEY` env var set (any non-empty string for local dev).
+- DB initialized: `python scripts/create_tables.py`.
+
+### Step 1 — Provision tenant
+```bash
+curl -s -X POST http://localhost:8000/admin/tenants \
+  -H "X-Admin-API-Key: $ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Intern Pilot AB",
+    "slug": "intern-pilot",
+    "enabled_job_types": ["lead", "customer_inquiry"],
+    "allowed_integrations": ["google_mail", "monday"],
+    "auto_actions": {"lead": false, "customer_inquiry": false}
+  }'
+# Response: {"tenant_id": "T_INTERN_PILOT", "api_key": "kw_xxx...", "status": "active"}
+# IMPORTANT: save the api_key — it is shown exactly once
+```
+
+Tenant ID derived from slug: `T_` + `slug.upper().replace("-", "_")` → `T_INTERN_PILOT`
+
+### Step 2 — Verify tenant was created
+```bash
+curl -s http://localhost:8000/admin/tenants \
+  -H "X-Admin-API-Key: $ADMIN_API_KEY"
+# → T_INTERN_PILOT must be listed
+```
+
+### Step 3 — Verify tenant API key
+```bash
+export TENANT_KEY="kw_xxx..."   # key from step 1
+
+curl -s http://localhost:8000/tenant \
+  -H "X-API-Key: $TENANT_KEY"
+# → {"current_tenant": "T_INTERN_PILOT", ...}
+```
+
+### Step 4 — Check pilot readiness (expected: not_ready before live)
+```bash
+curl -s http://localhost:8000/pilot/readiness \
+  -H "X-API-Key: $TENANT_KEY"
+# → overall_status: not_ready or almost_ready (no live tokens yet — expected)
+# Inspect each of the 11 checks to identify what is missing for live go-live
+```
+
+Pilot readiness checks (11 total, all deterministic — no external API calls):
+1. `auth_configured` — tenant DB key active
+2. `tenant_exists` — tenant row in DB
+3. `onboarding_ready` — onboarding checklist complete
+4. `integrations_health_not_error` — integration health not "error"
+5. `routing_ready_for_lead` — routing preview for lead is ready
+6. `dispatch_duplicate_protection` — idempotency column exists
+7. `dispatch_observability` — at least one integration event
+8. `scheduler_safe` — run_mode != scheduled OR Gmail configured
+9. `required_env_present` — APP_NAME + at least one integration env set
+10. `ui_available` — `app/ui/index.html` present on disk
+11. `test_lead_exists` — at least one lead job exists for tenant
+
+### Step 5 — Check integration health (expected: not_configured before live)
+```bash
+curl -s http://localhost:8000/integrations/health \
+  -H "X-API-Key: $TENANT_KEY"
+# → overall_status: not_configured — Gmail, Monday, Fortnox all show not_configured
+# No secrets in response — verified
+```
+
+Without live tokens (`GOOGLE_MAIL_ACCESS_TOKEN`, `MONDAY_API_KEY`, etc.):
+- Gmail → `not_configured`
+- Monday → `not_configured`
+- Fortnox → `not_configured`
+
+This is expected and safe. The endpoint will not crash.
+
+### Step 6 — Run onboarding test lead (no external calls)
+```bash
+curl -s -X POST http://localhost:8000/onboarding/test-lead \
+  -H "X-API-Key: $TENANT_KEY"
+# → {"job_id": "...", "status": "completed" or "awaiting_approval"}
+# Uses deterministic pipeline — no LLM or external calls
+```
+
+### Step 7 — Run deterministic pipeline verification (admin)
+```bash
+curl -s -X POST http://localhost:8000/verify/T_INTERN_PILOT \
+  -H "X-Admin-API-Key: $ADMIN_API_KEY"
+# → {"status": "completed" or "awaiting_approval", ...}
+# No LLM, no external calls — safe for local use
+```
+
+### Step 8 — Check customer dashboard loads (empty state)
+```bash
+curl -s http://localhost:8000/customer/results \
+  -H "X-API-Key: $TENANT_KEY"
+
+curl -s http://localhost:8000/customer/health \
+  -H "X-API-Key: $TENANT_KEY"
+# → HTTP 200, empty/zero-state data — no crash
+```
+
+### Step 9 — Check onboarding status
+```bash
+curl -s http://localhost:8000/onboarding/status \
+  -H "X-API-Key: $TENANT_KEY"
+# → {"status": "in_progress" or "not_started", "steps": [...]}
+# Shows which of 8 onboarding steps are complete/incomplete
+```
+
+### Step 10 — Rotate API key (if needed)
+```bash
+curl -s -X POST http://localhost:8000/admin/tenants/T_INTERN_PILOT/rotate-key \
+  -H "X-Admin-API-Key: $ADMIN_API_KEY"
+# → {"tenant_id": "T_INTERN_PILOT", "api_key": "kw_new..."}
+# Old key is immediately revoked. Save the new key.
+```
+
+### Step 11 — Set tenant status (if needed)
+```bash
+# Deactivate
+curl -s -X PATCH http://localhost:8000/admin/tenants/T_INTERN_PILOT/status \
+  -H "X-Admin-API-Key: $ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "inactive"}'
+
+# Reactivate
+curl -s -X PATCH http://localhost:8000/admin/tenants/T_INTERN_PILOT/status \
+  -H "X-Admin-API-Key: $ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "active"}'
+```
+
+### Pre-live readiness checklist
+Before connecting live tokens:
+
+- [ ] Steps 1–11 above completed locally.
+- [ ] Test suite passes: `python -m pytest --tb=no -q`.
+- [ ] R1 gate passes: `python -m scripts.run_release_gate_r1`.
+- [ ] `ADMIN_API_KEY` set to a strong random value in production env.
+- [ ] `APP_NAME` set in production env.
+- [ ] DB backup completed before first live onboarding.
+
+### Live-only steps (deferred — requires real OAuth)
+```text
+TODO: verify during live phase
+```
+- Gmail OAuth: `GET /auth/gmail/start?tenant_id=T_INTERN_PILOT` → follow redirect.
+- Verify inbox sync creates cases: send test mail, confirm case created.
+- Verify scheduler: `GET /scheduler/status` shows `run_mode: scheduled` or equivalent.
+- Run smoke check: `python scripts/smoke_check.py --base-url https://your-domain.com --expect-production`.
 
 ---
 

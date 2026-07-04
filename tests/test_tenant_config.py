@@ -140,9 +140,14 @@ class TestGetTenantConfig:
         result = get_tenant_config("TENANT_1001")
         assert result == TENANT_CONFIGS["TENANT_1001"]
 
-    def test_fallback_to_default_tenant_for_unknown(self):
+    def test_unknown_tenant_returns_fail_closed_config(self):
+        # Unknown tenant IDs must NOT inherit TENANT_1001's permissions.
+        # They must receive a fail-closed config with no enabled job types or integrations.
         result = get_tenant_config("TENANT_UNKNOWN")
-        assert result == TENANT_CONFIGS["TENANT_1001"]
+        assert result != TENANT_CONFIGS["TENANT_1001"]
+        assert result.get("enabled_job_types") == []
+        assert result.get("allowed_integrations") == []
+        assert result.get("auto_actions") == {}
 
     def test_returns_db_row_when_present(self):
         db = _mock_db()
