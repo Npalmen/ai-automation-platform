@@ -1,19 +1,29 @@
 from app.ai.schemas import ClassificationResponse
 from app.domain.workflows.models import Job
+from app.workflows.intelligence_safety import assess_content_risk
 from app.workflows.processors.ai_processor_utils import run_ai_step
 
 
 PROCESSOR_NAME = "classification_processor"
 PROMPT_NAME = "classification"
 
-# Priority order (highest → lowest):
-# spam > newsletter > internal > invoice > supplier > partnership > lead > customer_inquiry
-# 'unknown' is never returned by deterministic path — it is an LLM-only output.
+# Priority order (highest -> lowest):
+# spam > wrong_recipient/unclear > newsletter > internal > invoice > supplier
+# > partnership > support/customer_inquiry > lead > customer_inquiry.
+# The deterministic path returns "unknown" for empty/unclear/wrong-recipient
+# content so the system does not confidently automate ambiguous input.
 
 _SPAM_KEYWORDS = {
     "you won", "click here to claim", "lottery", "nigerian prince",
     "free money", "make money fast", "enlarge", "casino bonus",
     "phishing", "wire transfer urgent", "verify your account immediately",
+    "spam", "säljutskick", "seo erbjudande", "köp länkar", "billiga länkar",
+    "massmail", "cold outreach", "leadlista",
+}
+
+_WRONG_RECIPIENT_KEYWORDS = {
+    "fel person", "fel bolag", "fel företag", "inte avsett för er",
+    "wrong person", "wrong company", "wrong recipient",
 }
 
 _NEWSLETTER_KEYWORDS = {
@@ -45,10 +55,19 @@ _PARTNERSHIP_KEYWORDS = {
 }
 
 _LEAD_KEYWORDS = {
-    "offert", "pris", "köpa", "intresserad", "installation", "montering",
-    "besiktning", "reparation", "service", "bokning", "boka",
+    "offert", "pris", "köpa", "intresserad", "installera", "installation av",
+    "boka installation", "montering", "besiktning", "kostnadsförslag",
+    "förfrågan", "vill ha",
     "quote", "pricing", "buy", "purchase", "interested",
     "demo", "trial", "inspection", "repair",
+}
+
+_SUPPORT_KEYWORDS = {
+    "fungerar inte", "producerar inget", "trasig", "felkod", "larm",
+    "driftstopp", "helt nere", "problem med", "support",
+    "boka om", "omboka", "flytta min bokade tid", "avboka",
+    "reklamation", "missnöjd", "häva avtalet", "avtalsfråga",
+    "inkasso", "betalningskrav", "garanti", "klagomål",
 }
 
 
@@ -68,9 +87,13 @@ def classify_email_type(subject: str, body: str) -> str:
     Priority order: spam > newsletter > internal > invoice > supplier > partnership > lead > customer_inquiry
     """
     combined = f"{subject} {body}".lower()
+    if not combined.strip():
+        return "unknown"
 
     if any(kw in combined for kw in _SPAM_KEYWORDS):
         return "spam"
+    if any(kw in combined for kw in _WRONG_RECIPIENT_KEYWORDS):
+        return "unknown"
     if any(kw in combined for kw in _NEWSLETTER_KEYWORDS):
         return "newsletter"
     if any(kw in combined for kw in _INTERNAL_KEYWORDS):
@@ -81,6 +104,8 @@ def classify_email_type(subject: str, body: str) -> str:
         return "supplier"
     if any(kw in combined for kw in _PARTNERSHIP_KEYWORDS):
         return "partnership"
+    if any(kw in combined for kw in _SUPPORT_KEYWORDS):
+        return "customer_inquiry"
     if any(kw in combined for kw in _LEAD_KEYWORDS):
         return "lead"
     return "customer_inquiry"
@@ -117,12 +142,16 @@ def process_classification_job(job: Job) -> Job:
             subject=input_data.get("subject") or "",
             body=input_data.get("message_text") or "",
         )
+        risk = assess_content_risk(input_data)
+        reasons = ["deterministic_fallback", "llm_unavailable"] + risk["reasons"]
+        confidence = 0.35 if detected == "unknown" or risk["risk_detected"] else 0.5
         return {
             "detected_job_type": detected,
-            "confidence": 0.5,
-            "reasons": ["deterministic_fallback", "llm_unavailable"],
+            "confidence": confidence,
+            "reasons": reasons,
             "error": error_message,
-            "recommended_next_step": detected,
+            "recommended_next_step": "manual_review" if risk["risk_detected"] else detected,
+            "risk": risk,
         }
 
     return run_ai_step(

@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-05 (Phase 2 prep — first tenant setup path audit, pilot readiness/integration health verification, flaky test fix. Tests run locally on Python 3.14.3. No live server/DB access.)
+2026-07-06 (Phase 2 local product hardening — Local Final Spurt before Live: Service Profiles wired into pipeline, Customer Reply Quality Pass, Tenant-aware Routing Hints Quality Pass, Local Golden Path Polish. Tests run locally on Python 3.14.3. No live verification, live server, production DB, OAuth token, scheduler, or external integration access.)
 
 ## Verification method
 
@@ -16,6 +16,7 @@
 - `python -m scripts.run_release_gate_r1` — R1 release gate script
 - Static code inspection of `app/main.py`, integration modules, `app/core/config.py`, `app/ui/index.html`
 - Glob/search of test files, scripts, and config
+- Static code inspection of core intelligence modules: classification, lead/support analyzers, invoice/policy/handoff/action dispatch, and customer reply drafting
 
 ---
 
@@ -23,10 +24,10 @@
 
 | Claim | Status | Detail |
 |-------|--------|--------|
-| Test suite runs | `Verified` | 2499 passed, 0 failed, 4 warnings (after Phase 2 prep bug fix) |
-| Test count: 2499 tests across 94 test files | `Verified` | Run 2026-07-05 after flaky test fix |
+| Test suite runs | `Verified` | 2735 passed, 0 failed, 4 warnings (after Local Final Spurt + 4 new test files) |
+| Test count: 2735 tests across 101 test files | `Verified` | Run 2026-07-06 after adding pipeline/reply/routing/golden-path test files |
 | All policy gate tests pass | `Verified` | Including `test_lead_disabled_for_finance_tenant` and unknown-tenant regression suite |
-| R1 release gate (`python -m scripts.run_release_gate_r1`) | `Verified — PASS` | 487 regression + 152 E2E = 639, all passed |
+| R1 release gate (`python -m scripts.run_release_gate_r1`) | `Verified — PASS` | 505 regression + 152 E2E = 657, all passed |
 | `httpx` added to `requirements.txt` | `Verified — FIXED` | AUDIT-BUG-01 resolved |
 | Unknown tenant IDs fail-closed | `Verified — FIXED` | AUDIT-BUG-02 resolved |
 | Customer API key cannot access admin endpoints | `Verified` | `test_tenant_isolation_http.py` — admin endpoints reject tenant keys |
@@ -43,6 +44,41 @@
 | Customer activity hides internal fields | `Verified` | job_id and payload stripped from /customer/activity |
 | Deprecation warnings: `on_event` and `datetime.utcnow()` | `Verified` | 4 warnings per run, non-fatal |
 | SLA reminder flaky test fixed | `Verified — FIXED 2026-07-05` | `test_sla_pass_already_run_today_skips` used `date.today()` (local TZ) vs prod code's `datetime.now(UTC)` — fixed to use UTC date |
+| Core intelligence quality eval suite | `Verified — ADDED 2026-07-06` | `tests/test_core_intelligence_quality.py` covers Swedish installation-company classification, qualification, missing info, risk/do-not-touch, customer reply, approval/routing, low-risk routing and high-risk handoff |
+| Swedish extraction & qualification eval suite | `Verified — ADDED 2026-07-06` | `tests/test_swedish_extraction_quality.py` — 61 tests covering address/location extraction, service type detection, phone/org-number parsing, customer type, lead qualification, support urgency/safety, invoice risk level, OCR extraction, missing fields, and routing hints |
+| Swedish address extraction (`extract_swedish_location`) | `Verified — ADDED 2026-07-06` | Deterministic regex: street address, postal code, city, property type, property designation. No LLM required. |
+| Swedish org number extraction (`extract_org_number`) | `Verified — ADDED 2026-07-06` | Matches format "NNNNNN-NNNN". |
+| OCR/payment reference extraction (`extract_ocr_number`) | `Verified — ADDED 2026-07-06` | Handles "OCR-nummer:", "betalningsref (OCR):", and similar labels. |
+| Invoice risk level detection (`detect_invoice_risk_level`) | `Verified — ADDED 2026-07-06` | Returns "high_risk" for inkasso/kronofogden/kravbrev, "medium_risk" for betalningspåminnelse, "normal" otherwise. |
+| Lead missing-info address detection from text | `Verified — IMPROVED 2026-07-06` | `_field_present("address")` now runs `extract_swedish_location` over message text when entity dict lacks address/city. |
+| Lead analyzer: felsökning, växelriktare, jordfelsbrytare keywords | `Verified — IMPROVED 2026-07-06` | `electrical_work` and `solar_installation` lead types now detect more Swedish fault/service terms. |
+| Lead analyzer: lantbruk/gård customer type | `Verified — IMPROVED 2026-07-06` | "lantbruk", "gård", "jordbruk" map to `private` customer type (closest Literal match). |
+| Support analyzer: "luktar bränt", "gnistor" → critical | `Verified — IMPROVED 2026-07-06` | Added to `_EMERGENCY_KEYWORDS` and `_URGENCY_KEYWORDS["critical"]`. |
+| Support analyzer: electrical fault issue keywords | `Verified — IMPROVED 2026-07-06` | "jordfelsbrytaren löser", "säkringen löser", "växelriktaren", "inga solceller" added to `issue` ticket type. |
+| Support analyzer: warranty from post-install failure | `Verified — IMPROVED 2026-07-06` | "ni installerade", "installerade hos oss" added to `warranty` ticket type keywords. |
+| Support analyzer: frustrated customers escalated | `Verified — IMPROVED 2026-07-06` | `requires_human` now includes `frustrated` sentiment in addition to `angry`. |
+| Service Profiles module (`app/service_profiles/`) | `Verified — ADDED 2026-07-06` | New package: `models.py` (ServiceProfile dataclass), `registry.py` (10 profiles), `qualification.py` (select, compute, build_message, tenant_seam), `__init__.py`. |
+| Service profile registry: 10 profiles | `Verified — ADDED 2026-07-06` | Profiles: generic_lead, generic_support, ev_charger_installation, solar_installation, battery_storage, electrical_fault, inverter_support, electrical_panel, invoice_generic, debt_collection_risk. |
+| Profile selection (`select_profile`) | `Verified — ADDED 2026-07-06` | Deterministic: invoice path (debt_collection_risk if inkasso/kronofogden), support path (electrical_fault/inverter_support/generic_support by keyword+category), lead path (by lead_type mapping), fallback generic_lead. |
+| Profile missing-info computation (`compute_profile_missing_info`) | `Verified — ADDED 2026-07-06` | Returns required_fields, present_fields, missing_fields, completeness_score, schema_source per service type. Handles 20+ field types including new profile-specific fields (safety_risk, desired_location, production_status, etc.). Tenant schema override respected. |
+| Profile question messages (`build_profile_question_message`) | `Verified — ADDED 2026-07-06` | Service-specific Swedish follow-up messages with profile-aware intro and field labels. |
+| question_generator.py: service_profile parameter | `Verified — IMPROVED 2026-07-06` | `generate_question_message` now accepts optional `service_profile` param; profile intro + questions take priority over generic labels. Fully backward-compatible. |
+| Tenant override seam (`apply_tenant_overrides`) | `Verified — ADDED 2026-07-06` | Thin seam: passes profile through unchanged when no tenant context; applies routing_hint overrides when present; documented as future onboarding connection point. |
+| Debt collection risk profile always routes manual_review | `Verified` | `default_route`, `complete_action`, `missing_info_action` all = "manual_review". `resolve_action()` always returns "manual_review" for this profile. |
+| Electrical fault profile is_high_risk for luktar bränt/gnistor | `Verified` | `is_high_risk()` returns True for any risk_flags keyword; `resolve_action()` returns high_risk_action regardless of completeness. |
+| Service profiles eval suite | `Verified — ADDED 2026-07-06` | `tests/test_service_profiles_qualification.py` — 82 tests across 8 test classes. |
+| Service profiles wired into lead pipeline | `Verified — WIRED 2026-07-06` | `lead_analyzer_processor.py` now calls `select_profile()` after `analyze_lead()`; passes `service_profile` to `generate_question_message()`; adds `service_profile_type` to payload. |
+| Service profiles wired into support pipeline | `Verified — WIRED 2026-07-06` | `support_analyzer_processor.py` now calls `select_profile()` after `analyze_support()`; adds `service_profile_type` to payload. |
+| Customer auto-reply uses service-profile questions | `Verified — IMPROVED 2026-07-06` | `action_dispatch_processor._build_lead_default_actions` reads `generated_question_message` from `lead_analyzer_processor`; uses it for the auto-reply body when available; generic fallback maintained. |
+| Customer auto-reply (inquiry) uses service-profile questions | `Verified — IMPROVED 2026-07-06` | `action_dispatch_processor._build_inquiry_default_actions` reads `support_generated_question_message` from `support_analyzer_processor`; uses it for the auto-reply body when available. |
+| Risk-aware customer replies | `Verified` | Sensitive/high-risk leads and inquiries get `_build_sensitive_customer_ack` with `_needs_approval=True`; no legal/financial commitment in reply body. |
+| Tenant routing hints override service profile route | `Verified` | `apply_tenant_overrides()` replaces `default_route` from `tenant_ctx.routing_hints[service_type]`; all other fields preserved. |
+| Tenant-specific required fields via schema seam | `Verified` | `compute_profile_missing_info()` checks `tenant_ctx.schema_for(service_type)`; returns `schema_source="tenant_override"` when override present. |
+| Company name in follow-up questions | `Verified` | `build_profile_question_message()` personalises intro with company name; `generate_question_message()` passes company_name from `tenant_ctx.company_name`. |
+| Debt collection risk: inkassokrav detected | `Verified — FIXED 2026-07-06` | Added "inkassokrav", "inkassobolag", "betalningsanmärkning" to `intelligence_safety._RISK_KEYWORDS["debt_collection"]`. |
+| Solar lead detection: plural forms | `Verified — FIXED 2026-07-06` | Added "solceller", "solpaneler" to `lead/analyzer.py` solar_installation keywords. |
+| Service profile field presence: phone/email/entity fallback | `Verified — FIXED 2026-07-06` | `_profile_field_present` now handles `phone` and `email` via text regex + entity dict; generic entity fallback added. |
+| Pipeline + reply + routing + golden path eval suites | `Verified — ADDED 2026-07-06` | `tests/test_service_profile_pipeline.py` (25 tests), `tests/test_customer_reply_quality.py` (22 tests), `tests/test_tenant_routing_hints.py` (15 tests), `tests/test_local_golden_path.py` (20 tests). |
 
 ### Phase 2 prep — First tenant setup path (verified 2026-07-05)
 
@@ -394,6 +430,21 @@
 | Safeguard: Fortnox/Visma writes | `Verified (code)` | Invoice export has `approval_required` gate; Visma has no write actions confirmed |
 | Safeguard: Monday writes | `Partially verified` | Depends on tenant `auto_actions` config; no hard approval gate in code confirmed |
 | Risk boundaries in production | `Unverified` | Depends on correct env var configuration at runtime |
+
+---
+
+## Core intelligence quality (verified 2026-07-06, local only)
+
+| Area | Status | Notes |
+|------|--------|-------|
+| Deterministic classification fallback | `Verified — IMPROVED` | Empty/unclear and wrong-recipient content now falls back to `unknown`; support/risk phrases are prioritized over broad lead keywords; Swedish spam/sales outreach is classified as `spam` |
+| Lead qualification | `Verified — IMPROVED` | Local evals verify EV charger lead type, contact/address/property/main-fuse/timeline missing-info behavior, and no free dispatch when auto actions are disabled |
+| Support qualification | `Verified — IMPROVED` | Local evals verify solar production outage as high-urgency support with human follow-up and approval-required task behavior |
+| Invoice/economy handling | `Verified — IMPROVED` | Invoice-like items remain approval/manual-review gated; inkasso/betalningskrav now force manual review instead of approval-free automation |
+| Do-not-touch risk logic | `Verified — ADDED` | Shared deterministic risk detector covers legal threats, reklamation, contract disputes, inkasso/betalningskrav, safety/work-environment risk, sensitive personal data, data deletion, financial changes, and mass-send intent |
+| Policy routing | `Verified — IMPROVED` | Risk signals set `decision=hold_for_review`, `needs_human=true`, `approval_required=true`, `route_to=manual_review`, and `next_best_action=manual_review` |
+| Customer reply drafts | `Verified — IMPROVED` | Sensitive lead/customer-inquiry auto replies are approval-gated, non-binding acknowledgements that hand off to a responsible human; low-risk inquiries still route to Monday/internal handoff |
+| Live verification | `Not run` | Explicitly deferred; no calls to `api.krowolf.se`, `app.krowolf.se`, production DB, Gmail OAuth, Monday/Fortnox/Visma credentials, scheduler, or tenant setup |
 
 ---
 

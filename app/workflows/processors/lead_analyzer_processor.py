@@ -16,6 +16,7 @@ from app.lead.offer_draft import build_offer_draft
 from app.lead.question_generator import generate_question_message, should_ask_questions
 from app.lead.scorer import score_lead
 from app.lead.tenant_context import load_tenant_context_from_job
+from app.service_profiles import select_profile
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
     get_latest_processor_payload,
@@ -38,29 +39,39 @@ def process_lead_analyzer_job(job: Job, db=None) -> Job:
     # 1. Analyze lead type, intent, urgency, customer_type
     analysis = analyze_lead(input_data, entities, tenant_ctx)
 
-    # 2. Compute missing info + completeness (tenant schema if available)
+    # 2. Select service profile — drives service-specific questions, routing and completeness
+    _combined = f"{input_data.get('subject', '')} {input_data.get('message_text', '')}".strip()
+    service_profile = select_profile(
+        "lead",
+        lead_type=analysis.lead_type,
+        text=_combined,
+        tenant_ctx=tenant_ctx if tenant_ctx.context_available else None,
+    )
+
+    # 3. Compute missing info + completeness (tenant schema if available)
     missing_info = compute_missing_info(analysis.lead_type, input_data, entities, tenant_ctx)
 
-    # 3. Score lead (tenant-aware bonuses/penalties)
+    # 4. Score lead (tenant-aware bonuses/penalties)
     lead_score = score_lead(analysis, missing_info, entities, input_data, tenant_ctx)
 
-    # 4. Next action
+    # 5. Next action
     next_action = decide_next_action(lead_score, missing_info, tenant_auto_actions, tenant_ctx)
 
-    # 5. Question message (if needed)
+    # 6. Question message (if needed) — uses service-profile intro + labels
     question_message: str | None = None
     if should_ask_questions(missing_info.completeness_score):
         question_message = generate_question_message(
-            missing_info.missing_fields, tenant_ctx, analysis.lead_type
+            missing_info.missing_fields, tenant_ctx, analysis.lead_type,
+            service_profile=service_profile,
         )
 
-    # 6. Offer draft (only if complete enough)
+    # 7. Offer draft (only if complete enough)
     offer_draft_dict: dict | None = None
     draft = build_offer_draft(analysis, missing_info, entities, tenant_ctx)
     if draft:
         offer_draft_dict = draft.to_dict()
 
-    # 7. lead_status — preserve if already set by operator
+    # 8. lead_status — preserve if already set by operator
     lead_status = input_data.get("lead_status") or _infer_lead_status(next_action, input_data)
 
     payload: dict = {
@@ -71,6 +82,7 @@ def process_lead_analyzer_job(job: Job, db=None) -> Job:
         "next_action": next_action,
         "lead_status": lead_status,
         "confidence": analysis.confidence,
+        "service_profile_type": service_profile.service_type,
     }
 
     if question_message:

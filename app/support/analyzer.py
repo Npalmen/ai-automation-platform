@@ -32,6 +32,7 @@ _EMERGENCY_KEYWORDS = [
     "elstöt", "stöt", "farligt", "fara", "läcker", "vattenskada",
     "kortslutning", "rök", "gnistor", "risk för liv", "brandrisk",
     "nödsituation", "omedelbart", "sos",
+    "luktar bränt", "bränt lukt", "gnistrar", "gnistrade", "gnistor",
 ]
 
 _TICKET_TYPE_KEYWORDS: list[tuple[TicketType, list[str]]] = [
@@ -39,6 +40,8 @@ _TICKET_TYPE_KEYWORDS: list[tuple[TicketType, list[str]]] = [
     ("warranty", [
         "garanti", "reklamation", "garantiärende", "fel efter installation",
         "defekt", "gick sönder", "slutat fungera", "inte fungerat sedan installation",
+        "installerade hos oss", "ni installerade", "sedan ni installerade",
+        "sedan installationen",
     ]),
     ("invoice_question", [
         "faktura", "fakturan", "belopp", "debitering", "påminnelse",
@@ -47,7 +50,9 @@ _TICKET_TYPE_KEYWORDS: list[tuple[TicketType, list[str]]] = [
     ("complaint", [
         "klagomål", "missnöjd", "besviken", "dålig service", "dåligt arbete",
         "inte nöjd", "kräver kompensation", "oacceptabelt", "skandal",
-        "anmäler", "JO-anmälan", "Konsumentverket",
+        "anmäler", "JO-anmälan", "Konsumentverket", "reklamation",
+        "häva avtalet", "hävning", "avtalstvist", "bestrider avtalet",
+        "bestrider kostnaden", "advokat",
     ]),
     ("scheduling", [
         "boka om", "boka tid", "omboka", "avboka", "när kommer ni",
@@ -63,6 +68,9 @@ _TICKET_TYPE_KEYWORDS: list[tuple[TicketType, list[str]]] = [
         "problem", "fungerar inte", "trasig", "fel på", "driftstörning",
         "sluta fungera", "går inte", "krånglar", "driftstopp",
         "inte igång", "larm", "varning", "felkod", "blinkar",
+        "producerar inget", "helt nere",
+        "jordfelsbrytaren löser", "säkringen löser", "säkring slår",
+        "växelriktaren", "invertern", "inga solceller",
     ]),
 ]
 
@@ -77,6 +85,7 @@ _CATEGORY_KEYWORDS: list[tuple[SupportCategory, list[str]]] = [
     ]),
     ("invoice", [
         "faktura", "belopp", "debitering", "betalning", "fakturering",
+        "inkasso", "betalningskrav", "kravbrev", "kronofogden",
     ]),
     ("scheduling", [
         "boka", "tid", "besök", "kalender", "schema",
@@ -94,6 +103,9 @@ _CATEGORY_KEYWORDS: list[tuple[SupportCategory, list[str]]] = [
 _URGENCY_KEYWORDS: dict[SupportUrgency, list[str]] = {
     "critical": _EMERGENCY_KEYWORDS + [
         "livsfarligt", "evakuering", "rädda", "läckage", "explosion",
+        "arbetsmiljö", "säkerhetsrisk",
+        "luktar bränt", "bränt lukt", "gnistrar", "gnistor",
+        "elstöt", "kortslutning",
     ],
     "high": [
         "brådskande", "asap", "snabbt", "snarast", "omgående",
@@ -110,7 +122,7 @@ _SENTIMENT_KEYWORDS: dict[CustomerSentiment, list[str]] = {
     "angry": [
         "arg", "rasande", "skandal", "oacceptabelt", "kräver",
         "anmäler", "skäms", "livsfarligt fel ni gjort", "stämmer",
-        "advokat", "polisanmälan",
+        "advokat", "polisanmälan", "häva avtalet", "bestrider",
     ],
     "frustrated": [
         "missnöjd", "besviken", "frustrerad", "trött på", "inte okej",
@@ -211,11 +223,12 @@ def analyze_support(
     # sentiment
     sentiment = _detect_sentiment(text)
 
-    # requires_human
+    # requires_human — also escalate frustrated customers; recurring-contact
+    # patterns ("tredje gången") indicate a case that has slipped through.
     requires_human = (
         ticket_type in _REQUIRES_HUMAN_SIGNALS
         or urgency in ("critical", "high")
-        or sentiment in ("angry",)
+        or sentiment in ("angry", "frustrated")
     )
 
     # matched_service from tenant context

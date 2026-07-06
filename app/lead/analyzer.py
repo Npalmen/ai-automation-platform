@@ -19,8 +19,9 @@ from app.lead.models import LeadAnalysis, LeadType, Intent, Urgency, CustomerTyp
 
 _LEAD_TYPE_KEYWORDS: list[tuple[LeadType, list[str]]] = [
     ("solar_installation", [
-        "solcell", "solpanel", "solenergi", "solar", "solkraft",
+        "solcell", "solceller", "solpanel", "solpaneler", "solenergi", "solar", "solkraft",
         "solcellsinstallation", "solcellsanläggning", "pv",
+        "växelriktare", "inverter",
     ]),
     ("battery_storage", [
         "batteri", "batterilager", "energilager", "laddlager",
@@ -35,6 +36,9 @@ _LEAD_TYPE_KEYWORDS: list[tuple[LeadType, list[str]]] = [
         "elarbete", "elinstallation", "elsystem", "elcentral",
         "säkring", "jordfelsbrytare", "gruppcent", "elmontör",
         "elektriker", "elledning",
+        "felsökning", "felsöker", "nätanslutning", "elnätsanslutning",
+        "projektering", "samordning elarbete",
+        "säkring slår", "säkringen löser", "jordfelsbrytaren löser",
     ]),
     ("roof_painting", [
         "takmålning", "måla tak", "takfärg", "takbehandling",
@@ -85,6 +89,7 @@ _CUSTOMER_TYPE_KEYWORDS: dict[CustomerType, list[str]] = {
     "private": [
         "villa", "hus", "mitt hem", "hemma", "privat",
         "enfamiljshus", "radhus",
+        "lantbruk", "gård", "jordbruk", "lantgård",
     ],
 }
 

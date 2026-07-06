@@ -21,7 +21,37 @@ Run `pip install -r requirements.txt` if tests fail with `ModuleNotFoundError: N
 
 Record the pass count in `docs/01-current-truth.md` after each run.
 
-**Verified 2026-07-04:** Python 3.14.3 — 2475 passed, 1 failed, 9.55s.
+**Verified 2026-07-06:** Python 3.14.3 — 2735 passed, 0 failed, 4 warnings, 10.53s.
+
+### Core intelligence evals
+
+```bash
+python -m pytest tests/test_core_intelligence_quality.py -q
+```
+
+Local deterministic evals for Swedish installation-company classification,
+qualification, missing info, risk/do-not-touch, customer reply, and
+approval/routing behavior. No live credentials or external APIs required.
+
+### Service profile pipeline evals
+
+```bash
+# All four targeted suites for local final spurt
+python -m pytest tests/test_service_profile_pipeline.py -q
+python -m pytest tests/test_customer_reply_quality.py -q
+python -m pytest tests/test_tenant_routing_hints.py -q
+python -m pytest tests/test_local_golden_path.py -q
+
+# All at once
+python -m pytest tests/test_service_profile_pipeline.py tests/test_customer_reply_quality.py tests/test_tenant_routing_hints.py tests/test_local_golden_path.py -q
+```
+
+Covers:
+- Service profile selection wired into lead_analyzer_processor and support_analyzer_processor
+- Profile-specific question message in customer auto-reply
+- Risk/high-risk safe acknowledgement behavior
+- Tenant routing hint and schema overrides
+- Local golden path scenarios (EV charger, solar, debt collection, electrical fault, tenant routing)
 
 ---
 

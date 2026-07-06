@@ -42,7 +42,7 @@ Define exactly what is required to get the first customer live, what is acceptab
 Systemet ska minst kunna:
 
 1. Läsa inkommande information (Gmail inbox sync).
-2. Förstå uppgiftstyp (classification — lead/support/invoice).
+2. Förstå uppgiftstyp (classification — lead/support/customer_inquiry/invoice/unknown/spam) och hellre välja `unknown`/mänsklig hantering än felaktig självsäker automation.
 3. Skapa/uppdatera ärende (case record in DB).
 4. Föreslå eller utföra låg-risk action enligt policy.
 5. Svara eller förbereda svar (approval-gated email draft).
@@ -205,6 +205,39 @@ All commands use the local dev server (`http://localhost:8000`).
   ```
 - [ ] **Verify no live credentials are required for above steps** — all should complete
   without `GOOGLE_MAIL_ACCESS_TOKEN`, `MONDAY_API_KEY`, or live OAuth tokens.
+- [ ] **Verify local core intelligence quality gate**
+  ```bash
+  python -m pytest tests/test_core_intelligence_quality.py -q
+  ```
+  # Expected: Swedish lead/support/customer inquiry/invoice/risk/approval evals pass
+- [ ] **Verify local service profile qualification gate**
+  ```bash
+  python -m pytest tests/test_service_profiles_qualification.py -q
+  ```
+  # Expected: 82 service-profile tests pass (registry, selection, missing fields, follow-up questions, risk routing, tenant override seam)
+- [ ] **Verify local golden path (service-profile aware pipeline)**
+  ```bash
+  python -m pytest tests/test_service_profile_pipeline.py tests/test_customer_reply_quality.py tests/test_tenant_routing_hints.py tests/test_local_golden_path.py -q
+  ```
+  # Expected: 82 tests pass (pipeline wiring, reply quality, tenant routing, golden path scenarios)
+
+### Service profile / customer profile note
+
+The system uses **service profiles** to adapt qualification, required fields, follow-up questions, and routing to the specific type of job (laddbox, solceller, elcentral, elfel, faktura, inkasso, etc.).
+
+**Service profiles are now wired into the live pipeline (as of 2026-07-06 Local Final Spurt):**
+- `lead_analyzer_processor` selects a service profile after analyzing the lead type; the profile drives question generation and is included in the payload as `service_profile_type`.
+- `support_analyzer_processor` selects a service profile after analyzing the support ticket; included in payload as `service_profile_type`.
+- `action_dispatch_processor` reads `generated_question_message` / `support_generated_question_message` from analyzer payloads and uses them for the customer auto-reply body when available.
+- High-risk and risk-flagged cases (inkasso, legal threats, safety risk, reklamation) produce safe acknowledgement replies with `_needs_approval=True`.
+
+During tenant setup/onboarding, the `TenantLeadContext` can be used to:
+- restrict which service profiles are active (`services` list)
+- override required fields per profile (`lead_requirements`)
+- override routing per profile (`routing_hints`)
+- personalise follow-up questions with company name (`company_name`)
+
+Full self-service onboarding UI for this is deferred. For the first pilot customer, these settings are configured manually in tenant memory/settings via the admin API. See `app/service_profiles/qualification.py` → `apply_tenant_overrides()` for the seam description.
 
 ---
 

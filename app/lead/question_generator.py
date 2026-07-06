@@ -7,6 +7,9 @@ When a TenantLeadContext is provided the message uses:
 - the tenant's company name
 - tone/language preferences
 - service-specific field labels
+
+When a ServiceProfile is provided the message uses the profile's
+follow_up_intro and follow_up_questions for richer, service-specific phrasing.
 """
 from __future__ import annotations
 
@@ -14,6 +17,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.lead.tenant_context import TenantLeadContext
+    from app.service_profiles.models import ServiceProfile
 
 # Swedish question templates per field
 _FIELD_QUESTIONS: dict[str, str] = {
@@ -52,12 +56,18 @@ def generate_question_message(
     missing_fields: list[str],
     tenant_ctx: "TenantLeadContext | None" = None,
     lead_type: str | None = None,
+    service_profile: "ServiceProfile | None" = None,
 ) -> str | None:
-    """Return a Swedish customer message asking for missing_fields, or None if list is empty."""
+    """Return a Swedish customer message asking for missing_fields, or None if list is empty.
+
+    When *service_profile* is provided its follow_up_intro and follow_up_questions
+    are used for service-specific phrasing.  Tenant field-label overrides are
+    still applied on top when available.
+    """
     if not missing_fields:
         return None
 
-    # Resolve company name and tone from tenant context
+    # Resolve company name from tenant context
     company_name: str | None = None
     if tenant_ctx and tenant_ctx.context_available:
         company_name = tenant_ctx.company_name
@@ -70,15 +80,30 @@ def generate_question_message(
                 custom_labels = svc.get("field_labels") or {}
                 break
 
+    # Service-profile questions have priority over generic _FIELD_QUESTIONS
+    profile_questions: dict[str, str] = {}
+    if service_profile is not None:
+        profile_questions = service_profile.follow_up_questions
+
     # Build question list
     questions = []
     for f in missing_fields:
-        label = custom_labels.get(f) or _FIELD_QUESTIONS.get(f) or f.replace("_", " ").capitalize()
+        label = (
+            custom_labels.get(f)
+            or profile_questions.get(f)
+            or _FIELD_QUESTIONS.get(f)
+            or f.replace("_", " ").capitalize()
+        )
         questions.append(f"• {label}")
     body = "\n".join(questions)
 
-    # Opening line
-    if company_name:
+    # Opening line — use profile intro when available
+    if service_profile is not None:
+        opening = service_profile.follow_up_intro
+        if company_name:
+            opening = opening.replace("vi gärna:", f"vi på {company_name} gärna:")
+            opening = opening.replace("vi:", f"vi på {company_name}:")
+    elif company_name:
         opening = f"För att vi på {company_name} ska kunna ta fram ett bra förslag behöver vi bara lite mer information:"
     else:
         opening = "För att kunna ta fram ett bra förslag behöver vi bara lite mer information:"

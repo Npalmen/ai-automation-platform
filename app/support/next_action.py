@@ -69,7 +69,17 @@ def decide_support_next_action(
             context_sources=ctx_sources,
         )
 
-    # 4. Common issue match + low risk + complete → suggest solution
+    # 4. Human-required, complete high-risk cases become approval-gated tasks.
+    if analysis.requires_human or analysis.urgency == "high":
+        return SupportNextAction(
+            action="create_task",
+            requires_approval=True,
+            reason="Ärendet är tillräckligt komplett men kräver mänsklig uppföljning.",
+            tenant_context_used=ctx_used,
+            context_sources=ctx_sources,
+        )
+
+    # 5. Common issue match + low risk + complete → suggest solution
     if tenant_ctx and tenant_ctx.context_available and not analysis.requires_human:
         text = ""  # can't access input_data here — signal via priority score
         # Use priority score < 40 as proxy for low risk
@@ -84,7 +94,7 @@ def decide_support_next_action(
                     context_sources=ctx_sources,
                 )
 
-    # 5. High priority score + tenant auto_actions → ready_to_dispatch (create_task only)
+    # 6. High priority score + tenant auto_actions → ready_to_dispatch (create_task only)
     auto = (tenant_auto_actions or {}).get("support", False)
     if priority.score >= 70 and (auto is True or auto == "auto"):
         return SupportNextAction(
@@ -95,7 +105,7 @@ def decide_support_next_action(
             context_sources=ctx_sources,
         )
 
-    # 6. Complete + high score → create_task (pending approval)
+    # 7. Complete + high score → create_task (pending approval)
     if priority.score >= 40 and missing_info.completeness_score >= 0.7:
         return SupportNextAction(
             action="create_task",
@@ -105,7 +115,7 @@ def decide_support_next_action(
             context_sources=ctx_sources,
         )
 
-    # 7. Default → manual review
+    # 8. Default → manual review
     return SupportNextAction(
         action="manual_review",
         requires_approval=False,

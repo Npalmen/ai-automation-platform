@@ -113,6 +113,169 @@ def extract_due_date(subject: str, body_text: str) -> str | None:
     return None
 
 
+# ── Swedish address / location extraction ─────────────────────────────────────
+
+# Street suffix patterns common in Swedish addresses.
+_STREET_SUFFIXES = (
+    r"vägen|gatan|gränd|torget|allén|leden|stigen|backen|parken"
+    r"|bron|torg|plan|plats|esplanaden|promenaden|boulevarden"
+    r"|gata|väg|stig|backe"
+)
+
+# Match "Solvägen 12", "Norra Strandvägen 3A", "Industrivägen 5B" etc.
+# Number part: digit(s) immediately followed by an optional single letter —
+# no space allowed between number and letter, preventing "4 i" from matching.
+_STREET_ADDRESS_RE = re.compile(
+    rf"([A-ZÅÄÖ][a-zåäöA-ZÅÄÖ]{{1,20}}"
+    rf"(?:\s+[A-ZÅÄÖ][a-zåäö]{{1,20}})?)"  # optional prefix word
+    rf"(?:{_STREET_SUFFIXES})"
+    rf"\s+(\d{{1,4}}[A-Za-z]?)",
+    re.UNICODE,
+)
+
+# Swedish postal code — always written "NNN NN" (with a space).
+_POSTAL_CODE_RE = re.compile(r"\b(\d{3}\s\d{2})\b")
+
+# City name following the postal code.
+_CITY_AFTER_POSTAL_RE = re.compile(
+    r"\b\d{3}\s\d{2}\s+([A-ZÅÄÖ][a-zåäö]+(?:\s+[A-ZÅÄÖ][a-zåäö]+)?)\b",
+    re.UNICODE,
+)
+
+# City name after "i", "till", "från", "vid", "nära", "utanför".
+_CITY_PREP_RE = re.compile(
+    r"\b(?:i|till|från|vid|nära|utanför)\s+([A-ZÅÄÖ][a-zåäö]{2,}(?:\s+[A-ZÅÄÖ][a-zåäö]+)?)\b",
+    re.UNICODE,
+)
+
+# Property designation: keyword + "Kommun Trakt 12:3" or inline "Namn Trakt 12:3".
+_PROP_DESIGNATION_RE = re.compile(
+    r"(?:fastighetsbeteckning|beteckning)\s+([A-ZÅÄÖ][a-zåäö]+(?:\s+[A-Za-zåäöÅÄÖ]+)*\s+\d+:\d+)",
+    re.IGNORECASE | re.UNICODE,
+)
+
+# Property-type keyword → canonical type label.
+_PROPERTY_TYPE_DETECT: list[tuple[str, list[str]]] = [
+    ("lantbruk", ["gård", "lantbruk", "jordbruk", "lantgård", "bondgård"]),
+    ("brf", ["brf", "bostadsrättsförening", "bostadsrätt"]),
+    ("villa", ["villa", "villafastighet", "enfamiljshus", "radhus"]),
+    ("lägenhet", ["lägenhet", " lgh "]),
+    ("lokal", ["lokal", "kontor", "kontorslokal", "industrilokal", "butikslokal"]),
+]
+
+
+def extract_swedish_location(text: str) -> dict:
+    """Return a dict with address components found in *text*.
+
+    Keys (only present when found):
+        street_address      e.g. "Solvägen 12"
+        postal_code         e.g. "753 20"
+        city                e.g. "Uppsala"
+        property_type       e.g. "villa" | "brf" | "lantbruk" | "lägenhet" | "lokal"
+        property_designation e.g. "Uppsala Nåntuna 12:3"
+    """
+    result: dict[str, str] = {}
+
+    # Street address
+    m = _STREET_ADDRESS_RE.search(text)
+    if m:
+        full = m.group(0).strip().rstrip("., ")
+        result["street_address"] = full
+
+    # Postal code
+    m_pc = _POSTAL_CODE_RE.search(text)
+    if m_pc:
+        result["postal_code"] = m_pc.group(1)
+
+    # City — prefer city after postal code, fall back to preposition marker
+    m_city = _CITY_AFTER_POSTAL_RE.search(text)
+    if m_city:
+        result["city"] = m_city.group(1)
+    else:
+        m_prep = _CITY_PREP_RE.search(text)
+        if m_prep:
+            result["city"] = m_prep.group(1)
+
+    # Property designation
+    m_pd = _PROP_DESIGNATION_RE.search(text)
+    if m_pd:
+        result["property_designation"] = m_pd.group(1).strip()
+
+    # Property type — first match wins (lantbruk before villa to avoid false villa)
+    lower = text.lower()
+    for ptype, keywords in _PROPERTY_TYPE_DETECT:
+        if any(kw in lower for kw in keywords):
+            result["property_type"] = ptype
+            break
+
+    return result
+
+
+# ── Swedish organisation number ───────────────────────────────────────────────
+
+# Format: 6 digits, hyphen or en-dash, 4 digits.  e.g. "556123-4567".
+_ORG_NO_RE = re.compile(r"\b(\d{6}[-\u2013]\d{4})\b")
+
+
+def extract_org_number(subject: str, body_text: str) -> str | None:
+    """Return the first Swedish organisation number found, or None."""
+    for text in (subject, body_text):
+        m = _ORG_NO_RE.search(text or "")
+        if m:
+            return m.group(1)
+    return None
+
+
+# ── OCR / payment reference ───────────────────────────────────────────────────
+
+# OCR number on Swedish bank giro / plus giro — various label styles.
+# Two branches:
+#   (1) Full label keyword before number (e.g. "OCR-nummer: 1234567890").
+#   (2) Standalone "OCR" with any mix of delimiters, e.g. "(OCR): 1234 5678 90".
+_OCR_RE = re.compile(
+    r"\b(?:ocr[-\s]?nummer|ocr[-\s]?ref\.?|betalningsref(?:erens)?)\s*[:\-]?\s*(\d[\d\s]{4,25}\d)"
+    r"|\bocr\b[)\-:\s]*(\d[\d\s]{4,25}\d)",
+    re.IGNORECASE,
+)
+
+
+def extract_ocr_number(subject: str, body_text: str) -> str | None:
+    """Return the first OCR / payment reference number found, or None."""
+    for text in (subject, body_text):
+        m = _OCR_RE.search(text or "")
+        if m:
+            raw = m.group(1) or m.group(2) or ""
+            return re.sub(r"\s+", "", raw) or None
+    return None
+
+
+# ── Invoice risk level ────────────────────────────────────────────────────────
+
+_HIGH_RISK_INVOICE_KW = [
+    "inkasso", "betalningskrav", "kravbrev", "kronofogden",
+    "förfallen skuld", "skuldsaldo", "betalningsanmärkning",
+]
+_MEDIUM_RISK_INVOICE_KW = [
+    "betalningspåminnelse", "påminnelse om betalning",
+    "påminnelseavgift", "förfallodatum passerat", "obetald faktura",
+]
+
+
+def detect_invoice_risk_level(subject: str, body_text: str) -> str:
+    """Return "high_risk", "medium_risk", or "normal" for an invoice message.
+
+    "high_risk"   — debt collection, bailiff, legal enforcement in progress.
+    "medium_risk" — payment reminder, overdue notice.
+    "normal"      — standard invoice or receipt.
+    """
+    combined = f"{subject} {body_text}".lower()
+    if any(kw in combined for kw in _HIGH_RISK_INVOICE_KW):
+        return "high_risk"
+    if any(kw in combined for kw in _MEDIUM_RISK_INVOICE_KW):
+        return "medium_risk"
+    return "normal"
+
+
 def extract_invoice_data(input_data: dict[str, Any]) -> dict[str, Any]:
     """Return a structured invoice payload extracted deterministically from input_data.
 

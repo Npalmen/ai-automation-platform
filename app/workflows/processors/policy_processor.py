@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.domain.workflows.models import Job
+from app.workflows.intelligence_safety import assess_content_risk
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
     get_latest_processor_payload,
@@ -91,6 +92,9 @@ def process_policy_job(job: Job) -> Job:
     decision = "assist"
     requires_human_review = False
     recommended_next_step = "continue_automation"
+    risk = assess_content_risk(input_data)
+    if risk["risk_detected"]:
+        reasons.extend(risk["reasons"])
 
     if extraction_issues:
         reasons.extend(extraction_issues)
@@ -245,6 +249,13 @@ def process_policy_job(job: Job) -> Job:
         target_queue = "manual_review"
         reasons.append("unknown_job_type")
 
+    if risk["risk_detected"]:
+        decision = "hold_for_review"
+        requires_human_review = True
+        approval_route = "manual_review"
+        recommended_next_step = "manual_review"
+        target_queue = "manual_review"
+
     reasons = _dedupe(reasons)
     missing_critical = _dedupe(missing_critical)
 
@@ -270,6 +281,11 @@ def process_policy_job(job: Job) -> Job:
             "approval_route": approval_route,
             "recommended_next_step": recommended_next_step,
             "actions_present": bool(decisioning_actions or input_data.get("actions")),
+            "risk": risk,
+            "needs_human": requires_human_review,
+            "approval_required": approval_route in ("approval_required", "manual_review"),
+            "route_to": target_queue,
+            "next_best_action": recommended_next_step,
         },
     }
 

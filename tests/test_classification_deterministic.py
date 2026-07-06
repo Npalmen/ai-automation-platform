@@ -6,7 +6,7 @@ Covers:
     A. Invoice keywords (faktura, invoice) — highest priority
     B. Lead keywords (offert, pris, köpa, intresserad, and English equivalents)
     C. Non-lead, non-invoice -> customer_inquiry
-    D. Empty/unclear -> customer_inquiry
+    D. Empty/unclear -> unknown
     E. Case-insensitivity
     F. Invoice beats lead when both keywords present
 
@@ -101,11 +101,11 @@ class TestClassifyDeterministic:
     def test_non_lead_non_invoice_is_customer_inquiry(self, subject, body):
         assert _classify_deterministic(subject, body) == "customer_inquiry"
 
-    def test_empty_subject_and_body_is_customer_inquiry(self):
-        assert _classify_deterministic("", "") == "customer_inquiry"
+    def test_empty_subject_and_body_is_unknown(self):
+        assert _classify_deterministic("", "") == "unknown"
 
-    def test_whitespace_only_is_customer_inquiry(self):
-        assert _classify_deterministic("   ", "   ") == "customer_inquiry"
+    def test_whitespace_only_is_unknown(self):
+        assert _classify_deterministic("   ", "   ") == "unknown"
 
     def test_case_insensitive_upper(self):
         assert _classify_deterministic("OFFERT ÖNSKAS", "") == "lead"
@@ -113,12 +113,11 @@ class TestClassifyDeterministic:
     def test_case_insensitive_mixed(self):
         assert _classify_deterministic("", "Jag är Intresserad av er lösning") == "lead"
 
-    def test_lead_keyword_in_body_wins_over_neutral_subject(self):
-        assert _classify_deterministic("Support fråga", "men vi vill också ha ett pris") == "lead"
+    def test_support_context_wins_over_ambiguous_price_keyword(self):
+        assert _classify_deterministic("Support fråga", "men vi vill också ha ett pris") == "customer_inquiry"
 
-    def test_no_false_positive_on_similar_word(self):
-        # "priser" contains "pris" as substring — should still match
-        assert _classify_deterministic("", "Vad är priser för support?") == "lead"
+    def test_support_price_question_stays_customer_inquiry(self):
+        assert _classify_deterministic("", "Vad är priser för support?") == "customer_inquiry"
 
 
 # ── process_classification_job — deterministic fallback ──────────────────────

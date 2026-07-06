@@ -12,6 +12,7 @@ import re
 from typing import Any
 
 from app.lead.models import LeadType, MissingInfoResult
+from app.workflows.processors.ai_processor_utils import extract_swedish_location
 
 
 # ── default field schemas per lead_type ──────────────────────────────────────
@@ -105,7 +106,10 @@ def _combined_text(input_data: dict) -> str:
 
 def _field_present(field: str, text: str, entities: dict[str, Any]) -> bool:
     if field == "address":
-        return bool(entities.get("address") or entities.get("city"))
+        if entities.get("address") or entities.get("city"):
+            return True
+        loc = extract_swedish_location(text)
+        return bool(loc.get("street_address") or loc.get("city") or loc.get("postal_code"))
     if field == "work_description":
         requested = entities.get("requested_service") or ""
         body = _body_from_combined(text)

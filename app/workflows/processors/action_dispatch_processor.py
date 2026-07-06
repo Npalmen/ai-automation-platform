@@ -10,6 +10,7 @@ from app.core.audit_service import create_audit_event
 from app.domain.workflows.models import Job
 from app.repositories.postgres.action_execution_repository import ActionExecutionRepository
 from app.workflows.action_executor import execute_action
+from app.workflows.intelligence_safety import assess_content_risk
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
     classify_inquiry_priority,
@@ -164,6 +165,41 @@ def _build_skipped_action(action_type: str, reason: str) -> dict[str, Any]:
     }
 
 
+def _build_sensitive_customer_ack(
+    *,
+    action_type: str,
+    tenant_id: str,
+    to: str,
+    subject: str,
+    sender_name: str,
+    signature_name: str,
+    source_thread_id: str | None = None,
+    source_internet_message_id: str | None = None,
+    use_thread_reply: bool = False,
+) -> dict[str, Any]:
+    closing = f"\n\nVänliga hälsningar\n{signature_name}" if signature_name else ""
+    body = (
+        f"Hej {sender_name or 'där'},\n\n"
+        "Tack för ditt meddelande. Vi har tagit emot ärendet och lämnar det vidare "
+        "till ansvarig handläggare för manuell bedömning.\n\n"
+        "Vi återkommer när ärendet har granskats. Det här automatiska svaret innebär "
+        "inte något juridiskt eller ekonomiskt ställningstagande."
+        f"{closing}"
+    )
+    return {
+        "type": action_type,
+        "tenant_id": tenant_id,
+        "to": to,
+        "subject": subject,
+        "body": body,
+        "thread_id": source_thread_id if use_thread_reply else None,
+        "in_reply_to": source_internet_message_id if use_thread_reply else None,
+        "references": source_internet_message_id if use_thread_reply else None,
+        "_needs_approval": True,
+        "_approval_reason": "sensitive_case_requires_human_review",
+    }
+
+
 def _build_lead_default_actions(
     job: Job,
     automation_settings: dict[str, Any] | None = None,
@@ -206,10 +242,15 @@ def _build_lead_default_actions(
     item_name = f"Lead: {sender_label} - {subject}"[:80].rstrip()
 
     completeness = evaluate_information_completeness("lead", input_data)
+    risk = assess_content_risk(input_data)
 
     lead_payload = get_latest_processor_payload(job, "lead_processor")
     priority = lead_payload.get("priority") or "normal"
     recommended_next_step = lead_payload.get("recommended_next_step") or ""
+
+    # Use service-profile-specific question message from lead_analyzer when available
+    lead_analyzer_payload = get_latest_processor_payload(job, "lead_analyzer_processor")
+    profile_question_message = lead_analyzer_payload.get("generated_question_message") or ""
 
     column_values: dict[str, Any] = {
         "source": source if isinstance(source, str) else "lead",
@@ -225,6 +266,8 @@ def _build_lead_default_actions(
         column_values["message"] = message_text[:200].rstrip()
     if completeness["missing_fields"]:
         column_values["missing_fields"] = ", ".join(completeness["missing_fields"])
+    if risk["risk_detected"]:
+        column_values["risk"] = ", ".join(risk["categories"])
 
     actions: list[dict[str, Any]] = []
 
@@ -233,27 +276,51 @@ def _build_lead_default_actions(
         actions.append(_build_skipped_action("send_customer_auto_reply", "followups_enabled=false"))
     elif not customer_to:
         actions.append(_build_skipped_action("send_customer_auto_reply", "no_customer_email"))
+    elif risk["risk_detected"]:
+        reply_subject = f"Re: {subject}" if subject and subject != "Lead" else "Tack för ditt mejl"
+        actions.append(_build_sensitive_customer_ack(
+            action_type="send_customer_auto_reply",
+            tenant_id=job.tenant_id,
+            to=customer_to,
+            subject=reply_subject,
+            sender_name=sender_name,
+            signature_name=signature_name,
+            source_thread_id=source_thread_id,
+            source_internet_message_id=source_internet_message_id,
+            use_thread_reply=use_thread_reply,
+        ))
     else:
         closing = f"\n\nVänliga hälsningar\n{signature_name}" if signature_name else ""
-        lead_questions = [
-            "- Gäller det en specifik tjänst eller vill du att vi rekommenderar en lösning?",
-            "- Vilken adress gäller ärendet?",
-            "- När vill du helst komma igång?",
-        ]
-        if not sender_phone:
-            lead_questions.append("- Vilket telefonnummer når vi dig bäst på?")
-        if completeness["missing_fields"]:
-            lead_questions.append(
-                "- Har du möjlighet att skicka bilder eller annan info som hjälper oss bedöma snabbare?"
-            )
         reply_subject = f"Re: {subject}" if subject and subject != "Lead" else "Tack för ditt mejl"
-        auto_reply_body = (
-            f"Hej {sender_name or 'där'},\n\n"
-            "Vad kul att du hör av dig till oss. Jag tar gärna detta vidare direkt.\n\n"
-            "För att vi ska kunna ge dig ett träffsäkert nästa steg får du gärna svara på:\n"
-            f"{chr(10).join(lead_questions)}"
-            f"{closing}"
-        )
+
+        if profile_question_message:
+            # Use service-profile-specific questions from lead_analyzer_processor
+            auto_reply_body = (
+                f"Hej {sender_name or 'där'},\n\n"
+                f"Tack för ditt meddelande.\n\n"
+                f"{profile_question_message}"
+                f"{closing}"
+            )
+        else:
+            # Fallback: generic lead follow-up questions
+            lead_questions = [
+                "- Gäller det en specifik tjänst eller vill du att vi rekommenderar en lösning?",
+                "- Vilken adress gäller ärendet?",
+                "- När vill du helst komma igång?",
+            ]
+            if not sender_phone:
+                lead_questions.append("- Vilket telefonnummer når vi dig bäst på?")
+            if completeness["missing_fields"]:
+                lead_questions.append(
+                    "- Har du möjlighet att skicka bilder eller annan info som hjälper oss bedöma snabbare?"
+                )
+            auto_reply_body = (
+                f"Hej {sender_name or 'där'},\n\n"
+                "Tack för att du hör av dig till oss. Vi tittar på underlaget och återkommer med nästa steg.\n\n"
+                "För att vi ska kunna ge dig ett träffsäkert nästa steg får du gärna svara på:\n"
+                f"{chr(10).join(lead_questions)}"
+                f"{closing}"
+            )
         actions.append({
             "type": "send_customer_auto_reply",
             "tenant_id": job.tenant_id,
@@ -284,7 +351,7 @@ def _build_lead_default_actions(
             f"{city_line}"
             f"Ämne:         {subject}\n\n"
             f"Meddelande:\n{message_text or '(inget meddelande)'}\n\n"
-            f"Förslag nästa steg: {recommended_next_step or 'Kontakta kunden'}\n\n"
+            f"Förslag nästa steg: {'Manuell granskning' if risk['risk_detected'] else (recommended_next_step or 'Kontakta kunden')}\n\n"
             f"Job ID:       {job.job_id}\n"
             f"Tenant:       {job.tenant_id}"
         )
@@ -308,7 +375,7 @@ def _build_lead_default_actions(
         actions.append(_build_follow_up_email(sender_email, completeness["follow_up_questions"]))
 
     # Gate outbound customer emails on auto_actions approval policy
-    if _email_needs_approval("lead", settings):
+    if risk["risk_detected"] or _email_needs_approval("lead", settings):
         actions = [
             _build_email_approval_action(a) if a.get("type") in _EMAIL_ACTION_TYPES and not a.get("_skip")
             else a
@@ -353,6 +420,11 @@ def _build_inquiry_default_actions(
 
     priority = classify_inquiry_priority(subject, message_text)
     completeness = evaluate_information_completeness("customer_inquiry", input_data)
+    risk = assess_content_risk(input_data)
+
+    # Use service-profile-specific question message from support_analyzer when available
+    support_analyzer_payload = get_latest_processor_payload(job, "support_analyzer_processor")
+    support_profile_question = support_analyzer_payload.get("support_generated_question_message") or ""
 
     sender_label = sender_name or sender_email or "Okänd avsändare"
     base_name = f"Support: {sender_label} - {subject}"
@@ -375,6 +447,8 @@ def _build_inquiry_default_actions(
         column_values["message"] = message_text[:200].rstrip()
     if completeness["missing_fields"]:
         column_values["missing_fields"] = ", ".join(completeness["missing_fields"])
+    if risk["risk_detected"]:
+        column_values["risk"] = ", ".join(risk["categories"])
 
     actions: list[dict[str, Any]] = []
 
@@ -383,29 +457,53 @@ def _build_inquiry_default_actions(
         actions.append(_build_skipped_action("send_customer_auto_reply", "followups_enabled=false"))
     elif not customer_to:
         actions.append(_build_skipped_action("send_customer_auto_reply", "no_customer_email"))
+    elif risk["risk_detected"]:
+        reply_subject = f"Re: {subject}" if subject and subject != "Support" else "Re: ditt ärende"
+        actions.append(_build_sensitive_customer_ack(
+            action_type="send_customer_auto_reply",
+            tenant_id=job.tenant_id,
+            to=customer_to,
+            subject=reply_subject,
+            sender_name=sender_name,
+            signature_name=signature_name,
+            source_thread_id=source_thread_id,
+            source_internet_message_id=source_internet_message_id,
+            use_thread_reply=use_thread_reply,
+        ))
     else:
         closing = f"\n\nVänliga hälsningar\n{signature_name}" if signature_name else ""
         urgency_line = (
-            "Tråkigt att höra att det strular. Jag tar en titt på det här direkt.\n\n"
+            "Tråkigt att höra att det strular. Vi har tagit emot ärendet och prioriterar det för uppföljning.\n\n"
             if priority == "HIGH"
-            else "Tack för att du hör av dig. Jag tar detta vidare direkt.\n\n"
+            else "Tack för att du hör av dig. Vi har tagit emot ärendet och återkommer med nästa steg.\n\n"
         )
-        support_questions = [
-            "- Vilken adress/anläggning gäller det?",
-            "- När började problemet och om något förändrades precis innan?",
-            "- Ser du någon felkod eller lampa som blinkar? (fota gärna om möjligt)",
-        ]
-        if not sender_phone:
-            support_questions.append("- Vilket telefonnummer når vi dig bäst på idag?")
         reply_subject = f"Re: {subject}" if subject and subject != "Support" else "Re: ditt ärende"
-        auto_reply_body = (
-            f"Hej {sender_name or 'där'},\n\n"
-            f"{urgency_line}"
-            "För att vi ska kunna hjälpa dig snabbare får du gärna svara med:\n"
-            f"{chr(10).join(support_questions)}\n\n"
-            "Om det är akut och påverkar drift helt får du gärna skriva AKUT i ditt svar så prioriterar vi direkt."
-            f"{closing}"
-        )
+
+        if support_profile_question:
+            # Use service-profile-specific questions from support_analyzer_processor
+            auto_reply_body = (
+                f"Hej {sender_name or 'där'},\n\n"
+                f"{urgency_line}"
+                f"{support_profile_question}"
+                f"{closing}"
+            )
+        else:
+            # Fallback: generic support follow-up questions
+            support_questions = [
+                "- Vilken adress/anläggning gäller det?",
+                "- När började problemet och om något förändrades precis innan?",
+                "- Ser du någon felkod eller lampa som blinkar? (fota gärna om möjligt)",
+            ]
+            if not sender_phone:
+                support_questions.append("- Vilket telefonnummer når vi dig bäst på idag?")
+            auto_reply_body = (
+                f"Hej {sender_name or 'där'},\n\n"
+                f"{urgency_line}"
+                "För att vi ska kunna hjälpa dig snabbare får du gärna svara med:\n"
+                f"{chr(10).join(support_questions)}\n\n"
+                "Om det finns akut säkerhetsrisk ska du kontakta jour eller behörig hjälp direkt."
+                f"{closing}"
+            )
         actions.append({
             "type": "send_customer_auto_reply",
             "tenant_id": job.tenant_id,
@@ -432,7 +530,7 @@ def _build_inquiry_default_actions(
             f"Ämne:      {subject}\n"
             f"Källa:     {source}\n\n"
             f"Meddelande:\n{message_text or '(inget meddelande)'}\n\n"
-            f"Förslag nästa steg: Kontakta kunden inom 24 h\n\n"
+            f"Förslag nästa steg: {'Manuell granskning' if risk['risk_detected'] else 'Kontakta kunden inom 24 h'}\n\n"
             f"Job ID:    {job.job_id}\n"
             f"Tenant:    {job.tenant_id}"
         )
@@ -456,7 +554,7 @@ def _build_inquiry_default_actions(
         actions.append(_build_follow_up_email(sender_email, completeness["follow_up_questions"]))
 
     # Gate outbound customer emails on auto_actions approval policy
-    if _email_needs_approval("customer_inquiry", settings):
+    if risk["risk_detected"] or _email_needs_approval("customer_inquiry", settings):
         actions = [
             _build_email_approval_action(a) if a.get("type") in _EMAIL_ACTION_TYPES and not a.get("_skip")
             else a

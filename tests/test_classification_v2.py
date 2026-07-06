@@ -9,7 +9,7 @@ Covers:
     - supplier detection
     - partnership detection
     - lead detection (unchanged)
-    - customer_inquiry fallback (unchanged)
+    - customer_inquiry fallback for normal messages
     - priority ordering between types
 
   _build_fallback_actions:
@@ -171,8 +171,8 @@ class TestRegressionExistingTypes:
     def test_normal_message_is_inquiry(self):
         assert classify_email_type("Fråga om leverans", "Hej, när kommer min order?") == "customer_inquiry"
 
-    def test_empty_strings_is_inquiry(self):
-        assert classify_email_type("", "") == "customer_inquiry"
+    def test_empty_strings_is_unknown(self):
+        assert classify_email_type("", "") == "unknown"
 
     def test_problem_with_product_is_inquiry(self):
         assert classify_email_type("Problem med produkten", "Det fungerar inte") == "customer_inquiry"

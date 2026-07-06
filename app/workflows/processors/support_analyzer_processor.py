@@ -15,6 +15,7 @@ When db is provided, loads TenantSupportContext for tenant-aware analysis.
 from __future__ import annotations
 
 from app.domain.workflows.models import Job
+from app.service_profiles import select_profile
 from app.support.analyzer import analyze_support
 from app.support.missing_info import compute_support_missing_info
 from app.support.next_action import decide_support_next_action
@@ -46,7 +47,15 @@ def process_support_analyzer_job(job: Job, db=None) -> Job:
         # 1. Analyze ticket type, category, urgency, sentiment
         analysis = analyze_support(input_data, entities, tenant_ctx)
 
-        # 2. Compute missing info + completeness
+        # 2. Select service profile — drives service-specific routing metadata
+        _combined = f"{input_data.get('subject', '')} {input_data.get('message_text', '')}".strip()
+        service_profile = select_profile(
+            "customer_inquiry",
+            support_category=analysis.category,
+            text=_combined,
+        )
+
+        # 3. Compute missing info + completeness
         missing_info = compute_support_missing_info(
             analysis.ticket_type, input_data, entities, tenant_ctx
         )
@@ -88,6 +97,7 @@ def process_support_analyzer_job(job: Job, db=None) -> Job:
             "support_response_draft": response_draft.to_dict(),
             "support_status": support_status,
             "confidence": analysis.confidence,
+            "service_profile_type": service_profile.service_type,
         }
 
         if question_message:

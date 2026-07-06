@@ -108,6 +108,27 @@
 
 ---
 
+## Service Profile expansion (future, not Fas 2)
+
+The platform's qualification layer is built around the concept of **service profiles**
+(see `app/service_profiles/`). The first version (Fas 2) covers installation and service
+companies in the electrical/solar/charger space.
+
+Future expansion to other industries and service families should be done by adding new
+service profiles to `app/service_profiles/registry.py` — **not** by changing the core
+qualification engine. This keeps the general platform architecture stable while enabling
+vertical/niche specialisation.
+
+Examples of future service profile packs (not Fas 2):
+- `construction` family: bygg, mark, VVS, ventilation, puts
+- `property_service` family: städ, fastighetsskötsel, snöröjning
+- `consulting_project` family: IT-konsult, redovisning, juridik
+- `generic_business` extensions: bokningshantering, kundservice, webshop
+
+Do not build these until a pilot customer from that vertical provides the requirement.
+
+---
+
 ## Integration roadmap
 
 | Integration | Priority | Phase |

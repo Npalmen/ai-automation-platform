@@ -147,6 +147,7 @@ curl -s -X PATCH http://localhost:8000/admin/tenants/T_INTERN_PILOT/status \
 Before connecting live tokens:
 
 - [ ] Steps 1–11 above completed locally.
+- [ ] Core intelligence quality evals pass: `python -m pytest tests/test_core_intelligence_quality.py -q`.
 - [ ] Test suite passes: `python -m pytest --tb=no -q`.
 - [ ] R1 gate passes: `python -m scripts.run_release_gate_r1`.
 - [ ] `ADMIN_API_KEY` set to a strong random value in production env.
@@ -454,3 +455,131 @@ Rehearse restore monthly. Record date and result.
 - [ ] Verify inbox sync: send test mail, confirm case created.
 - [ ] Set notification recipient and daily digest hour.
 - [ ] Inform customer about what AI does and does not do automatically.
+
+### Service profiles — local developer / demo note
+
+Service profiles control which fields are required, what follow-up questions are asked, and how jobs are routed, based on the type of work. The 10 first profiles are:
+
+| Profile | Detects | Route |
+|---------|---------|-------|
+| ev_charger_installation | laddbox, wallbox | sales |
+| solar_installation | solcell, solpanel, pv | sales |
+| battery_storage | batteri, energilager, powerwall | sales |
+| electrical_fault | jordfelsbrytare, felsökning, kortslutning | support |
+| inverter_support | växelriktare, inverter | support |
+| electrical_panel | elcentral, proppskåp, gruppcent | sales |
+| invoice_generic | faktura, invoice | invoice |
+| debt_collection_risk | inkasso, kravbrev, kronofogden | manual_review |
+| generic_lead | (fallback for leads) | sales |
+| generic_support | (fallback for support) | support |
+
+Debt-collection and safety-risk profiles always force `manual_review` — they cannot enter low-risk automation.
+
+To see which profile would be selected for a message, use `select_profile()` from `app/service_profiles` in a Python shell or test fixture. To override routing for a tenant, add entries to `routing_hints` in the tenant memory config.
+
+---
+
+## Local golden path demo — service-profile aware
+
+Run this checklist to verify the full local pipeline before live verification.
+No live credentials needed. All steps use deterministic/mock flows.
+
+### Prerequisites
+```bash
+python -m pytest --tb=no -q          # must pass, 0 failures
+python -m scripts.run_release_gate_r1  # must pass
+```
+
+### 1. Run the targeted pipeline test suites
+```bash
+# Service profile pipeline wiring
+python -m pytest tests/test_service_profile_pipeline.py -v
+
+# Customer reply quality
+python -m pytest tests/test_customer_reply_quality.py -v
+
+# Tenant-aware routing hints
+python -m pytest tests/test_tenant_routing_hints.py -v
+
+# Full golden path scenarios
+python -m pytest tests/test_local_golden_path.py -v
+```
+
+All 82 tests must pass before proceeding to live verification.
+
+### 2. Golden path scenarios (verified locally)
+
+**EV charger lead (low risk, incomplete info)**
+```
+Input: "Hej, vi vill ha offert på laddbox till villa i Uppsala."
+→ classification: lead
+→ service_profile_type: ev_charger_installation
+→ missing_fields: [address, main_fuse, desired_location, ...]
+→ question_message: "För att kunna ta fram rätt underlag för laddboxinstallationen..."
+→ customer auto-reply: profile-specific follow-up, non-binding
+→ no booking confirmation, no price commitment
+```
+
+**Solar installation lead**
+```
+Input: "Vi vill installera solceller på taket."
+→ classification: lead
+→ service_profile_type: solar_installation
+→ missing_fields: [roof_type, annual_consumption, ...]
+→ question_message: "För att kunna bedöma solcellsförutsättningarna..."
+→ customer auto-reply: solar-profile-specific follow-up
+```
+
+**Debt collection / high-risk invoice**
+```
+Input: "Inkassokrav. Betala din skuld omgående."
+→ risk_detected: True (debt_collection)
+→ service_profile_type: debt_collection_risk
+→ customer auto-reply: sensitive ack with _needs_approval=True
+→ routes to manual_review, NOT low-risk automation
+```
+
+**Electrical fault with safety risk**
+```
+Input: "Det luktar bränt från eluttaget och det gnistrar."
+→ risk_detected: True (safety_risk)
+→ service_profile_type: electrical_fault
+→ support analyzer: escalate/manual_review
+→ customer auto-reply: sensitive ack with _needs_approval=True
+```
+
+**Tenant routing hint override**
+```
+tenant_ctx.routing_hints = {"ev_charger_installation": "sales_team"}
+→ select_profile("lead", lead_type="ev_charger", tenant_ctx=ctx).default_route == "sales_team"
+→ service_type and required_fields unchanged
+```
+
+### 3. Local HTTP smoke check (if server is running)
+
+```bash
+# 1. Check integration health (expects not_configured without live tokens)
+curl -s http://localhost:8000/integrations/health \
+  -H "X-API-Key: <TENANT_API_KEY>" | python -m json.tool
+
+# 2. Submit a test lead (uses deterministic pipeline)
+curl -s -X POST http://localhost:8000/onboarding/test-lead \
+  -H "X-API-Key: <TENANT_API_KEY>" \
+  -H "Content-Type: application/json" | python -m json.tool
+
+# 3. Check approvals queue
+curl -s http://localhost:8000/approvals/pending \
+  -H "X-API-Key: <TENANT_API_KEY>" | python -m json.tool
+
+# 4. Check customer activity
+curl -s "http://localhost:8000/customer/activity" \
+  -H "X-API-Key: <TENANT_API_KEY>" | python -m json.tool
+```
+
+### Definition of done (local)
+
+- [ ] All 82 golden-path + pipeline tests pass
+- [ ] Full test suite: 2735 passed, 0 failed
+- [ ] R1 release gate: 505 regression + 152 E2E = 657 passed
+- [ ] No live credentials used
+- [ ] No external API calls made
