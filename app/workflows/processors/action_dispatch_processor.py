@@ -232,11 +232,6 @@ def _build_lead_default_actions(
         sender_email=sender_email,
         internal_recipient=internal_recipient,
     )
-    customer_to, use_thread_reply = _resolve_customer_reply_target(
-        input_data=input_data,
-        sender_email=sender_email,
-        internal_recipient=internal_recipient,
-    )
 
     sender_label = sender_name or sender_email or "Okänd avsändare"
     item_name = f"Lead: {sender_label} - {subject}"[:80].rstrip()

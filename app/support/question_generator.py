@@ -45,7 +45,7 @@ _SAFETY_TRIGGER_KEYWORDS = [
 
 
 def _has_safety_risk(ticket_type: str, input_data: dict) -> bool:
-    if ticket_type == "emergency":
+    if ticket_type in ("emergency", "safety"):
         return True
     text = (
         (input_data.get("subject") or "")
@@ -64,8 +64,15 @@ def generate_support_question_message(
     ticket_type: str = "other",
     tenant_ctx: "TenantSupportContext | None" = None,
     input_data: dict | None = None,
+    service_profile=None,
 ) -> str | None:
-    """Return a Swedish message asking for missing fields, or None if list is empty."""
+    """Return a Swedish message asking for missing fields, or None if list is empty.
+
+    When *service_profile* is provided and the ticket is not an emergency/safety
+    case, the profile's own follow-up intro and field labels are used (via
+    build_profile_question_message). Falls back to generic support logic for
+    emergency tickets, safety risks, or when no profile is given.
+    """
     if not missing_fields:
         return None
 
@@ -77,7 +84,14 @@ def generate_support_question_message(
     is_emergency = ticket_type == "emergency"
     is_safety = _has_safety_risk(ticket_type, input_data)
 
-    # Build question list
+    # Use service-profile intro/labels for non-emergency, non-safety tickets
+    if service_profile is not None and not is_emergency and not is_safety:
+        from app.service_profiles.qualification import build_profile_question_message
+        profile_msg = build_profile_question_message(service_profile, missing_fields, company_name)
+        if profile_msg:
+            return profile_msg
+
+    # Build generic question list
     questions = []
     for f in missing_fields:
         label = _FIELD_LABELS.get(f) or f.replace("_", " ").capitalize()

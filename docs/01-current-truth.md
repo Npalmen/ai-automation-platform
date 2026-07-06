@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-06 (Phase 2 local product hardening — Local Final Spurt before Live: Service Profiles wired into pipeline, Customer Reply Quality Pass, Tenant-aware Routing Hints Quality Pass, Local Golden Path Polish. Tests run locally on Python 3.14.3. No live verification, live server, production DB, OAuth token, scheduler, or external integration access.)
+2026-07-06 (Phase 2 — Local Cleanup/Consistency-Pass before Live Verification: profile_missing_fields wired into lead_analyzer_processor payload; service_profile passed to generate_support_question_message; duplicate _resolve_customer_reply_target call removed; docs inconsistencies fixed (test count, customer-safe isolation wording); _has_safety_risk extended to handle ticket_type=="safety"; 9 new pipeline/support tests added. Tests run locally on Python 3.14.3. No live verification, live server, production DB, OAuth token, scheduler, or external integration access.)
 
 ## Verification method
 
@@ -24,8 +24,8 @@
 
 | Claim | Status | Detail |
 |-------|--------|--------|
-| Test suite runs | `Verified` | 2735 passed, 0 failed, 4 warnings (after Local Final Spurt + 4 new test files) |
-| Test count: 2735 tests across 101 test files | `Verified` | Run 2026-07-06 after adding pipeline/reply/routing/golden-path test files |
+| Test suite runs | `Verified` | 2744 passed, 0 failed, 4 warnings (after Local Cleanup-Pass: 9 new tests added) |
+| Test count: 2744 tests across 101 test files | `Verified` | Run 2026-07-06 after Local Cleanup/Consistency-Pass |
 | All policy gate tests pass | `Verified` | Including `test_lead_disabled_for_finance_tenant` and unknown-tenant regression suite |
 | R1 release gate (`python -m scripts.run_release_gate_r1`) | `Verified — PASS` | 505 regression + 152 E2E = 657, all passed |
 | `httpx` added to `requirements.txt` | `Verified — FIXED` | AUDIT-BUG-01 resolved |
@@ -78,7 +78,11 @@
 | Debt collection risk: inkassokrav detected | `Verified — FIXED 2026-07-06` | Added "inkassokrav", "inkassobolag", "betalningsanmärkning" to `intelligence_safety._RISK_KEYWORDS["debt_collection"]`. |
 | Solar lead detection: plural forms | `Verified — FIXED 2026-07-06` | Added "solceller", "solpaneler" to `lead/analyzer.py` solar_installation keywords. |
 | Service profile field presence: phone/email/entity fallback | `Verified — FIXED 2026-07-06` | `_profile_field_present` now handles `phone` and `email` via text regex + entity dict; generic entity fallback added. |
-| Pipeline + reply + routing + golden path eval suites | `Verified — ADDED 2026-07-06` | `tests/test_service_profile_pipeline.py` (25 tests), `tests/test_customer_reply_quality.py` (22 tests), `tests/test_tenant_routing_hints.py` (15 tests), `tests/test_local_golden_path.py` (20 tests). |
+| Pipeline + reply + routing + golden path eval suites | `Verified — ADDED 2026-07-06` | `tests/test_service_profile_pipeline.py` (34 tests after cleanup additions), `tests/test_customer_reply_quality.py` (22 tests), `tests/test_tenant_routing_hints.py` (15 tests), `tests/test_local_golden_path.py` (20 tests). |
+| `profile_missing_fields` in lead pipeline payload | `Verified — WIRED 2026-07-06` | `lead_analyzer_processor` calls `compute_profile_missing_info(service_profile, ...)` and exposes `profile_missing_fields` + `profile_completeness_score` in payload; `generate_question_message` uses profile-specific missing fields for question content. |
+| Support question generator: service_profile parameter | `Verified — IMPROVED 2026-07-06` | `generate_support_question_message` now accepts optional `service_profile`; uses `build_profile_question_message` for non-emergency/non-safety tickets; emergency and safety ticket types bypass profile and keep AKUT/disclaimer logic. |
+| `_has_safety_risk` handles ticket_type=="safety" | `Verified — FIXED 2026-07-06` | `_has_safety_risk` now returns True for ticket_type in ("emergency", "safety"), ensuring safety tickets always get safety disclaimer and bypass profile question generation. |
+| Duplicate `_resolve_customer_reply_target` call removed | `Verified — FIXED 2026-07-06` | Redundant second call in `action_dispatch_processor._build_lead_default_actions` removed; behavior unchanged. |
 
 ### Phase 2 prep — First tenant setup path (verified 2026-07-05)
 
@@ -144,7 +148,7 @@
 | `app/repositories/postgres/` | SQLAlchemy models and repos for jobs, approvals, audit, tenants, integrations, credentials |
 | `app/domain/` | Schema/response models for workflows, integrations, tenants, documents, users |
 | `app/admin/`, `app/alerts/`, `app/analytics/`, `app/automation/`, `app/finance/`, `app/health/`, `app/insights/`, `app/lead/`, `app/onboarding/`, `app/support/`, `app/agents/`, `app/ai/`, `app/llm/` | Functional sub-modules |
-| `tests/` | 94 test files |
+| `tests/` | 101 test files (see Test status table above for current count) |
 | `scripts/` | `run_release_gate_r1.py`, `smoke_check.py`, `create_tables.py`, `test_db_connection.py`, `dev_https_proxy.py` |
 | `docs/` | Governing documentation (this file and peers) |
 | `docker-compose.yml` | Postgres service for local dev |
@@ -306,7 +310,9 @@
 | Integration setup | Opens modal/setup (not a switchView) | Admin only | `Verified (code)` |
 
 **UI file size:** 535,991 bytes (single-file architecture).
-**Customer-safe:** `Unverified` — admin-only and customer-only views are separated by CSS classes (`admin-only`/`customer-only`) and JS-side role checks. Whether server-side data responses are equally gated has not been verified in this session.
+**Customer-safe API responses:** `Verified locally` — server-side tenant/admin/customer isolation confirmed via `test_tenant_isolation_http.py` and `test_customer_saas_surfaces.py`: admin endpoints reject tenant keys, customer endpoints reject admin keys, cross-tenant data returns 404, `/customer/activity` strips internal fields.
+**Customer visual UI separation:** `Partially verified (code/static)` — admin-only and customer-only views are separated by CSS classes (`admin-only`/`customer-only`) and JS-side role checks.
+**Live browser/session validation:** `Deferred to live verification` — actual browser session rendering and visual role separation have not been validated against a live server in this session.
 
 ---
 
@@ -527,7 +533,7 @@ These have caused real failures and are preserved from the README:
 - **No live server health check performed.** `api.krowolf.se` not verified in this audit. Before first customer, must verify `GET /` returns `{"status":"ok"}` and `GET /pilot/readiness` returns passing state.
 - **Monday board connection unverified.** Live API key and board ID not checked. Must verify before enabling Monday dispatch for first customer.
 - **Fortnox access token unverified.** Live read/write credentials not checked. Must verify before enabling Fortnox invoice flows for first customer.
-- **Customer UI data isolation not server-verified.** Admin-only vs customer-only views separated by JS/CSS, but server-side response filtering not confirmed in this audit. Must verify that customer API key cannot retrieve admin-level data.
+- **Customer UI data isolation: server-side verified locally, live browser deferred.** Server-side response isolation confirmed via HTTP isolation tests (tenant/admin/customer API key separation, cross-tenant 404). Visual browser/session rendering not validated against a live server — deferred to live verification.
 - **No DB migration tooling.** Schema is managed via `create_all` + `ensure_runtime_schema()` at startup. Any breaking schema change requires careful coordination. Risk is low for initial pilot but will grow.
 
 ### Non-blocking

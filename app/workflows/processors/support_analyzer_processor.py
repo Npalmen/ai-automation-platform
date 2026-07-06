@@ -60,15 +60,15 @@ def process_support_analyzer_job(job: Job, db=None) -> Job:
             analysis.ticket_type, input_data, entities, tenant_ctx
         )
 
-        # 3. Prioritize
+        # 4. Prioritize
         priority = prioritize_support(analysis, missing_info, entities, input_data, tenant_ctx)
 
-        # 4. Next action
+        # 5. Next action
         next_action = decide_support_next_action(
             analysis, missing_info, priority, tenant_auto_actions, tenant_ctx
         )
 
-        # 5. Question message (if needed)
+        # 6. Question message (if needed) — uses service profile for non-emergency tickets
         question_message: str | None = None
         if should_ask_questions(missing_info.completeness_score):
             question_message = generate_support_question_message(
@@ -76,14 +76,15 @@ def process_support_analyzer_job(job: Job, db=None) -> Job:
                 ticket_type=analysis.ticket_type,
                 tenant_ctx=tenant_ctx,
                 input_data=input_data,
+                service_profile=service_profile,
             )
 
-        # 6. Response draft
+        # 7. Response draft
         response_draft = build_support_response_draft(
             analysis, missing_info, priority, entities, input_data, tenant_ctx
         )
 
-        # 7. support_status — preserve if already set by operator
+        # 8. support_status — preserve if already set by operator
         support_status = input_data.get("support_status") or _infer_support_status(
             next_action.action, input_data
         )

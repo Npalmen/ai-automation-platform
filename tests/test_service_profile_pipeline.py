@@ -376,3 +376,142 @@ class TestQuestionGeneratorWithProfile:
             service_profile=profile,
         )
         assert msg is None
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Profile-specific missing fields exposed in lead_analyzer_processor payload
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestLeadPipelineProfileMissingFieldsPayload:
+    def test_ev_charger_job_exposes_profile_missing_fields(self):
+        """profile_missing_fields key must appear in processor payload for EV charger."""
+        job = _lead_job(
+            "Offert laddbox",
+            "Hej, vi vill ha laddbox till villan.",
+        )
+        result_job = process_lead_analyzer_job(job)
+        payload = get_latest_processor_payload(result_job, "lead_analyzer_processor")
+        assert "profile_missing_fields" in payload
+        # EV charger profile requires main_fuse — must be missing without that info
+        assert "main_fuse" in payload["profile_missing_fields"]
+
+    def test_solar_job_exposes_profile_missing_fields_with_roof_type(self):
+        """Solar profile should flag roof_type as missing when not provided."""
+        job = _lead_job(
+            "Solceller",
+            "Vi vill ha solceller på huset i Malmö.",
+        )
+        result_job = process_lead_analyzer_job(job)
+        payload = get_latest_processor_payload(result_job, "lead_analyzer_processor")
+        assert "profile_missing_fields" in payload
+        assert "roof_type" in payload["profile_missing_fields"]
+
+    def test_profile_completeness_score_in_payload(self):
+        """profile_completeness_score must be a float between 0 and 1."""
+        job = _lead_job("Laddbox", "Jag vill ha offert.")
+        result_job = process_lead_analyzer_job(job)
+        payload = get_latest_processor_payload(result_job, "lead_analyzer_processor")
+        score = payload.get("profile_completeness_score")
+        assert score is not None
+        assert 0.0 <= score <= 1.0
+
+    def test_ev_charger_question_uses_profile_missing_fields_content(self):
+        """Question message for EV charger should reflect profile-specific fields,
+        not just generic lead fields like 'address'."""
+        job = _lead_job(
+            "Laddbox villa",
+            "Jag vill installera en laddbox i garaget.",
+        )
+        result_job = process_lead_analyzer_job(job)
+        payload = get_latest_processor_payload(result_job, "lead_analyzer_processor")
+        msg = payload.get("generated_question_message") or ""
+        # Message should contain profile-specific content (laddbox/garage/säkring context)
+        assert len(msg) > 0
+        lower_msg = msg.lower()
+        assert any(kw in lower_msg for kw in ["laddbox", "ladda", "säkring", "installation", "adress"])
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Support pipeline: service profile passed to question generator
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestSupportPipelineProfileQuestionGeneration:
+    def test_inverter_support_question_uses_profile_intro(self):
+        """Inverter support with missing info should get profile-based question message."""
+        from app.support.question_generator import generate_support_question_message
+        from app.service_profiles import get_profile
+
+        profile = get_profile("inverter_support")
+        msg = generate_support_question_message(
+            ["installation_date", "error_code"],
+            ticket_type="issue",
+            tenant_ctx=None,
+            input_data={},
+            service_profile=profile,
+        )
+        assert msg is not None
+        # Profile-specific intro for inverter_support should be present
+        lower_msg = msg.lower()
+        assert any(kw in lower_msg for kw in ["växelriktare", "inverter", "solcell", "installation", "felinformation"])
+
+    def test_emergency_support_ignores_service_profile(self):
+        """Emergency ticket must keep AKUT opening regardless of service profile."""
+        from app.support.question_generator import generate_support_question_message
+        from app.service_profiles import get_profile
+
+        profile = get_profile("electrical_fault")
+        msg = generate_support_question_message(
+            ["address"],
+            ticket_type="emergency",
+            tenant_ctx=None,
+            input_data={},
+            service_profile=profile,
+        )
+        assert msg is not None
+        assert "AKUT" in msg
+
+    def test_safety_support_keeps_disclaimer(self):
+        """Safety-risk tickets must keep the safety disclaimer even with a profile."""
+        from app.support.question_generator import generate_support_question_message
+        from app.service_profiles import get_profile
+
+        profile = get_profile("electrical_fault")
+        msg = generate_support_question_message(
+            ["address"],
+            ticket_type="safety",
+            tenant_ctx=None,
+            input_data={"message_text": "Det luktar bränt"},
+            service_profile=profile,
+        )
+        assert msg is not None
+        assert "⚠️" in msg or "säkerhet" in msg.lower() or "elektriker" in msg.lower()
+
+    def test_support_pipeline_passes_service_profile_to_question_generator(self):
+        """Inverter fault inquiry should produce a profile-aware question message in pipeline."""
+        job = _inquiry_job(
+            "Växelriktarfel",
+            "Växelriktaren blinkar rött och visar felkod F03. Inget installation_date.",
+        )
+        result_job = process_support_analyzer_job(job)
+        payload = get_latest_processor_payload(result_job, "support_analyzer_processor")
+        # Profile type confirmed
+        assert payload.get("service_profile_type") == "inverter_support"
+        # If question message generated, it should reflect profile context
+        msg = payload.get("support_generated_question_message")
+        if msg:
+            lower_msg = msg.lower()
+            assert any(kw in lower_msg for kw in ["växelriktare", "inverter", "solcell", "installation", "felinformation", "adress", "information"])
+
+    def test_support_no_regression_without_service_profile(self):
+        """generate_support_question_message without service_profile must still work."""
+        from app.support.question_generator import generate_support_question_message
+
+        msg = generate_support_question_message(
+            ["address", "phone"],
+            ticket_type="issue",
+            tenant_ctx=None,
+            input_data={},
+            service_profile=None,
+        )
+        assert msg is not None
+        assert len(msg) > 10

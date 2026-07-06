@@ -87,6 +87,17 @@
 - [x] **Local golden path test suite** — `tests/test_local_golden_path.py` (20 tests) covering EV charger, solar, debt collection, electrical fault, and tenant routing golden paths end-to-end locally.
 - [x] **Local verification passed** — `python -m pytest --tb=no -q` passed with 2735 tests; `python -m scripts.run_release_gate_r1` passed with 505 regression + 152 E2E tests.
 
+### Fas 2 local hardening — Local Cleanup/Consistency-Pass before Live Verification (2026-07-06)
+
+- [x] **`docs/01-current-truth.md` test file count corrected** — repo structure table now shows "101 test files (see Test status above)" matching actual count and top-level test status.
+- [x] **`docs/01-current-truth.md` customer-safe isolation wording updated** — now clearly distinguishes: customer-safe API responses (verified locally), tenant/admin/customer server-side isolation (verified locally), customer visual UI separation (partially verified code/static), live browser/session validation (deferred to live verification). Known-issues note updated accordingly.
+- [x] **`profile_missing_fields` wired into lead pipeline** — `lead_analyzer_processor` now calls `compute_profile_missing_info(service_profile, ...)` and exposes `profile_missing_fields` and `profile_completeness_score` in payload. `generate_question_message` uses profile-specific missing fields for question content (fallback to generic if empty).
+- [x] **Support question generator accepts `service_profile`** — `generate_support_question_message` now has optional `service_profile` parameter; uses `build_profile_question_message` for non-emergency/non-safety tickets; `support_analyzer_processor` passes `service_profile` to it.
+- [x] **`_has_safety_risk` extended for `ticket_type=="safety"`** — ensures safety-typed tickets always get the safety disclaimer and bypass profile question generation, regardless of message content.
+- [x] **Duplicate `_resolve_customer_reply_target` call removed** — redundant second call in `action_dispatch_processor._build_lead_default_actions` removed; behavior unchanged.
+- [x] **9 new tests added to `test_service_profile_pipeline.py`** — covers `profile_missing_fields`/`profile_completeness_score` in lead payload, profile question content for EV charger, inverter support profile questions, emergency/safety bypass regression, and no-profile fallback.
+- [x] **Local verification passed** — `python -m pytest --tb=no -q` passed with 2744 tests; `python -m scripts.run_release_gate_r1` passed with 505 regression + 152 E2E tests.
+
 ### Deferred — live verification phase (not next local step)
 
 Full live verification plan: `docs/10-live-verification-plan.md` — not run yet, prepared only.
