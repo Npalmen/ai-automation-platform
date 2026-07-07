@@ -21,7 +21,7 @@ Run `pip install -r requirements.txt` if tests fail with `ModuleNotFoundError: N
 
 Record the pass count in `docs/01-current-truth.md` after each run.
 
-**Verified 2026-07-06:** Python 3.14.3 — 2735 passed, 0 failed, 4 warnings, 10.53s.
+**Verified 2026-07-07:** Python 3.14.3 — 2746 passed, 0 failed, 4 warnings, 9.87s.
 
 ### Core intelligence evals
 
@@ -52,6 +52,19 @@ Covers:
 - Risk/high-risk safe acknowledgement behavior
 - Tenant routing hint and schema overrides
 - Local golden path scenarios (EV charger, solar, debt collection, electrical fault, tenant routing)
+
+### Root / health / production docs tests
+
+```bash
+python -m pytest tests/test_root_routing.py tests/test_production_hardening.py -q
+```
+
+Covers:
+- `GET /` returns public health payload for API host.
+- `GET /health` returns HTTP 200 with `status`, `app_name`, and `env`.
+- `GET /health` does not expose secret-like config keys.
+- App/UI host and `/ui` return HTML for the Internal Operator Console.
+- Production docs URLs remain disabled via `_openapi_urls_for()`.
 
 ---
 
@@ -109,6 +122,9 @@ uvicorn app.main:app --reload
 curl http://localhost:8000/
 # Expected: {"status":"ok","app_name":"AI Automation Platform","env":"dev"}
 
+curl http://localhost:8000/health
+# Expected: {"status":"ok","app_name":"AI Automation Platform","env":"dev"}
+
 # Open UI
 # http://localhost:8000/ui
 ```
@@ -136,6 +152,7 @@ Steps:
 - [ ] `ADMIN_API_KEY` is non-empty.
 - [ ] `DATABASE_URL` points to a real PostgreSQL instance.
 - [ ] `ENV=production` is set.
+- [ ] `GET /health` returns HTTP 200 with `status: ok` after deploy.
 - [ ] `python scripts/create_tables.py` run (idempotent).
 - [ ] At least one tenant provisioned.
 - [ ] Gmail env vars configured (all four for refresh, or none — partial fails on first expiry).

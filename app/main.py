@@ -147,15 +147,24 @@ def _operator_ui_html() -> str:
     return (Path(__file__).parent / "ui" / "index.html").read_text(encoding="utf-8")
 
 
-@app.get("/")
-def root(request: Request):
-    if _is_ui_host(request.headers.get("host")):
-        return HTMLResponse(content=_operator_ui_html())
+def _public_health_payload() -> dict:
     return {
         "status": "ok",
         "app_name": settings.APP_NAME,
         "env": settings.ENV,
     }
+
+
+@app.get("/")
+def root(request: Request):
+    if _is_ui_host(request.headers.get("host")):
+        return HTMLResponse(content=_operator_ui_html())
+    return _public_health_payload()
+
+
+@app.get("/health")
+def health():
+    return _public_health_payload()
 
 
 @app.get("/ui", response_class=HTMLResponse, include_in_schema=False)

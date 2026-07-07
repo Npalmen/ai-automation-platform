@@ -1,7 +1,10 @@
 # Live Verification Plan
 
-> **Status: Not run. Prepared only.**
-> This document is a planning artifact only. No live tests have been executed.
+> **Status: Phase A-C partially run 2026-07-07; blocker fix completed locally before Phase D.**
+> Phase A and Phase B were executed; Phase C negative auth checks were executed, but correct admin-key validation was blocked because `ADMIN_API_KEY` was not available in the session.
+> `GET /health` has been added and tested locally; production must be redeployed and Phase B2 re-run before Phase D.
+> Pre-live UI is now an Internal Operator Console; polished customer UI is deferred.
+> No Phase D or later live verification steps have been executed.
 > Governing authority: `docs/00-master-plan.md`.
 > Execute this plan only after all local preconditions are satisfied.
 > After execution, record results in the Evidence Log at the end of this file.
@@ -21,7 +24,7 @@ This plan covers:
 - Gmail OAuth and inbox sync
 - Monday/Fortnox/Visma safe read-only checks
 - Approval queue end-to-end
-- Customer UI and wow-statistics
+- Internal operator console and minimal customer-safe UI/status checks
 - Smoke check
 - Rollback and escalation
 
@@ -32,7 +35,7 @@ This plan covers:
 All must be true before live verification begins.
 
 - [ ] Latest code deployed to production server.
-- [ ] Full local test suite passes: `python -m pytest --tb=no -q` — 2499 passed, 0 failed.
+- [ ] Full local test suite passes: `python -m pytest --tb=no -q` — latest final pre-live UI simplification run: 2746 passed, 0 failed.
 - [ ] R1 release gate passes: `python -m scripts.run_release_gate_r1`.
 - [ ] `ADMIN_API_KEY` set to a strong random value (not empty, not dev-mode default).
 - [ ] `ENV=production` set in production environment.
@@ -46,6 +49,19 @@ All must be true before live verification begins.
 - [ ] Support owner assigned for pilot tenant (person responsible for escalation).
 - [ ] Restore rehearsal completed within the last 30 days.
 - [ ] `/docs`, `/redoc`, `/openapi.json` are **not** accessible in production (`ENV=production` disables them).
+
+### Operator confirmation required before Phase D
+
+Before tenant provisioning or any Phase D step, an operator must confirm all of:
+
+- `ENV=production` is set in the running production app/container.
+- `ADMIN_API_KEY` or `ADMIN_API_KEYS` is set and non-empty.
+- `DATABASE_URL` is set and points to the intended production PostgreSQL database.
+- The app/container is running the latest deployed code that includes `GET /health`.
+- The app/container is running the latest deployed `app/ui/index.html` Internal Operator Console.
+- Caddy/reverse proxy is running and HTTPS is active.
+- A DB backup has completed before live tenant provisioning.
+- Correct admin-key success path was verified with a real admin key against a read-only endpoint such as `GET /admin/tenants`; do not record the key in reports.
 
 ---
 
@@ -611,17 +627,17 @@ curl -s $BASE/audit-events \
 
 ---
 
-## Phase J — Customer UI and wow-statistics checks
+## Phase J — Operator console and minimal customer-safe UI checks
 
 ```bash
 export BASE=https://api.krowolf.se
 export TENANT_KEY=<tenant api key>
 
-# J1: Customer dashboard / wow-statistics
+# J1: Customer-safe status endpoint
 curl -s $BASE/customer/results \
   -H "X-API-Key: $TENANT_KEY" | python -m json.tool
 # Expected: HTTP 200
-# Expected: shows stats (possibly zero for new tenant — acceptable)
+# Expected: returns minimal status/stats (possibly zero for new tenant — acceptable)
 # Expected: no admin-only data (no raw tenant configs, no other tenants' data)
 
 # J2: Customer activity after test jobs
@@ -634,13 +650,14 @@ curl -s $BASE/customer/activity \
 # J3: Open admin UI in browser
 # Navigate to: https://api.krowolf.se/ui (or https://app.krowolf.se)
 # Log in as admin (ADMIN_USERNAME/password)
-# Expected: Super Admin view loads
+# Expected: Internal Operator Console loads
+# Expected: Super Admin / operator views are readable and functional
 # Expected: T_INTERN_PILOT visible in tenant list
 # Expected: "Behöver hjälp" queue shows any failed jobs
 
-# J4: Open customer UI (as pilot tenant)
+# J4: Open customer-safe UI mode (as pilot tenant)
 # Navigate to: https://api.krowolf.se/ui
-# Expected: customer-facing dashboard loads
+# Expected: minimal customer-safe views load
 # Expected: activity/results visible after test jobs
 # Expected: no admin-only data visible in customer view
 # Expected: no raw JSON payloads in customer-visible sections
@@ -841,6 +858,45 @@ Use this table when executing the plan. Fill in the Actual and Status columns as
 ```
 
 Status key: ☐ Not run | ✅ Pass | ❌ Fail | ⚠️ Warning | 🛑 Stop condition hit
+
+## Evidence log — 2026-07-07 controlled Phase A-C run
+
+| Step | Command/action | Expected | Actual | Status | Evidence/notes |
+|------|----------------|----------|--------|--------|----------------|
+| A0 | `git status --short`; `git status --branch --short` | Clean working tree / latest code deployable | Modified `app/ui/index.html`; branch `main...origin/main`; latest commit `7cec357` | ❌ Fail | Local working tree is not clean, so latest local code is not fully committed/deployable. |
+| A1 | `python -m pytest --tb=no -q` | Full suite passes | 2744 passed, 0 failed, 4 warnings | ✅ Pass | Python 3.14.3. |
+| A2 | `python -m scripts.run_release_gate_r1` | R1 release gate passes | 505 regression + 152 E2E passed | ✅ Pass | 657 total gate tests passed. |
+| A3 | Inspect `docs/01-current-truth.md` | Latest local status documented | Latest status updated with this controlled Phase A-C run | ✅ Pass | Live verification overall remains not completed. |
+| A4 | Confirm `docs/10-live-verification-plan.md` exists | Plan exists | File exists and is being used for this run | ✅ Pass | This evidence log records only Phase A-C. |
+| A5 | Inspect `docs/06-backlog.md` | No local blockers | Local blockers section says none; pre-live blockers require live environment | ✅ Pass | Dirty working tree found separately in A0. |
+| A6 | Check live verification completion state | Not marked completed | Not marked completed; only Phase A-C partial run documented | ✅ Pass | Phase D+ remains not run. |
+| A7 | Server/deploy env inspection | `ENV`, `ADMIN_API_KEY`, `DATABASE_URL`, image/code, Caddy confirmed | Requires operator confirmation | ⚠️ Warning | No SSH/server access available in this session. |
+| B1 | `curl.exe -i --max-time 10 https://api.krowolf.se/` | HTTP 200, `env: production` | HTTP 200, `{"status":"ok","app_name":"Krowolf","env":"production"}` | ✅ Pass | No stack trace or secrets observed. |
+| B2 | `curl.exe -i --max-time 10 https://api.krowolf.se/health` | HTTP 200 | HTTP 404, `{"detail":"Not Found"}` | ❌ Fail | Live verification plan expected `/health` to return HTTP 200. Code inspection showed no generic `/health` route. Response was controlled and did not leak internals. |
+| B3 | `curl.exe -i --max-time 10 https://api.krowolf.se/docs` | HTTP 404 in production | HTTP 404, `{"detail":"Not Found"}` | ✅ Pass | Production docs are not exposed. |
+| B4 | `curl.exe -i --max-time 10 https://api.krowolf.se/openapi.json` | HTTP 404 in production | HTTP 404, `{"detail":"Not Found"}` | ✅ Pass | OpenAPI schema is not exposed. |
+| C1 | `curl.exe -i --max-time 10 https://api.krowolf.se/admin/tenants` | HTTP 401/403 | HTTP 401 | ✅ Pass | Admin endpoint rejects missing admin key. |
+| C2 | `curl.exe -i --max-time 10 https://api.krowolf.se/admin/tenants -H "X-Admin-API-Key: wrong-key"` | HTTP 401/403 | HTTP 401 | ✅ Pass | Admin endpoint rejects wrong admin key. |
+| C3 | `GET /admin/tenants` with correct `X-Admin-API-Key` | HTTP 200 | Blocked | ☐ Not run | `ADMIN_API_KEY` was not available in this session. |
+| C4 | `GET /admin/tenants` with tenant key | HTTP 401/403 | Deferred | ☐ Not run | No tenant key exists yet; deferred to Phase D/E. |
+
+## Blocker fix log — 2026-07-07 before Phase D
+
+| Blocker | Fix/action | Local verification | Remaining before Phase D |
+|---------|------------|--------------------|---------------------------|
+| `/health` returned HTTP 404 in production | Added unauthenticated `GET /health` in `app/main.py`; returns only `status`, `app_name`, `env`. | `python -m pytest tests/test_root_routing.py tests/test_production_hardening.py -q` — 10 passed, 2 warnings. Full suite: 2746 passed, 4 warnings. R1 gate passed. | Deploy latest code, then re-run Phase B2: `curl -i https://api.krowolf.se/health`; expected HTTP 200 and `status: ok`. |
+| Dirty `app/ui/index.html` | Resolved intentionally by replacing the previous fancy CSS/card-contrast dirty state with a minimal Internal Operator Console. Functional HTML/JS views and operator flows were preserved. | UI static structure check passed; `python -m pytest tests/test_root_routing.py -q` passed; full suite passed with 2746 tests; R1 gate passed. | Commit/deploy latest code, then re-run Phase A-C. |
+| Correct admin-key success path not verified | Added explicit pending instruction: use real `ADMIN_API_KEY` only in secure environment against read-only `GET /admin/tenants`. | Not run; no key available. | Re-run Phase C3 after key is provided securely. Do not print the key in report. |
+| Server/container deployment state unknown | Added required operator confirmation list. | Not locally verifiable without server access. | Operator confirms `ENV=production`, non-empty admin key, `DATABASE_URL`, latest code/container, Caddy/reverse proxy, and DB backup before Phase D. |
+
+## Deploy / Phase A-C re-run attempt — 2026-07-07 20:19
+
+| Step | Command/action | Expected | Actual | Status | Evidence/notes |
+|------|----------------|----------|--------|--------|----------------|
+| DPL-0 | Inspect deploy docs/tooling | Documented deploy path and available tooling | Only generic Docker Compose deploy commands exist; no server-specific SSH/deploy target found. `docker` and `gh` are unavailable in this session. | 🛑 Stop condition hit | Stopped before deploy as instructed when deploy procedure requires operator action. |
+| DPL-1 | Check secret availability without printing values | `ADMIN_API_KEY` available for Phase C3 | No local `ADMIN_API_KEY` or `ADMIN_API_KEYS`; no local `DATABASE_URL`. | ☐ Not run | Correct admin-key success path remains blocked until key is provided/used securely. |
+| DPL-2 | Deploy latest local code | Production app/container updated | Not run | ☐ Not run | Requires operator with Docker/server access or documented deploy automation. |
+| DPL-3 | Re-run Phase A-C after deploy | Phase A-C pass/fail evidence | Not run | ☐ Not run | No live checks were run after blocked deploy attempt. |
 
 ---
 

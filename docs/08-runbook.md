@@ -6,6 +6,17 @@
 
 ---
 
+## Pre-live UI mode
+
+`app/ui/index.html` is the Internal Operator Console for live verification and first pilot operations.
+
+- Use it for admin/operator tasks: tenant provisioning, tenant selection, readiness, integration health, approvals, jobs/cases, setup/onboarding, support/needs-help, and safe test-lead flow.
+- Treat polished customer-facing UI as deferred. The current UI prioritizes function, clarity, secure configuration, and troubleshooting.
+- Store one-time tenant API keys securely when shown. Do not paste or record secrets in reports.
+- Before Phase D, deploy the latest code and re-run Phase A-C with the correct `ADMIN_API_KEY`.
+
+---
+
 ## First internal pilot tenant setup — local/pre-live
 
 Complete this sequence before any live tenant onboarding.

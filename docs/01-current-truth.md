@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-06 (Phase 2 — Local Cleanup/Consistency-Pass before Live Verification: profile_missing_fields wired into lead_analyzer_processor payload; service_profile passed to generate_support_question_message; duplicate _resolve_customer_reply_target call removed; docs inconsistencies fixed (test count, customer-safe isolation wording); _has_safety_risk extended to handle ticket_type=="safety"; 9 new pipeline/support tests added. Tests run locally on Python 3.14.3. No live verification, live server, production DB, OAuth token, scheduler, or external integration access.)
+2026-07-07 (Deploy/re-run attempt for live verification Phase A-C was blocked before deploy. Preconditions remain locally true: full suite latest 2746 passed, R1 gate passed, `GET /health` exists locally, `app/ui/index.html` is intentionally an Internal Operator Console, and Phase D has not been run. Deployment could not be performed from this session because no documented server-specific deploy target/SSH host is present, `docker` is not available locally, GitHub CLI is not available, `.github/workflows/release-gate.yml` only tests/builds and does not deploy, and no `ADMIN_API_KEY`/`ADMIN_API_KEYS` is available in the local environment. No production deploy, live `/health` re-test, admin-key success-path check, tenant provisioning, OAuth, inbox sync, integration checks, approval E2E, customer UI/wow stats, or full live smoke was run.)
 
 ## Verification method
 
@@ -24,10 +24,11 @@
 
 | Claim | Status | Detail |
 |-------|--------|--------|
-| Test suite runs | `Verified` | 2744 passed, 0 failed, 4 warnings (after Local Cleanup-Pass: 9 new tests added) |
-| Test count: 2744 tests across 101 test files | `Verified` | Run 2026-07-06 after Local Cleanup/Consistency-Pass |
+| Test suite runs | `Verified` | 2746 passed, 0 failed, 4 warnings (after `/health` blocker fix and pre-live operator console simplification) |
+| Test count: 2746 tests across 101 test files | `Verified` | Run 2026-07-07 during final pre-live UI simplification before Phase A-C re-run |
 | All policy gate tests pass | `Verified` | Including `test_lead_disabled_for_finance_tenant` and unknown-tenant regression suite |
-| R1 release gate (`python -m scripts.run_release_gate_r1`) | `Verified — PASS` | 505 regression + 152 E2E = 657, all passed |
+| R1 release gate (`python -m scripts.run_release_gate_r1`) | `Verified — PASS` | 2026-07-07: 505 regression + 152 E2E = 657, all passed |
+| Root/UI/health/docs targeted tests | `Verified — PASS` | 2026-07-07: `python -m pytest tests/test_root_routing.py -q` — 8 passed, 2 warnings; previous root/health/docs set passed before UI simplification |
 | `httpx` added to `requirements.txt` | `Verified — FIXED` | AUDIT-BUG-01 resolved |
 | Unknown tenant IDs fail-closed | `Verified — FIXED` | AUDIT-BUG-02 resolved |
 | Customer API key cannot access admin endpoints | `Verified` | `test_tenant_isolation_http.py` — admin endpoints reject tenant keys |
@@ -126,11 +127,50 @@
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Server deployment at `api.krowolf.se` | `Unverified` | Was live 2026-05-21; not checked in this audit |
+| Server deployment at `api.krowolf.se` | `Partially verified` | 2026-07-07 controlled Phase B: root returned HTTP 200 with `env: production`; deeper deploy/image/env inspection requires operator confirmation. |
 | Local start via `uvicorn app.main:app --reload` | `Verified (code)` | Startup sequence present in `app/main.py` |
 | Docker Compose (Postgres only) | `Verified (code)` | `docker-compose.yml` + `docker-compose.prod.yml` + `Dockerfile` all present |
 | `ENV=production` disables public docs and dev fallback | `Verified (code)` | `_is_production_env()` and `_openapi_urls_for()` in `main.py` |
 | `.env` file present | `Verified` | `.env` exists in repo root |
+
+### Controlled live verification Phase A-C (2026-07-07)
+
+| Check | Status | Detail |
+|-------|--------|--------|
+| Local working tree clean / latest code committed | `Failed` | `git status --short` showed modified `app/ui/index.html`; branch `main` tracks `origin/main` with latest commit `7cec357`. |
+| Full local test suite | `Verified — PASS` | `python -m pytest --tb=no -q` — 2744 passed, 0 failed, 4 warnings. |
+| R1 release gate | `Verified — PASS` | `python -m scripts.run_release_gate_r1` — 505 regression + 152 E2E passed. |
+| Live root health | `Verified — PASS` | `GET https://api.krowolf.se/` returned HTTP 200 and `{"status":"ok","app_name":"Krowolf","env":"production"}`. |
+| Live `/health` route | `Fixed locally — pending deploy/retest` | Initial live check returned HTTP 404. `GET /health` was added locally on 2026-07-07 and verified by tests; production must be redeployed and B2 re-run before Phase D. |
+| Production docs disabled | `Verified — PASS` | `GET /docs` and `GET /openapi.json` both returned HTTP 404. |
+| Admin endpoint without key | `Verified — PASS` | `GET /admin/tenants` returned HTTP 401. |
+| Admin endpoint with wrong key | `Verified — PASS` | `GET /admin/tenants` with `X-Admin-API-Key: wrong-key` returned HTTP 401. |
+| Admin endpoint with correct key | `Blocked` | `ADMIN_API_KEY` was not available in this session. |
+| Tenant key against admin endpoint | `Deferred` | No tenant key exists yet; deferred to Phase D/E. |
+| Server/deploy env inspection | `Requires operator confirmation` | No SSH/server access in this session to verify production env vars, container image, DB URL, or Caddy process directly. |
+| Live verification overall | `Not completed` | Only Phase A-C partial run was performed. Phase D and later were not run. |
+
+### Deploy / Phase A-C re-run attempt (2026-07-07 20:19)
+
+| Check | Status | Detail |
+|-------|--------|--------|
+| Local preconditions | `Verified` | Latest known full suite: 2746 passed; R1 gate passed; `/health` exists locally; `app/ui/index.html` is intentionally the Internal Operator Console; Phase D not run. |
+| Documented deploy procedure | `Blocked` | Repo documents generic Docker Compose production commands only; no server-specific target, SSH host, or deploy script is present. |
+| Local deploy tooling | `Blocked` | `docker` and `gh` are not installed in this session. SSH client exists, but no production SSH target/credentials are documented in repo. |
+| Production secret availability | `Blocked` | No `ADMIN_API_KEY`, `ADMIN_API_KEYS`, or `DATABASE_URL` present in local environment. No secrets were printed or stored. |
+| Production deploy | `Not run` | Stopped before deploy as required when deploy procedure/operator action is missing. |
+| Phase A-C re-run | `Not run` | No live checks were run after the blocked deploy attempt. |
+
+### Phase A-C blocker fix before Phase D (2026-07-07)
+
+| Blocker | Status | Detail |
+|---------|--------|--------|
+| `/health` returned HTTP 404 on production | `Fixed locally — pending deploy/retest` | Added unauthenticated `GET /health` with public payload only: `status`, `app_name`, `env`. |
+| `/health` tests | `Verified — PASS` | `tests/test_root_routing.py` now verifies HTTP 200, public fields, and no secret-like keys. |
+| Production docs disablement regression | `Verified — PASS` | Existing docs disablement tests still pass. |
+| Dirty `app/ui/index.html` | `Resolved intentionally — pending commit/deploy` | Previous fancy CSS/card-contrast dirty state was replaced with minimal Internal Operator Console styling. Existing functional HTML/JS operator flows were preserved; static structure check passed. |
+| Correct admin-key success path | `Pending` | Requires real `ADMIN_API_KEY` provided securely; must be tested against read-only `/admin/tenants` without printing the key. |
+| Operator confirmations | `Pending` | Must confirm `ENV=production`, non-empty `ADMIN_API_KEY`, `DATABASE_URL`, latest deployed code/container, Caddy/reverse proxy, and DB backup before Phase D. |
 
 ---
 
@@ -177,6 +217,7 @@
 | Endpoint | Method | Auth | Status |
 |----------|--------|------|--------|
 | `/` | GET | None | `Verified` — returns `{"status":"ok"}` or serves HTML for UI hosts |
+| `/health` | GET | None | `Verified (local)` — added 2026-07-07; returns only `status`, `app_name`, `env`; no auth or secrets |
 | `/ui` | GET | None | `Verified` — returns `app/ui/index.html` |
 | `/callback` | GET | None | `Verified` — Visma OAuth callback alias |
 
@@ -309,9 +350,10 @@
 | `admin` | Super Admin overview | Admin only | `Verified (code)` |
 | Integration setup | Opens modal/setup (not a switchView) | Admin only | `Verified (code)` |
 
-**UI file size:** 535,991 bytes (single-file architecture).
+**UI file size:** 460,633 bytes after pre-live operator-console CSS simplification (single-file architecture).
+**Pre-live UI decision:** `Verified/documented` — `docs/07-decisions.md` DEC-023 locks pre-live UI as an Internal Operator Console; polished customer UI is deferred.
 **Customer-safe API responses:** `Verified locally` — server-side tenant/admin/customer isolation confirmed via `test_tenant_isolation_http.py` and `test_customer_saas_surfaces.py`: admin endpoints reject tenant keys, customer endpoints reject admin keys, cross-tenant data returns 404, `/customer/activity` strips internal fields.
-**Customer visual UI separation:** `Partially verified (code/static)` — admin-only and customer-only views are separated by CSS classes (`admin-only`/`customer-only`) and JS-side role checks.
+**Operator/customer visual UI separation:** `Partially verified (code/static)` — admin-only and customer-only views are separated by CSS classes (`admin-only`/`customer-only`) and JS-side role checks; pre-live shell is intentionally optimized for operator use.
 **Live browser/session validation:** `Deferred to live verification` — actual browser session rendering and visual role separation have not been validated against a live server in this session.
 
 ---
@@ -450,7 +492,7 @@
 | Do-not-touch risk logic | `Verified — ADDED` | Shared deterministic risk detector covers legal threats, reklamation, contract disputes, inkasso/betalningskrav, safety/work-environment risk, sensitive personal data, data deletion, financial changes, and mass-send intent |
 | Policy routing | `Verified — IMPROVED` | Risk signals set `decision=hold_for_review`, `needs_human=true`, `approval_required=true`, `route_to=manual_review`, and `next_best_action=manual_review` |
 | Customer reply drafts | `Verified — IMPROVED` | Sensitive lead/customer-inquiry auto replies are approval-gated, non-binding acknowledgements that hand off to a responsible human; low-risk inquiries still route to Monday/internal handoff |
-| Live verification | `Not run` | Explicitly deferred; no calls to `api.krowolf.se`, `app.krowolf.se`, production DB, Gmail OAuth, Monday/Fortnox/Visma credentials, scheduler, or tenant setup |
+| Live verification | `Partially run` | 2026-07-07 controlled Phase A-C only: local gates, production root/docs checks, and negative admin-auth checks. No production DB access, Gmail OAuth, Monday/Fortnox/Visma credentials, scheduler, tenant setup, approval E2E, or smoke check. |
 
 ---
 
@@ -530,7 +572,7 @@ These have caused real failures and are preserved from the README:
 
 ### Important
 
-- **No live server health check performed.** `api.krowolf.se` not verified in this audit. Before first customer, must verify `GET /` returns `{"status":"ok"}` and `GET /pilot/readiness` returns passing state.
+- **Production `/health` must be re-tested after deploy.** `GET /` on `api.krowolf.se` returned HTTP 200 with `env: production` during Phase A-C, but `/health` returned HTTP 404 before the local blocker fix. `GET /health` now exists locally and must be deployed/re-tested before Phase D.
 - **Monday board connection unverified.** Live API key and board ID not checked. Must verify before enabling Monday dispatch for first customer.
 - **Fortnox access token unverified.** Live read/write credentials not checked. Must verify before enabling Fortnox invoice flows for first customer.
 - **Customer UI data isolation: server-side verified locally, live browser deferred.** Server-side response isolation confirmed via HTTP isolation tests (tenant/admin/customer API key separation, cross-tenant 404). Visual browser/session rendering not validated against a live server — deferred to live verification.
@@ -550,7 +592,7 @@ These have caused real failures and are preserved from the README:
 
 ## Unverified claims
 
-- Whether `api.krowolf.se` is currently reachable and healthy.
+- Whether deployed `api.krowolf.se/health` returns HTTP 200 after the local `/health` blocker fix is deployed.
 - Whether Gmail OAuth tokens are currently valid for any connected tenant.
 - Whether Monday board connection is current.
 - Whether Fortnox access tokens are current.
@@ -568,7 +610,8 @@ These have caused real failures and are preserved from the README:
 - [x] Fix policy gate fail-open bug. — **Done. AUDIT-BUG-02 fixed.**
 - [x] Add `httpx` to `requirements.txt`. — **Done. AUDIT-BUG-01 fixed.**
 - [x] Verify local tenant/auth/customer-data isolation. — **Done. All isolation tests pass.**
-- [ ] Verify `GET /` returns `{"status":"ok"}` on target instance.
+- [x] Verify `GET /` returns `{"status":"ok"}` on target instance. — **Done 2026-07-07.** HTTP 200, `app_name: Krowolf`, `env: production`.
+- [ ] Verify `GET /health` returns `{"status":"ok"}` on target instance after deploying the local blocker fix.
 - [ ] Verify `GET /pilot/readiness` returns passing state for pilot tenant.
 - [ ] Verify `GET /integrations/health` reflects real Gmail and Monday state.
 - [ ] Verify Gmail OAuth token is valid (or document that refresh is needed).

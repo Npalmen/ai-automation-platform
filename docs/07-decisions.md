@@ -223,3 +223,13 @@ Each decision records a locked product or execution decision. Execution agents m
 **Reason:** Price discovery happens through pilot; it should not delay shipping.  
 **Consequence:** First customer may be unpaid/pilot. Pricing model is defined in a later decision.  
 **Can change if:** A separate pricing decision is made and documented here.
+
+---
+
+## DEC-023 — Pre-live UI is an internal operator console
+
+**Status:** Locked  
+**Decision:** Pre-live UI is an internal operator console. Polished customer UI is deferred.  
+**Reason:** Before live verification, the owner needs a simple, readable admin/operator surface for tenant setup, readiness, integration health, approvals, cases, and support triage.  
+**Consequence:** `app/ui/index.html` stays a single-file vanilla HTML/CSS/JS UI with minimal black/white styling. Do not optimize for a polished customer SaaS dashboard before Phase A-C is green and the pilot path is stable.  
+**Can change if:** The master plan is explicitly revised or pilot feedback shows a customer-facing UI improvement is needed for first-customer operation.

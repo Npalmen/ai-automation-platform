@@ -98,24 +98,27 @@
 - [x] **9 new tests added to `test_service_profile_pipeline.py`** — covers `profile_missing_fields`/`profile_completeness_score` in lead payload, profile question content for EV charger, inverter support profile questions, emergency/safety bypass regression, and no-profile fallback.
 - [x] **Local verification passed** — `python -m pytest --tb=no -q` passed with 2744 tests; `python -m scripts.run_release_gate_r1` passed with 505 regression + 152 E2E tests.
 
-### Deferred — live verification phase (not next local step)
+### Deferred — live verification phase
 
-Full live verification plan: `docs/10-live-verification-plan.md` — not run yet, prepared only.
+Full live verification plan: `docs/10-live-verification-plan.md` — Phase A-C partially run 2026-07-07. Phase A-C blocker fix completed locally before Phase D, including final pre-live UI simplification to Internal Operator Console. Phase D and later not run.
 
 **Phase A — Pre-flight**
-- [ ] Confirm full local test suite passes immediately before live session.
-- [ ] Confirm R1 gate passes immediately before live session.
+- [x] Confirm full local test suite passes immediately before live session — 2026-07-07 final pre-live UI simplification run: 2746 passed, 0 failed, 4 warnings.
+- [x] Confirm R1 gate passes immediately before live session — 2026-07-07: 505 regression + 152 E2E passed.
+- [x] Resolve unclear `app/ui/index.html` dirty state — previous fancy CSS/card-contrast styling replaced with minimal Internal Operator Console; still must be committed/deployed with the rest of the pending pre-live fixes before Phase A-C can be green.
+- [ ] Deploy latest code before Phase A-C re-run — blocked in current session: no local Docker, no GitHub CLI, no documented production SSH/deploy target, and no local `ADMIN_API_KEY`.
+- [ ] Operator confirmation required before Phase D: production `ENV`, non-empty `ADMIN_API_KEY`, `DATABASE_URL`, latest image/code, Caddy/reverse proxy process, and DB backup completed.
 
 **Phase B — Production health**
-- [ ] `GET https://api.krowolf.se/` → HTTP 200, `env: production`.
-- [ ] `GET https://api.krowolf.se/health` → HTTP 200.
-- [ ] Confirm `/docs` and `/openapi.json` return 404 in production.
+- [x] `GET https://api.krowolf.se/` → HTTP 200, `env: production`.
+- [ ] `GET https://api.krowolf.se/health` → HTTP 200 — fixed locally by adding `GET /health`; requires deploy and live re-test before Phase D.
+- [x] Confirm `/docs` and `/openapi.json` return 404 in production.
 
 **Phase C — Admin/auth**
-- [ ] Admin endpoint without key → 401.
-- [ ] Admin endpoint with wrong key → 401.
-- [ ] Admin endpoint with correct key → 200.
-- [ ] Tenant key rejected on admin endpoint.
+- [x] Admin endpoint without key → 401.
+- [x] Admin endpoint with wrong key → 401.
+- [ ] Admin endpoint with correct key → 200 — blocked until `ADMIN_API_KEY` is provided securely.
+- [ ] Tenant key rejected on admin endpoint — deferred to Phase D/E because no tenant key exists yet.
 
 **Phase D — Tenant provisioning**
 - [ ] `POST /admin/tenants` creates T_INTERN_PILOT, returns api_key (once).
@@ -172,9 +175,11 @@ Full live verification plan: `docs/10-live-verification-plan.md` — not run yet
 - [x] **`docs/02-first-customer-plan.md`** — added "Local pre-live setup checklist" (11 items).
 - [x] **Flaky test fixed**: `test_sla_pass_already_run_today_skips` used `date.today()` (local TZ) vs UTC production code. Fixed to use `datetime.now(timezone.utc)`.
 
-### Local blockers — none
+### Local blocker status
 
-No local blockers remain before live phase.
+`GET /health` blocker is fixed locally and covered by tests.
+`app/ui/index.html` is no longer an unknown fancy dirty state: it has been intentionally simplified into an Internal Operator Console with minimal black/white styling. It must be committed/deployed with the latest code before Phase A-C can be re-run as green.
+Deploy/re-run attempt on 2026-07-07 20:19 stopped before production changes: this session has no Docker, no GitHub CLI/deploy automation, no documented server-specific SSH target, and no local admin key. Operator must deploy latest code and provide/use `ADMIN_API_KEY` securely before Phase A-C can be re-run.
 
 ### Remaining local quality gaps
 
@@ -185,6 +190,8 @@ No local blockers remain before live phase.
 ### Pre-live blockers (require live environment)
 
 - [ ] `ADMIN_API_KEY` must be set to strong random value in production.
+- [ ] Correct admin-key success path must be verified with real `ADMIN_API_KEY` against a read-only admin endpoint such as `GET /admin/tenants`; do not print the key in reports.
+- [ ] Operator must confirm `ENV=production`, non-empty `ADMIN_API_KEY`, `DATABASE_URL`, latest deployed code/container, Caddy/reverse proxy running, and DB backup completed before Phase D.
 - [ ] Gmail OAuth flow must be completed for pilot tenant (`GET /auth/gmail/start?tenant_id=...`).
 - [ ] Monday `MONDAY_API_KEY` must be set and board connection verified.
 - [ ] DB backup must be run before first live onboarding.
