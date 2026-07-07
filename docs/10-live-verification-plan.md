@@ -898,6 +898,16 @@ Status key: ☐ Not run | ✅ Pass | ❌ Fail | ⚠️ Warning | 🛑 Stop condi
 | DPL-2 | Deploy latest local code | Production app/container updated | Not run | ☐ Not run | Requires operator with Docker/server access or documented deploy automation. |
 | DPL-3 | Re-run Phase A-C after deploy | Phase A-C pass/fail evidence | Not run | ☐ Not run | No live checks were run after blocked deploy attempt. |
 
+## Post-push deploy / Phase A-C re-run attempt — 2026-07-07 20:24
+
+| Step | Command/action | Expected | Actual | Status | Evidence/notes |
+|------|----------------|----------|--------|--------|----------------|
+| DPL-4 | Verify pushed code | `main` clean and pushed | `HEAD` and `origin/main` are `8e19622`; working tree clean before this documentation update. | ✅ Pass | Latest local fixes are in GitHub. |
+| DPL-5 | Test non-interactive SSH to production host | SSH command can run production deploy commands | `ssh -o BatchMode=yes ... api.krowolf.se` resolved to default user `niklas` and returned permission denied. | 🛑 Stop condition hit | No interactive password prompt attempted; no deploy command run. |
+| DPL-6 | Check secret availability without printing values | `ADMIN_API_KEY` available for Phase C3 | No local `ADMIN_API_KEY`, `ADMIN_API_KEYS`, or `DATABASE_URL`. | ☐ Not run | Correct admin-key success path remains blocked until key is provided/used securely on server or in session. |
+| DPL-7 | Deploy latest pushed code | Production app/container updated | Not run | ☐ Not run | Requires valid SSH/server access or operator-run deploy. |
+| DPL-8 | Re-run Phase A-C after deploy | Phase A-C pass/fail evidence | Not run | ☐ Not run | No live checks were run after blocked deploy attempt. |
+
 ---
 
 ## Final report template

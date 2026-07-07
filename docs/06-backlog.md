@@ -106,7 +106,7 @@ Full live verification plan: `docs/10-live-verification-plan.md` — Phase A-C p
 - [x] Confirm full local test suite passes immediately before live session — 2026-07-07 final pre-live UI simplification run: 2746 passed, 0 failed, 4 warnings.
 - [x] Confirm R1 gate passes immediately before live session — 2026-07-07: 505 regression + 152 E2E passed.
 - [x] Resolve unclear `app/ui/index.html` dirty state — previous fancy CSS/card-contrast styling replaced with minimal Internal Operator Console; still must be committed/deployed with the rest of the pending pre-live fixes before Phase A-C can be green.
-- [ ] Deploy latest code before Phase A-C re-run — blocked in current session: no local Docker, no GitHub CLI, no documented production SSH/deploy target, and no local `ADMIN_API_KEY`.
+- [ ] Deploy latest code before Phase A-C re-run — blocked in current session: latest code is pushed (`8e19622`), but there is no local Docker/GitHub CLI, no local `ADMIN_API_KEY`, and non-interactive SSH to `api.krowolf.se` as default `niklas` user is denied.
 - [ ] Operator confirmation required before Phase D: production `ENV`, non-empty `ADMIN_API_KEY`, `DATABASE_URL`, latest image/code, Caddy/reverse proxy process, and DB backup completed.
 
 **Phase B — Production health**
@@ -179,7 +179,7 @@ Full live verification plan: `docs/10-live-verification-plan.md` — Phase A-C p
 
 `GET /health` blocker is fixed locally and covered by tests.
 `app/ui/index.html` is no longer an unknown fancy dirty state: it has been intentionally simplified into an Internal Operator Console with minimal black/white styling. It must be committed/deployed with the latest code before Phase A-C can be re-run as green.
-Deploy/re-run attempt on 2026-07-07 20:19 stopped before production changes: this session has no Docker, no GitHub CLI/deploy automation, no documented server-specific SSH target, and no local admin key. Operator must deploy latest code and provide/use `ADMIN_API_KEY` securely before Phase A-C can be re-run.
+Deploy/re-run attempts on 2026-07-07 20:19 and 20:24 stopped before production changes: latest code is pushed, but this session has no Docker, no GitHub CLI/deploy automation, no local admin key, and SSH auth to `api.krowolf.se` is unavailable. Operator must deploy latest code and provide/use `ADMIN_API_KEY` securely before Phase A-C can be re-run.
 
 ### Remaining local quality gaps
 

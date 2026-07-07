@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-07 (Deploy/re-run attempt for live verification Phase A-C was blocked before deploy. Preconditions remain locally true: full suite latest 2746 passed, R1 gate passed, `GET /health` exists locally, `app/ui/index.html` is intentionally an Internal Operator Console, and Phase D has not been run. Deployment could not be performed from this session because no documented server-specific deploy target/SSH host is present, `docker` is not available locally, GitHub CLI is not available, `.github/workflows/release-gate.yml` only tests/builds and does not deploy, and no `ADMIN_API_KEY`/`ADMIN_API_KEYS` is available in the local environment. No production deploy, live `/health` re-test, admin-key success-path check, tenant provisioning, OAuth, inbox sync, integration checks, approval E2E, customer UI/wow stats, or full live smoke was run.)
+2026-07-07 (Post-push deploy/re-run attempt for live verification Phase A-C was blocked before deploy. Local `main` is clean and pushed: `HEAD`/`origin/main` = `8e19622`. Preconditions remain locally true: full suite latest 2746 passed, R1 gate passed, `GET /health` exists locally, `app/ui/index.html` is intentionally an Internal Operator Console, and Phase D has not been run. Deployment could not be performed from this session because `docker` is not available locally, GitHub CLI is not available, `.github/workflows/release-gate.yml` only tests/builds and does not deploy, no `ADMIN_API_KEY`/`ADMIN_API_KEYS` or `DATABASE_URL` is available in the local environment, and non-interactive SSH to `api.krowolf.se` as the default `niklas` user was denied. No production deploy, live `/health` re-test, admin-key success-path check, tenant provisioning, OAuth, inbox sync, integration checks, approval E2E, customer UI/wow stats, or full live smoke was run.)
 
 ## Verification method
 
@@ -159,6 +159,17 @@
 | Local deploy tooling | `Blocked` | `docker` and `gh` are not installed in this session. SSH client exists, but no production SSH target/credentials are documented in repo. |
 | Production secret availability | `Blocked` | No `ADMIN_API_KEY`, `ADMIN_API_KEYS`, or `DATABASE_URL` present in local environment. No secrets were printed or stored. |
 | Production deploy | `Not run` | Stopped before deploy as required when deploy procedure/operator action is missing. |
+| Phase A-C re-run | `Not run` | No live checks were run after the blocked deploy attempt. |
+
+### Post-push deploy / Phase A-C re-run attempt (2026-07-07 20:24)
+
+| Check | Status | Detail |
+|-------|--------|--------|
+| Latest code pushed | `Verified` | Local `main` is clean and synced with `origin/main`; `HEAD` = `8e19622`. |
+| SSH access | `Blocked` | `ssh -o BatchMode=yes ... api.krowolf.se` resolved to the default `niklas` user but failed with permission denied. No interactive password prompt was attempted. |
+| Local deploy tooling | `Blocked` | `docker` and `gh` remain unavailable in this session. |
+| Production secret availability | `Blocked` | No local `ADMIN_API_KEY`, `ADMIN_API_KEYS`, or `DATABASE_URL`. No secrets were printed or stored. |
+| Production deploy | `Not run` | Stopped before deploy because production SSH authentication is unavailable. |
 | Phase A-C re-run | `Not run` | No live checks were run after the blocked deploy attempt. |
 
 ### Phase A-C blocker fix before Phase D (2026-07-07)
