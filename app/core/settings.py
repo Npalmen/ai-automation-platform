@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
     STORAGE_PATH: str = "./storage/local_dev"
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/ai_platform"
+    DB_ECHO: bool = False
 
     # Per-tenant API keys — JSON string mapping tenant_id to api_key.
     # Example: '{"TENANT_1001": "key-abc123", "TENANT_2001": "key-def456"}'
