@@ -1,4 +1,4 @@
-# Current Truth
+﻿# Current Truth
 
 > **This file contains verified repository truth. It must not contain vision or plans.**
 > If something is unverified, it is marked `Unverified`.
@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-07 (Post-push deploy/re-run attempt for live verification Phase A-C was blocked before deploy. Local `main` is clean and pushed: `HEAD`/`origin/main` = `8e19622`. Preconditions remain locally true: full suite latest 2746 passed, R1 gate passed, `GET /health` exists locally, `app/ui/index.html` is intentionally an Internal Operator Console, and Phase D has not been run. Deployment could not be performed from this session because `docker` is not available locally, GitHub CLI is not available, `.github/workflows/release-gate.yml` only tests/builds and does not deploy, no `ADMIN_API_KEY`/`ADMIN_API_KEYS` or `DATABASE_URL` is available in the local environment, and non-interactive SSH to `api.krowolf.se` as the default `niklas` user was denied. No production deploy, live `/health` re-test, admin-key success-path check, tenant provisioning, OAuth, inbox sync, integration checks, approval E2E, customer UI/wow stats, or full live smoke was run.)
+2026-07-08 (Phase O PASSED — CONDITIONAL GO decision issued. All 29 Phase O checks passed (0 fail, 0 warn). 10 jobs confirmed (2 synthetic + 8 Gmail). 1 pending approval (email_send type, not approved). Production is pilot-ready subject to: set support email, review pending approval before approving, rotate DB password. Live commit `01f5763`. All phases A–O now PASSED.)
 
 ## Verification method
 
@@ -24,7 +24,7 @@
 
 | Claim | Status | Detail |
 |-------|--------|--------|
-| Test suite runs | `Verified` | 2746 passed, 0 failed, 4 warnings (after `/health` blocker fix and pre-live operator console simplification) |
+| Test suite runs | `Verified` | 2746 passed, 0 failed, 4 warnings (re-verified in Phase N after DB_ECHO fix) |
 | Test count: 2746 tests across 101 test files | `Verified` | Run 2026-07-07 during final pre-live UI simplification before Phase A-C re-run |
 | All policy gate tests pass | `Verified` | Including `test_lead_disabled_for_finance_tenant` and unknown-tenant regression suite |
 | R1 release gate (`python -m scripts.run_release_gate_r1`) | `Verified — PASS` | 2026-07-07: 505 regression + 152 E2E = 657, all passed |
@@ -127,7 +127,7 @@
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Server deployment at `api.krowolf.se` | `Partially verified` | 2026-07-07 controlled Phase B: root returned HTTP 200 with `env: production`; deeper deploy/image/env inspection requires operator confirmation. |
+| Server deployment at `api.krowolf.se` | `Verified — Phase A-C PASS` | 2026-07-07 production deploy completed on `/opt/krowolf`, live commit `87d9369`, using `/opt/krowolf/docker-compose.prod.yml`; app/db/caddy containers running. Phase D and full live verification not run. |
 | Local start via `uvicorn app.main:app --reload` | `Verified (code)` | Startup sequence present in `app/main.py` |
 | Docker Compose (Postgres only) | `Verified (code)` | `docker-compose.yml` + `docker-compose.prod.yml` + `Dockerfile` all present |
 | `ENV=production` disables public docs and dev fallback | `Verified (code)` | `_is_production_env()` and `_openapi_urls_for()` in `main.py` |
@@ -137,18 +137,18 @@
 
 | Check | Status | Detail |
 |-------|--------|--------|
-| Local working tree clean / latest code committed | `Failed` | `git status --short` showed modified `app/ui/index.html`; branch `main` tracks `origin/main` with latest commit `7cec357`. |
+| Phase A — Pre-flight | `Verified — PASS` | Production deploy completed from `/opt/krowolf`; live commit `87d9369`; Docker Compose file `/opt/krowolf/docker-compose.prod.yml`; containers `krowolf-app-1`, `krowolf-db-1`, and `krowolf-caddy-1` running. |
 | Full local test suite | `Verified — PASS` | `python -m pytest --tb=no -q` — 2744 passed, 0 failed, 4 warnings. |
 | R1 release gate | `Verified — PASS` | `python -m scripts.run_release_gate_r1` — 505 regression + 152 E2E passed. |
 | Live root health | `Verified — PASS` | `GET https://api.krowolf.se/` returned HTTP 200 and `{"status":"ok","app_name":"Krowolf","env":"production"}`. |
-| Live `/health` route | `Fixed locally — pending deploy/retest` | Initial live check returned HTTP 404. `GET /health` was added locally on 2026-07-07 and verified by tests; production must be redeployed and B2 re-run before Phase D. |
+| Live `/health` route | `Verified — PASS` | `GET https://api.krowolf.se/health` returned HTTP 200 and `{"status":"ok","app_name":"Krowolf","env":"production"}` after production deploy. |
 | Production docs disabled | `Verified — PASS` | `GET /docs` and `GET /openapi.json` both returned HTTP 404. |
 | Admin endpoint without key | `Verified — PASS` | `GET /admin/tenants` returned HTTP 401. |
 | Admin endpoint with wrong key | `Verified — PASS` | `GET /admin/tenants` with `X-Admin-API-Key: wrong-key` returned HTTP 401. |
-| Admin endpoint with correct key | `Blocked` | `ADMIN_API_KEY` was not available in this session. |
+| Admin endpoint with correct key | `Verified — PASS` | `GET /admin/tenants` with correct `X-Admin-API-Key` returned HTTP 200 and existing tenants `T_ELITGRUPPEN`, `TENANT_2001`, `T_TEST1`. |
 | Tenant key against admin endpoint | `Deferred` | No tenant key exists yet; deferred to Phase D/E. |
-| Server/deploy env inspection | `Requires operator confirmation` | No SSH/server access in this session to verify production env vars, container image, DB URL, or Caddy process directly. |
-| Live verification overall | `Not completed` | Only Phase A-C partial run was performed. Phase D and later were not run. |
+| Server/deploy env inspection | `Partially verified` | Server path, compose file, live commit, and running app/db/caddy containers confirmed. Secret values were not recorded. |
+| Live verification overall | `Not completed` | Phase A-C, D, E, F, G, H, I, and J passed. Phase K BLOCKED (Gmail invalid_grant). Full live verification not complete. |
 
 ### Deploy / Phase A-C re-run attempt (2026-07-07 20:19)
 
@@ -176,14 +176,361 @@
 
 | Blocker | Status | Detail |
 |---------|--------|--------|
-| `/health` returned HTTP 404 on production | `Fixed locally — pending deploy/retest` | Added unauthenticated `GET /health` with public payload only: `status`, `app_name`, `env`. |
+| `/health` returned HTTP 404 on production | `Fixed and verified live` | Added unauthenticated `GET /health` with public payload only: `status`, `app_name`, `env`; production now returns HTTP 200 after deploy. |
 | `/health` tests | `Verified — PASS` | `tests/test_root_routing.py` now verifies HTTP 200, public fields, and no secret-like keys. |
 | Production docs disablement regression | `Verified — PASS` | Existing docs disablement tests still pass. |
-| Dirty `app/ui/index.html` | `Resolved intentionally — pending commit/deploy` | Previous fancy CSS/card-contrast dirty state was replaced with minimal Internal Operator Console styling. Existing functional HTML/JS operator flows were preserved; static structure check passed. |
-| Correct admin-key success path | `Pending` | Requires real `ADMIN_API_KEY` provided securely; must be tested against read-only `/admin/tenants` without printing the key. |
-| Operator confirmations | `Pending` | Must confirm `ENV=production`, non-empty `ADMIN_API_KEY`, `DATABASE_URL`, latest deployed code/container, Caddy/reverse proxy, and DB backup before Phase D. |
+| Dirty `app/ui/index.html` | `Resolved intentionally — deployed` | Previous fancy CSS/card-contrast dirty state was replaced with minimal Internal Operator Console styling, included in live commit `87d9369`, and deployed with the Phase A-C checkpoint. Existing functional HTML/JS operator flows were preserved; static structure check passed. |
+| Correct admin-key success path | `Verified — PASS` | Read-only `GET /admin/tenants` with correct key returned HTTP 200. Key was not recorded. |
+| Operator confirmations | `Verified — Phase D complete` | Live commit `87d9369`, compose path, running app/db/caddy containers confirmed. DB backup (`pre-phase-d-20260707-190618.sql`, 677 KB) taken before Phase D. Phase D tenant provisioning passed. |
+
+### Phase D — Tenant provisioning (2026-07-07)
+
+| Check | Status | Detail |
+|-------|--------|--------|
+| DB backup taken before Phase D | `Verified — PASS` | `backups/pre-phase-d-20260707-190618.sql` (677 KB). Automated daily backups also present through `ai_platform_2026-07-07-0200.sql.gz`. |
+| Admin access pre-Phase D | `Verified — PASS` | `GET /admin/tenants` with admin key returned HTTP 200. |
+| Existing tenants untouched | `Verified — PASS` | `T_ELITGRUPPEN` (active), `TENANT_2001` (active), `T_TEST1` (active) — none modified. |
+| `T_LIVE_TEST_001` pre-existing check | `Verified` | Tenant did not exist before Phase D. |
+| Create `T_LIVE_TEST_001` | `Verified — PASS` | `POST /admin/tenants` returned HTTP 201. `tenant_id: T_LIVE_TEST_001`, `name: Live Test Tenant`, `slug: live-test-001`, `status: active`. API key shown once (masked, length 35) and not recorded. |
+| `T_LIVE_TEST_001` appears in admin list | `Verified — PASS` | `GET /admin/tenants` after creation listed `T_LIVE_TEST_001` correctly. |
+| Key rotation | `Verified — PASS` | `POST /admin/tenants/T_LIVE_TEST_001/rotate-key` returned HTTP 200; fresh key obtained (length 35). Used for tenant verification and cleared immediately after. |
+| `GET /tenant` with tenant key | `Verified — PASS` | HTTP 200; endpoint accessible with `T_LIVE_TEST_001` key. |
+| `GET /pilot/readiness` with tenant key | `Verified — PASS` | `overall_status: almost_ready`; 6 passed, 5 warnings, 0 failures — expected for new tenant without integrations. |
+| `GET /integrations/health` with tenant key | `Verified — PASS` | `overall_status: warning`; no secrets in response body. |
+| Tenant key rejected on admin endpoint | `Verified — PASS` | `GET /admin/tenants` with `T_LIVE_TEST_001` tenant key returned HTTP 401 — isolation confirmed. |
+| T_ELITGRUPPEN data not visible to T_LIVE_TEST_001 | `Verified — PASS` | `GET /jobs` with `T_LIVE_TEST_001` key returned empty list; no cross-tenant data. |
+| Secrets handled | `Verified` | Admin key never recorded. Tenant key used in-memory on server only; cleared with `unset` after each check. Temp scripts removed from server. |
+| Phase D overall | `Verified — PASS` | All D-checks passed 2026-07-07. |
+
+### Phase E — Tenant/customer endpoint isolation and readiness (2026-07-07)
+
+| Check | Status | Detail |
+|-------|--------|--------|
+| Preconditions | `Verified` | Phase A-D confirmed passed; `T_LIVE_TEST_001` confirmed active; key rotated fresh for Phase E. |
+| E1 `/tenant` with key | `Verified — PASS` | HTTP 200; no secrets in body; no cross-tenant data. |
+| E1b `/tenant` without key | `Verified — PASS` | HTTP 401. |
+| E2a `/customer/health` with key | `Verified — PASS` | HTTP 200; no secrets; no cross-tenant data. |
+| E2b `/customer/health` without key | `Verified — PASS` | HTTP 401. |
+| E2c `/customer/results` with key | `Verified — PASS` | HTTP 200; no secrets; no cross-tenant data. |
+| E2d `/customer/activity` with key | `Verified — PASS` | HTTP 200; no secrets; no cross-tenant data. |
+| E2e `/customer/account` with key | `Verified — PASS` | HTTP 200; no secrets; no cross-tenant data. |
+| E3 `/pilot/readiness` with key | `Verified — PASS` | HTTP 200; `almost_ready`; no secrets. |
+| E4a `/integrations/health` with key | `Verified — PASS` | HTTP 200; `overall_status: warning`; no secrets in body. |
+| E4b `/integrations/health` without key | `Verified — PASS` | HTTP 401. |
+| E5a `/jobs` with key | `Verified — PASS` | HTTP 200; empty list; no cross-tenant data. |
+| E5b `/jobs` without key | `Verified — PASS` | HTTP 401. |
+| E6a `/audit-events` with key | `Verified — PASS` | HTTP 200; no cross-tenant data. |
+| E6b `/audit-events` without key | `Verified — PASS` | HTTP 401. |
+| E6c `/integration-events` with key | `Verified — PASS` | HTTP 200; no cross-tenant data. |
+| E6d `/integration-events` without key | `Verified — PASS` | HTTP 401. |
+| E7a `/tenant/context` with key | `Verified — PASS` | HTTP 200; no secrets; no cross-tenant data. |
+| E7b `/tenant/context` without key | `Verified — PASS` | HTTP 401. |
+| E7c `/tenant/memory` with key | `Verified — PASS` | HTTP 200; no secrets; no cross-tenant data. |
+| E7d `/tenant/memory` without key | `Verified — PASS` | HTTP 401. |
+| E8a `X-Tenant-ID: T_ELITGRUPPEN` with `T_LIVE_TEST_001` key | `Verified — PASS (design)` | HTTP 200. Correct behavior: `X-Tenant-ID` header is ignored when `TENANT_API_KEYS` is configured; tenant resolves from key only. Response was scoped to `T_LIVE_TEST_001`, not `T_ELITGRUPPEN`. |
+| E8b Admin key on `/jobs` | `Verified — PASS` | HTTP 403; admin key correctly rejected as tenant key. |
+| E8c Tenant key on `/admin/tenants` | `Verified — PASS` | HTTP 401; tenant key correctly rejected on admin endpoint. |
+| Logs review | `Verified — PASS` | No 500s, no stack traces, no leaked secrets, no cross-tenant SQL queries. SQL echo verbose (logged clean hashed key values only — non-blocking cleanup item). |
+| Secrets handling | `Verified` | Admin key and tenant key used in-memory on server only; cleared with `unset`; temp script removed. |
+| Phase E overall | `Verified — PASS` | All E-checks passed 2026-07-07. |
+
+### Phase F — Safe synthetic intake/job flow (2026-07-07)
+
+| Check | Status | Detail |
+|-------|--------|--------|
+| F1: Tenant safety config | `Verified — PASS` | `T_LIVE_TEST_001` active; `auto_actions: {lead: false, customer_inquiry: false, invoice: false}`; no integrations configured for external writes. |
+| F2: Create synthetic lead job | `Verified — PASS` | `POST /jobs` returned HTTP 200; `job_id: bea23f74-1dbe-4424-a8cb-60262da92f9b`; `tenant_id: T_LIVE_TEST_001`; `job_type: lead`; no secrets in response. |
+| F2: Pipeline completion | `Verified — PASS` | Job ran through full pipeline in-process; `status: completed`; `result.status: completed`; `result.summary: "Ingen manuell överlämning behövs."`; `requires_human_review: False`; 0 external actions dispatched. |
+| F3: GET /jobs/:id | `Verified — PASS` | HTTP 200; `tenant_id: T_LIVE_TEST_001`; `job_type: lead`; `status: completed`; no secrets; no cross-tenant data. |
+| F4: Jobs list isolation | `Verified — PASS` | HTTP 200; synthetic job listed; `T_ELITGRUPPEN`, `TENANT_2001`, `T_TEST1` absent. |
+| F5: Audit events | `Verified — PASS` | HTTP 200; no cross-tenant data; no external write audit events (no gmail send / monday write / fortnox export / visma write). |
+| F5b: Integration events | `Verified — PASS` | HTTP 200; no external write events. |
+| F6: No external writes | `Verified — PASS` | App logs reviewed: no Gmail send, no Monday write, no Fortnox/Visma events; no 500s or stack traces. |
+| F7: GET /jobs/:id without key | `Verified — PASS` | HTTP 401. |
+| F7b: Wrong tenant header on specific job | `Verified — PASS (design)` | HTTP 200 with `tenant_id: T_LIVE_TEST_001` — job correctly scoped to T_LIVE_TEST_001; `X-Tenant-ID` header ignored per auth design. |
+| Secrets handling | `Verified` | Admin key and tenant key used in-memory on server; cleared with `unset`; temp scripts removed. |
+| Synthetic job left as evidence | `Intentional` | Synthetic job `bea23f74-1dbe-4424-a8cb-60262da92f9b` retained under `T_LIVE_TEST_001` as Phase F evidence. No delete action taken. |
+| Phase F overall | `Verified — PASS` | 20/20 checks passed; 0 failures; 0 warnings. |
 
 ---
+
+
+### Phase G — Approval queue / manual review (2026-07-07)
+
+| Check | Status | Detail |
+|-------|--------|--------|
+| G1: Approval endpoints identified | `Verified — PASS` | `GET /approvals/pending`, `POST /approvals/{id}/approve`, `POST /approvals/{id}/reject`, `GET /jobs/{id}/approvals` — all tenant-scoped via `get_verified_tenant`; reject body `{actor?,channel?,note?}`; reject never sends email or dispatches externally. |
+| G2: Create synthetic approval-trigger job | `Verified — PASS` | `POST /jobs` with `force_approval_test: true` + `job_type: customer_inquiry` → HTTP 200; `job_id: 8b2d53d2-cc44-4d45-a11b-5a4a60654bb0`; `status: awaiting_approval`; `tenant_id: T_LIVE_TEST_001`; no secrets in response. |
+| G3: GET /jobs/:id | `Verified — PASS` | HTTP 200; `status: awaiting_approval`; `result.summary: "Approval dispatched via dashboard."`; scoped to T_LIVE_TEST_001; no secrets; no cross-tenant data. |
+| G4: GET /approvals/pending | `Verified — PASS` | HTTP 200; 2 pending for T_LIVE_TEST_001; `approval_id: f5d27fc3-071c-41f0-ba65-c9f052f591b3`; `next_on_approve: action_dispatch`; no cross-tenant; no secrets. |
+| G5a: /approvals/pending without key | `Verified — PASS` | HTTP 401. |
+| G5b: X-Tenant-ID: T_ELITGRUPPEN + T_LIVE_TEST_001 key | `Verified — PASS (design)` | HTTP 200 scoped to T_LIVE_TEST_001 only; no T_ELITGRUPPEN data; header ignored per auth design. |
+| G6: POST /approvals/:id/reject | `Verified — PASS` | HTTP 200; job status -> `manual_review`; no email/monday/fortnox markers; no external write executed. |
+| G7: Approval no longer pending after reject | `Verified — PASS` | `f5d27fc3-...` removed from pending queue; other tenants absent. |
+| G8a: /audit-events | `Verified — PASS` | HTTP 200; no cross-tenant data; no external write events. |
+| G8b: /integration-events | `Verified — PASS` | HTTP 200; no external write events. |
+| G9: App logs | `Verified — PASS` | `POST /approvals/.../reject 200 OK` confirmed; no 500s; no stack traces; no external writes. |
+| Secrets handling | `Verified` | Admin key and tenant key used in-memory on server; cleared with unset; temp scripts removed. |
+| Cleanup note | `Non-blocking` | Phase F email_send approval (eml_adeaf87...) remains pending — consider rejecting via dashboard before pilot. |
+| Phase G overall | `Verified — PASS` | 24/24 checks passed; 0 failures; 0 warnings. |
+
+### Phase H — Integration health/OAuth readiness (2026-07-07)
+
+| Check | Status | Detail |
+|-------|--------|--------|
+| H1: GET /integrations/health | `Verified — PASS` | HTTP 200; `overall_status: warning`; `gmail.status: warning` (configured, not yet OAuth-synced); no tokens/secrets; no cross-tenant data. Warning is a safe, controlled state for a new tenant. |
+| H2a: GET /integrations | `Verified — PASS` | HTTP 200; 2 enabled integrations (Monday.com, Google Mail); no secrets; no cross-tenant. |
+| H2b: GET /setup/status | `Verified — PASS` | HTTP 200; `readiness.score: 90, status: ready`; `google_mail: true, monday: true, fortnox: false, visma: false`; `missing: ["Support email not configured"]`; no secrets. |
+| H2c: GET /pilot/readiness | `Verified — PASS` | HTTP 200; `almost_ready`; no secrets. |
+| H3a: GET /integrations/visma/status | `Verified — PASS` | HTTP 200; `status: disconnected, connected: false`; no tokens. |
+| H3b: GET /integrations/visma/oauth/url | `Verified — PASS` | HTTP 503; `"Visma OAuth is not configured"`; VISMA_CLIENT_ID not set; safe not-configured response. |
+| H3-skip: oauth/start, oauth/callback | `Skipped — Out of scope` | Redirect/token-exchange endpoints not tested per plan. |
+| H4: GET /integration-events | `Verified — PASS` | HTTP 200; no gmail/monday/fortnox write events; no cross-tenant. |
+| H5: GET /audit-events | `Verified — PASS` | HTTP 200; T_LIVE_TEST_001 data only; no secrets. |
+| H6a: /integrations/health without key | `Verified — PASS` | HTTP 401. |
+| H6b: X-Tenant-ID: T_ELITGRUPPEN + T_LIVE_TEST_001 key | `Verified — PASS (design)` | HTTP 200 scoped to T_LIVE_TEST_001 only; T_ELITGRUPPEN integration state not exposed. |
+| H7: Pending approvals cleanup | `Verified — PASS + Cleanup` | Phase F email_send approval (eml_adeaf87..., job bea23f74...) found and safely rejected (HTTP 200); no external write; no cross-tenant. |
+| H8: App logs | `Verified — PASS` | All requests logged cleanly; no 500s; no stack traces; no secrets; 401 for no-key; 503 for unconfigured Visma. |
+| Secrets handling | `Verified` | Admin key and tenant key used in-memory only; cleared with unset; temp scripts removed. |
+| Phase H overall | `Verified — PASS` | 42 pass, 0 fail, 1 warn (expected cleanup). |
+
+**Integration state summary (T_LIVE_TEST_001, 2026-07-07):**
+- Gmail: `warning` — env credentials present (`google_mail: true`), OAuth not yet connected, no scanner run.
+- Monday: enabled (`monday: true`), connection state not separately checked.
+- Visma: `disconnected` — VISMA_CLIENT_ID not set; safely returns 503 on oauth/url.
+- Fortnox: `false` — not configured.
+
+### Phase I — UI / read-only dashboard verification (2026-07-07)
+
+| Check | Status | Detail |
+|-------|--------|--------|
+| I1a: app.krowolf.se/ui | `Verified — PASS` | HTTP 200; 460 KB HTML; "Internal Operator Console" markers present; no actual secret values embedded. |
+| I1b: api.krowolf.se/ui | `Verified — PASS` | HTTP 200; same HTML served via API host. |
+| I1c: Cache-bust request | `Verified — PASS` | HTTP 200; same operator console content. |
+| I2: Static HTML content | `Verified — PASS` | All sections present: Internal Operator Console, Tenants, Readiness, Integrations, Jobs, Approvals, Activity, Setup. No cross-tenant data. No actual secret values (script false-positives on JS variable names and CSS selectors explained separately). |
+| I3: No-key auth states | `Verified — PASS` | /tenant, /jobs, /approvals/pending without key → all 401. |
+| I4: Customer read-only endpoints | `Verified — PASS` | /tenant, /customer/health, /customer/results, /customer/activity, /customer/account — all 200; T_LIVE_TEST_001 scoped; no secrets; no cross-tenant. |
+| I5a: /pilot/readiness | `Verified — PASS` | 200; almost_ready. |
+| I5b: /integrations/health | `Verified — PASS` | 200; overall_status: warning (expected). |
+| I5c: /jobs | `Verified — PASS` | 200; total=2 (Phase F + G synthetic); no cross-tenant. |
+| I5d: /approvals/pending | `Verified — PASS` | 200; 0 pending (queue clean after Phase H cleanup). |
+| I5e: /audit-events | `Verified — PASS` | 200; T_LIVE_TEST_001 only; no secrets. |
+| I6a: /admin/tenants without key | `Verified — PASS` | HTTP 401. |
+| I6b: /admin/tenants with admin key | `Verified — PASS` | 200; tenants: T_ELITGRUPPEN, TENANT_2001, T_LIVE_TEST_001, T_TEST1; no api_key values in list; no secrets. |
+| I7: Browser UI check | `Verified — PASS` | Browser confirmed: "Internal Operator Console" title; Admin/Kund login tabs; username/password form; no plaintext API keys visible; no old polished SaaS dashboard; minimal internal operator UI. Screenshot captured 2026-07-07. |
+| I8: App logs | `Verified — PASS` | All endpoints logged correctly; no 500s; no stack traces; no secrets; 401 for no-key. |
+| Script false-positives | `Non-blocking` | 3 script FAILs were false positives: HTML `input[type="password"]` CSS selector, JS variable names (`access_token`, `admin_api_key`), and config status text ("FORTNOX_ACCESS_TOKEN är konfigurerade") — all variable NAMES, not actual VALUES. Verified via grep extraction and browser inspection. |
+| Secrets handling | `Verified` | Admin key and tenant key used in-memory only; cleared with unset; temp scripts removed. |
+| Phase I overall | `Verified — PASS` | 58 actual pass, 0 true fail, 0 warn; 3 script false-positives explained. |
+
+### Phase J — Gmail OAuth readiness/connection planning (2026-07-07)
+
+| Check | Status | Detail |
+|-------|--------|--------|
+| J1: Gmail config inspection | `Verified — PASS` | All required env vars SET and masked: `GOOGLE_MAIL_ACCESS_TOKEN (len=253)`, `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID` (visible, safe), `GOOGLE_OAUTH_CLIENT_SECRET` (masked), `GOOGLE_MAIL_API_URL`, `GOOGLE_MAIL_USER_ID=me`. Env var names match `app/core/settings.py` exactly. No secrets printed. |
+| J2: Route/code inspection | `Verified — PASS` | Gmail uses static token model — no OAuth consent URL route exists. Sync routes identified (NOT called): `POST /gmail/process-inbox`, `POST /workflow-scan/gmail`, `POST /dashboard/inbox-sync`. Token refresh is internal only. |
+| J3: /integrations/health | `Verified — PASS` | 200; `gmail.status: warning, configured: True`; `monday: warning, configured: True`; `fortnox: not_configured`; no secrets. Warning expected — scanner not yet run. |
+| J4a: /setup/status | `Verified — PASS` | 200; `google_mail: True, email_connected: True`; `readiness.score: 90, status: ready`; `missing: ["Support email not configured"]`; no secrets. |
+| J4b: /pilot/readiness | `Verified — PASS` | 200; `almost_ready`; warnings: onboarding 4/8 steps, no routing hints, no integration events. Expected pre-scan state. |
+| J5: OAuth auth-url routes | `Verified — PASS` | All Google OAuth URL routes → 404 (not implemented). Correct: Gmail uses static token model, no consent redirect needed. |
+| J6: Gmail callback route | `Verified — PASS` | No Gmail OAuth callback route (404). No token exchange. No real code sent. |
+| J7: Inbox sync status | `Verified — PASS` | Sync routes documented and NOT called. `GET /workflow-scan/status` → 200; `status: never_run, last_scan_at: null`. No inbox data read. |
+| J8a: /integration-events | `Verified — PASS` | 200; no gmail_send/inbox_sync events; no secrets; T_LIVE_TEST_001 only. |
+| J8b: /audit-events | `Verified — PASS` | 200; no secrets; no cross-tenant. |
+| J9: App logs | `Verified — PASS` | No 500s; no stack traces; no OAuth tokens; 404s for non-existent OAuth routes; no inbox sync. 1 false-positive WARN (grep matched function name). |
+| Secrets handling | `Verified` | Admin key and tenant key used in-memory only; cleared with unset; temp scripts removed. |
+| Phase J overall | `Verified — PASS` | 32 pass, 0 fail, 1 warn (false positive). |
+
+**Gmail OAuth state summary (2026-07-07):**
+- Token model: Static env-var tokens — no browser consent flow needed.
+- `GOOGLE_MAIL_ACCESS_TOKEN`: SET (len=253) — valid token present.
+- `GOOGLE_OAUTH_REFRESH_TOKEN`: SET — auto-refresh enabled.
+- `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`: both SET.
+- Scanner: `never_run` — inbox sync not yet executed.
+- Inbox sync is blocked until explicit Phase K approval.
+
+### Phase K — Gmail inbox sync (2026-07-08) — PASSED
+
+| Check | Status | Detail |
+|-------|--------|--------|
+| Preconditions | `Verified — PASS` | `auto_actions: {lead: False, customer_inquiry: False, invoice: False}`; safe to proceed. |
+| K1: dry_run=true | `Verified — PASS` | HTTP 200; `dry_run: True`; 0 new jobs created (correct); no side effects. |
+| K2: dry_run=false (real sync) | `Verified — PASS` | HTTP 200; `dry_run: False`; **8 new jobs created** from Gmail inbox; `jobs_before=2 → jobs_after=10`. |
+| K3: Jobs after sync | `Verified — PASS` | 10 total jobs (2 synthetic + 8 from Gmail); no cross-tenant; no secrets. |
+| K4: App logs | `Verified — PASS` | `POST /gmail/process-inbox HTTP/1.1 200 OK` (×2); no errors; no leaked tokens. |
+| K5: auto_actions safe | `Verified — PASS` | `auto_actions: {lead: False, customer_inquiry: False, invoice: False}` — no automatic external dispatch triggered. |
+
+**Resolution (2026-07-08):**
+- New Google OAuth client created: `502012997563-gp9iku5erqff3u8tad923pk8mb7fsp8m`
+- New `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_MAIL_ACCESS_TOKEN` updated in `.env.production`
+- Container recreated with `docker compose up -d` (not just restart — required to pick up new env vars)
+- Token refresh verified against Google API before container restart: `PASS, new_access_token=SET (len=253), expires_in=3599`
+- Phase K now **PASSED**; blocker removed
+
+**Important lesson:** `docker compose restart` does NOT re-read `.env.production` — must use `docker compose up -d` to recreate container with updated env vars.
+
+**Previous attempt (2026-07-07) — BLOCKED:**
+- First attempt: HTTP 503; `invalid_grant` — old refresh token revoked/expired.
+- Second attempt: tokens replaced but with wrong OAuth client_id (old client); `unauthorized_client`.
+- Third attempt: new client_id + secret set correctly; container recreated; Phase K PASSED.
+
+### Phase L — Monday readiness/no-write verification (2026-07-07)
+
+| Check | Status | Detail |
+|-------|--------|--------|
+| L1: Monday config inspection | `Verified — PASS` | `MONDAY_API_KEY` SET (len=227), `MONDAY_BOARD_ID` SET (len=11), `MONDAY_API_URL` SET. `MONDAY_WORKSPACE_ID` not present (not required). No token value printed. |
+| L2: Monday routes identified | `Verified — PASS` | Write routes identified and NOT called: `POST /integrations/{type}/execute`. Read-only routes tested: `/integrations`, `/integrations/health`, `/setup/status`, `/pilot/readiness`, `/workflow-scan/status`. No `/integrations/monday/status` route exists (correct). |
+| L3: /integrations/health | `Verified — PASS` | HTTP 200; `overall_status: warning`; `monday.status: warning, configured: True`; no tokens/secrets; no cross-tenant data. Warning: expected state — Monday API key set but no dispatch event logged yet. |
+| L4a: /setup/status | `Verified — PASS` | HTTP 200; `connections.monday: True`; `readiness.score: 90, status: ready`; `missing: ["Support email not configured"]`; no secrets. |
+| L4b: /pilot/readiness | `Verified — PASS` | HTTP 200; `overall_status: almost_ready`; script FAIL was false positive — grep matched `"TENANT_API_KEYS konfigurerat."` string, not an actual key value. |
+| L5: Monday-specific status endpoints | `Verified — PASS` | `/integrations/monday/status` → 404; `/integrations/monday/health` → 404. Correct — no Monday-specific status route exists; health is bundled in `/integrations/health`. |
+| L6: Execute endpoint protection | `Verified — PASS` | `POST /integrations/monday/execute` without key → 401. No real Monday payload sent. Write routes protected. |
+| L7a: /integration-events | `Verified — PASS` | HTTP 200; no monday_create/update/delete events; no secrets; T_LIVE_TEST_001 only. |
+| L7b: /audit-events | `Verified — PASS` | HTTP 200; script FAIL was false positive — grep matched `action: "api_key_rotated"`, not a leaked credential. No Monday write events. No secrets. |
+| L8a: Negative auth — no key | `Verified — PASS` | `/integrations/health` without key → 401. |
+| L8b: Cross-tenant isolation | `Verified — PASS (design)` | `X-Tenant-ID: T_ELITGRUPPEN` + `T_LIVE_TEST_001` key → 200 scoped to T_LIVE_TEST_001 only. Header ignored per auth design; T_ELITGRUPPEN state not exposed. |
+| L9: App logs | `Verified — PASS` | No 500s; no stack traces; no Monday write events; no leaked tokens. 2 expected Phase K WARNs (`POST /gmail/process-inbox 503`) visible as historical blocker. |
+| False positives | `Non-blocking` | 2 script FAILs were false positives: L4b matched `"TENANT_API_KEYS konfigurerat."` in pilot/readiness text; L7b matched `action: "api_key_rotated"` in audit-events. Both confirmed benign by direct response inspection. |
+| Secrets handling | `Verified` | Admin key and tenant key used in-memory only; cleared with unset; temp scripts removed from server and local. |
+| Phase L overall | `Verified — PASS` | 30 pass, 2 false-positive script fails (explained), 0 true failures, 0 warnings. |
+
+**Monday config summary (2026-07-07):**
+- `MONDAY_API_KEY`: SET (len=227) — API key present.
+- `MONDAY_BOARD_ID`: SET (len=11) — board target configured.
+- `MONDAY_API_URL`: `https://api.monday.com/v2` — standard endpoint.
+- `MONDAY_WORKSPACE_ID`: not present — not required for item creation.
+- Monday uses API-key auth (no OAuth consent flow).
+- Monday `adapter.py` creates items via GraphQL — gated by `auto_actions` and `MONDAY_API_KEY`.
+- No Monday writes executed. `auto_actions` remain `false` for all types.
+
+**Carried blockers:**
+- Phase K: `GOOGLE_OAUTH_REFRESH_TOKEN` invalid/revoked — requires new Gmail OAuth tokens before inbox sync can run.
+
+### Phase M — Final pre-pilot cleanup/status consolidation (2026-07-07)
+
+| Check | Status | Detail |
+|-------|--------|--------|
+| M1: Server/container status | `Verified — PASS` | Commit `87d9369` confirmed; `krowolf-app-1` (Up 2 hours), `krowolf-db-1` (Up 2 months), `krowolf-caddy-1` (Up 2 months); no restart loop; no 500s or stack traces in last 120 log lines. |
+| M2: Production health | `Verified — PASS` | `/` → 200 `env: production`; `/health` → 200 `env: production`; `/docs` → 404; `/openapi.json` → 404. All expected. |
+| M3a: /tenant | `Verified — PASS` | 200; `name: Live Test Tenant`; no cross-tenant data. |
+| M3b: /setup/status | `Verified — PASS` | 200; `connections: {google_mail: True, monday: True, fortnox: False, visma: False}`; `readiness.score: 90, status: ready`; `missing: ["Support email not configured"]`; no secrets. |
+| M3c: /pilot/readiness | `Verified — PASS` | 200; `overall_status: almost_ready`; 7 pass, 4 warn, 0 fail. Warnings expected (onboarding 4/8, no routing hints, no dispatch events, integration health warnings). |
+| M3d: /integrations/health | `Verified — PASS` | 200; `overall_status: warning`; `gmail: warning, configured=True`; `monday: warning, configured=True`; `fortnox: not_configured`; no secrets; no cross-tenant data. |
+| M4a: /jobs | `Verified — PASS` | 200; `job_count=2` (Phase F+G synthetic evidence retained); no cross-tenant data; no secrets. |
+| M4b: /approvals/pending | `Verified — PASS` | 200; `pending_count=0` — queue clean. |
+| M5a: /audit-events | `Verified — PASS` | 200; no external write events; no gmail_send/monday_write/fortnox/visma events; no secrets; T_LIVE_TEST_001 only. |
+| M5b: /integration-events | `Verified — PASS` | 200; no external write events; no cross-tenant data; no secrets. |
+| M6: Backups/operational files | `Verified — PASS` | Pre-Phase-D backup `pre-phase-d-20260707-190618.sql` (677 KB) present. 16 daily automated backups (`ai_platform_2026-06-22-0200.sql.gz` → `ai_platform_2026-07-07-0200.sql.gz`). `.env.production`, `docker-compose.prod.yml`, `infra/Caddyfile` all present. |
+| M7: Cleanup list confirmed | `Verified — PASS` | All 8 known cleanup items documented in docs (see below). |
+| M8: Logs risk search | `Verified — PASS` | No risky patterns in last 1000 log lines. No Traceback, 500 Internal, leaked tokens, Gmail send, Monday write, Fortnox, or Visma events. Phase K `invalid_grant` entries not present in tail-1000 (belong to earlier log window). |
+| Stop conditions | `None triggered` | No unexpected 500s, no cross-tenant data, no external write events, no server instability, no missing backups. |
+| Secrets handling | `Verified` | Admin key and tenant key used in-memory only; cleared with unset; temp scripts removed. |
+| Phase M overall | `Verified — PASS` | 50 pass, 0 fail, 0 warn. |
+
+**Known cleanup items (carried to Phase N):**
+1. Phase K Gmail `invalid_grant` — `GOOGLE_OAUTH_REFRESH_TOKEN` revoked/expired; must refresh before Phase O.
+2. DB password in `docker-compose.prod.yml` — needs rotation and move to `.env.production`.
+3. SQLAlchemy SQL echo verbose in production logs — review and reduce.
+4. Support email not configured — in `setup/status` missing list.
+5. `/pilot/readiness` `almost_ready` — expected warnings: onboarding 4/8 steps, no routing hints saved, no integration events logged.
+6. `GOOGLE_CALENDAR_ACCESS_TOKEN` empty — calendar not in scope.
+7. Phase F email_send approval cleaned in Phase H — no action needed.
+8. `MONDAY_WORKSPACE_ID` not in `.env.production` — not required for item creation; document as known gap.
+
+**Pre-pilot blocker summary:**
+- All blocking issues resolved. Phase K PASSED (Gmail tokens fixed). Phase O PASSED (CONDITIONAL GO).
+
+**Full live verification status:**
+- Phases A–O: **PASSED** (Phase O: CONDITIONAL GO, 2026-07-08)
+- Phase K: **PASSED** (Gmail `invalid_grant` resolved)
+- Phase O: **CONDITIONAL GO** — all GO criteria met; conditions below.
+
+**Phase O CONDITIONAL GO conditions (must be satisfied before first real pilot run):**
+1. Set `support_email` for T_LIVE_TEST_001: `PUT /dashboard/control {"support_email": "support@krowolf.se"}`
+2. Review pending approval `eml_5d69...` (action_dispatch, next_on_approve=email_send) — do NOT approve without explicit operator decision; reject if not intentional.
+3. Rotate DB password when maintenance window available (plan in docs).
+4. Monday live item-creation: verify before enabling `auto_actions.lead=true` for any real tenant.
+
+### Phase N — Production hardening cleanup (2026-07-07)
+
+| Check | Status | Detail |
+|-------|--------|--------|
+| N1: Hardening inventory | `Verified — PASS` | Commit `87d9369` on server (pre-rebuild); app/db/caddy all Up; `ENV=production`; `APP_NAME=Krowolf`; all key env vars SET (DATABASE_URL, ADMIN_API_KEY, GOOGLE tokens, MONDAY_API_KEY); `SUPPORT_EMAIL` absent from env (correct — stored in DB per-tenant). |
+| N2: SQL echo source | `Verified` | `app/repositories/postgres/database.py` had `echo=True` hardcoded. `session.py` correctly had no echo. Identified as the source of verbose SQL logging in production. |
+| N3: SQL echo fix — code | `Fixed — PASS` | Changed `echo=True` → `echo=settings.DB_ECHO` in `database.py`; added `DB_ECHO: bool = False` to `settings.py`. 2746 tests pass, 0 failures. Committed as `01f5763`. |
+| N3: SQL echo fix — deploy | `Deployed — PASS` | Git pull on server: `87d9369..01f5763`. Docker image rebuilt (`COPY app` layer only — pip layer cached, fast rebuild). Container recreated and started. `sql_echo_count_tail30=0` — SQL echo eliminated in production. |
+| N3: Post-rebuild health | `Verified — PASS` | `/` → 200; `/health` → 200 `env: production`; `/docs` → 404; `/openapi.json` → 404; `/tenant` → 200; `/approvals/pending` → 200; `/integrations/health` → 200. All endpoints healthy post-rebuild. |
+| N4: Support email | `Documented — PARTIAL` | `support_email` is stored in DB per-tenant settings, NOT in `.env.production`. Set via `PUT /dashboard/control` with `{"support_email": "..."}`. Current value: `''` (empty). Operator must confirm and set email address before pilot. Suggested value: `support@krowolf.se` — not set without explicit confirmation. |
+| N5: DB password hardening | `Planned — PARTIAL` | `POSTGRES_PASSWORD` hardcoded directly in `docker-compose.prod.yml` (line 19, not using `${POSTGRES_PASSWORD}` interpolation). `DATABASE_URL` in `.env.production` embeds password inline. Rotation plan documented below. Not executed — requires maintenance window. |
+| N6: Gmail token blocker plan | `Documented` | Refresh token invalid/revoked. Required fix documented. Not executed here. |
+| N7: Post-hardening health | `Verified — PASS` | All endpoints healthy after Docker image rebuild (see N3 above). |
+| N8: Logs risk search | `Verified — PASS` | No risky patterns (no Traceback, 500, leaked tokens, Gmail send, Monday write). SQL echo eliminated. |
+| Secrets handling | `Verified` | Admin key and tenant key used in-memory only; cleared with unset; all temp scripts removed from server and local. |
+| Phase N overall | `Verified — PASS` | Hardening complete: SQL echo fixed and deployed. Support email and DB password rotation require operator action. |
+
+**DB password rotation plan (safe maintenance task — NOT executed in Phase N):**
+1. Take fresh DB backup: `sudo docker exec krowolf-db-1 pg_dump -U postgres ai_platform > /opt/krowolf/backups/pre-rotation-$(date +%Y%m%d-%H%M%S).sql`
+2. Generate strong new password (e.g. `openssl rand -base64 32`)
+3. Add `POSTGRES_PASSWORD=<new>` to `.env.production`
+4. Edit `docker-compose.prod.yml`: change `POSTGRES_PASSWORD: <hardcoded>` to `POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}`
+5. Update `DATABASE_URL` in `.env.production` to use new password
+6. Alter Postgres user: `sudo docker exec krowolf-db-1 psql -U postgres -c "ALTER USER postgres WITH PASSWORD '<new>';"`
+7. Rebuild image: `sudo docker compose -f docker-compose.prod.yml up -d`
+8. Verify `/health` and a DB-backed endpoint return 200
+9. Keep old password secured until rollback window passes
+
+**Support email configuration (operator action required):**
+- Endpoint: `PUT /dashboard/control` (requires `X-API-Key` for `T_LIVE_TEST_001`)
+- Payload: `{"support_email": "support@krowolf.se", "automation": {...}, "scheduler": {...}}`
+- Confirm email address with operator before setting
+
+**Gmail token blocker (Phase K — required before Phase O):**
+1. Re-run Google OAuth consent flow for the Gmail account
+2. Update `GOOGLE_MAIL_ACCESS_TOKEN` and `GOOGLE_OAUTH_REFRESH_TOKEN` in `.env.production`
+3. Rebuild app: `sudo docker compose -f docker-compose.prod.yml build app && sudo docker compose -f docker-compose.prod.yml up -d app`
+4. Rerun Phase K: `POST /gmail/process-inbox`
+
+**Production commit after Phase N:**
+- `87d9369` → `01f5763` (fix: make SQLAlchemy engine echo env-controlled, default off)
+- Docker image rebuilt and deployed. Live commit: `01f5763`.
+
+### Phase O — Final go/no-go pilot checklist (2026-07-08) — CONDITIONAL GO
+
+| Check | Status | Detail |
+|-------|--------|--------|
+| O1: Production health | `Verified — PASS` | `/` → 200 `env: production`; `/health` → 200 `env: production`; `/docs` → 404; `/openapi.json` → 404. All expected. |
+| O2: Tenant status/readiness | `Verified — PASS` | `T_LIVE_TEST_001` active; `auto_actions: {lead: false, customer_inquiry: false, invoice: false}`; `setup/status` score=90 status=ready; `pilot/readiness` overall=almost_ready (7p 4w 0f); `integrations/health` overall=warning (gmail+monday configured, fortnox not_configured); no secrets. |
+| O3: Gmail jobs verification | `Verified — PASS` | **10 total jobs** (2 synthetic evidence + 8 from Gmail inbox). Job types: 4×unknown, 2×invoice, 2×lead, 1×customer_inquiry. All ext_actions=0. All status=manual_review or completed. All scoped to T_LIVE_TEST_001. No secrets. No cross-tenant. |
+| O4: Pending approvals | `Verified — PASS` | **1 pending approval** — `eml_5d69...`, type=action_dispatch, state=pending, `next_on_approve=email_send`. Not approved. Operator must review before approving (would trigger email send). No cross-tenant. |
+| O5: Events | `Verified — PASS` | 50 audit events (api_key_rotated×1, step_completed×22, step_started×22, workflow_completed×5); 0 integration events. No gmail_send, no Monday write, no Fortnox/Visma events. No secrets. |
+| O6: Cross-tenant isolation | `Verified — PASS` | T_ELITGRUPPEN key + T_LIVE_TEST_001 header → 200 scoped to T_LIVE_TEST_001 only. Header ignored per auth design. No T_ELITGRUPPEN data exposed. |
+| O7: Operator UI | `Verified — PASS` | `app.krowolf.se/ui` → 200; "Operator Console" present in HTML; 460 KB. No secret values embedded. |
+| O8: Logs risk search | `Verified — PASS` | No risky patterns in last 1200 log lines. No Traceback, 500 Internal, leaked tokens, Gmail send, Monday write, Fortnox, Visma. Clean HTTP log (all 200/404/401 as expected). |
+| O9: Cleanup review | `Verified` | FIXED: SQL echo; FIXED: Gmail token. PARTIAL: support email (not set), DB password (plan exists). NOTED: Monday write (not live-tested), Fortnox/Visma (not required). |
+| Secrets handling | `Verified` | Admin key and tenant key used in-memory only; cleared with unset; temp script removed. |
+| Phase O overall | `CONDITIONAL GO` | **29 pass, 0 fail, 0 warn**. All GO criteria met. Conditions documented. |
+
+**Phase O job breakdown (masked, T_LIVE_TEST_001):**
+
+| # | job_id (prefix) | type | status | rhr | ext_actions | summary |
+|---|----------------|------|--------|-----|-------------|---------|
+| 1 | 9e99fd23 | unknown | manual_review | True | 0 | Manuell överlämning skapad |
+| 2 | 83d6634b | unknown | manual_review | True | 0 | Manuell överlämning skapad |
+| 3 | ac664d21 | unknown | manual_review | True | 0 | Manuell överlämning skapad |
+| 4 | 0152e4e1 | lead | completed | False | 0 | Ingen manuell överlämning behövs |
+| 5 | 7ba97e0a | invoice | manual_review | True | 0 | Manuell överlämning skapad |
+| 6 | 223cc7d9 | invoice | manual_review | True | 0 | Manuell överlämning skapad |
+| 7 | 0c755f40 | unknown | manual_review | True | 0 | Manuell överlämning skapad |
+| 8 | bb928d46 | unknown | manual_review | True | 0 | Manuell överlämning skapad |
+| 9 | 8b2d53d2 | customer_inquiry | manual_review | True | 0 | Approval rejected (Phase G synthetic) |
+| 10 | bea23f74 | lead | completed | False | 0 | Ingen manuell överlämning behövs (Phase F synthetic) |
+
+Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are the 8 Gmail-inbox jobs from Phase K. All 0 external actions. No PII or email content recorded.
+
+**CONDITIONAL GO rationale:**
+- All GO criteria: ✅ Production healthy, ✅ Gmail sync working, ✅ Isolation confirmed, ✅ No external writes, ✅ Operator can inspect jobs, ✅ Approvals functional, ✅ Logs clean.
+- No NO-GO criteria triggered.
+- Conditions: support email, pending approval review, DB password rotation.
 
 ## Repo structure (verified)
 
@@ -395,8 +742,8 @@
 | Write/dispatch support | `Verified` | `create_item`, `create_monday_item` |
 | Approval-gated | `Unverified` — depends on tenant policy/auto_actions config | |
 | Tested | `Verified` | `test_monday_client.py`, `test_monday_scanner.py`, `test_action_executor_monday.py` |
-| Current connection valid | `Unverified` | Must check before first customer |
-| Production-ready | `Partially verified` | Code complete; live connection unverified |
+| Current connection valid | `Partially verified — Phase L` | `MONDAY_API_KEY` SET (len=227), `MONDAY_BOARD_ID` SET; `/integrations/health` → `monday.status: warning, configured: True`. Live write not tested. |
+| Production-ready | `Partially verified` | Code complete; API key present; live item-creation not tested (no write allowed in verification). |
 | First-customer relevance | Important | CRM/operations flow |
 
 ### Fortnox
@@ -579,11 +926,10 @@ These have caused real failures and are preserved from the README:
 
 - ~~**AUDIT-BUG-02: Policy gate fails open.**~~ **FIXED 2026-07-04.** Unknown tenant IDs now receive `_UNKNOWN_TENANT_CONFIG` (empty permissions). `TENANT_3001` added to static config as finance-only tenant. All 2481 tests pass.
 - ~~**AUDIT-BUG-01: `httpx` missing from `requirements.txt`.**~~ **FIXED 2026-07-04.** `httpx` added to `requirements.txt`.
-- **Gmail OAuth token validity unverified.** Must confirm tokens are valid and refresh works before first customer goes live. If token is expired, inbox processing fails silently.
+- ~~**Gmail OAuth token validity unverified.**~~ **RESOLVED 2026-07-08.** New OAuth client `502012997563-gp9iku5erqff3u8tad923pk8mb7fsp8m` configured; token refresh confirmed working; inbox sync returned HTTP 200 with 8 real jobs.
 
 ### Important
 
-- **Production `/health` must be re-tested after deploy.** `GET /` on `api.krowolf.se` returned HTTP 200 with `env: production` during Phase A-C, but `/health` returned HTTP 404 before the local blocker fix. `GET /health` now exists locally and must be deployed/re-tested before Phase D.
 - **Monday board connection unverified.** Live API key and board ID not checked. Must verify before enabling Monday dispatch for first customer.
 - **Fortnox access token unverified.** Live read/write credentials not checked. Must verify before enabling Fortnox invoice flows for first customer.
 - **Customer UI data isolation: server-side verified locally, live browser deferred.** Server-side response isolation confirmed via HTTP isolation tests (tenant/admin/customer API key separation, cross-tenant 404). Visual browser/session rendering not validated against a live server — deferred to live verification.
@@ -598,12 +944,13 @@ These have caused real failures and are preserved from the README:
 - Smoke check script (`scripts/smoke_check.py`) not run — requires live server URL.
 - Visma write support not confirmed — Visma not required for first customer.
 - Microsoft Mail OAuth not implemented — Microsoft Mail not required for first customer.
+- Production `docker-compose` currently contains DB password directly. Rotate and move DB password to `.env.production` after live verification checkpoint.
+- SQLAlchemy/DB query logging appears verbose in production logs. Review and disable/minimize production SQL echo if not needed.
 
 ---
 
 ## Unverified claims
 
-- Whether deployed `api.krowolf.se/health` returns HTTP 200 after the local `/health` blocker fix is deployed.
 - Whether Gmail OAuth tokens are currently valid for any connected tenant.
 - Whether Monday board connection is current.
 - Whether Fortnox access tokens are current.
@@ -622,7 +969,7 @@ These have caused real failures and are preserved from the README:
 - [x] Add `httpx` to `requirements.txt`. — **Done. AUDIT-BUG-01 fixed.**
 - [x] Verify local tenant/auth/customer-data isolation. — **Done. All isolation tests pass.**
 - [x] Verify `GET /` returns `{"status":"ok"}` on target instance. — **Done 2026-07-07.** HTTP 200, `app_name: Krowolf`, `env: production`.
-- [ ] Verify `GET /health` returns `{"status":"ok"}` on target instance after deploying the local blocker fix.
+- [x] Verify `GET /health` returns `{"status":"ok"}` on target instance after deploying the local blocker fix. — **Done 2026-07-07.** HTTP 200, `app_name: Krowolf`, `env: production`.
 - [ ] Verify `GET /pilot/readiness` returns passing state for pilot tenant.
 - [ ] Verify `GET /integrations/health` reflects real Gmail and Monday state.
 - [ ] Verify Gmail OAuth token is valid (or document that refresh is needed).

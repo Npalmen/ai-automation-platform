@@ -1,4 +1,4 @@
-# Backlog
+﻿# Backlog
 
 > Governed by `docs/00-master-plan.md`.
 > Backlog items must be compatible with the master plan. No side tracks without a decision in `docs/07-decisions.md`.
@@ -100,25 +100,59 @@
 
 ### Deferred — live verification phase
 
-Full live verification plan: `docs/10-live-verification-plan.md` — Phase A-C partially run 2026-07-07. Phase A-C blocker fix completed locally before Phase D, including final pre-live UI simplification to Internal Operator Console. Phase D and later not run.
+Full live verification plan: `docs/10-live-verification-plan.md` — production deploy completed 2026-07-07 on `/opt/krowolf` with live commit `87d9369`. Phase A-C, D, E, F, G, H, I, and J passed 2026-07-07. Phase K BLOCKED (Gmail invalid_grant). Full live verification not complete.
 
 **Phase A — Pre-flight**
 - [x] Confirm full local test suite passes immediately before live session — 2026-07-07 final pre-live UI simplification run: 2746 passed, 0 failed, 4 warnings.
 - [x] Confirm R1 gate passes immediately before live session — 2026-07-07: 505 regression + 152 E2E passed.
-- [x] Resolve unclear `app/ui/index.html` dirty state — previous fancy CSS/card-contrast styling replaced with minimal Internal Operator Console; still must be committed/deployed with the rest of the pending pre-live fixes before Phase A-C can be green.
-- [ ] Deploy latest code before Phase A-C re-run — blocked in current session: latest code is pushed (`8e19622`), but there is no local Docker/GitHub CLI, no local `ADMIN_API_KEY`, and non-interactive SSH to `api.krowolf.se` as default `niklas` user is denied.
-- [ ] Operator confirmation required before Phase D: production `ENV`, non-empty `ADMIN_API_KEY`, `DATABASE_URL`, latest image/code, Caddy/reverse proxy process, and DB backup completed.
+- [x] Resolve unclear `app/ui/index.html` dirty state — previous fancy CSS/card-contrast styling replaced with minimal Internal Operator Console.
+- [x] Deploy latest code before Phase A-C re-run — completed on `/opt/krowolf`; live commit `87d9369`; Docker Compose file `/opt/krowolf/docker-compose.prod.yml`; containers `krowolf-app-1`, `krowolf-db-1`, and `krowolf-caddy-1` running.
+ - [x] Operator confirmation required before Phase D — DB backup taken (`pre-phase-d-20260707-190618.sql`); app/db/caddy containers running; admin key confirmed working; no real customer tenants modified.
 
 **Phase B — Production health**
 - [x] `GET https://api.krowolf.se/` → HTTP 200, `env: production`.
-- [ ] `GET https://api.krowolf.se/health` → HTTP 200 — fixed locally by adding `GET /health`; requires deploy and live re-test before Phase D.
+- [x] `GET https://api.krowolf.se/health` → HTTP 200, `env: production`.
 - [x] Confirm `/docs` and `/openapi.json` return 404 in production.
 
 **Phase C — Admin/auth**
 - [x] Admin endpoint without key → 401.
 - [x] Admin endpoint with wrong key → 401.
-- [ ] Admin endpoint with correct key → 200 — blocked until `ADMIN_API_KEY` is provided securely.
-- [ ] Tenant key rejected on admin endpoint — deferred to Phase D/E because no tenant key exists yet.
+- [x] Admin endpoint with correct key → 200; existing tenants: `T_ELITGRUPPEN`, `TENANT_2001`, `T_TEST1`.
+- [x] Tenant key rejected on admin endpoint → 401 — verified in Phase D.
+
+**Phase D — Tenant provisioning**
+- [x] DB backup taken before Phase D — `pre-phase-d-20260707-190618.sql` (677 KB).
+- [x] `T_ELITGRUPPEN`, `TENANT_2001`, `T_TEST1` confirmed untouched.
+- [x] `POST /admin/tenants` creates `T_LIVE_TEST_001` — HTTP 201, `status: active`.
+- [x] `GET /admin/tenants` shows `T_LIVE_TEST_001` listed correctly.
+- [x] `GET /tenant` with tenant key → HTTP 200.
+- [x] `GET /pilot/readiness` → `almost_ready` (6 pass, 5 warnings, 0 failures — expected pre-integration).
+- [x] `GET /integrations/health` → `warning`, no secrets in response.
+- [x] Tenant key on `/admin/tenants` → HTTP 401 — isolation confirmed.
+- [x] `GET /jobs` with `T_LIVE_TEST_001` key → empty list; no cross-tenant data.
+
+**Phase E — Tenant/customer endpoint isolation and readiness**
+- [x] All `/tenant`, `/customer/*`, `/jobs`, `/audit-events`, `/integration-events`, `/tenant/context`, `/tenant/memory`, `/integrations/health`, `/pilot/readiness` with tenant key → HTTP 200.
+- [x] All above endpoints without key → HTTP 401.
+- [x] Admin key on tenant endpoint (`/jobs`) → HTTP 403.
+- [x] Tenant key on admin endpoint (`/admin/tenants`) → HTTP 401.
+- [x] Wrong `X-Tenant-ID` header with correct key → HTTP 200 (correct: header ignored per auth design; tenant resolved from key).
+- [x] No secrets, stack traces, or 500s in any response or logs.
+- [x] No cross-tenant data (`T_ELITGRUPPEN`, `TENANT_2001`, `T_TEST1`) visible via `T_LIVE_TEST_001` key.
+- [x] SQL logs show only `T_LIVE_TEST_001` queries; key values stored as SHA-256 hash only.
+
+**Phase F — Safe synthetic intake/job flow**
+- [x] `auto_actions: false` for all job types confirmed before first write.
+- [x] `POST /jobs` with synthetic lead payload → HTTP 200; `job_id: bea23f74-...`; `tenant_id: T_LIVE_TEST_001`.
+- [x] Pipeline ran to completion: `status: completed`, `requires_human_review: False`, `summary: "Ingen manuell överlämning behövs."`, 0 external actions dispatched.
+- [x] `GET /jobs/:id` → HTTP 200; scoped to `T_LIVE_TEST_001`; no secrets.
+- [x] Jobs list → only `T_LIVE_TEST_001` data; no cross-tenant entries.
+- [x] Audit events → no external write events; no cross-tenant data.
+- [x] Integration events → no external write events.
+- [x] App logs → no Gmail/Monday/Fortnox/Visma writes; no 500s or stack traces.
+- [x] `GET /jobs/:id` without key → HTTP 401.
+- [x] Wrong `X-Tenant-ID` + correct key on specific job → HTTP 200 scoped to `T_LIVE_TEST_001` (header ignored per auth design).
+- [x] Synthetic job `bea23f74-1dbe-4424-a8cb-60262da92f9b` retained under `T_LIVE_TEST_001` as Phase F evidence.
 
 **Phase D — Tenant provisioning**
 - [ ] `POST /admin/tenants` creates T_INTERN_PILOT, returns api_key (once).
@@ -134,6 +168,131 @@ Full live verification plan: `docs/10-live-verification-plan.md` — Phase A-C p
 **Phase F — Integration health**
 - [ ] `GET /integrations/health` returns safely without live tokens (not_configured).
 - [ ] No token values in integration health response.
+
+
+**Phase G — Approval queue / manual review**
+- [x] Approval endpoints identified: `GET /approvals/pending`, `POST /approvals/{id}/approve`, `POST /approvals/{id}/reject` — all tenant-scoped; reject safe (no external writes).
+- [x] Synthetic `customer_inquiry` created with `force_approval_test: true` → HTTP 200; `job_id: 8b2d53d2-cc44-4d45-a11b-5a4a60654bb0`; `status: awaiting_approval`.
+- [x] `GET /jobs/:id` → HTTP 200; `status: awaiting_approval`; `result.summary: "Approval dispatched via dashboard."`.
+- [x] `GET /approvals/pending` → HTTP 200; `approval_id: f5d27fc3-071c-41f0-ba65-c9f052f591b3`; `next_on_approve: action_dispatch`; no cross-tenant data.
+- [x] `/approvals/pending` without key → HTTP 401.
+- [x] Wrong tenant header + T_LIVE_TEST_001 key → HTTP 200 scoped only to T_LIVE_TEST_001 (header ignored per auth design).
+- [x] `POST /approvals/:id/reject` → HTTP 200; job status → `manual_review`; no external writes.
+- [x] Approval removed from pending queue after reject; T_ELITGRUPPEN/TENANT_2001/T_TEST1 absent.
+- [x] Audit events → no cross-tenant data; no external write events.
+- [x] Integration events → no external write events.
+- [x] App logs → no 500s, no stack traces, no external writes.
+- [x] 24/24 checks passed; 0 failures; 0 warnings.
+- [x] Phase F email_send approval (eml_adeaf87...) remains pending — non-blocking; consider rejecting via dashboard before pilot.
+
+**Phase H — Integration health/OAuth readiness**
+- [x] `GET /integrations/health` → 200; `overall_status: warning`; gmail configured but not OAuth-synced; no secrets; no cross-tenant.
+- [x] `GET /integrations` → 200; Monday.com and Google Mail listed as enabled; no secrets.
+- [x] `GET /setup/status` → 200; `readiness.score: 90, status: ready`; `google_mail: true, monday: true, fortnox: false, visma: false`.
+- [x] `GET /pilot/readiness` → 200; `almost_ready`.
+- [x] `GET /integrations/visma/status` → 200; `disconnected`; no tokens.
+- [x] `GET /integrations/visma/oauth/url` → 503; not configured; safe.
+- [x] `/oauth/start` and `/oauth/callback` — skipped (out of scope).
+- [x] `GET /integration-events` → 200; no external write events; no cross-tenant.
+- [x] `GET /audit-events` → 200; no cross-tenant; no secrets.
+- [x] `GET /integrations/health` without key → 401.
+- [x] Wrong `X-Tenant-ID` + correct key → 200 scoped to T_LIVE_TEST_001 only.
+- [x] Phase F email_send approval (eml_adeaf87...) found and safely rejected (cleanup). No external write.
+- [x] App logs clean — no 500s, no secrets, no external writes.
+- [x] 42/42 checks passed; 0 failures; 1 warning (expected cleanup).
+
+**Phase I — UI / read-only dashboard verification**
+- [x] `GET https://app.krowolf.se/ui` → 200; "Internal Operator Console" confirmed in HTML; all operator sections present.
+- [x] `GET https://api.krowolf.se/ui` → 200; same HTML.
+- [x] Cache-bust request → 200; same content.
+- [x] No-key: /tenant, /jobs, /approvals/pending → all 401.
+- [x] Tenant read-only: /tenant, /customer/health, /customer/results, /customer/activity, /customer/account → all 200; T_LIVE_TEST_001 scoped; no secrets.
+- [x] /pilot/readiness → 200; almost_ready.
+- [x] /integrations/health → 200; overall_status: warning.
+- [x] /jobs → 200; total=2 (Phase F+G synthetics only); no cross-tenant.
+- [x] /approvals/pending → 200; 0 pending (clean after Phase H).
+- [x] /audit-events → 200; T_LIVE_TEST_001 only.
+- [x] /admin/tenants without key → 401; with admin key → 200; no api_key values in list.
+- [x] Browser check: "Internal Operator Console" title confirmed; login form visible; no plaintext keys; minimal internal UI; no cached fancy SaaS dashboard. Screenshot taken 2026-07-07.
+- [x] App logs clean — no 500s, no stack traces, no secrets.
+- [x] 58 actual pass, 0 true fail; 3 script false-positives on HTML variable names (not actual values).
+
+**Phase J — Gmail OAuth readiness/connection planning**
+- [x] Gmail config: `GOOGLE_MAIL_ACCESS_TOKEN` (len=253), `GOOGLE_OAUTH_REFRESH_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` — all SET. Env var names match `settings.py` exactly.
+- [x] Token model: static env-var tokens — no browser OAuth consent URL flow. No consent route exists in app.
+- [x] Sync routes identified but NOT called: `POST /gmail/process-inbox`, `POST /workflow-scan/gmail`, `POST /dashboard/inbox-sync`.
+- [x] All Google OAuth URL/start/callback routes → 404 (not implemented — correct for static token model).
+- [x] `GET /workflow-scan/status` → 200; `status: never_run` — inbox sync never executed.
+- [x] `/integrations/health` → gmail.status: warning, configured: True (warning = not scanned yet).
+- [x] `/setup/status` → `google_mail: True, email_connected: True, readiness.score: 90`.
+- [x] `/pilot/readiness` → almost_ready; warnings: onboarding steps, routing hints, integration events.
+- [x] No Gmail events in integration-events or audit-events.
+- [x] Logs: no 500s, no tokens, no inbox sync, no Gmail writes.
+- [x] 32/32 pass; 0 fail; 1 false-positive warn.
+- [x] Phase K attempted 2026-07-07 — BLOCKED: Gmail invalid_grant (GOOGLE_OAUTH_REFRESH_TOKEN revoked/expired). Fix: regenerate OAuth tokens, update .env.production, restart app, rerun Phase K.
+
+**Phase K — Gmail inbox sync (PASSED 2026-07-08)**
+- [x] `POST /gmail/process-inbox` dry_run=true → HTTP 200; 0 new jobs (correct).
+- [x] `POST /gmail/process-inbox` dry_run=false → HTTP 200; **8 real jobs created** from Gmail inbox.
+- [x] `auto_actions: false` — no external dispatch triggered.
+- [x] Token refresh working: new Google OAuth client `502012997563-gp9iku5erqff3u8tad923pk8mb7fsp8m` configured.
+- [x] Container recreated with `docker compose up -d` (env vars require recreation, not just restart).
+- [x] Phase K blocker removed. Phase O unblocked.
+
+**Phase O — Final go/no-go pilot checklist (CONDITIONAL GO 2026-07-08)**
+- [x] O1: Production health — `/` + `/health` → 200 production; `/docs` + `/openapi.json` → 404. All pass.
+- [x] O2: Tenant readiness — T_LIVE_TEST_001 active; auto_actions=false; score=90; pilot/readiness=almost_ready (7p 4w 0f); no secrets.
+- [x] O3: Gmail jobs — 10 total (2 synthetic + 8 Gmail); all ext_actions=0; all T_LIVE_TEST_001 scoped; no secrets.
+- [x] O4: Pending approvals — 1 pending (eml_5d69..., action_dispatch, next_on_approve=email_send); not approved; cross-tenant absent.
+- [x] O5: Events — 50 audit events (no external writes); 0 integration events; no secrets.
+- [x] O6: Cross-tenant isolation — header ignored per design; T_ELITGRUPPEN data not exposed.
+- [x] O7: Operator UI — app.krowolf.se/ui → 200; Operator Console confirmed; no secrets.
+- [x] O8: Logs — no risky patterns in tail=1200; no 500s, tokens, writes.
+- [x] O9: Cleanup review documented. All GO criteria met. CONDITIONAL GO issued.
+- [x] 29/29 pass; 0 fail; 0 warn.
+- [ ] **CONDITION**: Set support email `PUT /dashboard/control` for T_LIVE_TEST_001.
+- [ ] **CONDITION**: Review pending approval `eml_5d69...` (email_send) — reject if not intentional.
+- [ ] **CONDITION**: DB password rotation (maintenance window required).
+
+**Phase N — Production hardening cleanup (PASSED 2026-07-07)**
+- [x] N1: Hardening inventory confirmed — ENV=production, APP_NAME=Krowolf, all key env vars SET.
+- [x] N2: SQL echo source identified — `echo=True` hardcoded in `database.py`.
+- [x] N3: SQL echo fixed — `DB_ECHO: bool = False` added to `settings.py`; `database.py` now uses `echo=settings.DB_ECHO`; 2746 tests pass; committed as `01f5763`; Docker image rebuilt on server; `sql_echo_count_tail30=0` confirmed.
+- [x] N4: Support email state inspected — empty `''`; set via `PUT /dashboard/control` (NOT env var); operator must confirm value before setting; suggested `support@krowolf.se` not yet applied.
+- [x] N5: DB password hardening plan documented — password currently hardcoded in compose; safe rotation plan written in `docs/01-current-truth.md`; not executed (maintenance window required).
+- [x] N6: Gmail token fix plan documented.
+- [x] N7: Post-rebuild health: `/` + `/health` 200; `/docs`+`/openapi.json` 404; all tenant endpoints 200.
+- [x] N8: Logs risk search: no risky patterns; SQL echo confirmed eliminated in production.
+- [x] 2746 tests pass; commit `01f5763` live on server.
+- [ ] Phase K remains BLOCKED.
+
+**Phase M — Final pre-pilot cleanup/status consolidation (PASSED 2026-07-07)**
+- [x] Server/container status: commit `87d9369`; app/db/caddy Up; no restart loop; no 500s.
+- [x] Production health: `/` and `/health` → 200 `env: production`; `/docs` + `/openapi.json` → 404.
+- [x] `/tenant` → 200; `T_LIVE_TEST_001` active; name: Live Test Tenant.
+- [x] `/setup/status` → score 90, status ready; connections: google_mail✓ monday✓ fortnox✗ visma✗.
+- [x] `/pilot/readiness` → `almost_ready`; 7 pass, 4 warn, 0 fail.
+- [x] `/integrations/health` → `warning`; gmail+monday configured; fortnox not_configured.
+- [x] `/jobs` → 2 synthetic jobs (Phase F+G evidence retained); no cross-tenant.
+- [x] `/approvals/pending` → 0 (queue clean).
+- [x] `/audit-events` + `/integration-events` → no external write events; no cross-tenant; no secrets.
+- [x] Backups: pre-Phase-D backup + 16 daily automated backups; `.env.production`/compose/Caddyfile present.
+- [x] Logs risk search (tail=1000): no risky patterns; no leaked tokens; no write events.
+- [x] 8 known cleanup items confirmed documented.
+- [x] 50/50 pass; 0 fail; 0 warn.
+- [ ] Phase K remains BLOCKED — Gmail `invalid_grant` carried forward.
+
+**Phase L — Monday readiness/no-write verification (PASSED 2026-07-07)**
+- [x] `MONDAY_API_KEY` SET (len=227), `MONDAY_BOARD_ID` SET — Monday configured.
+- [x] `/integrations/health` → `monday.status: warning, configured: True` — health check passes.
+- [x] `/setup/status` → `connections.monday: True`, score 90 — Monday connection confirmed.
+- [x] `/integrations/monday/status` → 404; `/integrations/monday/health` → 404 — controlled, no dedicated route (health bundled).
+- [x] `POST /integrations/monday/execute` without key → 401 — write endpoint protected.
+- [x] No Monday write events in integration-events or audit-events.
+- [x] No 500s, no stack traces, no leaked tokens in logs.
+- [x] Negative auth: 401 without key; cross-tenant scoping confirmed for T_LIVE_TEST_001.
+- [x] Phase K Gmail blocker visible in logs (historical, expected).
+- [x] 30 pass, 0 true fail, 2 false-positive script FAILs (explained).
 
 **Phase G — Gmail OAuth and inbox sync**
 - [ ] Gmail OAuth flow completed for pilot tenant.
@@ -178,14 +337,16 @@ Full live verification plan: `docs/10-live-verification-plan.md` — Phase A-C p
 ### Local blocker status
 
 `GET /health` blocker is fixed locally and covered by tests.
-`app/ui/index.html` is no longer an unknown fancy dirty state: it has been intentionally simplified into an Internal Operator Console with minimal black/white styling. It must be committed/deployed with the latest code before Phase A-C can be re-run as green.
-Deploy/re-run attempts on 2026-07-07 20:19 and 20:24 stopped before production changes: latest code is pushed, but this session has no Docker, no GitHub CLI/deploy automation, no local admin key, and SSH auth to `api.krowolf.se` is unavailable. Operator must deploy latest code and provide/use `ADMIN_API_KEY` securely before Phase A-C can be re-run.
+`app/ui/index.html` is no longer an unknown fancy dirty state: it has been intentionally simplified into an Internal Operator Console with minimal black/white styling and included in the production deploy used for the passed Phase A-C checkpoint.
+Production deploy and Phase A-C re-run completed on 2026-07-07. Live commit after Phase N hardening is `01f5763`. Phase D, E, F, G, H, I, J, K, L, M, N, and O PASSED. Phase O: **CONDITIONAL GO (2026-07-08)**. Next: prepare first controlled pilot run with real tenant. Conditions: set support email, review pending approval, rotate DB password.
 
 ### Remaining local quality gaps
 
 - [ ] Broaden deterministic extraction for Swedish addresses/property details beyond current keyword/entity coverage.
 - [ ] Add more tenant-specific eval scenarios once the first pilot tenant's real service taxonomy and routing hints are known.
 - [ ] Consider wiring deterministic support analysis output more directly into older AI-backed `customer_inquiry_processor` payloads if pilot feedback shows operator UI needs one consolidated payload.
+- [ ] Production `docker-compose` currently contains DB password directly. Rotate and move DB password to `.env.production` after live verification checkpoint.
+- [x] SQLAlchemy SQL echo verbose in production — FIXED in Phase N. `DB_ECHO: bool = False` now default; `database.py` uses `echo=settings.DB_ECHO`. Committed `01f5763`, Docker image rebuilt, SQL echo eliminated in production.
 
 ### Pre-live blockers (require live environment)
 
@@ -193,7 +354,7 @@ Deploy/re-run attempts on 2026-07-07 20:19 and 20:24 stopped before production c
 - [ ] Correct admin-key success path must be verified with real `ADMIN_API_KEY` against a read-only admin endpoint such as `GET /admin/tenants`; do not print the key in reports.
 - [ ] Operator must confirm `ENV=production`, non-empty `ADMIN_API_KEY`, `DATABASE_URL`, latest deployed code/container, Caddy/reverse proxy running, and DB backup completed before Phase D.
 - [ ] Gmail OAuth flow must be completed for pilot tenant (`GET /auth/gmail/start?tenant_id=...`).
-- [ ] Monday `MONDAY_API_KEY` must be set and board connection verified.
+- [x] Monday `MONDAY_API_KEY` is SET (len=227) and `MONDAY_BOARD_ID` is SET — Phase L confirmed. Live item-creation not tested (intentional — no write in verification).
 - [ ] DB backup must be run before first live onboarding.
 - [ ] `python scripts/smoke_check.py --base-url <url> --expect-production` must pass.
 
