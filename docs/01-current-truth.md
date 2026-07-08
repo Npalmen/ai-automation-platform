@@ -24,8 +24,8 @@
 
 | Claim | Status | Detail |
 |-------|--------|--------|
-| Test suite runs | `Verified` | 2746 passed, 0 failed, 4 warnings (re-verified in Phase N after DB_ECHO fix) |
-| Test count: 2746 tests across 101 test files | `Verified` | Run 2026-07-07 during final pre-live UI simplification before Phase A-C re-run |
+| Test suite runs | `Verified` | 2770 passed, 0 failed, 4 warnings (re-verified 2026-07-08 after adding test_pilot_safety_contract.py) |
+| Test count: 2770 tests across 102 test files | `Verified` | Run 2026-07-08 after pilot readiness docs and test_pilot_safety_contract added |
 | All policy gate tests pass | `Verified` | Including `test_lead_disabled_for_finance_tenant` and unknown-tenant regression suite |
 | R1 release gate (`python -m scripts.run_release_gate_r1`) | `Verified — PASS` | 2026-07-07: 505 regression + 152 E2E = 657, all passed |
 | Root/UI/health/docs targeted tests | `Verified — PASS` | 2026-07-07: `python -m pytest tests/test_root_routing.py -q` — 8 passed, 2 warnings; previous root/health/docs set passed before UI simplification |
@@ -439,6 +439,7 @@
 
 **Pre-pilot blocker summary:**
 - All blocking issues resolved. Phase K PASSED (Gmail tokens fixed). Phase O PASSED (CONDITIONAL GO).
+- Backup scripts added (2026-07-08): `scripts/backup_postgres.sh`, `scripts/restore_postgres_rehearsal.sh`, `scripts/check_backup_freshness.sh`. Offsite upload requires `OFFSITE_BACKUP_COMMAND` configuration on server (not yet configured — **BLOCKER before first real customer pilot**; local-only backups are not sufficient).
 
 **Full live verification status:**
 - Phases A–O: **PASSED** (Phase O: CONDITIONAL GO, 2026-07-08)

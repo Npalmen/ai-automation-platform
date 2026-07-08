@@ -660,6 +660,33 @@ These are real behaviors that have caused failures during live testing.
 
 ---
 
+## Operations (Pilot)
+
+Phase O: **CONDITIONAL GO** (2026-07-08). Before the first customer pilot run, complete:
+
+| Document | Purpose |
+|----------|---------|
+| [docs/PILOT_READINESS_CHECKLIST.md](docs/PILOT_READINESS_CHECKLIST.md) | Full pre-pilot checklist (BLOCKER / REQUIRED / RECOMMENDED) |
+| [docs/PHASE_O_CLOSURE_CHECKLIST.md](docs/PHASE_O_CLOSURE_CHECKLIST.md) | Phase O conditional items with exact curl commands |
+| [docs/runbooks/](docs/runbooks/) | Operational runbooks (monitoring, approvals, failed jobs, OAuth, incidents, backup, onboarding) |
+
+**Quick healthcheck** (one command covers app, DB, containers, disk, backups):
+```bash
+sudo APP_BASE_URL=https://api.krowolf.se \
+  DOCKER_APP_CONTAINER=krowolf-app-1 DOCKER_DB_CONTAINER=krowolf-db-1 \
+  DISK_CHECK_PATH=/opt/krowolf BACKUP_DIR=/opt/krowolf/backups \
+  bash /opt/krowolf/scripts/check_production_health.sh
+```
+
+**Quick kill switch** (pause a tenant):
+```bash
+curl -sS -X POST https://api.krowolf.se/admin/support/TENANT_ID/pause-automation \
+  -H "X-Admin-API-Key: ADMIN_API_KEY" -H "Content-Type: application/json" \
+  -d '{"actor":"admin","note":"reason"}'
+```
+
+---
+
 ## Documentation
 
 | File | Description |
@@ -676,3 +703,6 @@ These are real behaviors that have caused failures during live testing.
 | [docs/09-testing-and-release.md](docs/09-testing-and-release.md) | Test and release procedures |
 | [docs/90-cursor-prompt-template.md](docs/90-cursor-prompt-template.md) | Execution prompt template |
 | [docs/archive/](docs/archive/) | Historical documents |
+| [docs/PILOT_READINESS_CHECKLIST.md](docs/PILOT_READINESS_CHECKLIST.md) | Pre-pilot readiness checklist |
+| [docs/PHASE_O_CLOSURE_CHECKLIST.md](docs/PHASE_O_CLOSURE_CHECKLIST.md) | Phase O closure conditions |
+| [docs/runbooks/](docs/runbooks/) | Operational runbooks |
