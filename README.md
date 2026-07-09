@@ -660,6 +660,30 @@ These are real behaviors that have caused failures during live testing.
 
 ---
 
+## Demo (Niklas Demo → Mårtens Demo)
+
+Run **Niklas Demo** (rehearsal) first. Only proceed to **Mårtens Demo** (sales demo) when Niklas Demo is GO.
+Both: `auto_actions=false`, Gmail send approval-gated, no Visma production writes, label-scoped inbox sync.
+
+### Niklas Demo (rehearsal — run first)
+
+| Document | Purpose |
+|----------|---------|
+| [docs/NIKLAS_DEMO_SETUP.md](docs/NIKLAS_DEMO_SETUP.md) | Rehearsal setup — tenant `T_NIKLAS_DEMO_001`, Gmail `niklas.palm@sol-f.se` |
+| [docs/NIKLAS_DEMO_READINESS_CHECKLIST.md](docs/NIKLAS_DEMO_READINESS_CHECKLIST.md) | Rehearsal checklist (BLOCKER / REQUIRED / DO_NOT_DO) |
+
+### Mårtens Demo (sales demo — run after Niklas GO)
+
+| Document | Purpose |
+|----------|---------|
+| [docs/MARTENS_DEMO_SETUP.md](docs/MARTENS_DEMO_SETUP.md) | Step-by-step demo setup and rollback |
+| [docs/MARTENS_DEMO_READINESS_CHECKLIST.md](docs/MARTENS_DEMO_READINESS_CHECKLIST.md) | Pre-demo checklist (BLOCKER / REQUIRED / DO_NOT_DO) |
+| [docs/demo/google-sheets-leads-support-structure.md](docs/demo/google-sheets-leads-support-structure.md) | Google Sheets structure for leads/support output |
+| [docs/demo/martens-gmail-demo-scenarios.md](docs/demo/martens-gmail-demo-scenarios.md) | 11 Swedish demo email scenarios |
+| [docs/demo/martens-sales-talk-track.md](docs/demo/martens-sales-talk-track.md) | Swedish sales script (2 min + 5 min) |
+
+---
+
 ## Operations (Pilot)
 
 Phase O: **CONDITIONAL GO** (2026-07-08). Before the first customer pilot run, complete:
@@ -706,3 +730,8 @@ curl -sS -X POST https://api.krowolf.se/admin/support/TENANT_ID/pause-automation
 | [docs/PILOT_READINESS_CHECKLIST.md](docs/PILOT_READINESS_CHECKLIST.md) | Pre-pilot readiness checklist |
 | [docs/PHASE_O_CLOSURE_CHECKLIST.md](docs/PHASE_O_CLOSURE_CHECKLIST.md) | Phase O closure conditions |
 | [docs/runbooks/](docs/runbooks/) | Operational runbooks |
+| [docs/NIKLAS_DEMO_SETUP.md](docs/NIKLAS_DEMO_SETUP.md) | Niklas Demo — rehearsal setup (run first) |
+| [docs/NIKLAS_DEMO_READINESS_CHECKLIST.md](docs/NIKLAS_DEMO_READINESS_CHECKLIST.md) | Niklas Demo — rehearsal checklist |
+| [docs/MARTENS_DEMO_SETUP.md](docs/MARTENS_DEMO_SETUP.md) | Mårtens Demo — step-by-step setup |
+| [docs/MARTENS_DEMO_READINESS_CHECKLIST.md](docs/MARTENS_DEMO_READINESS_CHECKLIST.md) | Mårtens Demo — readiness checklist |
+| [docs/demo/](docs/demo/) | Demo scenarios, Sheets structure, sales talk track |
