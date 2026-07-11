@@ -167,7 +167,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #111; outline-off
 .tenant-label, .topbar-key-label, .ts-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
 .tenant-name, .topbar-tenant-static { font-weight: 700; }
 .topbar-tenant-select { min-width: 180px; padding: 4px 6px; }
-#viewWrap { flex: 1; min-height: 0; overflow: hidden; }
+#viewWrap { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
 .auth-banner, .msg { padding: 10px 12px; border: 1px solid var(--border-hi); margin: 10px 16px; background: var(--surface-2); color: #111; }
 .msg-error, .login-error, .auth-banner { border-color: var(--danger); background: var(--danger-bg); color: var(--danger); }
 .msg-success { border-color: var(--success); background: var(--success-bg); color: var(--success); }
@@ -330,6 +330,191 @@ pre, code, .json-block {
   #viewDash, #viewOps, #viewSetup, #viewCtrl, #viewCases, #viewResults, #viewActivity,
   #viewCustomerSettings, #viewAccount, #viewOnboarding, #viewNotif, #viewMemory,
   #viewReadiness, #viewAdmin, #viewSupport, #viewWizardflow, #adminDash, #custDash { padding: 12px !important; }
+}
+
+/* ── Overlay modals (wizard + integration setup) ─────────────────────────── */
+/* These overlays live at body root — position:fixed ensures they always      */
+/* cover the viewport regardless of the shell scroll container.               */
+#wizardOverlay,
+#intSetupOverlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(0,0,0,.35);
+  align-items: flex-start;
+  justify-content: center;
+  padding: 32px 16px;
+  overflow-y: auto;
+}
+#intSetupOverlay.open { display: flex; }
+
+.wiz-panel,
+.int-setup-panel {
+  background: #fff !important;
+  border: 1px solid #111 !important;
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+.int-setup-panel { max-width: 760px; }
+
+.wiz-header,
+.int-setup-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.wiz-header-icon,
+.int-setup-header-icon { font-size: 18px; flex-shrink: 0; }
+.wiz-title,
+.int-setup-header-title { font-weight: 700; font-size: 15px; color: #111; }
+.wiz-sub,
+.int-setup-header-sub { font-size: 12px; color: var(--text-muted); }
+.wiz-close,
+.int-setup-close {
+  margin-left: auto;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  flex-shrink: 0;
+  color: #111 !important;
+}
+
+.wiz-stepper {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 4px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.wiz-step { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); }
+.wiz-step.active { color: #111; font-weight: 700; }
+.wiz-step.done .wiz-step-num { background: var(--success-bg) !important; border-color: var(--success) !important; color: var(--success) !important; }
+.wiz-step-num {
+  width: 22px; height: 22px;
+  border: 1px solid var(--border-med);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; border-radius: 50%; flex-shrink: 0;
+  background: #fff; color: #111;
+}
+.wiz-step.active .wiz-step-num { background: #111 !important; color: #fff !important; border-color: #111 !important; }
+.wiz-step-sep { width: 20px; height: 1px; background: var(--border); flex-shrink: 0; }
+
+.wiz-body { padding: 20px; overflow-y: auto; max-height: 55vh; flex: 1; }
+.wiz-footer {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.wiz-field { margin-bottom: 16px; }
+.wiz-input { width: 100%; }
+.wiz-input-hint { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+.wiz-field-error { display: none; font-size: 11px; color: var(--danger); margin-top: 3px; }
+.wiz-chip-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+.wiz-review-section {
+  margin-bottom: 12px; padding: 10px;
+  background: var(--surface-2); border: 1px solid var(--border); font-size: 13px;
+}
+.wiz-warning-box {
+  border: 1px solid var(--warning); background: var(--warning-bg);
+  color: var(--warning); padding: 10px; font-size: 12px;
+}
+.wiz-success { text-align: center; padding: 24px 16px; }
+.wiz-success-icon { font-size: 36px; color: var(--success); margin-bottom: 12px; }
+.wiz-success-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+.wiz-success-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+.wiz-success-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.wiz-err { font-size: 12px; color: var(--danger); flex: 1; min-width: 0; }
+
+/* Integration setup overlay inner components */
+.int-setup-body { padding: 16px; overflow-y: auto; max-height: 55vh; flex: 1; }
+.int-setup-footer {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.int-setup-tenant-badge { font-size: 11px; color: var(--text-muted); flex: 1; }
+.int-card { border: 1px solid var(--border-med) !important; margin-bottom: 12px; padding: 14px; }
+.int-card.coming { opacity: .65; }
+.int-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.int-card-logo { font-size: 22px; width: 36px; text-align: center; flex-shrink: 0; }
+.int-card-name { font-weight: 700; font-size: 13px; }
+.int-card-desc { font-size: 11px; color: var(--text-muted); }
+.int-status-pill {
+  margin-left: auto; display: inline-block;
+  border: 1px solid var(--border-med); padding: 2px 8px;
+  font-size: 11px; font-weight: 700; flex-shrink: 0;
+}
+.int-status-pill.healthy { border-color: var(--success) !important; color: var(--success) !important; background: var(--success-bg) !important; }
+.int-status-pill.warning { border-color: var(--warning) !important; color: var(--warning) !important; background: var(--warning-bg) !important; }
+.int-status-pill.error   { border-color: var(--danger)  !important; color: var(--danger)  !important; background: var(--danger-bg)  !important; }
+.int-status-pill.not_configured { color: var(--text-dim) !important; }
+.int-card-body { font-size: 12px; }
+.int-card-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.int-card-check-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 11px; }
+.int-card-meta { font-size: 10px; color: var(--text-dim); margin-top: 4px; }
+
+/* KPI accent borders (admin overview) */
+.kpi-card.accent-blue   { border-top: 2px solid #111; }
+.kpi-card.accent-green  { border-top: 2px solid var(--success); }
+.kpi-card.accent-amber  { border-top: 2px solid var(--warning); }
+.kpi-card.accent-purple { border-top: 2px solid var(--border-hi); }
+
+/* Customer context view */
+.ctx-kpi {
+  background: var(--surface-1, #fafafa);
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 6px;
+  padding: 12px 16px;
+  min-width: 140px;
+  flex: 1 1 140px;
+}
+.ctx-kpi-warn { border-top: 2px solid var(--warning, #e68a00); }
+.ctx-kpi-err  { border-top: 2px solid var(--danger,  #d13); }
+.ctx-kpi-label { font-size: 11px; color: var(--text-dim, #999); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .03em; }
+.ctx-kpi-val   { font-size: 18px; font-weight: 700; }
+.ctx-panel { margin-bottom: 16px; }
+.ctx-panel .panel-header { display: flex; align-items: center; justify-content: space-between; }
+.ctx-int-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 0; border-bottom: 1px solid var(--border, #e0e0e0);
+}
+.ctx-int-row:last-child { border-bottom: none; }
+.ctx-int-name { font-weight: 600; min-width: 90px; }
+.ctx-ev-row {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  padding: 6px 0; border-bottom: 1px solid var(--border, #e0e0e0); font-size: 12px;
+}
+.ctx-ev-row:last-child { border-bottom: none; }
+.ctx-ev-ts   { color: var(--text-dim, #999); white-space: nowrap; min-width: 130px; }
+.ctx-ev-cat  { font-weight: 600; min-width: 80px; }
+.ctx-ev-desc { color: var(--text-secondary, #444); }
+.kpi-icon {
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; background: var(--surface-2); border: 1px solid var(--border);
+}
+
+/* Admin overview table */
+.act-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.act-table th,
+.act-table td { border-bottom: 1px solid var(--border); padding: 7px 8px; text-align: left; vertical-align: top; }
+.act-table th { background: var(--surface-2); font-weight: 700; }
+
+@media (max-width: 900px) {
+  .wiz-panel, .int-setup-panel { max-width: 100%; }
+  .wiz-body, .int-setup-body { max-height: none; }
+  #wizardOverlay, #intSetupOverlay { padding: 16px 8px; }
 }
 </style>
 </head>
@@ -2124,8 +2309,8 @@ pre, code, .json-block {
     </div>
   </div>
 
-  <!-- Admin key input -->
-  <div class="cfg-section" style="max-width:1100px; margin-bottom:16px;">
+  <!-- Admin key input — hidden in session mode; visible for API-key-only auth -->
+  <div id="adminKeySection" class="cfg-section" style="max-width:1100px; margin-bottom:16px;">
     <div class="cfg-section-body" style="padding:12px 16px;">
       <div style="display:flex; align-items:center; gap:10px;">
         <span style="font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.07em; white-space:nowrap;">Admin API-nyckel</span>
@@ -2136,7 +2321,7 @@ pre, code, .json-block {
     </div>
   </div>
   <div id="adminKeyBanner" class="msg msg-error" style="display:none; margin-bottom:12px; max-width:1100px;">
-    Super Admin kräver adminnyckel. Ange ADMIN_API_KEY-värdet ovan.
+    Super Admin kräver adminnyckel. Logga in med session eller ange ADMIN_API_KEY ovan.
   </div>
 
   <div id="adminError" class="msg msg-error" style="display:none; max-width:1100px;"></div>
@@ -2300,6 +2485,40 @@ pre, code, .json-block {
   <div id="adminTable" style="max-width:1100px;"><span class="empty">Tryck på "↻ Uppdatera" för att ladda.</span></div>
 
 </div><!-- /viewAdmin -->
+
+<!-- ══════════════════════════════════════════════════════ KUNDKONTEXTVY -->
+<div id="viewCustomerCtx" style="display:none; overflow-y:auto; flex:1;">
+
+  <!-- Sticky header -->
+  <div style="position:sticky; top:0; background:var(--bg,#fff); border-bottom:1px solid var(--border-hi,#ddd); z-index:10; padding:14px 24px;">
+    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; max-width:1100px;">
+      <button class="btn btn-neutral btn-sm" onclick="switchView('admin')" title="Tillbaka">← Alla kunder</button>
+      <div style="flex:1; min-width:0;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <span id="ctxCustomerName" style="font-size:17px; font-weight:700;"></span>
+          <span id="ctxHealthBadge"></span>
+          <span id="ctxTenantId" style="font-size:11px; color:var(--text-dim,#999); font-family:monospace;"></span>
+        </div>
+      </div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="btn btn-neutral btn-sm" onclick="openTenantSetup(_activeTenantId)">⚙ Inställningar</button>
+        <button class="btn btn-neutral btn-sm" onclick="_adminOpenCases(_activeTenantId)">📋 Ärenden</button>
+        <button class="btn btn-neutral btn-sm" onclick="_adminOpenIntegrations(_activeTenantId)">⚡ Integrationer</button>
+        <button class="btn btn-neutral btn-sm" onclick="_adminOpenReadiness(_activeTenantId)">✓ Redo</button>
+        <button class="btn btn-neutral btn-sm" onclick="loadCustomerCtx(_activeTenantId)" title="Uppdatera">↻</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI row -->
+  <div id="ctxKpis" style="display:flex; flex-wrap:wrap; gap:12px; padding:16px 24px; max-width:1100px;"></div>
+
+  <!-- Status body: quick actions + integration health + audit events -->
+  <div id="ctxContent" style="padding:0 24px 32px; max-width:1100px;">
+    <span class="empty">Välj en kund för att se status.</span>
+  </div>
+
+</div><!-- /viewCustomerCtx -->
 
 <!-- ══════════════════════════════════════════════════════ SUPPORTKONSOL -->
 <div id="viewSupport" style="display:none; padding:24px; overflow-y:auto; flex:1; max-width:860px;">
@@ -2719,7 +2938,7 @@ function toggleTheme() {
 let _uiMode = 'admin';   // current role; initialised in initApiKey()
 
 // Admin-only tab names — hidden in customer mode
-const ADMIN_ONLY_VIEWS = ['ops', 'setup', 'ctrl', 'onboarding', 'notif', 'memory', 'readiness', 'admin', 'support'];
+const ADMIN_ONLY_VIEWS = ['ops', 'setup', 'ctrl', 'onboarding', 'notif', 'memory', 'readiness', 'admin', 'support', 'customerCtx'];
 const CUSTOMER_ONLY_VIEWS = ['results', 'activity', 'customerSettings', 'account', 'wizardflow'];
 // Views visible to customers
 const CUSTOMER_VIEWS   = ['dash', 'results', 'cases', 'activity', 'customerSettings', 'account', 'wizardflow'];
@@ -2906,7 +3125,12 @@ function _launchApp(mode, key) {
   if (keyEl) keyEl.value = apiKey;
   const adminEl = document.getElementById('adminKeyInput');
   if (adminEl) adminEl.value = adminKey;
-  document.getElementById('authBanner').style.display = apiKey ? 'none' : 'block';
+  // Session-mode admin doesn't need a per-tenant API key in the UI.
+  const sessionMode = mode === 'admin' && localStorage.getItem(LS_SESSION) === 'admin';
+  document.getElementById('authBanner').style.display = (apiKey || sessionMode) ? 'none' : 'block';
+  // Hide the manual admin-key input row when session authentication is active.
+  const adminKeySec = document.getElementById('adminKeySection');
+  if (adminKeySec) adminKeySec.style.display = sessionMode ? 'none' : '';
 
   _refreshTenantContext();
   switchView(_uiMode === 'admin' ? 'admin' : 'dash');
@@ -3029,6 +3253,7 @@ const _VIEW_DISPLAY = {
   cases: 'block', results: 'block', activity: 'block', customerSettings: 'block', account: 'block',
   onboarding: 'block', notif: 'block', memory: 'block',
   readiness: 'block', admin: 'block', support: 'block', wizardflow: 'block',
+  customerCtx: 'block',
 };
 
 const _VIEW_TITLE = {
@@ -3038,6 +3263,7 @@ const _VIEW_TITLE = {
   onboarding: 'Onboarding', notif: 'Notifieringar',
   memory: 'Kundminne', readiness: 'Redo för drift', admin: 'Alla kunder',
   support: 'Supportkonsol', wizardflow: 'Kom igång',
+  customerCtx: 'Kundöversikt',
 };
 
 function switchView(name) {
@@ -3072,6 +3298,7 @@ function switchView(name) {
   if (name === 'memory')     loadMemory();
   if (name === 'readiness')  loadReadiness();
   if (name === 'admin')      loadAdminOverview();
+  if (name === 'customerCtx') loadCustomerCtx(_activeTenantId);
 }
 
 // ---------------------------------------------------------------------------
@@ -3987,8 +4214,9 @@ async function loadAdminOverview() {
     const saved = localStorage.getItem(LS_ADMIN_KEY) || '';
     if (saved) adminEl.value = saved;
   }
+  const sessionMode = localStorage.getItem(LS_SESSION) === 'admin';
   const aKey = adminKey();
-  if (!aKey) {
+  if (!aKey && !sessionMode) {
     const banner = document.getElementById('adminKeyBanner');
     if (banner) banner.style.display = 'block';
     document.getElementById('adminTable').innerHTML = '';
@@ -4039,7 +4267,7 @@ async function loadAdminOverview() {
         <td style="color:${(t.recent_error_count || 0) > 0 ? 'var(--danger)' : 'var(--text-dim)'};">${t.recent_error_count ?? 0}</td>
         <td style="font-size:11px; color:var(--text-dim);">${actAt}</td>
         <td style="white-space:nowrap; display:flex; gap:4px; flex-wrap:wrap;">
-          <button class="btn btn-neutral btn-sm" onclick="openTenant(${JSON.stringify(t.tenant_id)})" title="Öppna Inställningar för denna kund">Öppna</button>
+          <button class="btn btn-primary btn-sm" onclick="openTenant(${JSON.stringify(t.tenant_id)})" title="Öppna kundöversikt">Öppna</button>
           <button class="btn btn-neutral btn-sm" onclick="_adminOpenCases(${JSON.stringify(t.tenant_id)})" title="Visa kundens ärenden">Ärenden</button>
           <button class="btn btn-neutral btn-sm" onclick="_adminOpenIntegrations(${JSON.stringify(t.tenant_id)})" title="Integrationsstatus & konfiguration">Integr.</button>
           <button class="btn btn-neutral btn-sm" onclick="_adminOpenReadiness(${JSON.stringify(t.tenant_id)})" title="Redo för drift">Redo</button>
@@ -4747,7 +4975,9 @@ async function _topbarSwitchTenant(tenantId) {
     const el = document.getElementById('view' + v.charAt(0).toUpperCase() + v.slice(1));
     return el && el.style.display !== 'none';
   });
-  if (activeView === 'setup') {
+  if (activeView === 'customerCtx') {
+    loadCustomerCtx(tenantId);
+  } else if (activeView === 'setup') {
     await loadSetup();
   } else if (activeView === 'dash') {
     await loadDashboard();
@@ -4762,17 +4992,183 @@ async function _topbarSwitchTenant(tenantId) {
 }
 
 async function openTenant(tenantId) {
-  // Pre-set the active tenant so loadSetup() picks it up correctly.
   _activeTenantId = tenantId;
-  // Switch to admin mode so Inställningar tab is visible
+  if (_uiMode !== 'admin') { _uiMode = 'admin'; _applyRoleMode(); }
+  _updateTenantCtx(tenantId);
+  switchView('customerCtx');
+}
+
+/** Navigate to the Setup / Inställningar view for the currently active tenant. */
+async function openTenantSetup(tenantId) {
+  _activeTenantId = tenantId;
   if (_uiMode !== 'admin') { _uiMode = 'admin'; _applyRoleMode(); }
   _updateTenantCtx(tenantId);
   await _refreshTenantContext();
   switchView('setup');
-  // After loadSetup() has run (called by switchView), sync the dropdown.
   await loadTenants();
   const sel = document.getElementById('switchTenantSelect');
   if (sel) sel.value = tenantId;
+}
+
+// ---------------------------------------------------------------------------
+// Customer Context View
+// ---------------------------------------------------------------------------
+async function loadCustomerCtx(tenantId) {
+  if (!tenantId) return;
+  _activeTenantId = tenantId;
+
+  const nameEl  = document.getElementById('ctxCustomerName');
+  const idEl    = document.getElementById('ctxTenantId');
+  const badgeEl = document.getElementById('ctxHealthBadge');
+  const kpiEl   = document.getElementById('ctxKpis');
+  const bodyEl  = document.getElementById('ctxContent');
+
+  if (nameEl)  nameEl.textContent  = tenantId;
+  if (idEl)    idEl.textContent    = tenantId;
+  if (badgeEl) badgeEl.innerHTML   = '';
+  if (kpiEl)   kpiEl.innerHTML     = '';
+  if (bodyEl)  bodyEl.innerHTML    = '<span class="empty">Laddar…</span>';
+
+  try {
+    const [ctx, ops] = await Promise.all([
+      adminApiFetch(`/admin/tenant-context/${encodeURIComponent(tenantId)}`),
+      adminApiFetch(`/admin/support/${encodeURIComponent(tenantId)}/state`).catch(() => null),
+    ]);
+    _renderCustomerCtx(ctx, ops, tenantId);
+  } catch (err) {
+    if (bodyEl) bodyEl.innerHTML =
+      `<div class="msg msg-error">Kunde inte ladda kunddata: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function _renderCustomerCtx(ctx, ops, tenantId) {
+  const name = (ctx && (ctx.name || ctx.tenant_id)) || tenantId;
+  const health = _ctxHealth(ops);
+
+  const nameEl  = document.getElementById('ctxCustomerName');
+  const idEl    = document.getElementById('ctxTenantId');
+  const badgeEl = document.getElementById('ctxHealthBadge');
+  const kpiEl   = document.getElementById('ctxKpis');
+  const bodyEl  = document.getElementById('ctxContent');
+
+  if (nameEl)  nameEl.textContent = name;
+  if (idEl)    idEl.textContent   = `(${tenantId})`;
+  if (badgeEl) badgeEl.innerHTML  = _ctxHealthBadge(health);
+
+  // ── KPI row ──────────────────────────────────────────────────────────────
+  const autoEnabled    = ops ? ops.automation_enabled : null;
+  const schedulerMode  = ops ? (ops.scheduler_mode  || 'manual') : '—';
+  const failedJobs     = ops ? (ops.failed_jobs_count  ?? 0) : '—';
+  const staleApprovals = ops ? (ops.stale_approvals     ?? 0) : '—';
+  const intHealth      = (ops && ops.integrations_health) ? ops.integrations_health : {};
+  const intEntries     = Object.entries(intHealth).filter(([k]) => k !== 'error');
+  const intHealthy     = intEntries.filter(([, v]) => v === 'healthy').length;
+
+  if (kpiEl) kpiEl.innerHTML = `
+    <div class="ctx-kpi ${autoEnabled === false ? 'ctx-kpi-warn' : ''}">
+      <div class="ctx-kpi-label">Automation</div>
+      <div class="ctx-kpi-val" style="color:${autoEnabled === false ? 'var(--warning,#e68a00)' : 'var(--success,#2a9a5a)'};">
+        ${autoEnabled === null ? '—' : autoEnabled ? '● På' : '○ Pausad'}
+      </div>
+    </div>
+    <div class="ctx-kpi">
+      <div class="ctx-kpi-label">Scheduler</div>
+      <div class="ctx-kpi-val">${escapeHtml(schedulerMode)}</div>
+    </div>
+    <div class="ctx-kpi ${failedJobs > 0 ? 'ctx-kpi-err' : ''}">
+      <div class="ctx-kpi-label">Misslyckade jobb 48h</div>
+      <div class="ctx-kpi-val" style="color:${failedJobs > 0 ? 'var(--danger,#d13)' : 'var(--success,#2a9a5a)'};">${failedJobs}</div>
+    </div>
+    <div class="ctx-kpi ${staleApprovals > 0 ? 'ctx-kpi-warn' : ''}">
+      <div class="ctx-kpi-label">Väntande godkänn.</div>
+      <div class="ctx-kpi-val" style="color:${staleApprovals > 0 ? 'var(--warning,#e68a00)' : 'var(--success,#2a9a5a)'};">${staleApprovals}</div>
+    </div>
+    ${intEntries.length > 0 ? `<div class="ctx-kpi">
+      <div class="ctx-kpi-label">Integrationer ok</div>
+      <div class="ctx-kpi-val">${intHealthy} / ${intEntries.length}</div>
+    </div>` : ''}
+  `;
+
+  // ── Integration health ────────────────────────────────────────────────────
+  let intHtml = '';
+  if (intEntries.length > 0) {
+    const rows = intEntries.map(([key, st]) => {
+      const cls = st === 'healthy' ? 'ok' : st === 'warning' ? 'warn' : 'err';
+      return `<div class="ctx-int-row">
+        <span class="ctx-int-name">${escapeHtml(key)}</span>
+        <span class="status-pill ${cls}">${escapeHtml(st)}</span>
+      </div>`;
+    }).join('');
+    intHtml = `
+      <div class="panel ctx-panel">
+        <div class="panel-header">
+          <strong>Integrationshälsa</strong>
+          <button class="btn btn-neutral btn-sm" onclick="_adminOpenIntegrations(${JSON.stringify(tenantId)})">⚡ Konfigurera</button>
+        </div>
+        ${rows}
+      </div>`;
+  } else {
+    intHtml = `
+      <div class="panel ctx-panel">
+        <div class="panel-header"><strong>Integrationshälsa</strong>
+          <button class="btn btn-neutral btn-sm" onclick="_adminOpenIntegrations(${JSON.stringify(tenantId)})">⚡ Lägg till</button>
+        </div>
+        <div class="empty">Inga integrationer konfigurerade.</div>
+      </div>`;
+  }
+
+  // ── Recent audit events ──────────────────────────────────────────────────
+  const events = (ops && ops.recent_audit_events) || [];
+  let evHtml = '';
+  if (events.length > 0) {
+    const evRows = events.map(e => {
+      const ts = e.created_at ? new Date(e.created_at).toLocaleString('sv-SE') : '—';
+      return `<div class="ctx-ev-row">
+        <span class="ctx-ev-ts">${escapeHtml(ts)}</span>
+        <span class="ctx-ev-cat">${escapeHtml(e.category || '')}</span>
+        <span class="ctx-ev-desc">${escapeHtml(e.action || e.description || '')}</span>
+      </div>`;
+    }).join('');
+    evHtml = `
+      <div class="panel ctx-panel">
+        <div class="panel-header"><strong>Senaste händelser</strong></div>
+        ${evRows}
+      </div>`;
+  }
+
+  // ── Quick actions ────────────────────────────────────────────────────────
+  const qaHtml = `
+    <div class="panel ctx-panel">
+      <div class="panel-header"><strong>Snabbåtgärder</strong></div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; padding:4px 0;">
+        <button class="btn btn-neutral" onclick="openTenantSetup(${JSON.stringify(tenantId)})">⚙ Inställningar</button>
+        <button class="btn btn-neutral" onclick="_adminOpenCases(${JSON.stringify(tenantId)})">📋 Ärenden</button>
+        <button class="btn btn-neutral" onclick="_adminOpenIntegrations(${JSON.stringify(tenantId)})">⚡ Integrationer</button>
+        <button class="btn btn-neutral" onclick="_adminOpenReadiness(${JSON.stringify(tenantId)})">✓ Redo för drift</button>
+      </div>
+    </div>`;
+
+  if (bodyEl) bodyEl.innerHTML = qaHtml + intHtml + evHtml;
+}
+
+function _ctxHealth(ops) {
+  if (!ops || ops.error) return 'unknown';
+  const intHealth = ops.integrations_health || {};
+  const vals = Object.values(intHealth);
+  if ((ops.failed_jobs_count || 0) > 0 || vals.includes('error')) return 'error';
+  if ((ops.stale_approvals || 0) > 2 || vals.includes('warning')) return 'warning';
+  return 'healthy';
+}
+
+function _ctxHealthBadge(health) {
+  const map = {
+    healthy: ['ok',   '✓ Frisk'],
+    warning: ['warn', '⚠ Varning'],
+    error:   ['err',  '✗ Fel'],
+    unknown: ['gray', '○ Okänd'],
+  };
+  const [cls, label] = map[health] || map.unknown;
+  return `<span class="status-pill ${cls}" style="font-size:13px;">${label}</span>`;
 }
 
 function _adminOpenIntegrations(tenantId) {
@@ -4892,7 +5288,15 @@ function _friendlyError(status, body) {
 }
 
 async function apiFetch(path, opts) {
-  const resp = await fetch(path, { headers: headers(), ...opts });
+  // In admin mode with an active tenant, route through adminApiFetch so that
+  // X-Admin-API-Key (API-key mode) or the session cookie (session mode) is
+  // automatically included alongside X-Tenant-ID.  This prevents 401s when
+  // the admin has not entered a per-tenant API key.
+  if (_uiMode === 'admin' && _activeTenantId) {
+    return adminApiFetch(path, opts);
+  }
+  // credentials:'same-origin' includes the session cookie for session-mode auth.
+  const resp = await fetch(path, { headers: headers(), credentials: 'same-origin', ...opts });
   if (!resp.ok) {
     const body = await resp.text();
     throw new Error(_friendlyError(resp.status, body));
@@ -9554,6 +9958,12 @@ async function _vismaOAuthTest(btn) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('sidebar').style.display     = '';
     document.getElementById('mainContent').style.display = '';
+    // Apply session-mode adjustments (no per-tenant key needed, no admin key banner)
+    if (session === 'admin') {
+      document.getElementById('authBanner').style.display = 'none';
+      const adminKeySec = document.getElementById('adminKeySection');
+      if (adminKeySec) adminKeySec.style.display = 'none';
+    }
     _refreshTenantContext();
     switchView(_uiMode === 'admin' ? 'admin' : 'dash');
     if (apiKey() || _uiMode === 'admin') loadAll();
