@@ -45,6 +45,7 @@ class ServiceProfile:
     complete_action: str
     high_risk_action: str
     follow_up_intro: str
+    reply_opener: str = ""
     follow_up_questions: dict[str, str] = field(default_factory=dict)
 
     def is_high_risk(self, text: str) -> bool:

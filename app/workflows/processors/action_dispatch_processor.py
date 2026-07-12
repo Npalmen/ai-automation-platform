@@ -34,9 +34,49 @@ _NO_REPLY_RE = re.compile(r"\b(?:no[-_. ]?reply|donotreply)\b", re.IGNORECASE)
 _EMAIL_RE = re.compile(r"([A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,})", re.IGNORECASE)
 _LEAD_SLA_TARGET_MINUTES = 15
 
+# Short opening sentence per service profile type — replaces stiff "Tack för ditt meddelande."
+_PROFILE_OPENERS: dict[str, str] = {
+    "battery_storage":          "Absolut, ett batterilager till befintlig solcellsanläggning kan vi ordna.",
+    "solar_installation":       "Kul att du är intresserad av solceller!",
+    "ev_charger_installation":  "Vi installerar laddboxar — bra val med elbil!",
+    "ev_charger_fault":         "Tråkigt att laddboxen strular — vi kollar upp det.",
+    "electrical_fault":         "Vi hjälper till med elfelsökning.",
+    "electrical_panel":         "Elcentralsbyte — det fixar vi.",
+    "inverter_support":         "Vi tittar gärna på växelriktarproblemet.",
+    "vvs_service":              "VVS är ingen fara — vi hjälper till.",
+    "building_project":         "Kul projekt — vi tar gärna en titt!",
+}
+
+_ORG_PREFIX_WORDS = frozenset({"brf", "ab", "hb", "kb", "ab.", "ltd", "inc", "as", "oy"})
+
 
 def _is_no_reply_email(value: str) -> bool:
     return bool(value and _NO_REPLY_RE.search(value))
+
+
+def _first_name(full_name: str) -> str:
+    """Return the first word of *full_name* as a greeting-safe first name.
+
+    Returns empty string when:
+    - name is empty or missing
+    - first word looks like an org prefix (BRF, AB, Ltd, …)
+    """
+    if not full_name:
+        return ""
+    first = full_name.strip().split()[0] if full_name.strip() else ""
+    if not first:
+        return ""
+    if first.lower() in _ORG_PREFIX_WORDS:
+        return ""
+    return first
+
+
+def _profile_opener(profile_type: str) -> str:
+    """Return a short, natural Swedish sentence for the profile type.
+
+    Returns empty string for generic/unknown profiles so no opener is prepended.
+    """
+    return _PROFILE_OPENERS.get(profile_type, "")
 
 
 def _extract_customer_email_candidates(text: str) -> list[str]:
@@ -178,9 +218,11 @@ def _build_sensitive_customer_ack(
     use_thread_reply: bool = False,
 ) -> dict[str, Any]:
     closing = f"\n\nVänliga hälsningar\n{signature_name}" if signature_name else ""
+    first = _first_name(sender_name)
+    greeting = f"Hej {first}," if first else "Hej,"
     body = (
-        f"Hej {sender_name or 'där'},\n\n"
-        "Tack för ditt meddelande. Vi har tagit emot ärendet och lämnar det vidare "
+        f"{greeting}\n\n"
+        "Vi har tagit emot ditt ärende och skickar det vidare "
         "till ansvarig handläggare för manuell bedömning.\n\n"
         "Vi återkommer när ärendet har granskats. Det här automatiska svaret innebär "
         "inte något juridiskt eller ekonomiskt ställningstagande."
@@ -288,11 +330,18 @@ def _build_lead_default_actions(
         closing = f"\n\nVänliga hälsningar\n{signature_name}" if signature_name else ""
         reply_subject = f"Re: {subject}" if subject and subject != "Lead" else "Tack för ditt mejl"
 
+        first = _first_name(sender_name)
+        greeting = f"Hej {first}," if first else "Hej,"
+
         if profile_question_message:
-            # Use service-profile-specific questions from lead_analyzer_processor
+            # Use service-profile-specific questions from lead_analyzer_processor.
+            # Add a profile-specific natural opener before the question block.
+            profile_type = lead_analyzer_payload.get("service_profile_type") or ""
+            opener = _profile_opener(profile_type)
+            opener_block = f"{opener}\n\n" if opener else ""
             auto_reply_body = (
-                f"Hej {sender_name or 'där'},\n\n"
-                f"Tack för ditt meddelande.\n\n"
+                f"{greeting}\n\n"
+                f"{opener_block}"
                 f"{profile_question_message}"
                 f"{closing}"
             )
@@ -307,12 +356,12 @@ def _build_lead_default_actions(
                 lead_questions.append("- Vilket telefonnummer når vi dig bäst på?")
             if completeness["missing_fields"]:
                 lead_questions.append(
-                    "- Har du möjlighet att skicka bilder eller annan info som hjälper oss bedöma snabbare?"
+                    "- Skicka gärna bilder eller annan info som hjälper oss bedöma snabbare."
                 )
             auto_reply_body = (
-                f"Hej {sender_name or 'där'},\n\n"
-                "Tack för att du hör av dig till oss. Vi tittar på underlaget och återkommer med nästa steg.\n\n"
-                "För att vi ska kunna ge dig ett träffsäkert nästa steg får du gärna svara på:\n"
+                f"{greeting}\n\n"
+                "Tack för att du hör av dig — kul att du kontaktar oss!\n\n"
+                "Skicka gärna svar på:\n"
                 f"{chr(10).join(lead_questions)}"
                 f"{closing}"
             )
@@ -468,16 +517,23 @@ def _build_inquiry_default_actions(
     else:
         closing = f"\n\nVänliga hälsningar\n{signature_name}" if signature_name else ""
         urgency_line = (
-            "Tråkigt att höra att det strular. Vi har tagit emot ärendet och prioriterar det för uppföljning.\n\n"
+            "Vi har tagit emot ärendet och prioriterar det.\n\n"
             if priority == "HIGH"
-            else "Tack för att du hör av dig. Vi har tagit emot ärendet och återkommer med nästa steg.\n\n"
+            else ""
         )
         reply_subject = f"Re: {subject}" if subject and subject != "Support" else "Re: ditt ärende"
 
+        first = _first_name(sender_name)
+        greeting = f"Hej {first}," if first else "Hej,"
+
         if support_profile_question:
-            # Use service-profile-specific questions from support_analyzer_processor
+            # Use service-profile-specific questions from support_analyzer_processor.
+            support_profile_type = support_analyzer_payload.get("service_profile_type") or ""
+            opener = _profile_opener(support_profile_type)
+            opener_block = f"{opener}\n\n" if opener else ""
             auto_reply_body = (
-                f"Hej {sender_name or 'där'},\n\n"
+                f"{greeting}\n\n"
+                f"{opener_block}"
                 f"{urgency_line}"
                 f"{support_profile_question}"
                 f"{closing}"
@@ -492,11 +548,11 @@ def _build_inquiry_default_actions(
             if not sender_phone:
                 support_questions.append("- Vilket telefonnummer når vi dig bäst på idag?")
             auto_reply_body = (
-                f"Hej {sender_name or 'där'},\n\n"
+                f"{greeting}\n\n"
                 f"{urgency_line}"
-                "För att vi ska kunna hjälpa dig snabbare får du gärna svara med:\n"
+                "Skicka gärna:\n"
                 f"{chr(10).join(support_questions)}\n\n"
-                "Om det finns akut säkerhetsrisk ska du kontakta jour eller behörig hjälp direkt."
+                "Om det finns akut säkerhetsrisk, kontakta jour eller behörig hjälp direkt."
                 f"{closing}"
             )
         actions.append({

@@ -8,7 +8,9 @@ Public surface:
     from app.service_profiles import compute_profile_missing_info
     from app.service_profiles import build_profile_question_message
     from app.service_profiles import apply_tenant_overrides
+    from app.service_profiles import detect_service_context
 """
+from app.service_profiles.context import detect_service_context
 from app.service_profiles.registry import get_profile, list_profiles
 from app.service_profiles.qualification import (
     select_profile,
@@ -18,6 +20,7 @@ from app.service_profiles.qualification import (
 )
 
 __all__ = [
+    "detect_service_context",
     "get_profile",
     "list_profiles",
     "select_profile",

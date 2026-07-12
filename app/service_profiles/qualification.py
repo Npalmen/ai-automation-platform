@@ -19,6 +19,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any
 
+from app.service_profiles.context import detect_service_context
 from app.service_profiles.models import ServiceProfile
 from app.service_profiles.registry import get_profile, _REGISTRY
 
@@ -37,6 +38,26 @@ _LEAD_TYPE_TO_PROFILE: dict[str, str] = {
     "roof_cleaning":       "generic_lead",
 }
 
+def _refine_profile_by_context(profile_key: str, context: str, lower_text: str) -> str:
+    """Return a refined profile key based on service context.
+
+    Handles cases where keyword classification picks the wrong profile:
+    - solar_installation + add_on_existing + battery keywords → battery_storage
+    - ev_charger_installation + repair_or_fault → ev_charger_fault
+    """
+    if (
+        profile_key == "solar_installation"
+        and context == "add_on_existing"
+        and any(kw in lower_text for kw in ("batteri", "batterilager", "laddlager", "energilager"))
+    ):
+        return "battery_storage"
+
+    if profile_key == "ev_charger_installation" and context == "repair_or_fault":
+        return "ev_charger_fault"
+
+    return profile_key
+
+
 # Support-category / text → service_type
 _INVERTER_KEYWORDS = ("växelriktare", "inverter", "invertern")
 _ELECTRICAL_FAULT_KEYWORDS = (
@@ -46,6 +67,10 @@ _ELECTRICAL_FAULT_KEYWORDS = (
 _DEBT_COLLECTION_KEYWORDS = (
     "inkasso", "betalningskrav", "kravbrev", "kronofogden",
     "förfallen skuld", "betalningsanmärkning",
+)
+_VVS_KEYWORDS = (
+    "vattenläcka", "läcka", "rörmokar", "rörmokare", "vvs", "rörmokeri",
+    "avlopp", "toalett", "droppande", "diskbänk",
 )
 
 
@@ -307,6 +332,8 @@ def select_profile(
             profile = _REGISTRY["inverter_support"]
         elif lower_text and any(kw in lower_text for kw in _ELECTRICAL_FAULT_KEYWORDS):
             profile = _REGISTRY["electrical_fault"]
+        elif lower_text and any(kw in lower_text for kw in _VVS_KEYWORDS):
+            profile = _REGISTRY["vvs_service"]
         else:
             profile = _REGISTRY["generic_support"]
         return apply_tenant_overrides(profile, tenant_ctx)
@@ -314,7 +341,14 @@ def select_profile(
     # ── lead path ─────────────────────────────────────────────────────────
     if job_type == "lead":
         profile_key = _LEAD_TYPE_TO_PROFILE.get(lead_type or "", "generic_lead")
-        profile = _REGISTRY[profile_key]
+
+        # Context-aware refinement: adjust profile when context contradicts
+        # the lead_type classification (e.g. "we already have solar + want battery").
+        if lower_text:
+            context = detect_service_context(lower_text)
+            profile_key = _refine_profile_by_context(profile_key, context, lower_text)
+
+        profile = _REGISTRY.get(profile_key) or _REGISTRY["generic_lead"]
         return apply_tenant_overrides(profile, tenant_ctx)
 
     # ── fallback: scan keywords then use generic_lead ─────────────────────
@@ -420,7 +454,7 @@ def build_profile_question_message(
         lines.append(f"• {label}")
 
     body = "\n".join(lines)
-    return f"{intro}\n\n{body}\n\nSvar räcker kort — så återkommer vi med nästa steg."
+    return f"{intro}\n\n{body}\n\nSkicka gärna tillbaka det du kan, så hör vi av oss snart."
 
 
 # ── Tenant override seam ──────────────────────────────────────────────────────

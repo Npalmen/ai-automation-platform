@@ -37,9 +37,8 @@ _EV_CHARGER = ServiceProfile(
     missing_info_action="ask_questions",
     complete_action="create_offer_draft",
     high_risk_action="manual_review",
-    follow_up_intro=(
-        "För att kunna ta fram rätt underlag för laddboxinstallationen behöver vi gärna:"
-    ),
+    follow_up_intro="För att ta fram rätt underlag för laddboxen behöver vi:",
+    reply_opener="Vi installerar laddboxar — kul att du valt elbil!",
     follow_up_questions={
         "contact_name":        "Ditt namn",
         "phone_or_email":      "Telefonnummer",
@@ -74,9 +73,8 @@ _SOLAR = ServiceProfile(
     missing_info_action="ask_questions",
     complete_action="create_offer_draft",
     high_risk_action="manual_review",
-    follow_up_intro=(
-        "För att kunna bedöma solcellsförutsättningarna behöver vi gärna:"
-    ),
+    follow_up_intro="För att bedöma förutsättningarna behöver vi:",
+    reply_opener="Kul att du är intresserad av solceller!",
     follow_up_questions={
         "contact_name":            "Ditt namn",
         "phone_or_email":          "Telefonnummer",
@@ -112,17 +110,16 @@ _BATTERY = ServiceProfile(
     missing_info_action="ask_questions",
     complete_action="create_offer_draft",
     high_risk_action="manual_review",
-    follow_up_intro=(
-        "För att kunna bedöma batterilagerlösningen behöver vi gärna:"
-    ),
+    follow_up_intro="För att ta fram rätt batterilösning behöver vi:",
+    reply_opener="Absolut, ett batterilager till befintlig solcellsanläggning kan vi ordna.",
     follow_up_questions={
         "contact_name":               "Ditt namn",
         "phone_or_email":             "Telefonnummer",
         "address":                    "Adress",
         "property_type":              "Fastighetstyp",
-        "solar_exists":               "Har du redan solceller? (ange gärna effekt/modell)",
+        "solar_exists":               "Vilket märke/modell är din befintliga solcellsanläggning? (effekt i kWp om du vet)",
         "main_fuse":                  "Huvudsäkringens storlek (ampere)",
-        "battery_capacity_preference": "Önskad batterikapacitet (kWh)",
+        "battery_capacity_preference": "Önskad batterikapacitet i kWh, eller ungefärlig dagsförbrukning",
         "installation_timeline":      "Önskad tidsplan",
     },
 )
@@ -147,9 +144,8 @@ _ELECTRICAL_FAULT = ServiceProfile(
     missing_info_action="ask_questions",
     complete_action="create_task",
     high_risk_action="manual_review",
-    follow_up_intro=(
-        "För att kunna hjälpa dig snabbare behöver vi gärna:"
-    ),
+    follow_up_intro="För att hjälpa dig snabbt behöver vi:",
+    reply_opener="Vi hjälper till med elfelsökning.",
     follow_up_questions={
         "contact_name":    "Ditt namn",
         "phone_or_email":  "Telefonnummer",
@@ -176,9 +172,8 @@ _INVERTER_SUPPORT = ServiceProfile(
     missing_info_action="ask_questions",
     complete_action="create_task",
     high_risk_action="manual_review",
-    follow_up_intro=(
-        "För att hjälpa dig med växelriktarproblemet behöver vi:"
-    ),
+    follow_up_intro="För att titta på växelriktarproblemet behöver vi:",
+    reply_opener="Vi tittar gärna på växelriktarproblemet.",
     follow_up_questions={
         "contact_name":                "Ditt namn",
         "phone_or_email":              "Telefonnummer",
@@ -208,9 +203,8 @@ _ELECTRICAL_PANEL = ServiceProfile(
     missing_info_action="ask_questions",
     complete_action="create_offer_draft",
     high_risk_action="manual_review",
-    follow_up_intro=(
-        "För att ta fram rätt förslag för elcentralen behöver vi:"
-    ),
+    follow_up_intro="För att ta fram rätt förslag för elcentralen behöver vi:",
+    reply_opener="Elcentralsbyte — det fixar vi.",
     follow_up_questions={
         "contact_name":    "Ditt namn",
         "phone_or_email":  "Telefonnummer",
@@ -237,9 +231,8 @@ _GENERIC_LEAD = ServiceProfile(
     missing_info_action="ask_questions",
     complete_action="create_offer_draft",
     high_risk_action="manual_review",
-    follow_up_intro=(
-        "För att kunna hjälpa dig behöver vi lite mer information:"
-    ),
+    follow_up_intro="Skicka gärna lite mer info så kan vi hjälpa dig:",
+    reply_opener="",
     follow_up_questions={
         "contact_name":        "Ditt namn",
         "phone_or_email":      "Telefonnummer eller e-postadress",
@@ -263,14 +256,109 @@ _GENERIC_SUPPORT = ServiceProfile(
     missing_info_action="ask_questions",
     complete_action="create_task",
     high_risk_action="manual_review",
-    follow_up_intro=(
-        "För att kunna hjälpa dig snabbare behöver vi:"
-    ),
+    follow_up_intro="Skicka gärna lite mer info så kan vi hjälpa dig:",
+    reply_opener="",
     follow_up_questions={
         "contact_name":      "Ditt namn",
         "phone_or_email":    "Telefonnummer eller e-postadress",
         "issue_description": "Beskriv problemet och när det uppstod",
         "address":           "Adress (om relevant)",
+    },
+)
+
+_EV_CHARGER_FAULT = ServiceProfile(
+    service_type="ev_charger_fault",
+    family="installation_service",
+    keywords=(
+        "laddboxen fungerar inte", "laddboxen laddar inte",
+        "laddboxen startar inte", "laddbox slutat",
+    ),
+    required_fields=(
+        "contact_name", "phone_or_email", "address",
+        "issue_description",
+    ),
+    optional_fields=(
+        "charger_model_or_brand", "when_started", "error_code",
+    ),
+    risk_flags=(),
+    default_route="support",
+    missing_info_action="ask_questions",
+    complete_action="create_task",
+    high_risk_action="manual_review",
+    follow_up_intro="Tråkigt att laddboxen strular — berätta lite mer så kollar vi:",
+    reply_opener="Tråkigt att laddboxen strular — vi kollar upp det.",
+    follow_up_questions={
+        "contact_name":          "Ditt namn",
+        "phone_or_email":        "Telefonnummer",
+        "address":               "Adress där laddboxen är installerad",
+        "issue_description":     "Vad händer när du försöker ladda?",
+        "charger_model_or_brand": "Vilket märke/modell är laddboxen? (Zaptec, Easee, m.fl.)",
+        "when_started":          "Sedan när fungerar det inte?",
+        "error_code":            "Finns det en felkod eller blinkar någon lampa?",
+    },
+)
+
+_VVS_SERVICE = ServiceProfile(
+    service_type="vvs_service",
+    family="installation_service",
+    keywords=(
+        "vattenläcka", "läcka", "rörmokar", "rörmokare", "vvs", "rörmokeri",
+        "avlopp", "toalett", "badrum", "diskbänk", "kran", "rör läcker",
+        "vatten", "droppande",
+    ),
+    required_fields=(
+        "contact_name", "phone_or_email", "address",
+        "issue_description",
+    ),
+    optional_fields=(
+        "urgency_level", "water_shut_off",
+    ),
+    risk_flags=("översvämning", "vattenflöde", "akut läcka", "vattenskada"),
+    default_route="support",
+    missing_info_action="ask_questions",
+    complete_action="create_task",
+    high_risk_action="manual_review",
+    follow_up_intro="Berätta lite mer, så ser vi hur snabbt vi kan komma:",
+    reply_opener="VVS är ingen fara — vi hjälper till.",
+    follow_up_questions={
+        "contact_name":    "Ditt namn",
+        "phone_or_email":  "Telefonnummer",
+        "address":         "Adress",
+        "issue_description": "Var läcker det och hur mycket? (t.ex. under diskbänk, droppande vs flödande)",
+        "urgency_level":   "Är det akut, eller kan det vänta någon dag?",
+        "water_shut_off":  "Har du stängt av vattnet? (om relevant)",
+    },
+)
+
+_BUILDING_PROJECT = ServiceProfile(
+    service_type="building_project",
+    family="generic_business",
+    keywords=(
+        "förråd", "friggebod", "attefallsåtgärd", "snickare", "snickeri",
+        "bygga", "byggarbete", "altan", "terrass", "carport", "pergola",
+        "renovering", "ombyggnad", "tillbyggnad",
+    ),
+    required_fields=(
+        "contact_name", "phone_or_email", "address",
+        "issue_description",
+    ),
+    optional_fields=(
+        "approximate_area", "installation_timeline",
+    ),
+    risk_flags=(),
+    default_route="sales",
+    missing_info_action="ask_questions",
+    complete_action="create_offer_draft",
+    high_risk_action="manual_review",
+    follow_up_intro="Kul projekt — skicka gärna:",
+    reply_opener="Kul projekt — vi tar gärna en titt!",
+    follow_up_questions={
+        "contact_name":      "Ditt namn",
+        "phone_or_email":    "Telefonnummer",
+        "address":           "Adress/plats för projektet",
+        "issue_description": "Beskriv projektet kort (mått, material, önskemål)",
+        "approximate_area":  "Ungefärlig yta (kvm) om relevant",
+        "installation_timeline": "Ungefärlig tidplan — när vill du ha det klart?",
     },
 )
 
@@ -287,9 +375,8 @@ _INVOICE_GENERIC = ServiceProfile(
     missing_info_action="manual_review",
     complete_action="auto_process",
     high_risk_action="manual_review",
-    follow_up_intro=(
-        "För att kunna hantera fakturan korrekt behöver vi:"
-    ),
+    follow_up_intro="För att hantera fakturan korrekt behöver vi:",
+    reply_opener="",
     follow_up_questions={
         "invoice_number_or_reference": "Fakturanummer eller referens",
         "amount":                      "Belopp",
@@ -317,9 +404,8 @@ _DEBT_COLLECTION = ServiceProfile(
     missing_info_action="manual_review",
     complete_action="manual_review",
     high_risk_action="manual_review",
-    follow_up_intro=(
-        "Detta ärende kräver manuell hantering och ska inte automatiseras."
-    ),
+    follow_up_intro="Detta ärende kräver manuell hantering och ska inte automatiseras.",
+    reply_opener="",
     follow_up_questions={
         "sender":      "Avsändare (inkassobolag eller fordringsägare)",
         "reference":   "Ärendenummer eller referens",
@@ -335,11 +421,14 @@ _REGISTRY: dict[str, ServiceProfile] = {
     p.service_type: p
     for p in [
         _EV_CHARGER,
+        _EV_CHARGER_FAULT,
         _SOLAR,
         _BATTERY,
         _ELECTRICAL_FAULT,
         _INVERTER_SUPPORT,
         _ELECTRICAL_PANEL,
+        _VVS_SERVICE,
+        _BUILDING_PROJECT,
         _GENERIC_LEAD,
         _GENERIC_SUPPORT,
         _INVOICE_GENERIC,

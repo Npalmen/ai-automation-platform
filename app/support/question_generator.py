@@ -117,7 +117,7 @@ def generate_support_question_message(
             opening = "För att hantera ditt ärende behöver vi lite mer information:"
 
     # Closing
-    closing = "Svara på detta mail så återkommer vi så snart som möjligt."
+    closing = "Skicka gärna svar på det du kan, så hör vi av oss snart."
     if is_emergency:
         closing = "Svara omgående eller ring oss direkt — vi prioriterar ditt ärende."
 

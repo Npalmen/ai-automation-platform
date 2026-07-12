@@ -108,7 +108,7 @@ def generate_question_message(
     else:
         opening = "För att kunna ta fram ett bra förslag behöver vi bara lite mer information:"
 
-    return f"{opening}\n\n{body}\n\nSvar räcker kort — så återkommer vi med nästa steg."
+    return f"{opening}\n\n{body}\n\nSkicka gärna svar på det du kan, så hör vi av oss snart."
 
 
 def should_ask_questions(completeness_score: float) -> bool:
