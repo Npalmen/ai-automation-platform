@@ -293,6 +293,212 @@ class TestInvalidKey:
 
 
 # ---------------------------------------------------------------------------
+# Admin session cookie as tenant auth
+# ---------------------------------------------------------------------------
+
+SECRET = "test-session-secret-for-auth-tests"
+
+
+def _session_settings(**kw):
+    defaults = dict(
+        TENANT_API_KEYS="",
+        ADMIN_API_KEY="",
+        ENV="dev",
+        SESSION_SECRET_KEY=SECRET,
+        ADMIN_PASSWORD_HASH="somehash",
+        ADMIN_USERNAME="admin",
+    )
+    defaults.update(kw)
+    return SimpleNamespace(**defaults)
+
+
+def _make_request(cookie_value=None):
+    r = MagicMock()
+    r.cookies = {"admin_session": cookie_value} if cookie_value else {}
+    return r
+
+
+def _valid_session_token():
+    from app.core.admin_session import create_session_token
+    return create_session_token("admin", SECRET)
+
+
+class TestAdminSessionTenantAuth:
+    """get_verified_tenant: priority-0 path — admin session cookie + X-Tenant-ID."""
+
+    def test_valid_session_with_tenant_id_returns_tenant(self):
+        auth = _reload_auth()
+        token = _valid_session_token()
+        request = _make_request(cookie_value=token)
+        settings = _session_settings()
+
+        with (
+            patch("app.core.auth.get_settings", return_value=settings),
+            patch("app.core.admin_session.get_settings", return_value=settings),
+            patch("app.core.auth._is_tenant_active", return_value=True),
+        ):
+            tenant_id = auth.get_verified_tenant(
+                request=request,
+                x_api_key=None,
+                x_tenant_id="T_ELITGRUPPEN",
+                x_admin_api_key=None,
+                db=MagicMock(),
+            )
+        assert tenant_id == "T_ELITGRUPPEN"
+
+    def test_valid_session_without_tenant_id_raises_400(self):
+        auth = _reload_auth()
+        token = _valid_session_token()
+        request = _make_request(cookie_value=token)
+        settings = _session_settings()
+
+        with (
+            patch("app.core.auth.get_settings", return_value=settings),
+            patch("app.core.admin_session.get_settings", return_value=settings),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                auth.get_verified_tenant(
+                    request=request,
+                    x_api_key=None,
+                    x_tenant_id=None,
+                    x_admin_api_key=None,
+                    db=MagicMock(),
+                )
+        assert exc_info.value.status_code == 400
+        assert "X-Tenant-ID" in exc_info.value.detail
+
+    def test_valid_session_inactive_tenant_raises_403(self):
+        auth = _reload_auth()
+        token = _valid_session_token()
+        request = _make_request(cookie_value=token)
+        settings = _session_settings()
+
+        with (
+            patch("app.core.auth.get_settings", return_value=settings),
+            patch("app.core.admin_session.get_settings", return_value=settings),
+            patch("app.core.auth._is_tenant_active", return_value=False),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                auth.get_verified_tenant(
+                    request=request,
+                    x_api_key=None,
+                    x_tenant_id="T_INACTIVE",
+                    x_admin_api_key=None,
+                    db=MagicMock(),
+                )
+        assert exc_info.value.status_code == 403
+
+    def test_invalid_session_falls_through_to_key_auth(self):
+        """A garbage session cookie does not authenticate; falls through to key check."""
+        auth = _reload_auth()
+        request = _make_request(cookie_value="garbage-token")
+        settings = _session_settings(TENANT_API_KEYS=KEY_MAP_JSON)
+
+        with (
+            patch("app.core.auth.get_settings", return_value=settings),
+            patch("app.core.admin_session.get_settings", return_value=settings),
+        ):
+            # No valid key provided → should reach normal key-required path
+            with pytest.raises(HTTPException) as exc_info:
+                auth.get_verified_tenant(
+                    request=request,
+                    x_api_key=None,
+                    x_tenant_id="T_ELITGRUPPEN",
+                    x_admin_api_key=None,
+                    db=MagicMock(),
+                )
+        assert exc_info.value.status_code == 401  # key required
+
+    def test_no_session_cookie_falls_through_to_key_auth(self):
+        """No cookie → session path skipped; tenant API key still works."""
+        auth = _reload_auth()
+        request = _make_request(cookie_value=None)
+        settings = _session_settings(TENANT_API_KEYS=KEY_MAP_JSON)
+
+        with (
+            patch("app.core.auth.get_settings", return_value=settings),
+            patch("app.core.admin_session.get_settings", return_value=settings),
+            patch("app.core.auth._lookup_db_key", return_value=None),
+            patch("app.core.auth._is_tenant_active", return_value=True),
+        ):
+            tenant_id = auth.get_verified_tenant(
+                request=request,
+                x_api_key="key-abc123",
+                x_tenant_id=None,
+                x_admin_api_key=None,
+                db=MagicMock(),
+            )
+        assert tenant_id == "TENANT_1001"
+
+    def test_request_none_falls_through_normally(self):
+        """When called with request=None (tests / direct calls), session path is skipped."""
+        auth = _reload_auth()
+        settings = _session_settings(TENANT_API_KEYS=KEY_MAP_JSON)
+
+        with (
+            patch("app.core.auth.get_settings", return_value=settings),
+            patch("app.core.auth._lookup_db_key", return_value=None),
+            patch("app.core.auth._is_tenant_active", return_value=True),
+        ):
+            tenant_id = auth.get_verified_tenant(
+                request=None,
+                x_api_key="key-abc123",
+                x_tenant_id=None,
+                x_admin_api_key=None,
+                db=MagicMock(),
+            )
+        assert tenant_id == "TENANT_1001"
+
+    def test_session_takes_priority_over_admin_api_key(self):
+        """Session is checked before X-Admin-API-Key; if session valid it wins."""
+        auth = _reload_auth()
+        token = _valid_session_token()
+        request = _make_request(cookie_value=token)
+        settings = _session_settings(ADMIN_API_KEY="admin-secret")
+
+        with (
+            patch("app.core.auth.get_settings", return_value=settings),
+            patch("app.core.admin_session.get_settings", return_value=settings),
+            patch("app.core.auth._is_tenant_active", return_value=True),
+        ):
+            tenant_id = auth.get_verified_tenant(
+                request=request,
+                x_api_key=None,
+                x_tenant_id="T_ELITGRUPPEN",
+                x_admin_api_key="admin-secret",
+                db=MagicMock(),
+            )
+        # Session wins — tenant returned correctly
+        assert tenant_id == "T_ELITGRUPPEN"
+
+    def test_session_module_exception_falls_through(self):
+        """If session module raises an unexpected error, fall through to next auth method."""
+        auth = _reload_auth()
+        request = _make_request(cookie_value="some-token")
+        settings = _session_settings(TENANT_API_KEYS=KEY_MAP_JSON)
+
+        with (
+            patch("app.core.auth.get_settings", return_value=settings),
+            patch(
+                "app.core.auth.get_admin_from_session",
+                side_effect=RuntimeError("unexpected"),
+                create=True,
+            ),
+            patch("app.core.auth._lookup_db_key", return_value=None),
+        ):
+            # Env keys configured, no key provided → 401 (fell through to key auth)
+            with pytest.raises(HTTPException) as exc_info:
+                auth.get_verified_tenant(
+                    request=request,
+                    x_api_key=None,
+                    x_tenant_id=None,
+                    x_admin_api_key=None,
+                    db=MagicMock(),
+                )
+        assert exc_info.value.status_code == 401
+
+
+# ---------------------------------------------------------------------------
 # Malformed config
 # ---------------------------------------------------------------------------
 

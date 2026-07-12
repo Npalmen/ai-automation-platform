@@ -19,7 +19,7 @@ import hmac
 import json
 import logging
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request
 from fastapi import status as http_status
 from sqlalchemy.orm import Session
 
@@ -96,6 +96,7 @@ def _is_tenant_active(db: Session, tenant_id: str) -> bool:
 
 
 def get_verified_tenant(
+    request: Request = None,  # type: ignore[assignment]  # FastAPI injects; None in direct test calls
     x_api_key: str | None = Header(default=None),
     x_tenant_id: str | None = Header(default=None),
     x_admin_api_key: str | None = Header(default=None),
@@ -104,19 +105,43 @@ def get_verified_tenant(
     """
     FastAPI dependency. Returns the verified tenant_id for the request.
 
-    Resolution order when X-Admin-API-Key + X-Tenant-ID are provided:
-      1. Validate the admin key and use X-Tenant-ID as the explicit tenant context.
-
-    Resolution order when X-API-Key is provided:
-      1. DB hashed key lookup  (new provisioned tenants)
-      2. Env TENANT_API_KEYS reverse lookup  (existing tenants, backward compat)
-
-    When no X-API-Key is provided:
-      - If env keys are configured → 401 (key required)
-      - If no env keys → dev-mode: use X-Tenant-ID or default TENANT_1001
+    Resolution order (highest to lowest priority):
+      0. Admin session cookie + X-Tenant-ID  — browser UI with session login
+      1. X-Admin-API-Key + X-Tenant-ID       — API/script admin impersonation
+      2. X-API-Key                           — tenant's own API key
+      3. Dev-mode passthrough                — only when no keys are configured
 
     After resolution, checks tenant status == 'active'.
     """
+    # Priority 0: Admin session cookie + explicit X-Tenant-ID header.
+    # Allows the browser operator UI to call tenant-scoped endpoints after
+    # POST /auth/admin/login without requiring a per-tenant API key in the UI.
+    if request is not None:
+        try:
+            from app.core.admin_session import get_admin_from_session
+            admin_user = get_admin_from_session(request)
+            if admin_user:
+                if not x_tenant_id:
+                    raise HTTPException(
+                        status_code=http_status.HTTP_400_BAD_REQUEST,
+                        detail=(
+                            "X-Tenant-ID is required when using admin session "
+                            "on tenant endpoints."
+                        ),
+                    )
+                if not _is_tenant_active(db, x_tenant_id):
+                    raise HTTPException(
+                        status_code=http_status.HTTP_403_FORBIDDEN,
+                        detail="Tenant is inactive.",
+                    )
+                set_current_tenant(x_tenant_id)
+                return x_tenant_id
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # session module not configured or error — fall through
+
+    # Priority 1: X-Admin-API-Key header + X-Tenant-ID.
     if isinstance(x_admin_api_key, str) and x_admin_api_key:
         configured_admin_key = getattr(get_settings(), "ADMIN_API_KEY", "").strip()
         if not configured_admin_key:
