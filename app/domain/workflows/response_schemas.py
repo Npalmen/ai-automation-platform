@@ -15,3 +15,5 @@ class JobResponse(BaseModel):
     result: Dict[str, Any] | None
     created_at: datetime
     updated_at: datetime
+    has_pending_approvals: bool = False
+    pending_approvals_count: int = 0

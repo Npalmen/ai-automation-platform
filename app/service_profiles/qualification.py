@@ -3,6 +3,7 @@
 Provides:
     select_profile()            — choose the right ServiceProfile for a job
     compute_profile_missing_info() — compute which required fields are present/missing
+    compute_playbook_questions()   — context-aware question selection via playbook
     build_profile_question_message() — build a Swedish follow-up question message
     apply_tenant_overrides()    — thin seam for future tenant profile overrides
 
@@ -36,6 +37,8 @@ _LEAD_TYPE_TO_PROFILE: dict[str, str] = {
     "electrical_work":     "electrical_panel",
     "roof_painting":       "generic_lead",
     "roof_cleaning":       "generic_lead",
+    "building_project":    "building_project",
+    "vvs_service":         "vvs_service",
 }
 
 def _refine_profile_by_context(profile_key: str, context: str, lower_text: str) -> str:
@@ -43,6 +46,7 @@ def _refine_profile_by_context(profile_key: str, context: str, lower_text: str) 
 
     Handles cases where keyword classification picks the wrong profile:
     - solar_installation + add_on_existing + battery keywords → battery_storage
+    - solar_installation + repair_or_fault/service_or_maintenance → solar_service
     - ev_charger_installation + repair_or_fault → ev_charger_fault
     """
     if (
@@ -51,6 +55,13 @@ def _refine_profile_by_context(profile_key: str, context: str, lower_text: str) 
         and any(kw in lower_text for kw in ("batteri", "batterilager", "laddlager", "energilager"))
     ):
         return "battery_storage"
+
+    if (
+        profile_key in ("solar_installation", "battery_storage")
+        and context in ("repair_or_fault", "service_or_maintenance")
+        and any(kw in lower_text for kw in _SOLAR_SERVICE_KEYWORDS)
+    ):
+        return "solar_service"
 
     if profile_key == "ev_charger_installation" and context == "repair_or_fault":
         return "ev_charger_fault"
@@ -71,6 +82,16 @@ _DEBT_COLLECTION_KEYWORDS = (
 _VVS_KEYWORDS = (
     "vattenläcka", "läcka", "rörmokar", "rörmokare", "vvs", "rörmokeri",
     "avlopp", "toalett", "droppande", "diskbänk",
+)
+_EV_CHARGER_FAULT_KEYWORDS = (
+    "laddboxen laddar inte", "laddboxen fungerar inte",
+    "laddboxen startar inte", "laddbox slutat", "laddar inte",
+    "laddbox", "laddboxen",
+)
+_SOLAR_SERVICE_KEYWORDS = (
+    "producerar dåligt", "dålig produktion", "lägre produktion",
+    "solceller producerar", "producerar för lite", "produktion minskat",
+    "solcellerna producerar", "har solceller", "befintlig solcell",
 )
 
 
@@ -107,16 +128,26 @@ def _profile_field_present(field: str, text: str, entities: dict[str, Any]) -> b
         )
 
     if field == "main_fuse":
+        # Require explicit ampere mention OR "huvudsäkring" with a known value.
+        # Negation phrases like "vet inte", "vet ej", "osäker" etc. mean NOT present.
+        # "vet inte vad jag har för huvudsäkring" → NOT present.
+        _negation = (
+            "vet inte", "vet ej", "osäker", "ingen aning",
+            "har inte koll", "känner inte till", "vet inte vilken",
+        )
+        if any(neg in text for neg in _negation):
+            return False
         return bool(
-            re.search(r"\b(?:huvudsäkring|säkring)\b", text)
-            or re.search(r"\b\d{1,3}\s*a\b", text)  # "16a", "20 a"
-            or re.search(r"\b(?:16|20|25|35|50|63|80|100)\b", text)
+            re.search(r"\bhuvudsäkring\b.*\d{1,3}\s*a", text, re.IGNORECASE)
+            or re.search(r"\b\d{1,3}\s*a\b", text, re.IGNORECASE)
+            or re.search(r"\b(?:16|20|25|35|50|63|80|100)\b\s*(?:a|ampere|amp)\b", text, re.IGNORECASE)
         )
 
     if field == "property_type":
         kws = (
-            "villa", "radhus", "lägenhet", "brf", "fastighet",
-            "hus", "kontor", "lokal", "garage", "lantbruk", "gård",
+            "villa", "villan", "radhus", "lägenhet", "brf",
+            "fastighet", "huset", "hus", "kontor", "lokal",
+            "garage", "lantbruk", "gård", "enfamiljs",
         )
         return any(kw in text for kw in kws)
 
@@ -142,7 +173,29 @@ def _profile_field_present(field: str, text: str, entities: dict[str, Any]) -> b
         )
 
     if field == "solar_exists":
-        return any(kw in text for kw in ("solcell", "solpanel", "solar", "befintlig solar", "har solar"))
+        # "10 kWp solceller" or "vi har solceller" confirms existing solar
+        return bool(
+            any(kw in text for kw in ("solcell", "solpanel", "solar", "befintlig solar", "har solar"))
+            or re.search(r"\b\d+\s*kwp\b", text)
+        )
+
+    if field == "inverter_brand_model":
+        return bool(
+            any(kw in text for kw in ("växelriktare", "inverter"))
+            and any(kw in text for kw in ("märke", "modell", "solarEdge", "fronius", "huawei",
+                                          "enphase", "solaredge", "goodwe", "sungrow"))
+        )
+
+    if field == "backup_requirement":
+        # Only confirmed if the customer clearly states a requirement or firm preference.
+        # "backup vore intressant om det går" = PARTIAL, not confirmed.
+        # The question "krav eller önskemål?" is still needed in that case.
+        confirmed_kws = (
+            "backup är krav", "backup krävs", "behöver backup",
+            "krav på backup", "måste ha backup", "backup som krav",
+            "strömavbrott är viktigt", "backup utan tvekan",
+        )
+        return any(kw in text for kw in confirmed_kws)
 
     if field == "battery_interest":
         return any(kw in text for kw in ("batteri", "batterilager", "lagra"))
@@ -323,17 +376,26 @@ def select_profile(
 
     # ── support / customer_inquiry path ───────────────────────────────────
     if job_type in ("customer_inquiry", "support"):
-        if support_category == "safety" or (
-            lower_text
-            and any(kw in lower_text for kw in ("luktar bränt", "gnistor", "gnistrar", "elstöt"))
+        # VVS must come BEFORE generic safety to avoid misclassifying water leaks
+        # as electrical_fault due to "läcker" appearing in emergency keywords.
+        if lower_text and any(kw in lower_text for kw in _VVS_KEYWORDS):
+            profile = _REGISTRY["vvs_service"]
+        elif (
+            support_category == "safety"
+            or (
+                lower_text
+                and any(kw in lower_text for kw in ("luktar bränt", "gnistor", "gnistrar", "elstöt", "brandrisk"))
+            )
         ):
             profile = _REGISTRY["electrical_fault"]
         elif lower_text and any(kw in lower_text for kw in _INVERTER_KEYWORDS):
             profile = _REGISTRY["inverter_support"]
         elif lower_text and any(kw in lower_text for kw in _ELECTRICAL_FAULT_KEYWORDS):
             profile = _REGISTRY["electrical_fault"]
-        elif lower_text and any(kw in lower_text for kw in _VVS_KEYWORDS):
-            profile = _REGISTRY["vvs_service"]
+        elif lower_text and any(kw in lower_text for kw in _SOLAR_SERVICE_KEYWORDS):
+            profile = _REGISTRY["solar_service"]
+        elif lower_text and any(kw in lower_text for kw in _EV_CHARGER_FAULT_KEYWORDS):
+            profile = _REGISTRY["ev_charger_fault"]
         else:
             profile = _REGISTRY["generic_support"]
         return apply_tenant_overrides(profile, tenant_ctx)
@@ -380,7 +442,17 @@ def compute_profile_missing_info(
         is_complete:        bool
         schema_source:      "service_profile" | "tenant_override"
     """
-    entities = entities or {}
+    entities = dict(entities or {})
+
+    # Enrich entities from sender dict so we don't re-ask for known contact info
+    sender_raw = input_data.get("sender") or {}
+    if isinstance(sender_raw, dict):
+        if not entities.get("customer_name") and sender_raw.get("name"):
+            entities["customer_name"] = sender_raw["name"]
+        if not entities.get("phone") and sender_raw.get("phone"):
+            entities["phone"] = sender_raw["phone"]
+        if not entities.get("email") and sender_raw.get("email"):
+            entities["email"] = sender_raw["email"]
     text = _combined(input_data)
 
     # Allow tenant to override required/optional via lead_requirements
@@ -403,6 +475,13 @@ def compute_profile_missing_info(
         else:
             missing.append(field)
 
+    # Also detect which optional fields are missing (used for richer support questions).
+    missing_optional: list[str] = [
+        f for f in optional
+        if not _profile_field_present(f, text, entities)
+        and f in profile.follow_up_questions  # only include when a question label is defined
+    ]
+
     completeness = len(present) / len(required) if required else 1.0
 
     return {
@@ -411,13 +490,114 @@ def compute_profile_missing_info(
         "optional_fields": optional,
         "present_fields": present,
         "missing_fields": missing,
+        "missing_optional_fields": missing_optional,
         "completeness_score": round(completeness, 3),
         "is_complete": len(missing) == 0,
         "schema_source": schema_source,
     }
 
 
+def compute_playbook_questions(
+    profile: ServiceProfile,
+    input_data: dict,
+    entities: dict[str, Any] | None = None,
+    service_context: str | None = None,
+    max_questions: int = 4,
+) -> dict[str, Any]:
+    """Return context-aware question fields using the Service Playbook architecture.
+
+    Integrates fact state detection (confirmed/unknown/uncertain/partial/missing)
+    and playbook-level context overrides (suppress/priority/extra fields) to
+    select the best 2–4 questions for the current situation.
+
+    Returns:
+        fact_states:         dict[str, FactState] for all candidate fields
+        selected_fields:     list[str] — fields to ask (max max_questions)
+        suppressed_fields:   list[str] — fields suppressed by playbook
+        service_context:     str — the context used for selection
+    """
+    from app.service_profiles.facts import detect_fact_state, FactState
+    from app.service_profiles.playbook import select_questions_from_playbook
+    from app.service_profiles.context import detect_service_context
+
+    entities = dict(entities or {})
+    text = _combined(input_data)
+    ctx = service_context or detect_service_context(text)
+
+    # Gather all candidate fields for fact detection
+    all_fields = list(profile.required_fields) + list(profile.optional_fields)
+
+    # Get playbook extra fields
+    from app.service_profiles.playbook import get_playbook
+    playbook = get_playbook(profile.service_type)
+    playbook_ctx = None
+    if playbook and ctx in playbook.contexts:
+        playbook_ctx = playbook.contexts[ctx]
+        for f in playbook_ctx.extra_fields:
+            if f not in all_fields:
+                all_fields.append(f)
+
+    # Detect fact states for all candidate fields
+    fact_states: dict[str, FactState] = {}
+    for f in all_fields:
+        fact_states[f] = detect_fact_state(f, text, entities)
+
+    # Get base missing fields (required only, not yet confirmed)
+    base_missing: list[str] = [
+        f for f in profile.required_fields
+        if fact_states.get(f) != FactState.CONFIRMED
+    ]
+
+    # Select questions using playbook
+    selected = select_questions_from_playbook(
+        service_type=profile.service_type,
+        service_context=ctx,
+        fact_states=fact_states,
+        base_missing_fields=base_missing,
+        max_questions=max_questions,
+    )
+
+    suppressed = list(playbook_ctx.suppress_fields) if playbook_ctx else []
+
+    return {
+        "fact_states": {k: v.value for k, v in fact_states.items()},
+        "selected_fields": selected,
+        "suppressed_fields": suppressed,
+        "service_context": ctx,
+    }
+
+
 # ── Question message builder ──────────────────────────────────────────────────
+
+# Swedish fallback labels for generic support fields that may appear in
+# missing_fields even when using a service-profile question builder.
+_GENERIC_FIELD_LABELS: dict[str, str] = {
+    "address":                    "Adress",
+    "phone":                      "Telefonnummer",
+    "phone_or_email":             "Telefonnummer eller e-post",
+    "email":                      "E-postadress",
+    "contact_name":               "Ditt namn",
+    "issue_description":          "Beskriv problemet kort",
+    "product_model":              "Produktmodell eller fabrikat",
+    "error_code":                 "Felkod eller larmkod",
+    "photos":                     "Skicka gärna en bild om du har möjlighet",
+    "when_started":               "När uppstod problemet?",
+    "installation_date":          "Datum för installationen",
+    "invoice_number":             "Fakturanummer",
+    "preferred_time":             "Önskat datum/tid för besök",
+    "distance_panel_to_charger":  "Ungefärligt avstånd från elskåpet till laddplatsen (meter)",
+    "charger_preference":         "Har du ett föredraget laddboxmärke? (Zaptec, Easee, m.fl.)",
+    "inverter_brand_model":       "Växelriktarens märke och modell (t.ex. SolarEdge, Fronius, Huawei)",
+    "backup_requirement":         "Är backup vid strömavbrott ett krav eller ett önskemål?",
+    "photo_inverter_cabinet":     "Skicka gärna en bild på elskåpet och växelriktaren",
+    "water_shut_off":             "Har du stängt av vattnet? Om läckan är kraftig — stäng av stoppkranen.",
+    "active_leak":                "Läcker det aktivt just nu?",
+    "location_of_issue":          "Var är problemet? (t.ex. badrum, kök, källare)",
+    "project_description":        "Beskriv projektet kort (mått, material, önskemål)",
+    "approximate_area":           "Ungefärlig yta (kvm) om relevant",
+    "desired_timing":             "Ungefärlig tidsplan — när vill du ha det klart?",
+}
+
 
 def build_profile_question_message(
     profile: ServiceProfile,
@@ -428,13 +608,13 @@ def build_profile_question_message(
 
     Uses the profile's follow_up_intro and follow_up_questions for service-
     specific, context-rich questions rather than generic field labels.
+    Falls back to _GENERIC_FIELD_LABELS then to a capitalized field name.
     """
     if not missing_fields:
         return None
 
     intro = profile.follow_up_intro
     if company_name:
-        # Personalise intro with company name when available
         intro = intro.replace(
             "Vi behöver", f"Vi på {company_name} behöver"
         ).replace(
@@ -445,14 +625,20 @@ def build_profile_question_message(
             "vi:", f"vi på {company_name}:"
         )
 
+    seen: set[str] = set()
     lines: list[str] = []
     for f in missing_fields:
         label = (
             profile.follow_up_questions.get(f)
+            or _GENERIC_FIELD_LABELS.get(f)
             or f.replace("_", " ").capitalize()
         )
-        lines.append(f"• {label}")
+        if label not in seen:
+            seen.add(label)
+            lines.append(f"• {label}")
 
+    if not lines:
+        return None
     body = "\n".join(lines)
     return f"{intro}\n\n{body}\n\nSkicka gärna tillbaka det du kan, så hör vi av oss snart."
 

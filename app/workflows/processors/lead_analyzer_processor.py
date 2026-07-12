@@ -17,6 +17,8 @@ from app.lead.question_generator import generate_question_message, should_ask_qu
 from app.lead.scorer import score_lead
 from app.lead.tenant_context import load_tenant_context_from_job
 from app.service_profiles import select_profile, compute_profile_missing_info
+from app.service_profiles.qualification import compute_playbook_questions
+from app.service_profiles.context import detect_service_context
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
     get_latest_processor_payload,
@@ -64,11 +66,26 @@ def process_lead_analyzer_job(job: Job, db=None) -> Job:
     # 6. Next action
     next_action = decide_next_action(lead_score, missing_info, tenant_auto_actions, tenant_ctx)
 
-    # 7. Question message (if needed) — uses profile-specific missing fields and intro
+    # 7. Question message (if needed) — uses playbook-aware selection
+    # Detect service context first so playbook can suppress/prioritize per context.
+    _service_context = detect_service_context(_combined)
+    _playbook_result: dict = {}
+
     question_message: str | None = None
     if should_ask_questions(missing_info.completeness_score):
-        # Prefer profile-specific missing fields for question content; fall back to generic
-        q_fields = profile_missing_info["missing_fields"] or missing_info.missing_fields
+        # Compute playbook-based questions: respects context-specific suppress/priority rules
+        # e.g. battery add-on suppresses property_type and prioritizes inverter/backup/main_fuse
+        _playbook_result = compute_playbook_questions(
+            service_profile, input_data, entities,
+            service_context=_service_context,
+            max_questions=4,
+        )
+        q_fields = _playbook_result.get("selected_fields") or []
+
+        # Fall back to basic profile missing fields if playbook returns empty
+        if not q_fields:
+            q_fields = profile_missing_info["missing_fields"] or missing_info.missing_fields
+
         question_message = generate_question_message(
             q_fields, tenant_ctx, analysis.lead_type,
             service_profile=service_profile,
@@ -94,6 +111,9 @@ def process_lead_analyzer_job(job: Job, db=None) -> Job:
         "service_profile_type": service_profile.service_type,
         "profile_missing_fields": profile_missing_info["missing_fields"],
         "profile_completeness_score": profile_missing_info["completeness_score"],
+        "service_context": _service_context,
+        "fact_states": _playbook_result.get("fact_states") or {},
+        "suppressed_fields": _playbook_result.get("suppressed_fields") or [],
     }
 
     if question_message:

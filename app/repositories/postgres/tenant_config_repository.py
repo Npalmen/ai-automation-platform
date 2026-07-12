@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import copy
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 
@@ -93,11 +95,14 @@ class TenantConfigRepository:
             record = TenantConfigRecord(tenant_id=tenant_id, created_at=now)
             db.add(record)
         if merge:
-            existing = dict(record.settings or {})
+            # Deep-copy so nested JSON mutations are not lost and SQLAlchemy
+            # detects the assignment as a change.
+            existing = copy.deepcopy(record.settings or {})
             _deep_merge(existing, settings)
             record.settings = existing
         else:
-            record.settings = settings
+            record.settings = copy.deepcopy(settings)
+        flag_modified(record, "settings")
         record.updated_at = now
         db.commit()
         db.refresh(record)

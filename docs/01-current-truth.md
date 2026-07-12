@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-08 (Phase O PASSED — CONDITIONAL GO decision issued. All 29 Phase O checks passed (0 fail, 0 warn). 10 jobs confirmed (2 synthetic + 8 Gmail). 1 pending approval (email_send type, not approved). Production is pilot-ready subject to: set support email, review pending approval before approving, rotate DB password. Live commit `01f5763`. All phases A–O now PASSED.)
+2026-07-12 (Sprint 1 AI Receptionist safety fixes — nested settings persistence, email approval fail-closed for `semi`, integration `allowed_integrations` gating in action_executor, job pending-approval visibility in API/orchestrator. Full suite 2924 passed.)
 
 ## Verification method
 
@@ -24,8 +24,12 @@
 
 | Claim | Status | Detail |
 |-------|--------|--------|
-| Test suite runs | `Verified` | 2770 passed, 0 failed, 4 warnings (re-verified 2026-07-08 after adding test_pilot_safety_contract.py) |
-| Test count: 2770 tests across 102 test files | `Verified` | Run 2026-07-08 after pilot readiness docs and test_pilot_safety_contract added |
+| Test suite runs | `Verified` | 2924 passed, 0 failed, 4 warnings (re-verified 2026-07-12 after Sprint 1 safety fixes) |
+| Test count: 2924 tests across 106 test files | `Verified` | Run 2026-07-12 after Sprint 1 regression tests added |
+| Sprint 1: nested tenant settings persist via deep-merge | `Verified — FIXED 2026-07-12` | `TenantConfigRepository.update_settings` uses `copy.deepcopy` + `flag_modified`; `tests/test_tenant_settings_persistence.py` |
+| Sprint 1: email `auto_actions=semi` requires approval | `Verified — FIXED 2026-07-12` | `_email_needs_approval` fail-closed; only `True`/`auto`/`full_auto` bypass; `tests/test_email_approval.py` |
+| Sprint 1: integration dispatch checks `allowed_integrations` | `Verified — FIXED 2026-07-12` | `action_executor.execute_action` skips with `integration_not_allowed`; `tests/test_integration_action_gating.py` |
+| Sprint 1: jobs expose pending approval state | `Verified — FIXED 2026-07-12` | Orchestrator + `JobResponse` fields `has_pending_approvals` / `pending_approvals_count`; `tests/test_job_pending_approval_visibility.py` |
 | All policy gate tests pass | `Verified` | Including `test_lead_disabled_for_finance_tenant` and unknown-tenant regression suite |
 | R1 release gate (`python -m scripts.run_release_gate_r1`) | `Verified — PASS` | 2026-07-07: 505 regression + 152 E2E = 657, all passed |
 | Root/UI/health/docs targeted tests | `Verified — PASS` | 2026-07-07: `python -m pytest tests/test_root_routing.py -q` — 8 passed, 2 warnings; previous root/health/docs set passed before UI simplification |

@@ -120,8 +120,64 @@ def get_pending_approval(job: Job) -> dict[str, Any] | None:
     return approval_request
 
 
+def action_dispatch_pending_approval_count(job: Job) -> int:
+    """Count email approvals queued by action_dispatch_processor."""
+    payload = get_latest_processor_payload(job, "action_dispatch_processor")
+    if not payload:
+        return 0
+    explicit = payload.get("pending_approval_count")
+    if explicit is not None:
+        try:
+            return max(0, int(explicit))
+        except (TypeError, ValueError):
+            pass
+    pending = payload.get("actions_pending_approval") or []
+    if isinstance(pending, list):
+        return len(pending)
+    return 0
+
+
 def has_pending_approval(job: Job) -> bool:
-    return get_pending_approval(job) is not None
+    if get_pending_approval(job) is not None:
+        return True
+    return action_dispatch_pending_approval_count(job) > 0
+
+
+def count_pending_approvals_for_job(
+    job: Job,
+    db: Session | None = None,
+) -> int:
+    """Return pending approval count from processor history and optional DB records."""
+    processor_count = action_dispatch_pending_approval_count(job)
+    if get_pending_approval(job) is not None:
+        processor_count = max(processor_count, 1)
+
+    if db is None:
+        return processor_count
+
+    from app.repositories.postgres.approval_repository import ApprovalRequestRepository
+
+    db_count = ApprovalRequestRepository.count_pending_for_job(
+        db=db,
+        tenant_id=job.tenant_id,
+        job_id=job.job_id,
+    )
+    try:
+        db_count = max(0, int(db_count))
+    except (TypeError, ValueError):
+        db_count = 0
+    return max(processor_count, db_count)
+
+
+def enrich_job_response_data(job: Job, db: Session | None = None) -> dict[str, Any]:
+    """Build job API payload with pending-approval visibility applied."""
+    data = job.model_dump()
+    pending_count = count_pending_approvals_for_job(job, db=db)
+    data["has_pending_approvals"] = pending_count > 0
+    data["pending_approvals_count"] = pending_count
+    if pending_count > 0:
+        data["status"] = JobStatus.AWAITING_APPROVAL.value
+    return data
 
 
 def _build_resolution_result(

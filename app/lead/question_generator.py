@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 # Swedish question templates per field
 _FIELD_QUESTIONS: dict[str, str] = {
-    "address":                   "Adress (gatuadress och ort)",
+    "address":                    "Adress (gatuadress och ort)",
     "roof_type":                  "Taktyp (t.ex. betongpannor, plåt, tegelpannor)",
     "annual_consumption":         "Ungefärlig årsförbrukning (kWh/år)",
     "installation_timeline":      "När vill du komma igång ungefär?",
@@ -29,7 +29,7 @@ _FIELD_QUESTIONS: dict[str, str] = {
     "roof_angle":                 "Takvinkel (ungefärlig lutning i grader)",
     "current_electricity_cost":   "Nuvarande elkostnad (kr/kWh eller elräkning per år)",
     "solar_exists":               "Har du redan solceller installerade?",
-    "battery_capacity_preference":"Önskad batterikapacitet (kWh)",
+    "battery_capacity_preference": "Önskad batterikapacitet (kWh)",
     "property_type":              "Fastighetstyp (villa, radhus, lägenhet, lokal m.m.)",
     "charger_count":              "Antal laddpunkter du behöver",
     "main_fuse":                  "Huvudsäkringens storlek (ampere)",
@@ -47,6 +47,21 @@ _FIELD_QUESTIONS: dict[str, str] = {
     "contact_phone":              "Telefonnummer",
     "contact_email":              "E-postadress",
     "notes":                      "Övrig information du vill dela",
+    # EV charger specific
+    "desired_location":           "Önskad placering av laddboxen",
+    "distance_panel_to_charger":  "Ungefärligt avstånd från elskåpet till laddplatsen (meter)",
+    "charger_preference":         "Har du ett föredraget laddboxmärke? (Zaptec, Easee, m.fl.)",
+    # Battery/solar specific
+    "inverter_brand_model":       "Vilket märke och modell har din växelriktare? (t.ex. SolarEdge, Huawei, Fronius) Skicka gärna en bild.",
+    "backup_requirement":         "Är backup vid strömavbrott ett krav, eller mer ett önskemål?",
+    "photo_inverter_cabinet":     "Skicka gärna en bild på elskåpet och växelriktaren",
+    # VVS specific
+    "water_shut_off":             "Har du stängt av vattnet? Om läckan är kraftig — stäng av stoppkranen.",
+    "active_leak":                "Läcker det aktivt just nu?",
+    "location_of_issue":          "Var är problemet? (t.ex. badrum, kök, källare)",
+    # Building specific
+    "project_description":        "Beskriv projektet kort (mått, material, önskemål)",
+    "desired_timing":             "Ungefärlig tidsplan — när vill du ha det klart?",
 }
 
 _COMPLETENESS_THRESHOLD = 0.7

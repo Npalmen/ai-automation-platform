@@ -26,8 +26,16 @@ ServiceContext = Literal[
 ]
 
 # Signals checked in specificity order — first match wins.
-# More specific/distinctive signals come first to avoid false positives.
+# urgent_issue must come BEFORE repair_or_fault to avoid false-negative safety cases.
 _CONTEXT_SIGNALS: list[tuple[ServiceContext, list[str]]] = [
+    ("urgent_issue", [
+        "akut", "asap", "snarast möjligt", "idag om möjligt", "hjälp idag",
+        "brinner", "brand", "vattenläcka", "översvämning",
+        "barn hemma", "vi har barn", "omedelbart",
+        # Electrical safety signals
+        "luktar bränt", "bränt lukt", "bränt", "gnistor", "gnistrar",
+        "livsfarligt", "brandrisk", "elstöt",
+    ]),
     ("repair_or_fault", [
         "fungerar inte", "fungerar ej", "slutat fungera", "slutar fungera",
         "inte längre", "laddar inte", "laddar inte längre", "laddar inte alls",
@@ -39,17 +47,24 @@ _CONTEXT_SIGNALS: list[tuple[ServiceContext, list[str]]] = [
         "strömmen borta", "strömbortfall", "ingen ström",
         "säkringen löser", "säkring slår", "jordfelsbrytaren löser",
         "larm", "varningssignal", "varnar",
-    ]),
-    ("urgent_issue", [
-        "akut", "asap", "snarast möjligt", "idag om möjligt", "hjälp idag",
-        "brinner", "brand", "vattenläcka", "översvämning",
-        "barn hemma", "vi har barn", "omedelbart",
+        # Solar low-production
+        "producerar dåligt", "dålig produktion", "lägre produktion",
+        "mycket lägre", "nästan ingenting", "produktion minskat",
+        # VVS faults
+        "läcker", "droppande", "vattenskada", "stopp i", "igensatt",
+        "blockerat avlopp", "avloppsstopp",
     ]),
     ("unclear_followup", [
         "kolla läget", "följde upp", "hörde inte", "inte hört något",
         "inte hört ifrån er", "hör av sig", "tänkte bara kolla",
         "undrar om ni", "som jag nämnde", "tidigare mejl", "förra veckan",
         "återkoppling", "uppdatering på",
+        # Dissatisfied/complaint signals
+        "missnöjd", "inte nöjd", "ingen har ringt", "ingen ringde",
+        "inte hört av er", "väntat länge",
+        # Vague callback
+        "ring mig", "kan du ringa", "ring när du kan", "ring oss",
+        "kontakta mig", "kontakta oss",
     ]),
     ("price_shopping", [
         "billigast", "billigaste alternativet", "jämföra priser",

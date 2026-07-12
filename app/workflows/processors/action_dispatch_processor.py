@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.audit_service import create_audit_event
 from app.domain.workflows.models import Job
 from app.repositories.postgres.action_execution_repository import ActionExecutionRepository
+from app.service_profiles.name_extraction import resolve_customer_name
 from app.workflows.action_executor import execute_action
 from app.workflows.intelligence_safety import assess_content_risk
 from app.workflows.processors.ai_processor_utils import (
@@ -38,12 +39,13 @@ _LEAD_SLA_TARGET_MINUTES = 15
 _PROFILE_OPENERS: dict[str, str] = {
     "battery_storage":          "Absolut, ett batterilager till befintlig solcellsanläggning kan vi ordna.",
     "solar_installation":       "Kul att du är intresserad av solceller!",
+    "solar_service":            "Absolut, det kan vi kika på.",
     "ev_charger_installation":  "Vi installerar laddboxar — bra val med elbil!",
     "ev_charger_fault":         "Tråkigt att laddboxen strular — vi kollar upp det.",
-    "electrical_fault":         "Vi hjälper till med elfelsökning.",
+    "electrical_fault":         "Vi hjälper till med felsökningen.",
     "electrical_panel":         "Elcentralsbyte — det fixar vi.",
-    "inverter_support":         "Vi tittar gärna på växelriktarproblemet.",
-    "vvs_service":              "VVS är ingen fara — vi hjälper till.",
+    "inverter_support":         "Vi tittar gärna på det.",
+    "vvs_service":              "Vi fixar det — berätta lite mer.",
     "building_project":         "Kul projekt — vi tar gärna en titt!",
 }
 
@@ -216,16 +218,68 @@ def _build_sensitive_customer_ack(
     source_thread_id: str | None = None,
     source_internet_message_id: str | None = None,
     use_thread_reply: bool = False,
+    risk_categories: list[str] | None = None,
 ) -> dict[str, Any]:
+    closing = f"\n\nVänliga hälsningar\n{signature_name}" if signature_name else ""
+    first = _first_name(sender_name)
+    greeting = f"Hej {first}," if first else "Hej,"
+
+    risk_cats = risk_categories or []
+
+    if "safety_risk" in risk_cats:
+        body = (
+            f"{greeting}\n\n"
+            "Vi har tagit emot ditt ärende.\n\n"
+            "Om det luktar bränt, gnistrar eller känns osäkert — bryt strömmen om det kan göras säkert "
+            "och kontakta oss direkt per telefon eller ring SOS 112 vid akut fara.\n\n"
+            "Vi prioriterar ditt ärende och återkommer snarast."
+            f"{closing}"
+        )
+    else:
+        body = (
+            f"{greeting}\n\n"
+            "Vi har tagit emot ditt ärende och skickar det vidare "
+            "till ansvarig handläggare för manuell bedömning.\n\n"
+            "Vi återkommer när ärendet har granskats. Det här automatiska svaret innebär "
+            "inte något juridiskt eller ekonomiskt ställningstagande."
+            f"{closing}"
+        )
+    return {
+        "type": action_type,
+        "tenant_id": tenant_id,
+        "to": to,
+        "subject": subject,
+        "body": body,
+        "thread_id": source_thread_id if use_thread_reply else None,
+        "in_reply_to": source_internet_message_id if use_thread_reply else None,
+        "references": source_internet_message_id if use_thread_reply else None,
+        "_needs_approval": True,
+        "_approval_reason": "sensitive_case_requires_human_review",
+    }
+
+
+def _build_complaint_customer_ack(
+    *,
+    action_type: str,
+    tenant_id: str,
+    to: str,
+    subject: str,
+    sender_name: str,
+    signature_name: str,
+    source_thread_id: str | None = None,
+    source_internet_message_id: str | None = None,
+    use_thread_reply: bool = False,
+) -> dict[str, Any]:
+    """Return a calm, apologetic acknowledgement for dissatisfied customers."""
     closing = f"\n\nVänliga hälsningar\n{signature_name}" if signature_name else ""
     first = _first_name(sender_name)
     greeting = f"Hej {first}," if first else "Hej,"
     body = (
         f"{greeting}\n\n"
-        "Vi har tagit emot ditt ärende och skickar det vidare "
-        "till ansvarig handläggare för manuell bedömning.\n\n"
-        "Vi återkommer när ärendet har granskats. Det här automatiska svaret innebär "
-        "inte något juridiskt eller ekonomiskt ställningstagande."
+        "Vi beklagar att du haft en negativ upplevelse — det tar vi på allvar.\n\n"
+        "Ditt ärende har flaggats för manuell hantering och en ansvarig handläggare "
+        "kommer att återkomma till dig inom kort.\n\n"
+        "Tack för att du hör av dig."
         f"{closing}"
     )
     return {
@@ -238,7 +292,7 @@ def _build_sensitive_customer_ack(
         "in_reply_to": source_internet_message_id if use_thread_reply else None,
         "references": source_internet_message_id if use_thread_reply else None,
         "_needs_approval": True,
-        "_approval_reason": "sensitive_case_requires_human_review",
+        "_approval_reason": "complaint_requires_human_review",
     }
 
 
@@ -274,6 +328,11 @@ def _build_lead_default_actions(
         sender_email=sender_email,
         internal_recipient=internal_recipient,
     )
+
+    # Resolve the display name for greetings: prefer body signature over sender name.
+    # Handles demo/test emails where sender is the tenant owner but customer name
+    # is in the body signature ("Mvh Anders", "Med vänlig hälsning Per", etc.)
+    display_name = resolve_customer_name(sender_name, message_text)
 
     sender_label = sender_name or sender_email or "Okänd avsändare"
     item_name = f"Lead: {sender_label} - {subject}"[:80].rstrip()
@@ -314,23 +373,25 @@ def _build_lead_default_actions(
     elif not customer_to:
         actions.append(_build_skipped_action("send_customer_auto_reply", "no_customer_email"))
     elif risk["risk_detected"]:
-        reply_subject = f"Re: {subject}" if subject and subject != "Lead" else "Tack för ditt mejl"
+        reply_subject = f"Re: {subject}" if subject and subject != "Lead" else "Re: ditt ärende"
         actions.append(_build_sensitive_customer_ack(
             action_type="send_customer_auto_reply",
             tenant_id=job.tenant_id,
             to=customer_to,
             subject=reply_subject,
-            sender_name=sender_name,
+            sender_name=display_name,
             signature_name=signature_name,
             source_thread_id=source_thread_id,
             source_internet_message_id=source_internet_message_id,
             use_thread_reply=use_thread_reply,
+            risk_categories=risk.get("categories") or [],
         ))
     else:
         closing = f"\n\nVänliga hälsningar\n{signature_name}" if signature_name else ""
-        reply_subject = f"Re: {subject}" if subject and subject != "Lead" else "Tack för ditt mejl"
+        reply_subject = f"Re: {subject}" if subject and subject != "Lead" else "Re: ditt ärende"
 
-        first = _first_name(sender_name)
+        # Use resolved display name (prefers body sig over sender name for demos)
+        first = _first_name(display_name) or _first_name(sender_name)
         greeting = f"Hej {first}," if first else "Hej,"
 
         if profile_question_message:
@@ -360,7 +421,6 @@ def _build_lead_default_actions(
                 )
             auto_reply_body = (
                 f"{greeting}\n\n"
-                "Tack för att du hör av dig — kul att du kontaktar oss!\n\n"
                 "Skicka gärna svar på:\n"
                 f"{chr(10).join(lead_questions)}"
                 f"{closing}"
@@ -382,10 +442,18 @@ def _build_lead_default_actions(
     else:
         phone_line = f"Telefon:      {sender_phone}\n" if sender_phone else ""
         city = ""
-        entities = get_latest_processor_payload(job, "entity_extraction_processor")
-        if entities:
-            city = (entities.get("entities") or {}).get("city") or ""
+        entities_payload = get_latest_processor_payload(job, "entity_extraction_processor")
+        if entities_payload:
+            city = (entities_payload.get("entities") or {}).get("city") or ""
         city_line = f"Ort:          {city}\n" if city else ""
+
+        # Enrich handoff with profile/context from lead_analyzer
+        profile_type = lead_analyzer_payload.get("service_profile_type") or ""
+        profile_missing = lead_analyzer_payload.get("profile_missing_fields") or []
+        profile_line = f"Profil:       {profile_type}\n" if profile_type else ""
+        missing_line = f"Saknad info:  {', '.join(profile_missing)}\n" if profile_missing else ""
+        risk_line = f"Risk:         {', '.join(risk['categories'])}\n" if risk["risk_detected"] else ""
+
         handoff_body = (
             f"Nytt lead inkom.\n\n"
             f"Prioritet:    {priority.upper()}\n"
@@ -393,6 +461,9 @@ def _build_lead_default_actions(
             f"E-post:       {sender_email or '(okänd)'}\n"
             f"{phone_line}"
             f"{city_line}"
+            f"{profile_line}"
+            f"{missing_line}"
+            f"{risk_line}"
             f"Ämne:         {subject}\n\n"
             f"Meddelande:\n{message_text or '(inget meddelande)'}\n\n"
             f"Förslag nästa steg: {'Manuell granskning' if risk['risk_detected'] else (recommended_next_step or 'Kontakta kunden')}\n\n"
@@ -462,6 +533,9 @@ def _build_inquiry_default_actions(
         internal_recipient=internal_recipient,
     )
 
+    # Resolve display name: prefer body signature over Gmail sender name
+    display_name = resolve_customer_name(sender_name, message_text)
+
     priority = classify_inquiry_priority(subject, message_text)
     completeness = evaluate_information_completeness("customer_inquiry", input_data)
     risk = assess_content_risk(input_data)
@@ -496,11 +570,32 @@ def _build_inquiry_default_actions(
 
     actions: list[dict[str, Any]] = []
 
+    # Read ticket_type from support_analyzer for complaint/emergency detection
+    _support_analysis = support_analyzer_payload.get("support_analysis") or {}
+    _ticket_type = _support_analysis.get("ticket_type") or ""
+    _is_complaint = _ticket_type == "complaint" or any(
+        c in (risk.get("categories") or []) for c in ("complaint",)
+    )
+
     # Customer auto-reply: empathetic and action-oriented.
     if not followups_enabled:
         actions.append(_build_skipped_action("send_customer_auto_reply", "followups_enabled=false"))
     elif not customer_to:
         actions.append(_build_skipped_action("send_customer_auto_reply", "no_customer_email"))
+    elif _is_complaint:
+        # Dissatisfied customer: calm, apologetic reply — never generic ack
+        reply_subject = f"Re: {subject}" if subject and subject != "Support" else "Re: ditt ärende"
+        actions.append(_build_complaint_customer_ack(
+            action_type="send_customer_auto_reply",
+            tenant_id=job.tenant_id,
+            to=customer_to,
+            subject=reply_subject,
+            sender_name=display_name,
+            signature_name=signature_name,
+            source_thread_id=source_thread_id,
+            source_internet_message_id=source_internet_message_id,
+            use_thread_reply=use_thread_reply,
+        ))
     elif risk["risk_detected"]:
         reply_subject = f"Re: {subject}" if subject and subject != "Support" else "Re: ditt ärende"
         actions.append(_build_sensitive_customer_ack(
@@ -508,11 +603,12 @@ def _build_inquiry_default_actions(
             tenant_id=job.tenant_id,
             to=customer_to,
             subject=reply_subject,
-            sender_name=sender_name,
+            sender_name=display_name,
             signature_name=signature_name,
             source_thread_id=source_thread_id,
             source_internet_message_id=source_internet_message_id,
             use_thread_reply=use_thread_reply,
+            risk_categories=risk.get("categories") or [],
         ))
     else:
         closing = f"\n\nVänliga hälsningar\n{signature_name}" if signature_name else ""
@@ -523,17 +619,15 @@ def _build_inquiry_default_actions(
         )
         reply_subject = f"Re: {subject}" if subject and subject != "Support" else "Re: ditt ärende"
 
-        first = _first_name(sender_name)
+        # Use resolved display name (prefers body sig name over Gmail sender)
+        first = _first_name(display_name) or _first_name(sender_name)
         greeting = f"Hej {first}," if first else "Hej,"
 
         if support_profile_question:
-            # Use service-profile-specific questions from support_analyzer_processor.
-            support_profile_type = support_analyzer_payload.get("service_profile_type") or ""
-            opener = _profile_opener(support_profile_type)
-            opener_block = f"{opener}\n\n" if opener else ""
+            # The profile question message already starts with the profile's
+            # follow_up_intro so we do not add a separate opener — it would repeat.
             auto_reply_body = (
                 f"{greeting}\n\n"
-                f"{opener_block}"
                 f"{urgency_line}"
                 f"{support_profile_question}"
                 f"{closing}"
@@ -571,17 +665,43 @@ def _build_inquiry_default_actions(
         actions.append(_build_skipped_action("send_internal_handoff", "no_internal_recipient"))
     else:
         phone_line = f"Telefon:   {sender_phone}\n" if sender_phone else ""
-        email_subject = f"Ny kundfråga [{priority}]" if priority == "HIGH" else "Ny kundfråga"
+
+        # Enrich handoff with profile/ticket context from support_analyzer
+        support_profile_type = support_analyzer_payload.get("service_profile_type") or ""
+        _support_urgency = _support_analysis.get("urgency") or ""
+        _support_missing = (support_analyzer_payload.get("support_missing_info") or {}).get("missing_fields") or []
+        profile_line = f"Profil:    {support_profile_type}\n" if support_profile_type else ""
+        ticket_line = f"Ärendetyp: {_ticket_type}\n" if _ticket_type else ""
+        urgency_line_h = f"Angeläget: {_support_urgency}\n" if _support_urgency else ""
+        missing_line = f"Saknar:    {', '.join(_support_missing)}\n" if _support_missing else ""
+        risk_line = f"Risk:      {', '.join(risk['categories'])}\n" if risk["risk_detected"] else ""
+        complaint_flag = "⚠️ KUND MISSNÖJD — hantera manuellt och kontakta kunden direkt.\n\n" if _is_complaint else ""
+        safety_flag = "🔴 SÄKERHETSRISK — prioritera och hantera omedelbart.\n\n" if "safety_risk" in (risk.get("categories") or []) else ""
+
+        if _is_complaint:
+            email_subject = f"⚠️ Missnöjd kund [{priority}]: {sender_label}"
+        elif priority == "HIGH" or "safety_risk" in (risk.get("categories") or []):
+            email_subject = f"🔴 Kundfråga [{priority}]: {sender_label}"
+        else:
+            email_subject = f"Ny kundfråga: {sender_label}"
+
         handoff_body = (
+            f"{complaint_flag}"
+            f"{safety_flag}"
             f"Ny kundfråga inkom.\n\n"
             f"Prioritet: {priority}\n"
             f"Från:      {sender_label}\n"
             f"E-post:    {sender_email or '(okänd)'}\n"
             f"{phone_line}"
+            f"{profile_line}"
+            f"{ticket_line}"
+            f"{urgency_line_h}"
+            f"{missing_line}"
+            f"{risk_line}"
             f"Ämne:      {subject}\n"
             f"Källa:     {source}\n\n"
             f"Meddelande:\n{message_text or '(inget meddelande)'}\n\n"
-            f"Förslag nästa steg: {'Manuell granskning' if risk['risk_detected'] else 'Kontakta kunden inom 24 h'}\n\n"
+            f"Förslag nästa steg: {'Manuell granskning' if (risk['risk_detected'] or _is_complaint) else 'Kontakta kunden inom 24 h'}\n\n"
             f"Job ID:    {job.job_id}\n"
             f"Tenant:    {job.tenant_id}"
         )
@@ -864,18 +984,20 @@ def _read_automation_settings(job: Job, db: Session | None) -> dict[str, Any]:
         return {}
 
 
-def _email_needs_approval(job_type: str, automation_settings: dict[str, Any]) -> bool:
-    """Return True when customer emails for this job type require manual approval.
-
-    Approval is required when auto_actions[job_type] is falsy or explicitly 'manual'.
-    auto_actions[job_type] == True / 'full_auto' / 'semi' → execute immediately.
-    auto_actions[job_type] missing / False / 'manual' → approval required.
-    """
+def _email_auto_execute_allowed(job_type: str, automation_settings: dict[str, Any]) -> bool:
+    """Return True only when auto_actions explicitly permits immediate email send."""
     auto_actions = automation_settings.get("auto_actions") or {}
     value = auto_actions.get(job_type)
-    if value is None or value is False or value == "manual":
-        return True
-    return False
+    return value is True or value == "auto" or value == "full_auto"
+
+
+def _email_needs_approval(job_type: str, automation_settings: dict[str, Any]) -> bool:
+    """Return True when outbound emails for this job type require manual approval.
+
+    Fail-closed: None, False, 'manual', and 'semi' all require approval.
+    Only explicit True, 'auto', or 'full_auto' may bypass approval.
+    """
+    return not _email_auto_execute_allowed(job_type, automation_settings)
 
 
 def _build_email_approval_action(action: dict[str, Any]) -> dict[str, Any]:
@@ -1067,7 +1189,7 @@ def process_action_dispatch_job(job: Job, db: Session | None = None) -> Job:
             continue
 
         try:
-            executed = execute_action(action)
+            executed = execute_action(action, db=db)
             executed_actions.append(executed)
             _persist_successful_action(
                 db=db,

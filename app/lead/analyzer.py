@@ -49,6 +49,19 @@ _LEAD_TYPE_KEYWORDS: list[tuple[LeadType, list[str]]] = [
         "biowash", "takhögertryckstvätt", "högtryckstvätt tak",
         "taktvättning",
     ]),
+    ("building_project", [
+        "förråd", "friggebod", "snickare", "snickeri",
+        "bygga förråd", "bygga altan", "bygga carport",
+        "altan", "terrass", "pergola",
+        "renovering", "renovera", "ombyggnad", "tillbyggnad",
+        "badrum renovera", "renovera badrum", "badrumsrenovering",
+        "byggarbete", "byggjobb", "attefallsåtgärd",
+    ]),
+    ("vvs_service", [
+        "vattenläcka", "läckage", "rörmokar", "rörmokare", "vvs", "rörmokeri",
+        "avlopp", "toalett", "diskbänk", "kran läcker", "rör läcker",
+        "droppande", "läcker vatten",
+    ]),
 ]
 
 # ready_to_buy > comparing > researching (first match wins in that order)

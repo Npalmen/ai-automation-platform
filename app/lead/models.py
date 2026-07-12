@@ -11,6 +11,8 @@ LeadType = Literal[
     "roof_painting",
     "electrical_work",
     "battery_storage",
+    "building_project",
+    "vvs_service",
     "unknown",
 ]
 

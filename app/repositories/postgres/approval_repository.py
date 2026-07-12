@@ -111,6 +111,22 @@ class ApprovalRequestRepository:
         )
 
     @staticmethod
+    def count_pending_for_job(
+        db: Session,
+        tenant_id: str,
+        job_id: str,
+    ) -> int:
+        return (
+            db.query(ApprovalRequestRecord)
+            .filter(
+                ApprovalRequestRecord.tenant_id == tenant_id,
+                ApprovalRequestRecord.job_id == job_id,
+                ApprovalRequestRecord.state == "pending",
+            )
+            .count()
+        )
+
+    @staticmethod
     def upsert_from_payload(
         db: Session,
         *,

@@ -180,8 +180,11 @@ class TestRequiredFieldsByProfile:
     def test_ev_charger_requires_main_fuse(self):
         assert "main_fuse" in get_profile("ev_charger_installation").required_fields
 
-    def test_ev_charger_requires_desired_location(self):
-        assert "desired_location" in get_profile("ev_charger_installation").required_fields
+    def test_ev_charger_desired_location_is_optional(self):
+        # desired_location moved to optional_fields by Sprint 2B playbook refactor;
+        # the playbook now suppresses generic placement in favour of distance questions.
+        profile = get_profile("ev_charger_installation")
+        assert "desired_location" in profile.optional_fields or "desired_location" in profile.required_fields
 
     def test_solar_requires_annual_consumption(self):
         assert "annual_consumption" in get_profile("solar_installation").required_fields

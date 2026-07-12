@@ -808,7 +808,8 @@ def get_job(
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
 
-    return JobResponse(**job.model_dump())
+    from app.workflows.approval_service import enrich_job_response_data
+    return JobResponse(**enrich_job_response_data(job, db))
 
 
 @app.get("/jobs", response_model=JobListResponse)
@@ -822,8 +823,9 @@ def list_jobs(
     jobs = JobRepository.list_jobs(db, tenant_id=tenant_id, limit=limit, offset=offset)
     total = JobRepository.count_jobs(db, tenant_id=tenant_id)
 
+    from app.workflows.approval_service import enrich_job_response_data
     return JobListResponse(
-        items=[JobResponse(**job.model_dump()) for job in jobs],
+        items=[JobResponse(**enrich_job_response_data(job, db)) for job in jobs],
         total=total,
     )
 
@@ -930,7 +932,7 @@ def _resolve_email_approval(
         delivery = approval.delivery_payload or {}
         if delivery:
             try:
-                send_result = execute_action(delivery)
+                send_result = execute_action(delivery, db=db)
             except Exception as exc:
                 send_error = str(exc)
                 # Do not raise — record the failure but complete the approval
@@ -1020,7 +1022,8 @@ def approve_request(
         note=request.note,
     )
 
-    return JobResponse(**job.model_dump())
+    from app.workflows.approval_service import enrich_job_response_data
+    return JobResponse(**enrich_job_response_data(job, db))
 
 
 @app.post("/approvals/{approval_id}/reject")
@@ -1079,7 +1082,8 @@ def reject_request(
         note=request.note,
     )
 
-    return JobResponse(**job.model_dump())
+    from app.workflows.approval_service import enrich_job_response_data
+    return JobResponse(**enrich_job_response_data(job, db))
 
 
 @app.get("/processors")

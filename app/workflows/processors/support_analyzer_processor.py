@@ -15,7 +15,9 @@ When db is provided, loads TenantSupportContext for tenant-aware analysis.
 from __future__ import annotations
 
 from app.domain.workflows.models import Job
-from app.service_profiles import select_profile
+from app.service_profiles import select_profile, compute_profile_missing_info
+from app.service_profiles.context import detect_service_context
+from app.service_profiles.qualification import compute_playbook_questions
 from app.support.analyzer import analyze_support
 from app.support.missing_info import compute_support_missing_info
 from app.support.next_action import decide_support_next_action
@@ -68,11 +70,38 @@ def process_support_analyzer_job(job: Job, db=None) -> Job:
             analysis, missing_info, priority, tenant_auto_actions, tenant_ctx
         )
 
-        # 6. Question message (if needed) — uses service profile for non-emergency tickets
+        # 6. Question message — uses playbook-aware selection for richer, context-relevant questions.
         question_message: str | None = None
-        if should_ask_questions(missing_info.completeness_score):
+        profile_missing_info = compute_profile_missing_info(service_profile, input_data, entities)
+        profile_missing_fields = profile_missing_info.get("missing_fields") or []
+        profile_optional_missing = profile_missing_info.get("missing_optional_fields") or []
+
+        # Detect service context for playbook-aware question selection
+        _combined_text = f"{input_data.get('subject', '')} {input_data.get('message_text', '')}".strip()
+        _service_context = detect_service_context(_combined_text)
+
+        # Use playbook questions (context-aware suppress/priority/extra fields)
+        playbook_result = compute_playbook_questions(
+            service_profile, input_data, entities,
+            service_context=_service_context,
+            max_questions=4,
+        )
+        playbook_fields = playbook_result.get("selected_fields") or []
+
+        # Merge: playbook fields (with context suppression/priority) + generic missing +
+        # profile optional fields (for service-specific diagnostics like inverter model, water shutoff)
+        all_profile_missing = list(dict.fromkeys(profile_missing_fields + profile_optional_missing))
+        all_missing = list(dict.fromkeys(
+            (playbook_fields or []) + [
+                f for f in (missing_info.missing_fields + profile_optional_missing)
+                if f not in (playbook_fields or [])
+            ]
+        ))
+
+        if should_ask_questions(missing_info.completeness_score) or all_profile_missing or playbook_fields:
+            q_fields = all_missing or missing_info.missing_fields
             question_message = generate_support_question_message(
-                missing_info.missing_fields,
+                q_fields,
                 ticket_type=analysis.ticket_type,
                 tenant_ctx=tenant_ctx,
                 input_data=input_data,
@@ -99,6 +128,9 @@ def process_support_analyzer_job(job: Job, db=None) -> Job:
             "support_status": support_status,
             "confidence": analysis.confidence,
             "service_profile_type": service_profile.service_type,
+            "service_context": _service_context,
+            "fact_states": playbook_result.get("fact_states") or {},
+            "suppressed_fields": playbook_result.get("suppressed_fields") or [],
         }
 
         if question_message:

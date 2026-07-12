@@ -84,18 +84,33 @@ def generate_support_question_message(
     is_emergency = ticket_type == "emergency"
     is_safety = _has_safety_risk(ticket_type, input_data)
 
-    # Use service-profile intro/labels for non-emergency, non-safety tickets
-    if service_profile is not None and not is_emergency and not is_safety:
+    # For non-emergency tickets: prefer the service profile's intro and question
+    # labels — they are more actionable (e.g. VVS water shutoff, inverter model).
+    # For emergency tickets: keep the AKUT header (tested contract) but still use
+    # profile-specific field labels where available for better quality.
+    if service_profile is not None and not is_emergency:
         from app.service_profiles.qualification import build_profile_question_message
         profile_msg = build_profile_question_message(service_profile, missing_fields, company_name)
         if profile_msg:
+            if is_safety:
+                profile_msg += f"\n\n⚠️ {_SAFETY_DISCLAIMER}"
             return profile_msg
 
-    # Build generic question list
+    # Build question list — use profile field labels where available.
+    profile_questions: dict[str, str] = (
+        service_profile.follow_up_questions if service_profile is not None else {}
+    )
+    seen: set[str] = set()
     questions = []
     for f in missing_fields:
-        label = _FIELD_LABELS.get(f) or f.replace("_", " ").capitalize()
-        questions.append(f"• {label}")
+        label = (
+            profile_questions.get(f)
+            or _FIELD_LABELS.get(f)
+            or f.replace("_", " ").capitalize()
+        )
+        if label not in seen:
+            seen.add(label)
+            questions.append(f"• {label}")
     body = "\n".join(questions)
 
     # Opening

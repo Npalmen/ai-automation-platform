@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.integrations.enums import IntegrationType
 from app.integrations.factory import get_integration_adapter
@@ -15,6 +15,9 @@ from app.integrations.service import (
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
 SUPPORTED_ACTIONS = {
     "send_email",
     "send_customer_auto_reply",
@@ -23,6 +26,14 @@ SUPPORTED_ACTIONS = {
     "notify_teams",
     "create_internal_task",
     "create_monday_item",
+}
+
+_ACTION_INTEGRATION_MAP: dict[str, IntegrationType] = {
+    "send_email": IntegrationType.GOOGLE_MAIL,
+    "send_customer_auto_reply": IntegrationType.GOOGLE_MAIL,
+    "send_internal_handoff": IntegrationType.GOOGLE_MAIL,
+    "notify_slack": IntegrationType.SLACK,
+    "create_monday_item": IntegrationType.MONDAY,
 }
 
 
@@ -270,7 +281,43 @@ def _build_monday_item_result(action: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def execute_action(action: dict[str, Any]) -> dict[str, Any]:
+def _build_integration_blocked_result(
+    action_type: str,
+    target: str | None,
+    payload: dict[str, Any],
+    integration: str,
+) -> dict[str, Any]:
+    return {
+        "type": action_type,
+        "status": "skipped",
+        "skip_reason": "integration_not_allowed",
+        "executed_at": _utcnow_iso(),
+        "target": target,
+        "provider": "none",
+        "payload": payload,
+        "integration_result": {
+            "skipped": True,
+            "reason": "integration_not_allowed",
+            "integration": integration,
+        },
+    }
+
+
+def _integration_allowed_for_action(
+    action_type: str,
+    tenant_id: str,
+    db: "Session | None" = None,
+) -> bool:
+    integration_type = _ACTION_INTEGRATION_MAP.get(action_type)
+    if integration_type is None:
+        return True
+
+    from app.integrations.policies import is_integration_enabled_for_tenant
+
+    return is_integration_enabled_for_tenant(tenant_id, integration_type, db=db)
+
+
+def execute_action(action: dict[str, Any], db: "Session | None" = None) -> dict[str, Any]:
     if not isinstance(action, dict):
         raise ValueError("Each action must be an object.")
 
@@ -289,6 +336,25 @@ def execute_action(action: dict[str, Any]) -> dict[str, Any]:
             "tenant_id": action.get("tenant_id"),
         },
     )
+
+    tenant_id = _get_tenant_id(action)
+    if not _integration_allowed_for_action(action_type, tenant_id, db=db):
+        integration = _ACTION_INTEGRATION_MAP[action_type].value
+        target = action.get("to") or action.get("item_name") or action.get("channel")
+        logger.info(
+            "Skipping workflow action — integration not allowed for tenant",
+            extra={
+                "action_type": action_type,
+                "tenant_id": tenant_id,
+                "integration": integration,
+            },
+        )
+        return _build_integration_blocked_result(
+            action_type=action_type,
+            target=str(target) if target is not None else None,
+            payload={k: v for k, v in action.items() if k != "type"},
+            integration=integration,
+        )
 
     if action_type in ("send_email", "send_customer_auto_reply", "send_internal_handoff"):
         result = _build_email_result(action)

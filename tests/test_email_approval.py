@@ -78,8 +78,11 @@ class TestEmailNeedsApproval:
     def test_full_auto_does_not_require_approval(self):
         assert _email_needs_approval("lead", {"auto_actions": {"lead": "full_auto"}}) is False
 
-    def test_semi_does_not_require_approval(self):
-        assert _email_needs_approval("lead", {"auto_actions": {"lead": "semi"}}) is False
+    def test_semi_requires_approval(self):
+        assert _email_needs_approval("lead", {"auto_actions": {"lead": "semi"}}) is True
+
+    def test_auto_string_does_not_require_approval(self):
+        assert _email_needs_approval("lead", {"auto_actions": {"lead": "auto"}}) is False
 
     def test_different_job_type_respected(self):
         settings = {"auto_actions": {"lead": True, "customer_inquiry": False}}
@@ -156,6 +159,13 @@ class TestLeadActionsEmailGate:
         actions = _build_lead_default_actions(job, settings)
         assert not any(a.get("_needs_approval") for a in actions)
 
+    def test_semi_wraps_email_actions(self):
+        job = self._lead_job()
+        settings = _settings_with_auto_actions("semi")
+        actions = _build_lead_default_actions(job, settings)
+        email_actions = [a for a in actions if a.get("type") in _EMAIL_ACTION_TYPES and not a.get("_skip")]
+        assert all(a.get("_needs_approval") for a in email_actions)
+
     def test_skipped_actions_not_wrapped(self):
         """Skipped sentinel actions (no sender_email) must not get _needs_approval."""
         job = _make_job(JobType.LEAD)
@@ -194,6 +204,13 @@ class TestInquiryActionsEmailGate:
         settings = {"auto_actions": {"customer_inquiry": True}}
         actions = _build_inquiry_default_actions(job, settings)
         assert not any(a.get("_needs_approval") for a in actions)
+
+    def test_semi_wraps_email_actions(self):
+        job = self._inquiry_job()
+        settings = {"auto_actions": {"customer_inquiry": "semi"}}
+        actions = _build_inquiry_default_actions(job, settings)
+        email_actions = [a for a in actions if a.get("type") in _EMAIL_ACTION_TYPES and not a.get("_skip")]
+        assert all(a.get("_needs_approval") for a in email_actions)
 
 
 # ---------------------------------------------------------------------------
@@ -240,7 +257,7 @@ class TestProcessActionDispatchEmailApproval:
 
         executed_types = []
 
-        def fake_execute(action):
+        def fake_execute(action, db=None):
             executed_types.append(action.get("type"))
             return {"type": action["type"], "status": "completed"}
 
@@ -526,6 +543,10 @@ class TestApproveRejectEndpointRouting:
             patch("app.main.ApprovalRequestRepository.get_by_approval_id", return_value=approval),
             patch("app.main._resolve_email_approval") as mock_email,
             patch("app.main.resolve_approval", return_value=fake_job),
+            patch(
+                "app.repositories.postgres.approval_repository.ApprovalRequestRepository.count_pending_for_job",
+                return_value=0,
+            ),
         ):
             approve_request(
                 approval_id="eml_endpoint_test",
