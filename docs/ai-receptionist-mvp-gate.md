@@ -1,0 +1,192 @@
+# AI Receptionist — MVP Gate
+
+> **Purpose:** Chapter-level verification checklist for the full AI Receptionist MVP flow.
+> Run this before opening to external/friend test customers.
+>
+> **When to run:** After all Sprint 1–3 changes are deployed to the live environment.
+> This gate verifies end-to-end behavior, not individual unit tests.
+>
+> **Who runs it:** Internal operator. Requires live server access, admin key, and tenant key.
+>
+> **Status options:**
+> - `PASS` — Criterion met, no action needed
+> - `PASS WITH NOTES` — Criterion met but with minor deviation; note it
+> - `BLOCKED` — Cannot verify (environment issue, missing config) — fix before continuing
+> - `FAIL` — Criterion not met — do not proceed to external tests
+
+---
+
+## Gate prerequisite checklist
+
+Before running the gate:
+
+- [ ] Server is running and `/health` returns `{"status": "ok", "env": "production"}`
+- [ ] A test tenant is set up using `docs/ai-receptionist-test-customer-onboarding.md`
+- [ ] Gmail label exists and test emails from `docs/ai-receptionist-test-mail-scenarios.md` are applied
+- [ ] Google Sheet created with tabs **Leads**, **Support**, **Logg** (if testing Sheets)
+- [ ] `auto_actions = false` for all job types — confirmed
+- [ ] `scheduler.run_mode = manual` — confirmed
+- [ ] No previous test jobs exist for this tenant (or use `GET /jobs` to establish baseline)
+
+---
+
+## Section A — Gmail ingestion
+
+| # | Check | Pass criteria | Status | Notes |
+|---|-------|---------------|--------|-------|
+| A1 | Dry-run scan finds correct emails | `dry_run=true` returns the expected email count (no extras) | | |
+| A2 | Live scan creates jobs | `jobs_created` = number of test emails sent | | |
+| A3 | Duplicate protection | Re-running scan does not duplicate jobs | | |
+| A4 | Job types are correct | Lead emails → `lead`, inquiry emails → `customer_inquiry` | | |
+| A5 | No external actions fired | All jobs show `external_actions_count = 0` immediately after scan | | |
+
+---
+
+## Section B — Playbook and reply quality
+
+Run for Scenarios 1–4 and 7 from test mail scenarios.
+
+| # | Check | Pass criteria | Status | Notes |
+|---|-------|---------------|--------|-------|
+| B1 | Customer name extracted correctly | Greeting uses correct name from email body signature | | |
+| B2 | EV charger asks correct questions | Asks main_fuse / panel distance; does NOT ask generic location | | |
+| B3 | Battery add-on suppresses wrong questions | Does NOT ask property_type; asks inverter/backup | | |
+| B4 | Battery classified separately from solar | `profile_type = battery_storage`, not `solar_installation` | | |
+| B5 | Solar issue asks relevant questions | Asks for production data, app readings, when issue started | | |
+| B6 | Building/carpentry generates intro question | Asks for timeline and scope | | |
+| B7 | Replies are non-binding | No legal/financial commitments in any auto-reply body | | |
+| B8 | No hallucinated content | Reply body refers only to what the customer mentioned | | |
+
+---
+
+## Section C — Safety and manual review routing
+
+Run for Scenarios 5 and 8 from test mail scenarios.
+
+| # | Check | Pass criteria | Status | Notes |
+|---|-------|---------------|--------|-------|
+| C1 | Emergency (luktar bränt) → manual_review | Job status = `manual_review`, no pending customer reply | | |
+| C2 | Complaint → manual_review | Job status = `manual_review`, no pending customer reply | | |
+| C3 | Emergency has internal handoff | `human_handoff_processor` payload exists in processor_history | | |
+| C4 | Complaint has internal handoff | `human_handoff_processor` payload exists in processor_history | | |
+| C5 | No auto-reply for C1/C2 | `GET /approvals/pending` shows ZERO approvals for these job IDs | | |
+
+---
+
+## Section D — Approval-first
+
+| # | Check | Pass criteria | Status | Notes |
+|---|-------|---------------|--------|-------|
+| D1 | Lead email has pending approval | Approval visible in `/approvals/pending` | | |
+| D2 | Support email has pending approval | Approval visible in `/approvals/pending` | | |
+| D3 | Approval type is `action_dispatch` | `type = action_dispatch`, `next_on_approve = email_send` | | |
+| D4 | Approval contains readable reply body | Body field is non-empty and readable Swedish | | |
+| D5 | Rejecting approval does not send email | After reject, no `gmail_send` event in `/integration-events` | | |
+| D6 | Approving sends to Gmail thread | After approve, email appears in correct Gmail thread (live check) | | |
+
+> Note: D6 requires a live Gmail send and is optional for internal-only tests. Mark `PASS WITH NOTES` if skipped.
+
+---
+
+## Section E — Google Sheets export
+
+| # | Check | Pass criteria | Status | Notes |
+|---|-------|---------------|--------|-------|
+| E1 | Lead job exports to Leads tab | Response: `{"status": "exported", "tab": "Leads"}` | | |
+| E2 | Support job exports to Support tab | Response: `{"status": "exported", "tab": "Support"}` | | |
+| E3 | Wrong tenant job returns 404 | Using a job_id from a different tenant returns HTTP 404 | | |
+| E4 | Missing spreadsheet_id returns blocked | Config without spreadsheet_id returns `configuration_missing` | | |
+| E5 | Row appears in spreadsheet | Verify row in Google Sheet (live check) | | |
+| E6 | Audit event created | `/audit-events` shows `action: google_sheets_export` | | |
+
+---
+
+## Section F — Tenant isolation
+
+| # | Check | Pass criteria | Status | Notes |
+|---|-------|---------------|--------|-------|
+| F1 | Test tenant cannot see other tenant jobs | `GET /jobs` with test key returns only test tenant jobs | | |
+| F2 | Test tenant cannot approve other tenant approvals | Approval from another tenant returns 404 | | |
+| F3 | Admin key rejected as tenant key | `GET /jobs` with admin key returns 403 | | |
+| F4 | Tenant key rejected on admin endpoints | `GET /admin/tenants` with tenant key returns 401 | | |
+
+---
+
+## Section G — Integration allowlist enforcement
+
+| # | Check | Pass criteria | Status | Notes |
+|---|-------|---------------|--------|-------|
+| G1 | google_sheets not in allowed → blocked | `export-job` returns `integration_not_allowed` | | |
+| G2 | No Monday writes triggered | `/integration-events` shows no `monday_create` events | | |
+| G3 | No Visma writes triggered | `/integration-events` shows no `visma_*` events | | |
+| G4 | No auto-send without approval | No `gmail_send` events in `/integration-events` before explicit approve | | |
+
+---
+
+## Section H — Observability and audit
+
+| # | Check | Pass criteria | Status | Notes |
+|---|-------|---------------|--------|-------|
+| H1 | Audit events are scoped to tenant | `/audit-events` shows only this tenant's events | | |
+| H2 | Workflow events visible | `step_started`/`step_completed` events present for each job | | |
+| H3 | No 500 errors in server logs | Server logs clean — no Traceback or 500 Internal Server Error | | |
+| H4 | No leaked secrets in any response | No token values in API responses | | |
+
+---
+
+## Gate result
+
+Fill in after running all checks:
+
+| Section | Status | Notes |
+|---------|--------|-------|
+| A — Gmail ingestion | | |
+| B — Playbook quality | | |
+| C — Safety routing | | |
+| D — Approval-first | | |
+| E — Sheets export | | |
+| F — Tenant isolation | | |
+| G — Allowlist enforcement | | |
+| H — Observability | | |
+| **Overall gate** | | |
+
+### GO criteria (all must be PASS or PASS WITH NOTES)
+
+- [ ] A1–A5 all PASS
+- [ ] B1–B8 all PASS (B7/B8 are critical — FAIL blocks proceed)
+- [ ] C1–C5 all PASS (any FAIL blocks proceed — safety routing must work)
+- [ ] D1–D5 all PASS (D6 may be PASS WITH NOTES)
+- [ ] E1–E4 PASS (E5 may be PASS WITH NOTES for internal-only)
+- [ ] F1–F4 all PASS (tenant isolation is non-negotiable)
+- [ ] G1–G4 all PASS (no unauthorized writes — non-negotiable)
+- [ ] H1–H4 all PASS
+
+### NO-GO criteria (any triggers a stop)
+
+- Any complaint or emergency email generates a pending customer auto-reply
+- Any email is sent without going through approval-first
+- Any cross-tenant data is returned
+- Any Monday or Visma write event appears without explicit configuration
+- Server logs contain 500 errors or leaked tokens during the gate run
+
+---
+
+## After gate
+
+If overall gate = PASS or PASS WITH NOTES with no blocking fails:
+
+→ Proceed to friend test using `docs/ai-receptionist-friend-test-guide.md`
+
+If gate BLOCKED or has any NO-GO:
+
+→ Fix the issue, re-run only the affected section, re-score.
+→ Do not run full pytest unless code was changed.
+→ Document the fix and re-run date in this file under "Gate run history".
+
+---
+
+## Gate run history
+
+| Date | Operator | Overall status | Notes |
+|------|----------|----------------|-------|
+| — | — | — | Not yet run |

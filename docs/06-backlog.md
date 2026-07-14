@@ -322,6 +322,29 @@ Full live verification plan: `docs/10-live-verification-plan.md` — production 
 
 ---
 
+### Sprint 3 — Google Sheets manual export (2026-07-14)
+
+- [x] **Google Sheets adapter created** — `app/integrations/google/sheets_client.py`: real `GoogleSheetsClient` (Sheets v4 REST API, appends rows via USER_ENTERED) and `MockGoogleSheetsClient` (in-memory, for tests). Uses existing Google OAuth access token.
+- [x] **Row mapper created** — `app/integrations/google/sheets_row_mapper.py`: `choose_tab()` for auto/explicit routing; `build_leads_row()` (12 cols), `build_support_row()` (12 cols), `build_logg_row()` (6 cols). Extracts sender, processor history fields, status, source.
+- [x] **Manual export endpoint added** — `POST /integrations/google-sheets/export-job` in `app/main.py`. Body: `{"job_id": "...", "target": "auto"|"leads"|"support"|"logg"}`. Auth: X-API-Key (tenant).
+- [x] **Tenant config support added** — `allowed_integrations` must include `"google_sheets"`. `settings.google_sheets.spreadsheet_id` must be set. Both fail-closed.
+- [x] **Audit event created on export** — `create_audit_event` called with `category="integration"`, `action="google_sheets_export"`, `status`, and `details` (job_id, tab, spreadsheet_id, error).
+- [x] **Integration event created on export** — `IntegrationEvent` row added with `integration_type="google_sheets"`, idempotency key, tab, spreadsheet_id, and status for observability.
+- [x] **Safety gates verified** — (1) `google_sheets` not in `allowed_integrations` → `integration_not_allowed`; (2) `spreadsheet_id` empty/missing → `configuration_missing`; (3) wrong-tenant job → 404; (4) no access token → `configuration_missing`; (5) no auto-export from Gmail processing.
+- [x] **Test suite added** — `tests/test_google_sheets_export.py`: 50 tests covering row mapper (choose_tab, build_leads_row, build_support_row, build_logg_row), MockGoogleSheetsClient, all endpoint safety gates, adapter called exactly once, audit event created, row_count in response, tenant-specific spreadsheet_id used, and no-auto-export pipeline checks.
+- [x] **Full test suite verified** — `python -m pytest --tb=no -q` → 3140 passed, 0 failed, 4 warnings (2026-07-14). Sprint 1, 2, 2B tests all unaffected.
+
+### Sprint 4 — AI Receptionist test-customer onboarding package (2026-07-15)
+
+- [x] **Onboarding checklist created** — `docs/ai-receptionist-test-customer-onboarding.md`: purpose, prerequisites, step-by-step tenant setup, API key handling, Gmail label/query setup, Google Sheet setup, approval-first settings, safety checklist, what NOT to enable, rollback/stop procedure, reference commands.
+- [x] **Test mail scenarios created** — `docs/ai-receptionist-test-mail-scenarios.md`: 8 core scenarios (EV charger, laddbox fault, battery add-on, solar issue, emergency, VVS, build/carpentry, complaint) with expected job_type, playbook, context, approval behavior, and sheet tab.
+- [x] **MVP Gate created** — `docs/ai-receptionist-mvp-gate.md`: chapter-level verification checklist (Sections A–H) covering Gmail ingestion, playbook quality, safety routing, approval-first, Sheets export, tenant isolation, allowlist enforcement, and observability. Clear PASS/PASS WITH NOTES/BLOCKED/FAIL status. GO/NO-GO criteria defined.
+- [x] **Friend test guide created** — `docs/ai-receptionist-friend-test-guide.md`: Swedish non-technical guide for test users explaining what Krowolf does, what to send, what to expect, feedback requested, and safety expectations.
+- [x] **Helper script created** — `scripts/print_ai_receptionist_test_setup.py`: prints tenant settings, Gmail setup, Sheets column/tab structure, safety checklist, and scenario table. Read-only, no dependencies. Syntax verified.
+- [x] **No code changed** — Sprint 4 is documentation only. No tests run (none required).
+- [x] **Deferred confirmed** — UI, Visma writes, Outlook/SMS, auto-export, and Monday remain deferred per master plan.
+- [x] **Next step defined** — Run `docs/ai-receptionist-mvp-gate.md` against live environment before first friend test.
+
 ## Now (pre-live blockers)
 
 ### Completed in Phase 2 prep

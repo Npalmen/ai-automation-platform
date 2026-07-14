@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-12 (Sprint 1 AI Receptionist safety fixes — nested settings persistence, email approval fail-closed for `semi`, integration `allowed_integrations` gating in action_executor, job pending-approval visibility in API/orchestrator. Full suite 2924 passed.)
+2026-07-15 (Sprint 4 test-customer onboarding package — 4 docs created, 1 helper script, no code changes, no tests run.)
 
 ## Verification method
 
@@ -24,8 +24,13 @@
 
 | Claim | Status | Detail |
 |-------|--------|--------|
-| Test suite runs | `Verified` | 2924 passed, 0 failed, 4 warnings (re-verified 2026-07-12 after Sprint 1 safety fixes) |
-| Test count: 2924 tests across 106 test files | `Verified` | Run 2026-07-12 after Sprint 1 regression tests added |
+| Test suite runs | `Verified` | 3140 passed, 0 failed, 4 warnings (re-verified 2026-07-14 after Sprint 3 Google Sheets export) |
+| Test count: 3140 tests across 107+ test files | `Verified` | Run 2026-07-14 after Sprint 3 export tests added |
+| Sprint 4: AI Receptionist test-customer onboarding package | `Added 2026-07-15` | `docs/ai-receptionist-test-customer-onboarding.md`, `docs/ai-receptionist-test-mail-scenarios.md`, `docs/ai-receptionist-mvp-gate.md`, `docs/ai-receptionist-friend-test-guide.md`, `scripts/print_ai_receptionist_test_setup.py` |
+| Sprint 3: Google Sheets manual export endpoint | `Verified — ADDED 2026-07-14` | `POST /integrations/google-sheets/export-job`; gated by `allowed_integrations` + `spreadsheet_id`; fail-closed; audit+integration events; 50 tests in `test_google_sheets_export.py` |
+| Sprint 3: Google Sheets adapter + mock | `Verified — ADDED 2026-07-14` | `GoogleSheetsClient` (real, Sheets v4 REST) and `MockGoogleSheetsClient` (in-memory, for tests) in `app/integrations/google/sheets_client.py` |
+| Sprint 3: Row mapper (Leads/Support/Logg) | `Verified — ADDED 2026-07-14` | `app/integrations/google/sheets_row_mapper.py`; Leads=12 cols, Support=12 cols, Logg=6 cols; extracts sender, processor history, status, source |
+| Sprint 3: No auto-export from Gmail pipeline | `Verified — CONFIRMED 2026-07-14` | gmail_adapter, lead_analyzer_processor, action_dispatch_processor, support_analyzer_processor contain no `google_sheets`/`append_row` references |
 | Sprint 1: nested tenant settings persist via deep-merge | `Verified — FIXED 2026-07-12` | `TenantConfigRepository.update_settings` uses `copy.deepcopy` + `flag_modified`; `tests/test_tenant_settings_persistence.py` |
 | Sprint 1: email `auto_actions=semi` requires approval | `Verified — FIXED 2026-07-12` | `_email_needs_approval` fail-closed; only `True`/`auto`/`full_auto` bypass; `tests/test_email_approval.py` |
 | Sprint 1: integration dispatch checks `allowed_integrations` | `Verified — FIXED 2026-07-12` | `action_executor.execute_action` skips with `integration_not_allowed`; `tests/test_integration_action_gating.py` |
@@ -641,6 +646,7 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 | `/integrations/fortnox/customers/lookup` | POST | Important |
 | `/integrations/fortnox/customers/create` | POST | Important |
 | `/integrations/fortnox/invoices/lookup` | POST | Important |
+| `/integrations/google-sheets/export-job` | POST | Important — Sprint 3; manual job-to-Sheets export; fail-closed |
 
 ### Dashboard and Cases
 

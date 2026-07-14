@@ -4963,6 +4963,170 @@ def fortnox_invoice_lookup(
     return {"invoices": invoices}
 
 
+# ── Google Sheets export ──────────────────────────────────────────────────────
+
+class GoogleSheetsExportRequest(_BaseModel):
+    job_id: str
+    target: str = "auto"  # "auto" | "leads" | "support" | "logg"
+
+
+@app.post("/integrations/google-sheets/export-job")
+def google_sheets_export_job(
+    request: GoogleSheetsExportRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Manually export a job row to the tenant's Google Sheets spreadsheet.
+
+    Safety gates:
+    - google_sheets must be in allowed_integrations (fail-closed).
+    - settings.google_sheets.spreadsheet_id must be configured.
+    - The job must belong to the authenticated tenant.
+    - No automatic export is triggered from Gmail processing.
+    """
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    from app.repositories.postgres.job_repository import JobRepository
+    from app.integrations.google.sheets_client import GoogleSheetsClient
+    from app.integrations.google.sheets_row_mapper import (
+        choose_tab,
+        build_leads_row,
+        build_support_row,
+        build_logg_row,
+        TAB_LEADS,
+        TAB_SUPPORT,
+    )
+    from app.core.audit_service import create_audit_event
+    from app.domain.integrations.models import IntegrationEvent
+
+    # 1. Verify google_sheets is allowed for this tenant
+    tenant_record = TenantConfigRepository.get(db, tenant_id)
+    allowed_integrations = (tenant_record.allowed_integrations or []) if tenant_record else []
+    if "google_sheets" not in allowed_integrations:
+        return {
+            "status": "blocked",
+            "reason": "integration_not_allowed",
+            "detail": "google_sheets is not in allowed_integrations for this tenant",
+        }
+
+    # 2. Verify spreadsheet_id is configured
+    tenant_settings = TenantConfigRepository.get_settings(db, tenant_id)
+    gs_settings = (tenant_settings or {}).get("google_sheets") or {}
+    spreadsheet_id = (gs_settings.get("spreadsheet_id") or "").strip()
+    if not spreadsheet_id:
+        return {
+            "status": "blocked",
+            "reason": "configuration_missing",
+            "detail": "google_sheets.spreadsheet_id is not configured for this tenant",
+        }
+
+    # 3. Load job — verify it belongs to this tenant (fail 404 if not)
+    job = JobRepository.get_job_by_id(db, tenant_id, request.job_id)
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found or does not belong to this tenant",
+        )
+
+    # 4. Validate target value
+    valid_targets = {"auto", "leads", "support", "logg"}
+    target = (request.target or "auto").lower()
+    if target not in valid_targets:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid target '{target}'. Allowed: {sorted(valid_targets)}",
+        )
+
+    # 5. Determine tab and build row
+    tab = choose_tab(job, target)
+    if tab == TAB_LEADS:
+        row = build_leads_row(job)
+    elif tab == TAB_SUPPORT:
+        row = build_support_row(job)
+    else:
+        row = build_logg_row(job, action="manual_export")
+
+    # 6. Build sheets client and append row
+    access_token = (
+        gs_settings.get("access_token")
+        or settings.GOOGLE_MAIL_ACCESS_TOKEN
+        or ""
+    ).strip()
+    if not access_token:
+        return {
+            "status": "blocked",
+            "reason": "configuration_missing",
+            "detail": "No Google access_token available for Sheets export",
+        }
+    sheets_client = GoogleSheetsClient(access_token=access_token)
+
+    # 7. Append row
+    export_status = "success"
+    error_detail: str | None = None
+    api_result: dict = {}
+    try:
+        api_result = sheets_client.append_row(
+            spreadsheet_id=spreadsheet_id,
+            tab_name=tab,
+            values=row,
+        )
+    except Exception as exc:
+        export_status = "failed"
+        error_detail = str(exc)
+
+    # 8. Create audit event
+    create_audit_event(
+        db=db,
+        tenant_id=tenant_id,
+        category="integration",
+        action="google_sheets_export",
+        status=export_status,
+        details={
+            "job_id": job.job_id,
+            "tab": tab,
+            "spreadsheet_id": spreadsheet_id,
+            "target": target,
+            "error": error_detail,
+        },
+    )
+
+    # 9. Create integration event for observability
+    from datetime import timezone as _tz
+    _now_ts = int(datetime.now(timezone.utc).timestamp())
+    ie = IntegrationEvent(
+        job_id=job.job_id,
+        tenant_id=tenant_id,
+        integration_type="google_sheets",
+        payload={
+            "tab": tab,
+            "spreadsheet_id": spreadsheet_id,
+            "target": target,
+            "row_count": len(row),
+        },
+        status=export_status,
+        idempotency_key=f"gs_export_{job.job_id}_{tab}_{_now_ts}",
+    )
+    db.add(ie)
+    db.commit()
+
+    if export_status == "failed":
+        return {
+            "status": "failed",
+            "spreadsheet_id": spreadsheet_id,
+            "tab": tab,
+            "job_id": job.job_id,
+            "error": error_detail,
+        }
+
+    return {
+        "status": "exported",
+        "spreadsheet_id": spreadsheet_id,
+        "tab": tab,
+        "job_id": job.job_id,
+        "row_count": len(row),
+        "api_result": api_result,
+    }
+
+
 def _extract_invoice_payload_from_history(record: JobRecord) -> dict:
     history = record.processor_history or []
     for entry in reversed(history):
