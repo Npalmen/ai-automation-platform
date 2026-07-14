@@ -41,6 +41,7 @@ from app.integrations.policies import is_integration_enabled_for_tenant
 from app.integrations.registry import IMPLEMENTED_INTEGRATIONS
 from app.integrations.schemas import IntegrationActionRequest
 from app.integrations.service import get_integration_connection_config
+from app.reporting.daily_report import generate_daily_report
 from app.repositories.postgres.action_execution_repository import ActionExecutionRepository
 from app.repositories.postgres.approval_repository import ApprovalRequestRepository
 from app.repositories.postgres.audit_repository import AuditRepository
@@ -1633,6 +1634,19 @@ def dashboard_summary(
 ):
     """Return today's job counts grouped by type and status for the tenant."""
     return _compute_summary(db, tenant_id)
+
+
+@app.get("/reports/daily-summary")
+def daily_summary_report(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+    since_hours: int = 24,
+):
+    """Generate a morning summary report for the tenant covering recent jobs.
+
+    Returns structured counts, top priorities, and a rendered Swedish text report.
+    """
+    return generate_daily_report(db, tenant_id=tenant_id, since_hours=since_hours)
 
 
 # ── ROI assumptions (minutes saved per handled item, hourly staff value) ──────

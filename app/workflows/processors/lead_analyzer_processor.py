@@ -156,11 +156,11 @@ def _infer_lead_status(next_action: str, input_data: dict) -> str:
     # If this is a continuation (customer replied), move to info_received
     if input_data.get("conversation_messages") and len(input_data["conversation_messages"]) > 1:
         if next_action in ("create_offer_draft", "ready_to_dispatch"):
-            return "offer_ready"
+            return "quote_draft_prepared"
         return "info_received"
     # Fresh lead
     if next_action == "ask_questions":
-        return "new"
+        return "waiting_for_customer"
     if next_action in ("create_offer_draft", "ready_to_dispatch"):
-        return "offer_ready"
+        return "quote_draft_prepared"
     return "new"

@@ -32,6 +32,7 @@ LeadStatus = Literal[
     "waiting_for_customer",
     "info_received",
     "offer_ready",
+    "quote_draft_prepared",
     "offer_sent",
     "won",
     "lost",
@@ -164,6 +165,12 @@ class OfferDraft:
         "confidence",
         "tenant_context_used",
         "context_sources",
+        "customer_name",
+        "customer_email",
+        "customer_phone",
+        "address",
+        "missing_fields",
+        "human_approval_required",
     )
 
     def __init__(
@@ -177,6 +184,12 @@ class OfferDraft:
         risk_points: list[str] | None = None,
         tenant_context_used: bool = False,
         context_sources: list[str] | None = None,
+        customer_name: str | None = None,
+        customer_email: str | None = None,
+        customer_phone: str | None = None,
+        address: str | None = None,
+        missing_fields: list[str] | None = None,
+        human_approval_required: bool = True,
     ) -> None:
         self.summary = summary
         self.recommended_next_step = recommended_next_step
@@ -187,6 +200,12 @@ class OfferDraft:
         self.confidence = confidence
         self.tenant_context_used = tenant_context_used
         self.context_sources: list[str] = context_sources or []
+        self.customer_name = customer_name
+        self.customer_email = customer_email
+        self.customer_phone = customer_phone
+        self.address = address
+        self.missing_fields: list[str] = missing_fields or []
+        self.human_approval_required = human_approval_required
 
     def to_dict(self) -> dict:
         return {
@@ -200,4 +219,10 @@ class OfferDraft:
             "disclaimer": "Preliminärt underlag — inte ett bindande erbjudande.",
             "tenant_context_used": self.tenant_context_used,
             "context_sources": self.context_sources,
+            "customer_name": self.customer_name,
+            "customer_email": self.customer_email,
+            "customer_phone": self.customer_phone,
+            "address": self.address,
+            "missing_fields": self.missing_fields,
+            "human_approval_required": self.human_approval_required,
         }

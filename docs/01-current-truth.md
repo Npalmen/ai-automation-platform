@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-15 (Sprint 4 test-customer onboarding package — 4 docs created, 1 helper script, no code changes, no tests run.)
+2026-07-15 (Sprint 5 Phase 1 value layer — quote draft enrichment, invoice routing, daily report, approval command parser, derived status helper. 25 new tests pass.)
 
 ## Verification method
 
@@ -24,8 +24,9 @@
 
 | Claim | Status | Detail |
 |-------|--------|--------|
-| Test suite runs | `Verified` | 3140 passed, 0 failed, 4 warnings (re-verified 2026-07-14 after Sprint 3 Google Sheets export) |
-| Test count: 3140 tests across 107+ test files | `Verified` | Run 2026-07-14 after Sprint 3 export tests added |
+| Test suite runs | `Verified` | 3165 passed, 0 failed (3140 pre-Sprint 5 + 25 new Sprint 5 tests; run 2026-07-15) |
+| Test count: 3165 tests | `Verified` | Run 2026-07-15 after Sprint 5 Phase 1 value layer |
+| Sprint 5: Phase 1 value layer | `Added 2026-07-15` | Quote draft enrichment, invoice routing, daily report, approval command parser, derived status. 25 tests in `tests/test_sprint5_phase1_value.py` |
 | Sprint 4: AI Receptionist test-customer onboarding package | `Added 2026-07-15` | `docs/ai-receptionist-test-customer-onboarding.md`, `docs/ai-receptionist-test-mail-scenarios.md`, `docs/ai-receptionist-mvp-gate.md`, `docs/ai-receptionist-friend-test-guide.md`, `scripts/print_ai_receptionist_test_setup.py` |
 | Sprint 3: Google Sheets manual export endpoint | `Verified — ADDED 2026-07-14` | `POST /integrations/google-sheets/export-job`; gated by `allowed_integrations` + `spreadsheet_id`; fail-closed; audit+integration events; 50 tests in `test_google_sheets_export.py` |
 | Sprint 3: Google Sheets adapter + mock | `Verified — ADDED 2026-07-14` | `GoogleSheetsClient` (real, Sheets v4 REST) and `MockGoogleSheetsClient` (in-memory, for tests) in `app/integrations/google/sheets_client.py` |
@@ -93,6 +94,21 @@
 | Support question generator: service_profile parameter | `Verified — IMPROVED 2026-07-06` | `generate_support_question_message` now accepts optional `service_profile`; uses `build_profile_question_message` for non-emergency/non-safety tickets; emergency and safety ticket types bypass profile and keep AKUT/disclaimer logic. |
 | `_has_safety_risk` handles ticket_type=="safety" | `Verified — FIXED 2026-07-06` | `_has_safety_risk` now returns True for ticket_type in ("emergency", "safety"), ensuring safety tickets always get safety disclaimer and bypass profile question generation. |
 | Duplicate `_resolve_customer_reply_target` call removed | `Verified — FIXED 2026-07-06` | Redundant second call in `action_dispatch_processor._build_lead_default_actions` removed; behavior unchanged. |
+
+### Sprint 5 — Phase 1 value layer (2026-07-15)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| `OfferDraft` enriched with contact + approval fields | `Verified` | `app/lead/models.py` + `app/lead/offer_draft.py`. Adds `customer_name`, `customer_email`, `customer_phone`, `address`, `missing_fields`, `human_approval_required=True` |
+| `_infer_lead_status` corrected | `Verified` | `lead_analyzer_processor.py`. `ask_questions` → `waiting_for_customer`; `create_offer_draft` → `quote_draft_prepared` |
+| `LeadStatus` extended | `Verified` | `app/lead/models.py`. Added `quote_draft_prepared` literal |
+| Invoice routing classifier | `Verified` | `app/invoice/routing.py`. Deterministic keyword detection for `debt_collection_review`, `payment_reminder_review`, `manual_review_required`, `forward_to_accounting`, `ignore_not_invoice` |
+| `invoice_processor` wired to routing | `Verified` | `invoice_routing`, `risk_signals`, `routing_reason` added to processor payload |
+| Derived status helper | `Verified` | `app/workflows/derived_status.py`. Pure `derive_job_status(job)` reads processor history; returns one of 7 derived statuses |
+| Daily report generator | `Verified` | `app/reporting/daily_report.py`. `generate_daily_report(db, tenant_id, since_hours=24)` returns counts + top_priorities + rendered Swedish text |
+| `GET /reports/daily-summary` endpoint | `Verified` | Tenant-scoped, `since_hours` param, uses `generate_daily_report` |
+| Approval command parser | `Verified` | `app/workflows/approval_command_parser.py`. `parse_approval_command(body)`. Supports GODKÄNN/APPROVE, STOPPA/REJECT, ÄNDRA/CHANGE. Fail-closed |
+| 25 Sprint 5 unit tests | `Verified` | `tests/test_sprint5_phase1_value.py` — 25 passed, 0 failed |
 
 ### Phase 2 prep — First tenant setup path (verified 2026-07-05)
 

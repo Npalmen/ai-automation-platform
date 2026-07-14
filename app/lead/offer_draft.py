@@ -208,4 +208,10 @@ def build_offer_draft(
         risk_points=risk_points,
         tenant_context_used=tenant_ctx_used,
         context_sources=ctx_sources,
+        customer_name=entities.get("customer_name") or entities.get("company_name"),
+        customer_email=entities.get("email"),
+        customer_phone=entities.get("phone"),
+        address=entities.get("address") or entities.get("city"),
+        missing_fields=list(missing_info.missing_fields),
+        human_approval_required=True,
     )

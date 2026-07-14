@@ -345,6 +345,19 @@ Full live verification plan: `docs/10-live-verification-plan.md` — production 
 - [x] **Deferred confirmed** — UI, Visma writes, Outlook/SMS, auto-export, and Monday remain deferred per master plan.
 - [x] **Next step defined** — Run `docs/ai-receptionist-mvp-gate.md` against live environment before first friend test.
 
+### Sprint 5 — Phase 1 value layer (2026-07-15)
+
+- [x] **Quote draft enrichment** — `app/lead/models.py` + `app/lead/offer_draft.py`. `OfferDraft` now includes `customer_name`, `customer_email`, `customer_phone`, `address`, `missing_fields`, `human_approval_required=True`. Always approval-gated. No Visma/Fortnox writes.
+- [x] **Lead status fix** — `lead_analyzer_processor._infer_lead_status`: `ask_questions` → `waiting_for_customer`; `create_offer_draft` → `quote_draft_prepared`. `LeadStatus` literal extended.
+- [x] **Invoice routing classifier** — `app/invoice/routing.py`. Deterministic keyword scan. Outputs one of: `debt_collection_review`, `payment_reminder_review`, `manual_review_required`, `forward_to_accounting`, `ignore_not_invoice`. Wired into `invoice_processor` payload.
+- [x] **Derived status helper** — `app/workflows/derived_status.py`. Pure `derive_job_status(job)` reads processor history; returns 7 human-readable statuses for reporting and MVP gate.
+- [x] **Daily report generator** — `app/reporting/daily_report.py`. `generate_daily_report(db, tenant_id, since_hours)`. Counts leads/quotes/inquiries/invoices/risk/approvals. Renders Swedish morning summary text.
+- [x] **`GET /reports/daily-summary` endpoint** — tenant-scoped, `since_hours` param, uses `generate_daily_report`.
+- [x] **Approval command parser** — `app/workflows/approval_command_parser.py`. `parse_approval_command(body)`. GODKÄNN/APPROVE → approve; STOPPA/REJECT → reject; ÄNDRA/CHANGE: text → change. Fail-closed. Gmail reply webhook deferred.
+- [x] **25 tests added and passing** — `tests/test_sprint5_phase1_value.py`. 25 passed, 0 failed, run 2026-07-15.
+- [x] **MVP Gate updated** — Section I added to `docs/ai-receptionist-mvp-gate.md` with 6 new checks for Phase 1 value layer.
+- [x] **Deferred (intentional)** — Calendar, Visma/Fortnox writes, Gmail reply webhook, customer UI, scheduler for daily report.
+
 ## Now (pre-live blockers)
 
 ### Completed in Phase 2 prep

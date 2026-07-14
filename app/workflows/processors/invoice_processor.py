@@ -1,5 +1,6 @@
 from app.ai.schemas import InvoiceAnalysisResponse
 from app.domain.workflows.models import Job
+from app.invoice.routing import classify_invoice_routing
 from app.workflows.processors.ai_processor_utils import (
     get_latest_processor_payload,
     run_ai_step,
@@ -42,6 +43,7 @@ def _build_source_context(job: Job) -> dict:
 
 def process_invoice_job(job: Job) -> Job:
     context = _build_source_context(job)
+    input_data = job.input_data or {}
 
     def success_payload_builder(parsed):
         invoice_data = parsed.invoice_data.model_dump()
@@ -62,6 +64,19 @@ def process_invoice_job(job: Job) -> Job:
             approval_route = "manual_review"
             missing_critical = sorted(set(missing_critical + ["duplicate_invoice_detected"]))
 
+        interim_payload = {
+            "validation_status": validation_status,
+            "approval_route": approval_route,
+            "missing_critical": missing_critical,
+            "duplicate_suspected": duplicate_suspected,
+            "validation": {"is_valid": validation["is_valid"], "issues": validation["issues"]},
+        }
+        routing = classify_invoice_routing(
+            invoice_payload=interim_payload,
+            subject=input_data.get("subject") or "",
+            body=input_data.get("message_text") or "",
+        )
+
         return {
             "processor_name": PROCESSOR_NAME,
             "invoice_data": validation["normalized_invoice_data"],
@@ -78,6 +93,9 @@ def process_invoice_job(job: Job) -> Job:
             "recommended_next_step": (
                 "manual_review" if approval_route == "manual_review" else approval_route
             ),
+            "invoice_routing": routing["invoice_routing"],
+            "risk_signals": routing["risk_signals"],
+            "routing_reason": routing["routing_reason"],
         }
 
     def fallback_payload_builder(error_message: str):

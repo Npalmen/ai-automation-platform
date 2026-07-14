@@ -134,6 +134,23 @@ Run for Scenarios 5 and 8 from test mail scenarios.
 
 ---
 
+## Section I — Phase 1 value layer (Sprint 5)
+
+Run these checks after Sprint 5 is deployed. Can be verified via unit tests or manual API inspection.
+
+| # | Check | Pass criteria | Status | Notes |
+|---|-------|---------------|--------|-------|
+| I1 | Complete lead → quote draft prepared | A lead with completeness ≥ 0.7 produces `offer_draft` in `lead_analyzer_processor` payload; payload includes `human_approval_required: true` and customer contact fields | | |
+| I2 | Incomplete lead → waiting_for_customer | A lead with completeness < 0.7 produces `lead_status = waiting_for_customer` and a `generated_question_message` in the payload | | |
+| I3 | Risky/unclear lead → risk_review_required | A complaint or emergency lead reaches `MANUAL_REVIEW` status; `derive_job_status` returns `risk_review_required`; no offer draft produced | | |
+| I4 | Invoice email → routing recommendation | An invoice job payload includes `invoice_routing` field; debt-collection keywords produce `debt_collection_review`; clean invoice produces `forward_to_accounting` | | |
+| I5 | Daily report generates without error | `GET /reports/daily-summary` returns HTTP 200 with `counts`, `top_priorities`, and `rendered_text`; `rendered_text` contains "Krowolf" | | |
+| I6 | Approval command parsing | `parse_approval_command("GODKÄNN")` → `command: approve`; `parse_approval_command("STOPPA")` → `command: reject`; `parse_approval_command("ÄNDRA: ny text")` → `command: change, change_text: ny text` | | |
+
+> Note: I1–I4 can be verified against the unit test suite (`tests/test_sprint5_phase1_value.py`). I5 requires a running server. I6 is unit-testable.
+
+---
+
 ## Gate result
 
 Fill in after running all checks:
@@ -148,6 +165,7 @@ Fill in after running all checks:
 | F — Tenant isolation | | |
 | G — Allowlist enforcement | | |
 | H — Observability | | |
+| I — Phase 1 value layer | | |
 | **Overall gate** | | |
 
 ### GO criteria (all must be PASS or PASS WITH NOTES)
@@ -160,6 +178,7 @@ Fill in after running all checks:
 - [ ] F1–F4 all PASS (tenant isolation is non-negotiable)
 - [ ] G1–G4 all PASS (no unauthorized writes — non-negotiable)
 - [ ] H1–H4 all PASS
+- [ ] I1–I6 all PASS (I5 may be PASS WITH NOTES if server unavailable for manual check)
 
 ### NO-GO criteria (any triggers a stop)
 
