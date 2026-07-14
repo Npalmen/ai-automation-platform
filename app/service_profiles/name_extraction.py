@@ -84,6 +84,13 @@ def extract_body_signature_name(message_text: str) -> str | None:
     if not message_text:
         return None
 
+    # Strip at the standard email/Gmail separator "-- " so we only search the
+    # customer's own message body and not the sender's footer (which often
+    # contains "Med vänliga hälsningar, Best regards, <Tenant Name>" etc.)
+    sep_match = re.search(r"\r?\n--\s*\r?\n", message_text)
+    if sep_match:
+        message_text = message_text[: sep_match.start()]
+
     for pattern in _SIGNATURE_PATTERNS:
         match = pattern.search(message_text)
         if not match:
