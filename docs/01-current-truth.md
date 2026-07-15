@@ -26,7 +26,11 @@
 |-------|--------|--------|
 | Test suite runs | `Verified` | 3165 passed, 0 failed (3140 pre-Sprint 5 + 25 new Sprint 5 tests; run 2026-07-15) |
 | Test count: 3165 tests | `Verified` | Run 2026-07-15 after Sprint 5 Phase 1 value layer |
-| Sprint 5: Phase 1 value layer | `Added 2026-07-15` | Quote draft enrichment, invoice routing, daily report, approval command parser, derived status. 25 tests in `tests/test_sprint5_phase1_value.py` |
+| Gmail manual-review handoff | `Verified (local)` | `app/workflows/manual_review_handoff.py` — UNREAD + `krowolf-manual-review` label on `manual_review`; queue at `/manual-review/jobs`; resolve via `POST .../resolve`; daily report `unresolved_manual_review`. 15 tests pass. Production backfill: `POST .../reconcile-gmail` on existing demo jobs. |
+| Internal handoff post-approval state | `Verified (local)` | `app/workflows/email_approval_resolution.py` — after final `email_send` approval resolves, job clears stale `awaiting_approval`/pending counts, records action execution, sets `completed` with `customer_case_open=true` for successful `send_internal_handoff`. 12 tests in `tests/test_internal_handoff_completion.py`. |
+| Dashboard `ready_cases` | `Verified (local)` | Uses `ApprovalRequestRepository.count_pending_for_tenant` (same source as `/approvals/pending`), not `jobs.status=awaiting_approval`. |
+| Daily summary `internal_handoffs_sent` | `Verified (local)` | Counts distinct successful `send_internal_handoff` action executions in report window; Swedish line when > 0. |
+| Approval via Gmail reply | `Unverified — deferred` | `approval_command_parser.py` parses GODKÄNN/STOPPA/ÄNDRA; not wired to Gmail intake; no approval-request email with embedded reference sent today. |
 | Sprint 4: AI Receptionist test-customer onboarding package | `Added 2026-07-15` | `docs/ai-receptionist-test-customer-onboarding.md`, `docs/ai-receptionist-test-mail-scenarios.md`, `docs/ai-receptionist-mvp-gate.md`, `docs/ai-receptionist-friend-test-guide.md`, `scripts/print_ai_receptionist_test_setup.py` |
 | Sprint 3: Google Sheets manual export endpoint | `Verified — ADDED 2026-07-14` | `POST /integrations/google-sheets/export-job`; gated by `allowed_integrations` + `spreadsheet_id`; fail-closed; audit+integration events; 50 tests in `test_google_sheets_export.py` |
 | Sprint 3: Google Sheets adapter + mock | `Verified — ADDED 2026-07-14` | `GoogleSheetsClient` (real, Sheets v4 REST) and `MockGoogleSheetsClient` (in-memory, for tests) in `app/integrations/google/sheets_client.py` |

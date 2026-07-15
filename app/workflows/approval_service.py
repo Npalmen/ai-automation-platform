@@ -147,26 +147,24 @@ def count_pending_approvals_for_job(
     job: Job,
     db: Session | None = None,
 ) -> int:
-    """Return pending approval count from processor history and optional DB records."""
+    """Return pending approval count; DB is authoritative when provided."""
+    if db is not None:
+        from app.repositories.postgres.approval_repository import ApprovalRequestRepository
+
+        db_count = ApprovalRequestRepository.count_pending_for_job(
+            db=db,
+            tenant_id=job.tenant_id,
+            job_id=job.job_id,
+        )
+        try:
+            return max(0, int(db_count))
+        except (TypeError, ValueError):
+            return 0
+
     processor_count = action_dispatch_pending_approval_count(job)
     if get_pending_approval(job) is not None:
         processor_count = max(processor_count, 1)
-
-    if db is None:
-        return processor_count
-
-    from app.repositories.postgres.approval_repository import ApprovalRequestRepository
-
-    db_count = ApprovalRequestRepository.count_pending_for_job(
-        db=db,
-        tenant_id=job.tenant_id,
-        job_id=job.job_id,
-    )
-    try:
-        db_count = max(0, int(db_count))
-    except (TypeError, ValueError):
-        db_count = 0
-    return max(processor_count, db_count)
+    return processor_count
 
 
 def enrich_job_response_data(job: Job, db: Session | None = None) -> dict[str, Any]:

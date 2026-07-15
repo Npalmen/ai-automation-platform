@@ -215,6 +215,13 @@ class WorkflowOrchestrator:
         if final_job.status == JobStatus.AWAITING_APPROVAL:
             final_job = dispatch_approval_request(self.db, final_job)
 
+        if final_job.status in (JobStatus.MANUAL_REVIEW, JobStatus.FAILED):
+            from app.workflows.manual_review_handoff import maybe_apply_gmail_manual_review_handoff
+
+            updated = maybe_apply_gmail_manual_review_handoff(self.db, final_job)
+            if updated is not None:
+                final_job = updated
+
         if final_job.status == JobStatus.COMPLETED:
             self._maybe_auto_dispatch(final_job)
 

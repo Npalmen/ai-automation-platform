@@ -37,11 +37,11 @@ def _make_record(
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestDashboardSummary:
-    def _call(self, tenant_id: str = "T1", scalar_values: list | None = None):
+    def _call(self, tenant_id: str = "T1", scalar_values: list | None = None, ready_cases: int = 0):
         """Call dashboard_summary with a fake db where scalar() returns values in order."""
         from app.main import dashboard_summary
 
-        scalars = iter(scalar_values or [0, 0, 0, 0, 0, 0, 0])
+        scalars = iter(scalar_values or [0, 0, 0, 0, 0])
 
         db = MagicMock()
         # Each call to db.query(...).filter(...).scalar() returns next scalar.
@@ -52,7 +52,8 @@ class TestDashboardSummary:
         mock_query.scalar.side_effect = lambda: next(scalars, 0)
 
         with patch("app.main.get_verified_tenant", return_value=tenant_id), \
-             patch("app.main.get_db", return_value=iter([db])):
+             patch("app.main.get_db", return_value=iter([db])), \
+             patch("app.main.ApprovalRequestRepository.count_pending_for_tenant", return_value=ready_cases):
             return dashboard_summary(db=db, tenant_id=tenant_id)
 
     def test_returns_required_keys(self):
@@ -65,7 +66,7 @@ class TestDashboardSummary:
         assert "completed_today" in result
 
     def test_all_values_are_integers(self):
-        result = self._call(scalar_values=[3, 1, 2, 0, 4, 5, 0])
+        result = self._call(scalar_values=[3, 1, 2, 5, 0], ready_cases=4)
         for key in ("leads_today", "inquiries_today", "invoices_today",
                     "waiting_customer", "ready_cases", "completed_today"):
             assert isinstance(result[key], int), f"{key} should be int"
@@ -76,9 +77,8 @@ class TestDashboardSummary:
         assert result["completed_today"] == 0
 
     def test_nonzero_values_returned(self):
-        # Scalar calls: leads, inquiries, invoices, ready_cases, completed, waiting
-        # The exact order depends on implementation — we just verify values propagate.
-        result = self._call(scalar_values=[5, 3, 2, 1, 8, 4])
+        # Scalar calls: leads, inquiries, invoices, completed, waiting; ready_cases from approvals
+        result = self._call(scalar_values=[5, 3, 2, 4, 1], ready_cases=8)
         total = (result["leads_today"] + result["inquiries_today"] + result["invoices_today"]
                  + result["waiting_customer"] + result["ready_cases"] + result["completed_today"])
         assert total > 0

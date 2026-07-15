@@ -274,13 +274,70 @@ class GoogleMailClient:
             )
         return response.json()
 
+    def list_labels(self) -> list[dict[str, Any]]:
+        data = self._get_with_refresh(f"/users/{self.user_id}/labels")
+        return data.get("labels") or []
+
+    def find_label_id(self, label_name: str) -> str | None:
+        for label in self.list_labels():
+            if label.get("name") == label_name:
+                label_id = label.get("id")
+                if label_id:
+                    return str(label_id)
+        return None
+
+    def create_label(self, label_name: str) -> str:
+        if not label_name or not label_name.strip():
+            raise ValueError("label_name is required.")
+        created = self._post_with_refresh(
+            f"/users/{self.user_id}/labels",
+            body={
+                "name": label_name.strip(),
+                "labelListVisibility": "labelShow",
+                "messageListVisibility": "show",
+            },
+        )
+        label_id = created.get("id")
+        if not label_id:
+            raise RuntimeError(f"Gmail label create succeeded but no id returned for '{label_name}'.")
+        return str(label_id)
+
+    def ensure_label(self, label_name: str) -> str:
+        existing = self.find_label_id(label_name)
+        if existing:
+            return existing
+        return self.create_label(label_name)
+
+    def modify_message_labels(
+        self,
+        message_id: str,
+        *,
+        add_label_ids: list[str] | None = None,
+        remove_label_ids: list[str] | None = None,
+    ) -> None:
+        if not message_id or not message_id.strip():
+            raise ValueError("message_id is required.")
+        body: dict[str, Any] = {}
+        if add_label_ids:
+            body["addLabelIds"] = add_label_ids
+        if remove_label_ids:
+            body["removeLabelIds"] = remove_label_ids
+        if not body:
+            return
+        self._post_with_refresh(
+            f"/users/{self.user_id}/messages/{message_id.strip()}/modify",
+            body=body,
+        )
+
     def mark_as_read(self, message_id: str) -> None:
         if not message_id or not message_id.strip():
             raise ValueError("message_id is required.")
-        self._post_with_refresh(
-            f"/users/{self.user_id}/messages/{message_id.strip()}/modify",
-            body={"removeLabelIds": ["UNREAD"]},
-        )
+        self.modify_message_labels(message_id, remove_label_ids=["UNREAD"])
+
+    def mark_as_unread(self, message_id: str) -> None:
+        if not message_id or not message_id.strip():
+            raise ValueError("message_id is required.")
+        self.modify_message_labels(message_id, add_label_ids=["UNREAD"])
 
     def list_messages(self, max_results: int = 10, query: str = "") -> list[dict[str, Any]]:
         params: dict[str, Any] = {"maxResults": max_results, "format": "metadata"}

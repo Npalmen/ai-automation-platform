@@ -21,6 +21,8 @@ from app.domain.workflows.models import Job
 from app.domain.workflows.statuses import JobStatus
 from app.workflows.derived_status import derive_job_status
 from app.workflows.processors.ai_processor_utils import get_latest_processor_payload
+from app.workflows.manual_review_handoff import is_unresolved_manual_review
+from app.workflows.email_approval_resolution import count_internal_handoffs_sent_since
 
 
 def generate_daily_report(
@@ -48,6 +50,18 @@ def generate_daily_report(
     # Count pending approvals
     pending_approvals = ApprovalRequestRepository.count_pending_for_tenant(db, tenant_id)
 
+    unresolved_manual_review = sum(
+        1
+        for j in recent_jobs
+        if is_unresolved_manual_review(j)
+    )
+
+    internal_handoffs_sent = count_internal_handoffs_sent_since(
+        db=db,
+        tenant_id=tenant_id,
+        since=cutoff,
+    )
+
     # Categorise each job
     counts = {
         "new_leads": 0,
@@ -57,6 +71,8 @@ def generate_daily_report(
         "invoice_items_needing_action": 0,
         "risk_review_required": 0,
         "pending_approvals": pending_approvals,
+        "unresolved_manual_review": unresolved_manual_review,
+        "internal_handoffs_sent": internal_handoffs_sent,
     }
 
     priority_items: list[dict[str, Any]] = []
@@ -198,6 +214,14 @@ def _render_text(counts: dict, priorities: list[dict], since_hours: int) -> str:
         lines.append(bullet("högriskärenden", counts["risk_review_required"]))
     if counts["pending_approvals"]:
         lines.append(bullet("väntande godkännanden", counts["pending_approvals"]))
+    if counts.get("unresolved_manual_review"):
+        lines.append(
+            bullet("ärenden i manuell granskning (ej lösta)", counts["unresolved_manual_review"])
+        )
+    if counts.get("internal_handoffs_sent"):
+        lines.append(
+            bullet("interna handoffs skickade", counts["internal_handoffs_sent"])
+        )
 
     if not any(v for v in counts.values() if isinstance(v, int) and v > 0):
         lines.append("* Inga nya ärenden")

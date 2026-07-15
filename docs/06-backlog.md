@@ -6,6 +6,16 @@
 
 ---
 
+### Niklas Demo — Gmail manual-review handoff + approval queue accuracy (2026-07-15)
+
+- [x] **Gmail manual-review operator handoff** — `manual_review` Gmail jobs now get `krowolf-manual-review` label + UNREAD; state on `job.result.manual_review_handoff`; queue APIs `GET/POST /manual-review/jobs*`; daily summary `unresolved_manual_review` count; 15 tests in `tests/test_manual_review_handoff.py`.
+- [x] **Internal handoff post-approval job state** — `finalize_email_approval_resolution()` syncs job status, processor pending counts, and action execution audit after `email_send` approvals; successful `send_internal_handoff` → `completed` with `customer_case_open=true` (not customer-resolved).
+- [x] **Dashboard `ready_cases` source of truth** — counts live pending rows via `ApprovalRequestRepository.count_pending_for_tenant`, not `jobs.status=awaiting_approval`.
+- [x] **Daily summary `internal_handoffs_sent`** — distinct successful `send_internal_handoff` executions in period; Swedish rendered line when > 0.
+- [ ] **Approval via Gmail reply** — parser exists (`approval_command_parser.py`); deferred — no approval-request email with reference, Gmail intake not wired (separate slice).
+
+---
+
 ## Completed (Fas 1 + Fas 2 prep)
 
 ### Fas 1 — Current Truth Audit (2026-07-04)

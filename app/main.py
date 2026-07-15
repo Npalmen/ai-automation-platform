@@ -959,6 +959,18 @@ def _resolve_email_approval(
         delivery_payload=approval.delivery_payload,
     )
 
+    from app.workflows.email_approval_resolution import finalize_email_approval_resolution
+
+    finalize_email_approval_resolution(
+        db,
+        approval,
+        approved=approved,
+        actor=actor,
+        note=note,
+        send_result=send_result,
+        send_error=send_error,
+    )
+
     return {
         "approval_id": approval.approval_id,
         "status": new_state,
@@ -1420,14 +1432,11 @@ def _run_gmail_inbox_sync(
                 failed_messages.append({"message_id": message_id, "reason": str(exc)})
                 continue
 
-            marked_handled = False
-            mark_warning: str | None = None
-            try:
-                adapter.execute_action(action="mark_as_read", payload={"message_id": message_id})
-                marked_handled = True
-            except Exception as exc:
-                mark_warning = str(exc)
+            from app.workflows.manual_review_handoff import post_pipeline_gmail_message_outcome
 
+            outcome = post_pipeline_gmail_message_outcome(
+                db, tenant_id, processed_job, message_id, adapter
+            )
             entry: dict = {
                 "message_id": message_id,
                 "job_id": processed_job.job_id,
@@ -1435,11 +1444,16 @@ def _run_gmail_inbox_sync(
                 "status": processed_job.status.value if hasattr(processed_job.status, "value") else str(processed_job.status),
                 "continued": True,
                 "continuation_reason": "thread_id_match",
-                "marked_handled": marked_handled,
+                "marked_handled": outcome.get("marked_handled", False),
                 "notified": False,
             }
-            if mark_warning:
-                entry["mark_warning"] = mark_warning
+            if outcome.get("mark_warning"):
+                entry["mark_warning"] = outcome["mark_warning"]
+            if outcome.get("manual_review_handoff"):
+                entry["manual_review_handoff"] = True
+                entry["manual_review_reason"] = outcome.get("manual_review_reason")
+            if outcome.get("handoff_error"):
+                entry["handoff_error"] = outcome["handoff_error"]
             created_jobs.append(entry)
             continue
 
@@ -1495,13 +1509,11 @@ def _run_gmail_inbox_sync(
             failed_messages.append({"message_id": message_id, "reason": str(exc)})
             continue
 
-        marked_handled = False
-        mark_warning = None
-        try:
-            adapter.execute_action(action="mark_as_read", payload={"message_id": message_id})
-            marked_handled = True
-        except Exception as exc:
-            mark_warning = str(exc)
+        from app.workflows.manual_review_handoff import post_pipeline_gmail_message_outcome
+
+        outcome = post_pipeline_gmail_message_outcome(
+            db, tenant_id, processed_job, message_id, adapter
+        )
 
         notified = False
         notify_warning: str | None = None
@@ -1532,11 +1544,16 @@ def _run_gmail_inbox_sync(
             "inferred_type": inferred_type,
             "status": processed_job.status.value if hasattr(processed_job.status, "value") else str(processed_job.status),
             "continued": False,
-            "marked_handled": marked_handled,
+            "marked_handled": outcome.get("marked_handled", False),
             "notified": notified,
         }
-        if mark_warning:
-            entry["mark_warning"] = mark_warning
+        if outcome.get("mark_warning"):
+            entry["mark_warning"] = outcome["mark_warning"]
+        if outcome.get("manual_review_handoff"):
+            entry["manual_review_handoff"] = True
+            entry["manual_review_reason"] = outcome.get("manual_review_reason")
+        if outcome.get("handoff_error"):
+            entry["handoff_error"] = outcome["handoff_error"]
         if notify_warning:
             entry["notify_warning"] = notify_warning
         created_jobs.append(entry)
@@ -1604,7 +1621,7 @@ def _compute_summary(db: "Session", tenant_id: str) -> dict:
     leads_today      = _count("lead",             None,               today_start)
     inquiries_today  = _count("customer_inquiry", None,               today_start)
     invoices_today   = _count("invoice",          None,               today_start)
-    ready_cases      = _count(None,               "awaiting_approval", None)
+    ready_cases      = ApprovalRequestRepository.count_pending_for_tenant(db, tenant_id)
     completed_today  = _count(None,               "completed",        today_start)
 
     waiting_customer = (
@@ -1647,6 +1664,101 @@ def daily_summary_report(
     Returns structured counts, top priorities, and a rendered Swedish text report.
     """
     return generate_daily_report(db, tenant_id=tenant_id, since_hours=since_hours)
+
+
+class ManualReviewResolveRequest(_BaseModel):
+    mark_gmail_read: bool = False
+    note: str | None = None
+    actor: str = "operator"
+
+
+class ManualReviewJobListResponse(_BaseModel):
+    items: list[dict]
+    total: int
+
+
+@app.get("/manual-review/jobs", response_model=ManualReviewJobListResponse)
+def list_manual_review_jobs(
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+    limit: int = 50,
+    offset: int = 0,
+):
+    """List unresolved manual-review jobs for the tenant (operator queue)."""
+    from app.workflows.manual_review_handoff import list_unresolved_manual_review_jobs
+
+    items, total = list_unresolved_manual_review_jobs(
+        db, tenant_id, limit=limit, offset=offset
+    )
+    return ManualReviewJobListResponse(items=items, total=total)
+
+
+@app.get("/manual-review/jobs/{job_id}")
+def get_manual_review_job(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Return manual-review detail for a single job."""
+    from app.workflows.manual_review_handoff import build_manual_review_job_summary
+
+    job = JobRepository.get_job_by_id(db, tenant_id, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
+    return build_manual_review_job_summary(job)
+
+
+@app.post("/manual-review/jobs/{job_id}/reconcile-gmail")
+def reconcile_manual_review_gmail(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Apply Gmail manual-review handoff if missing (idempotent backfill)."""
+    from app.workflows.manual_review_handoff import apply_manual_review_handoff
+
+    job = JobRepository.get_job_by_id(db, tenant_id, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
+    result = apply_manual_review_handoff(db, job, notify=False)
+    if result.get("fail_closed"):
+        raise HTTPException(
+            status_code=422,
+            detail=result.get("error", "manual_review_handoff_failed"),
+        )
+    return result
+
+
+@app.post("/manual-review/jobs/{job_id}/resolve")
+def resolve_manual_review_job_endpoint(
+    job_id: str,
+    request: ManualReviewResolveRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Acknowledge/resolve a manual-review job. Does not send customer email."""
+    from app.workflows.manual_review_handoff import (
+        build_manual_review_job_summary,
+        resolve_manual_review_job,
+    )
+
+    job = JobRepository.get_job_by_id(db, tenant_id, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
+    result = resolve_manual_review_job(
+        db,
+        job,
+        actor=request.actor,
+        note=request.note,
+        mark_gmail_read=request.mark_gmail_read,
+    )
+    if result.get("status") == "not_manual_review":
+        raise HTTPException(status_code=400, detail="Job is not in manual_review.")
+    resolved_job = result.get("job") or job
+    return {
+        **result,
+        "summary": build_manual_review_job_summary(resolved_job),
+    }
 
 
 # ── ROI assumptions (minutes saved per handled item, hourly staff value) ──────

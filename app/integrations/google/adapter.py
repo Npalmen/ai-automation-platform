@@ -103,6 +103,60 @@ class GoogleMailAdapter(BaseIntegrationAdapter):
                 "message_id": message_id,
             }
 
+        if action == "mark_as_unread":
+            message_id = payload.get("message_id")
+            if not message_id:
+                raise ValueError("mark_as_unread requires 'message_id' in payload.")
+            self.client.mark_as_unread(message_id=str(message_id))
+            return {
+                "status": "success",
+                "integration": "google_mail",
+                "provider": "google_mail",
+                "action": action,
+                "message_id": message_id,
+            }
+
+        if action == "apply_manual_review_label":
+            message_id = payload.get("message_id")
+            label_name = str(payload.get("label_name") or "krowolf-manual-review")
+            if not message_id:
+                raise ValueError("apply_manual_review_label requires 'message_id' in payload.")
+            label_id = self.client.ensure_label(label_name)
+            self.client.modify_message_labels(
+                str(message_id),
+                add_label_ids=["UNREAD", label_id],
+            )
+            return {
+                "status": "success",
+                "integration": "google_mail",
+                "provider": "google_mail",
+                "action": action,
+                "message_id": message_id,
+                "label_name": label_name,
+                "label_id": label_id,
+            }
+
+        if action == "remove_manual_review_label":
+            message_id = payload.get("message_id")
+            label_name = str(payload.get("label_name") or "krowolf-manual-review")
+            mark_read = bool(payload.get("mark_read", False))
+            if not message_id:
+                raise ValueError("remove_manual_review_label requires 'message_id' in payload.")
+            label_id = self.client.find_label_id(label_name)
+            if label_id:
+                self.client.modify_message_labels(str(message_id), remove_label_ids=[label_id])
+            if mark_read:
+                self.client.mark_as_read(str(message_id))
+            return {
+                "status": "success",
+                "integration": "google_mail",
+                "provider": "google_mail",
+                "action": action,
+                "message_id": message_id,
+                "label_removed": bool(label_id),
+                "marked_read": mark_read,
+            }
+
         if action != "send_email":
             raise ValueError(f"Unsupported Google Mail action '{action}'.")
 

@@ -78,6 +78,20 @@ class TestJobResponseEnrichment:
         assert data["status"] == "awaiting_approval"
         assert data["pending_approvals_count"] == 2
 
+    def test_enrich_prefers_db_zero_over_stale_processor_count(self):
+        job = _job_with_action_dispatch_pending(1)
+        db = MagicMock()
+
+        with patch(
+            "app.repositories.postgres.approval_repository.ApprovalRequestRepository.count_pending_for_job",
+            return_value=0,
+        ):
+            data = enrich_job_response_data(job, db=db)
+
+        assert data["status"] == "completed"
+        assert data["pending_approvals_count"] == 0
+        assert data["has_pending_approvals"] is False
+
 
 class TestOrchestratorFinalizePendingApproval:
     def test_finalize_success_sets_awaiting_approval_when_emails_pending(self):

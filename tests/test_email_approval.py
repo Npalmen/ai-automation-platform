@@ -327,6 +327,7 @@ class TestProcessActionDispatchEmailApproval:
 
 _EXEC = "app.workflows.action_executor.execute_action"
 _UPSERT = "app.repositories.postgres.approval_repository.ApprovalRequestRepository.upsert_from_payload"
+_FINALIZE = "app.workflows.email_approval_resolution.finalize_email_approval_resolution"
 
 
 class TestResolveEmailApproval:
@@ -359,6 +360,7 @@ class TestResolveEmailApproval:
         with (
             patch(_EXEC, return_value={"status": "sent"}) as mock_exec,
             patch(_UPSERT),
+            patch(_FINALIZE),
         ):
             result = _resolve_email_approval(db, approval, approved=True, actor="operator")
 
@@ -375,6 +377,7 @@ class TestResolveEmailApproval:
         with (
             patch(_EXEC, return_value={"status": "sent", "message_id": "msg123"}),
             patch(_UPSERT),
+            patch(_FINALIZE),
         ):
             result = _resolve_email_approval(db, approval, approved=True)
 
@@ -389,6 +392,7 @@ class TestResolveEmailApproval:
         with (
             patch(_EXEC) as mock_exec,
             patch(_UPSERT),
+            patch(_FINALIZE),
         ):
             result = _resolve_email_approval(db, approval, approved=False, actor="operator")
 
@@ -404,6 +408,7 @@ class TestResolveEmailApproval:
         with (
             patch(_EXEC, side_effect=RuntimeError("Gmail unavailable")),
             patch(_UPSERT),
+            patch(_FINALIZE),
         ):
             result = _resolve_email_approval(db, approval, approved=True)
 
@@ -422,6 +427,7 @@ class TestResolveEmailApproval:
         with (
             patch(_EXEC, return_value={"status": "sent"}),
             patch(_UPSERT, side_effect=lambda **kw: upserted_payloads.append(kw["approval_request"])),
+            patch(_FINALIZE),
         ):
             _resolve_email_approval(db, approval, approved=True, actor="anna", note="Ser bra ut")
 
@@ -441,6 +447,7 @@ class TestResolveEmailApproval:
         with (
             patch(_EXEC),
             patch(_UPSERT, side_effect=lambda **kw: upserted_payloads.append(kw["approval_request"])),
+            patch(_FINALIZE),
         ):
             _resolve_email_approval(db, approval, approved=False)
 
@@ -456,6 +463,7 @@ class TestResolveEmailApproval:
         with (
             patch(_EXEC) as mock_exec,
             patch(_UPSERT),
+            patch(_FINALIZE),
         ):
             result = _resolve_email_approval(db, approval, approved=True)
 
