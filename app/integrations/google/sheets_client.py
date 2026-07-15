@@ -25,6 +25,25 @@ class SheetsClientProtocol(Protocol):
         values: list[Any],
     ) -> dict[str, Any]: ...
 
+    def clear_range(
+        self,
+        spreadsheet_id: str,
+        range_notation: str,
+    ) -> dict[str, Any]: ...
+
+    def update_values(
+        self,
+        spreadsheet_id: str,
+        range_notation: str,
+        values: list[list[Any]],
+    ) -> dict[str, Any]: ...
+
+    def ensure_tab(
+        self,
+        spreadsheet_id: str,
+        tab_name: str,
+    ) -> None: ...
+
 
 class GoogleSheetsClient:
     """Real Google Sheets API client.
@@ -82,6 +101,103 @@ class GoogleSheetsClient:
         )
         return response.json()
 
+    def clear_range(
+        self,
+        spreadsheet_id: str,
+        range_notation: str,
+    ) -> dict[str, Any]:
+        """Clear values in *range_notation* without removing formatting."""
+        from urllib.parse import quote
+
+        url = (
+            f"{_SHEETS_BASE_URL}/{spreadsheet_id}/values/"
+            f"{quote(range_notation)}:clear"
+        )
+        response = requests.post(
+            url,
+            json={},
+            headers=self._headers(),
+            timeout=self._timeout,
+        )
+        if response.status_code not in (200, 201):
+            raise RuntimeError(
+                f"Google Sheets clear failed ({response.status_code}): "
+                f"{response.text[:300]}"
+            )
+        logger.info(
+            "Google Sheets: cleared range %s / %s",
+            spreadsheet_id,
+            range_notation,
+        )
+        return response.json()
+
+    def update_values(
+        self,
+        spreadsheet_id: str,
+        range_notation: str,
+        values: list[list[Any]],
+    ) -> dict[str, Any]:
+        """Replace values in *range_notation* with *values*."""
+        from urllib.parse import quote
+
+        url = (
+            f"{_SHEETS_BASE_URL}/{spreadsheet_id}/values/"
+            f"{quote(range_notation)}"
+            "?valueInputOption=USER_ENTERED"
+        )
+        response = requests.put(
+            url,
+            json={"values": values},
+            headers=self._headers(),
+            timeout=self._timeout,
+        )
+        if response.status_code not in (200, 201):
+            raise RuntimeError(
+                f"Google Sheets update failed ({response.status_code}): "
+                f"{response.text[:300]}"
+            )
+        logger.info(
+            "Google Sheets: updated range %s / %s (%s rows)",
+            spreadsheet_id,
+            range_notation,
+            len(values),
+        )
+        return response.json()
+
+    def ensure_tab(self, spreadsheet_id: str, tab_name: str) -> None:
+        """Create *tab_name* if it does not already exist."""
+        meta_url = f"{_SHEETS_BASE_URL}/{spreadsheet_id}?fields=sheets.properties.title"
+        meta_response = requests.get(
+            meta_url,
+            headers=self._headers(),
+            timeout=self._timeout,
+        )
+        if meta_response.status_code != 200:
+            raise RuntimeError(
+                f"Google Sheets metadata failed ({meta_response.status_code}): "
+                f"{meta_response.text[:300]}"
+            )
+        titles = [
+            sheet.get("properties", {}).get("title")
+            for sheet in meta_response.json().get("sheets", [])
+        ]
+        if tab_name in titles:
+            return
+
+        batch_url = f"{_SHEETS_BASE_URL}/{spreadsheet_id}:batchUpdate"
+        batch_response = requests.post(
+            batch_url,
+            json={"requests": [{"addSheet": {"properties": {"title": tab_name}}}]},
+            headers=self._headers(),
+            timeout=self._timeout,
+        )
+        if batch_response.status_code not in (200, 201):
+            raise RuntimeError(
+                f"Google Sheets add tab failed ({batch_response.status_code}): "
+                f"{batch_response.text[:300]}"
+            )
+        logger.info("Google Sheets: created tab %s in %s", tab_name, spreadsheet_id)
+
 
 class MockGoogleSheetsClient:
     """In-memory mock for unit tests.
@@ -91,6 +207,10 @@ class MockGoogleSheetsClient:
 
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
+        self.clear_calls: list[dict[str, Any]] = []
+        self.update_calls: list[dict[str, Any]] = []
+        self.ensure_tab_calls: list[dict[str, Any]] = []
+        self.tabs: set[str] = set()
 
     def append_row(
         self,
@@ -110,3 +230,45 @@ class MockGoogleSheetsClient:
             "tableRange": f"{tab_name}!A1:L1",
             "updates": {"updatedRows": 1, "updatedColumns": len(values)},
         }
+
+    def clear_range(
+        self,
+        spreadsheet_id: str,
+        range_notation: str,
+    ) -> dict[str, Any]:
+        self.clear_calls.append(
+            {
+                "spreadsheet_id": spreadsheet_id,
+                "range_notation": range_notation,
+            }
+        )
+        return {"clearedRange": range_notation}
+
+    def update_values(
+        self,
+        spreadsheet_id: str,
+        range_notation: str,
+        values: list[list[Any]],
+    ) -> dict[str, Any]:
+        self.update_calls.append(
+            {
+                "spreadsheet_id": spreadsheet_id,
+                "range_notation": range_notation,
+                "values": values,
+            }
+        )
+        return {
+            "spreadsheetId": spreadsheet_id,
+            "updatedRange": range_notation,
+            "updatedRows": len(values),
+            "updatedColumns": max((len(row) for row in values), default=0),
+        }
+
+    def ensure_tab(self, spreadsheet_id: str, tab_name: str) -> None:
+        self.ensure_tab_calls.append(
+            {
+                "spreadsheet_id": spreadsheet_id,
+                "tab_name": tab_name,
+            }
+        )
+        self.tabs.add(tab_name)

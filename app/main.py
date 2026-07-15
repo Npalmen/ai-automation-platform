@@ -5109,10 +5109,14 @@ def google_sheets_export_job(
     - settings.google_sheets.spreadsheet_id must be configured.
     - The job must belong to the authenticated tenant.
     - No automatic export is triggered from Gmail processing.
+
+    Export mode is append-only. Each call appends a new row; repeated exports
+    for the same job are not idempotent and may create duplicate rows.
     """
     from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
     from app.repositories.postgres.job_repository import JobRepository
     from app.integrations.google.sheets_client import GoogleSheetsClient
+    from app.integrations.google.sheets_auth import resolve_google_sheets_access_token
     from app.integrations.google.sheets_row_mapper import (
         choose_tab,
         build_leads_row,
@@ -5171,17 +5175,14 @@ def google_sheets_export_job(
     else:
         row = build_logg_row(job, action="manual_export")
 
-    # 6. Build sheets client and append row
-    access_token = (
-        gs_settings.get("access_token")
-        or settings.GOOGLE_MAIL_ACCESS_TOKEN
-        or ""
-    ).strip()
-    if not access_token:
+    # 6. Resolve OAuth token and build sheets client (refresh; no stale env token)
+    try:
+        access_token = resolve_google_sheets_access_token(gs_settings)
+    except RuntimeError as exc:
         return {
             "status": "blocked",
             "reason": "configuration_missing",
-            "detail": "No Google access_token available for Sheets export",
+            "detail": str(exc),
         }
     sheets_client = GoogleSheetsClient(access_token=access_token)
 
@@ -5245,10 +5246,151 @@ def google_sheets_export_job(
 
     return {
         "status": "exported",
+        "export_mode": "append_only",
+        "duplicate_warning": "Repeated exports append a new row; not idempotent.",
         "spreadsheet_id": spreadsheet_id,
         "tab": tab,
         "job_id": job.job_id,
         "row_count": len(row),
+        "api_result": api_result,
+    }
+
+
+class GoogleSheetsRefreshSummaryRequest(_BaseModel):
+    since_hours: int = 24
+
+
+@app.post("/integrations/google-sheets/refresh-summary")
+def google_sheets_refresh_summary(
+    request: GoogleSheetsRefreshSummaryRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Manually refresh the Sammanfattning tab with current operational summary.
+
+    Safety gates match export-job: allowed_integrations, spreadsheet_id, tenant scope.
+    Replaces a fixed range on Sammanfattning (not append). Leads/Support/Logg unchanged.
+    """
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    from app.integrations.google.sheets_client import GoogleSheetsClient
+    from app.integrations.google.sheets_auth import resolve_google_sheets_access_token
+    from app.integrations.google.sheets_summary_mapper import (
+        TAB_SUMMARY,
+        SUMMARY_CLEAR_RANGE,
+        build_summary_sheet_data,
+    )
+    from app.core.audit_service import create_audit_event
+    from app.domain.integrations.models import IntegrationEvent
+
+    tenant_record = TenantConfigRepository.get(db, tenant_id)
+    allowed_integrations = (tenant_record.allowed_integrations or []) if tenant_record else []
+    if "google_sheets" not in allowed_integrations:
+        return {
+            "status": "blocked",
+            "reason": "integration_not_allowed",
+            "detail": "google_sheets is not in allowed_integrations for this tenant",
+        }
+
+    tenant_settings = TenantConfigRepository.get_settings(db, tenant_id)
+    gs_settings = (tenant_settings or {}).get("google_sheets") or {}
+    spreadsheet_id = (gs_settings.get("spreadsheet_id") or "").strip()
+    if not spreadsheet_id:
+        return {
+            "status": "blocked",
+            "reason": "configuration_missing",
+            "detail": "google_sheets.spreadsheet_id is not configured for this tenant",
+        }
+
+    since_hours = max(1, min(int(request.since_hours or 24), 168))
+    summary_data = build_summary_sheet_data(
+        db,
+        tenant_id,
+        since_hours=since_hours,
+    )
+    matrix = summary_data["matrix"]
+    write_range = summary_data["write_range"]
+
+    try:
+        access_token = resolve_google_sheets_access_token(gs_settings)
+    except RuntimeError as exc:
+        return {
+            "status": "blocked",
+            "reason": "configuration_missing",
+            "detail": str(exc),
+        }
+
+    sheets_client = GoogleSheetsClient(access_token=access_token)
+    refresh_status = "success"
+    error_detail: str | None = None
+    api_result: dict = {}
+    try:
+        sheets_client.ensure_tab(spreadsheet_id=spreadsheet_id, tab_name=TAB_SUMMARY)
+        sheets_client.clear_range(
+            spreadsheet_id=spreadsheet_id,
+            range_notation=SUMMARY_CLEAR_RANGE,
+        )
+        api_result = sheets_client.update_values(
+            spreadsheet_id=spreadsheet_id,
+            range_notation=write_range,
+            values=matrix,
+        )
+    except Exception as exc:
+        refresh_status = "failed"
+        error_detail = str(exc)
+
+    create_audit_event(
+        db=db,
+        tenant_id=tenant_id,
+        category="integration",
+        action="google_sheets_summary_refresh",
+        status=refresh_status,
+        details={
+            "tab": TAB_SUMMARY,
+            "spreadsheet_id": spreadsheet_id,
+            "since_hours": since_hours,
+            "rows_written": len(matrix),
+            "error": error_detail,
+        },
+    )
+
+    _now_ts = int(datetime.now(timezone.utc).timestamp())
+    ie = IntegrationEvent(
+        job_id=f"summary_refresh_{tenant_id}",
+        tenant_id=tenant_id,
+        integration_type="google_sheets",
+        payload={
+            "tab": TAB_SUMMARY,
+            "spreadsheet_id": spreadsheet_id,
+            "since_hours": since_hours,
+            "rows_written": len(matrix),
+            "update_mode": "replace_range",
+        },
+        status=refresh_status,
+        idempotency_key=f"gs_summary_{tenant_id}_{_now_ts}",
+    )
+    db.add(ie)
+    db.commit()
+
+    if refresh_status == "failed":
+        return {
+            "status": "failed",
+            "spreadsheet_id": spreadsheet_id,
+            "tab": TAB_SUMMARY,
+            "error": error_detail,
+        }
+
+    return {
+        "status": "refreshed",
+        "update_mode": "replace_range",
+        "spreadsheet_id": spreadsheet_id,
+        "tab": TAB_SUMMARY,
+        "clear_range": SUMMARY_CLEAR_RANGE,
+        "write_range": write_range,
+        "rows_written": len(matrix),
+        "columns_written": 7,
+        "period_hours": since_hours,
+        "priority_job_ids": summary_data["priority_job_ids"],
+        "counts": summary_data["report"].get("counts"),
         "api_result": api_result,
     }
 

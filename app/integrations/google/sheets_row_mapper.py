@@ -9,9 +9,12 @@ Required tabs and their columns:
              Risk, Sammanfattning, Föreslagen åtgärd, Status, Källa, Job ID
 
   Logg    — Tid, Typ, Job ID, Action, Resultat, Kommentar
+
+Export mode: append-only. Repeated exports for the same job append duplicate rows.
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any
 
@@ -21,6 +24,89 @@ from app.domain.workflows.models import Job
 TAB_LEADS = "Leads"
 TAB_SUPPORT = "Support"
 TAB_LOGG = "Logg"
+
+_PREFERRED_DICT_KEYS = (
+    "label",
+    "level",
+    "priority",
+    "action",
+    "reason",
+    "summary",
+    "text",
+    "category",
+    "score",
+)
+
+
+def normalize_sheet_cell(value: Any) -> str | int | float | bool:
+    """Coerce a value into a Google Sheets scalar (string, number, boolean, or blank)."""
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str):
+        return value
+    if hasattr(value, "value"):
+        return str(value.value)
+    if isinstance(value, list):
+        parts = [normalize_sheet_cell(item) for item in value]
+        rendered = "; ".join(str(part) for part in parts if part != "")
+        return rendered
+    if isinstance(value, dict):
+        return _normalize_dict_cell(value)
+    return str(value)
+
+
+def _normalize_dict_cell(value: dict[str, Any]) -> str:
+    if "score" in value and "category" in value and "reasons" in value:
+        return _format_support_priority(value)
+    if "action" in value and "reason" in value:
+        return _format_support_next_action(value)
+
+    for key in _PREFERRED_DICT_KEYS:
+        if key in value and value[key] not in (None, "", [], {}):
+            return str(normalize_sheet_cell(value[key]))
+
+    return json.dumps(value, sort_keys=True, ensure_ascii=False)
+
+
+def _format_support_priority(value: dict[str, Any]) -> str:
+    category = normalize_sheet_cell(value.get("category")) or "normal"
+    score = value.get("score")
+    parts: list[str] = []
+    if score is not None and score != "":
+        parts.append(f"{category} (score {score})")
+    else:
+        parts.append(str(category))
+
+    reasons = value.get("reasons") or []
+    if isinstance(reasons, list) and reasons:
+        reason_text = "; ".join(str(normalize_sheet_cell(r)) for r in reasons if r)
+        if reason_text:
+            parts.append(reason_text)
+
+    risk = value.get("business_risk_reason")
+    if risk:
+        parts.append(f"risk: {normalize_sheet_cell(risk)}")
+
+    return " — ".join(parts)
+
+
+def _format_support_next_action(value: dict[str, Any]) -> str:
+    action = normalize_sheet_cell(value.get("action")) or "unknown"
+    reason = normalize_sheet_cell(value.get("reason"))
+    requires_approval = value.get("requires_approval")
+
+    if reason:
+        text = f"{action} — {reason}"
+    else:
+        text = str(action)
+
+    if requires_approval is True:
+        text = f"{text} (approval required)"
+    return text
 
 
 # ── Tab selection ─────────────────────────────────────────────────────────────
@@ -87,16 +173,29 @@ def build_support_row(job: Job) -> list[Any]:
     telefon = sender.get("phone") or data.get("phone") or ""
     epost = sender.get("email") or data.get("email") or ""
     arende = data.get("subject") or support_analysis.get("category") or ""
-    prioritet = support_payload.get("support_priority") or ""
-    risk = support_analysis.get("ticket_type") or ""
+    prioritet = normalize_sheet_cell(support_payload.get("support_priority"))
+    risk = normalize_sheet_cell(support_analysis.get("ticket_type"))
     sammanfattning = _truncate(data.get("message_text") or data.get("subject") or "")
-    foresl_atgard = support_payload.get("support_next_action") or ""
+    foresl_atgard = normalize_sheet_cell(support_payload.get("support_next_action"))
     status = _str_val(job.status)
     kalla = _source(data)
     job_id = job.job_id
 
-    return [datum, kund, telefon, epost, arende, prioritet,
-            risk, sammanfattning, foresl_atgard, status, kalla, job_id]
+    row = [
+        datum,
+        normalize_sheet_cell(kund),
+        normalize_sheet_cell(telefon),
+        normalize_sheet_cell(epost),
+        normalize_sheet_cell(arende),
+        prioritet,
+        risk,
+        sammanfattning,
+        foresl_atgard,
+        status,
+        kalla,
+        job_id,
+    ]
+    return row
 
 
 def build_logg_row(

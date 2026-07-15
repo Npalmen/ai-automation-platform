@@ -413,7 +413,7 @@ class TestEndpointSafetyGates:
 
         assert resp.status_code == 404
 
-    def test_no_access_token_returns_configuration_missing(self):
+    def test_no_refresh_credentials_returns_configuration_missing(self):
         tenant_record = _make_tenant_record(["google_sheets"])
         db = _make_db()
         job = _make_lead_job()
@@ -432,9 +432,11 @@ class TestEndpointSafetyGates:
                 "app.repositories.postgres.job_repository.JobRepository.get_job_by_id",
                 return_value=job,
             ),
-            patch("app.main.settings") as mock_settings,
+            patch(
+                "app.integrations.google.sheets_auth.resolve_google_sheets_access_token",
+                side_effect=RuntimeError("Google OAuth refresh credentials are not configured for Sheets export."),
+            ),
         ):
-            mock_settings.GOOGLE_MAIL_ACCESS_TOKEN = ""
             c = TestClient(app)
             resp = c.post(
                 "/integrations/google-sheets/export-job",
@@ -480,10 +482,12 @@ class TestEndpointSuccessPath:
                 "app.integrations.google.sheets_client.GoogleSheetsClient",
                 return_value=mock_client,
             ),
-            patch("app.main.settings") as mock_settings,
+            patch(
+                "app.integrations.google.sheets_auth.resolve_google_sheets_access_token",
+                return_value="test_token",
+            ),
             patch("app.main.create_audit_event"),
         ):
-            mock_settings.GOOGLE_MAIL_ACCESS_TOKEN = "test_token"
             c = TestClient(app)
             resp = c.post(
                 "/integrations/google-sheets/export-job",
@@ -561,10 +565,12 @@ class TestEndpointSuccessPath:
                 "app.integrations.google.sheets_client.GoogleSheetsClient",
                 return_value=mock_client,
             ),
-            patch("app.main.settings") as mock_settings,
+            patch(
+                "app.integrations.google.sheets_auth.resolve_google_sheets_access_token",
+                return_value="test_token",
+            ),
             patch("app.core.audit_service.create_audit_event") as mock_audit,
         ):
-            mock_settings.GOOGLE_MAIL_ACCESS_TOKEN = "test_token"
             c = TestClient(app)
             c.post(
                 "/integrations/google-sheets/export-job",
