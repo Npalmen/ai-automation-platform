@@ -10,6 +10,26 @@
 
 ---
 
+> ## ⚠ HARD REQUIREMENT — Gmail query must be label-scoped
+>
+> `POST /gmail/process-inbox` defaults to `query: "is:unread"` when no `query` is provided.
+> That default scans the **entire unread inbox**, not just test emails.
+>
+> **For friend tests, and for any production or shared mailbox, you MUST always pass an
+> explicit label-scoped query, for example:**
+>
+> ```
+> label:krowolf-test is:unread
+> ```
+>
+> **Using the default/unscoped query is NOT allowed for friend tests or for any
+> production/shared mailbox.** Every call to `/gmail/process-inbox` in this checklist
+> (dry-run and live) must include an explicit `"query"` field scoped to the tenant's
+> dedicated Gmail label. This is a GO/NO-GO check — see Step 6/7 and the
+> pre-flight checklist below.
+
+---
+
 ## Prerequisites
 
 Before starting:
@@ -148,11 +168,20 @@ Recommended Gmail query format:
 label:krowolf-demo-test01
 ```
 
+**⚠ Required for friend tests:** always pass this query explicitly in every
+`/gmail/process-inbox` call. Never rely on the default query. See the hard
+requirement notice at the top of this document.
+
 ---
 
 ## Step 6 — Dry-run inbox scan
 
-Always dry-run first:
+Always dry-run first.
+
+**⚠ GO/NO-GO check:** the `"query"` field below is not optional for friend tests.
+If `"query"` is missing or empty, the scan will default to `"is:unread"` across the
+**entire mailbox**. Do not proceed to Step 7 unless the dry-run response shows only
+the expected test emails in scope.
 
 ```powershell
 Invoke-RestMethod `
@@ -171,6 +200,10 @@ Invoke-RestMethod `
 ---
 
 ## Step 7 — Live inbox scan
+
+**⚠ GO/NO-GO check:** confirm the `"query"` field is the same label-scoped query
+verified in Step 6 before running this live call. Never omit `"query"` or fall back
+to the default for a friend test or any shared/production mailbox.
 
 ```powershell
 Invoke-RestMethod `
@@ -242,6 +275,7 @@ Verify row appeared in the Google Sheet.
 - [ ] Reply body reviewed — no hallucinations, no wrong customer name, no legal/financial commitments
 - [ ] Complaint/urgent email in `manual_review` (no auto-reply)
 - [ ] If this is a friend test: confirm with the friend that test emails will arrive
+- [ ] **GO/NO-GO:** every `/gmail/process-inbox` call so far used an explicit label-scoped `query` (never the default `is:unread`)
 
 Only approve an email send after reviewing the reply body carefully.
 
@@ -257,6 +291,7 @@ Only approve an email send after reviewing the reply body carefully.
 | `allowed_integrations: visma` | No Visma writes in MVP |
 | `scheduler.run_mode = scheduled` | Would auto-scan inbox without manual trigger |
 | `followups_enabled = false` | Breaks pending customer reply flow |
+| Omitting `"query"` (or using the default `is:unread`) on `/gmail/process-inbox` | Scans the entire unread mailbox instead of just test emails — **not allowed for friend tests or any production/shared mailbox** |
 
 ---
 

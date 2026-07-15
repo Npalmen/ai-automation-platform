@@ -27,13 +27,22 @@ Before running the gate:
 - [ ] `auto_actions = false` for all job types — confirmed
 - [ ] `scheduler.run_mode = manual` — confirmed
 - [ ] No previous test jobs exist for this tenant (or use `GET /jobs` to establish baseline)
+- [ ] **GO/NO-GO — Gmail query is label-scoped:** every planned `/gmail/process-inbox` call for this gate run and for the friend test uses an explicit label-scoped `query` (e.g. `label:krowolf-test is:unread`). `/gmail/process-inbox` defaults to `query: "is:unread"` (the entire unread inbox) when `query` is omitted. **This default is NOT allowed for friend tests or any production/shared mailbox.** Do not proceed past this checklist until confirmed.
 
 ---
 
 ## Section A — Gmail ingestion
 
+> **GO/NO-GO before running this section:** confirm every `/gmail/process-inbox` call
+> below (A1–A3) explicitly passes `"query": "label:<test-label> is:unread"` (or
+> equivalent). Do NOT omit `"query"` and rely on the default (`is:unread` across the
+> whole mailbox) — this is not allowed for friend tests or any production/shared
+> mailbox. If any call in this section was made without an explicit label-scoped
+> query, mark Section A `BLOCKED` and re-run with the correct query.
+
 | # | Check | Pass criteria | Status | Notes |
 |---|-------|---------------|--------|-------|
+| A0 | Gmail query is label-scoped | Every scan in this section used an explicit `query` scoped to the test label — never the default `is:unread` | | |
 | A1 | Dry-run scan finds correct emails | `dry_run=true` returns the expected email count (no extras) | | |
 | A2 | Live scan creates jobs | `jobs_created` = number of test emails sent | | |
 | A3 | Duplicate protection | Re-running scan does not duplicate jobs | | |
@@ -170,6 +179,7 @@ Fill in after running all checks:
 
 ### GO criteria (all must be PASS or PASS WITH NOTES)
 
+- [ ] A0 PASS (Gmail query label-scoped — hard requirement, no exceptions for friend tests or shared mailboxes)
 - [ ] A1–A5 all PASS
 - [ ] B1–B8 all PASS (B7/B8 are critical — FAIL blocks proceed)
 - [ ] C1–C5 all PASS (any FAIL blocks proceed — safety routing must work)
@@ -187,6 +197,7 @@ Fill in after running all checks:
 - Any cross-tenant data is returned
 - Any Monday or Visma write event appears without explicit configuration
 - Server logs contain 500 errors or leaked tokens during the gate run
+- Any `/gmail/process-inbox` call during the gate run or friend test omitted `"query"` or used the default `is:unread` against a production/shared mailbox
 
 ---
 
