@@ -22,3 +22,6 @@ storage/local_dev/logs/
 
 # Dev HTTPS proxy certs (local only)
 scripts/.dev-certs/
+
+# One-time Visma OAuth migration payloads (never commit)
+scripts/ops/.tmp/
