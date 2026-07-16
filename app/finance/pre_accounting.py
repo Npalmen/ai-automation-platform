@@ -162,21 +162,21 @@ def build_invoice_draft(
 
 def build_visma_export_payload(draft: dict[str, Any]) -> dict[str, Any]:
     """Build Visma customer + customer-invoice payload from a finance draft."""
+    from datetime import date
+
     from app.integrations.visma.mappers import (
         map_invoice_to_visma_customer,
         map_invoice_to_visma_invoice,
     )
 
-    customer_number = (
-        draft.get("supplier_email")
-        or draft.get("supplier_name")
-        or f"AUTO-{draft.get('job_id', 'UNKNOWN')}"
-    )
+    # Leave customerNumber empty in invoice payload when only a draft lookup hint exists.
+    # Visma customer creation runs in the approved export path when needed.
+    customer_ref = ""
     row_price = draft.get("amount_ex_vat") or draft.get("amount_inc_vat") or 0.0
     job_payload = {
         "data": {
             "customer_name": draft.get("supplier_name") or "Leverantör okänd",
-            "customer_number": str(customer_number)[:50],
+            "customer_number": customer_ref,
             "email": draft.get("supplier_email"),
             "phone": draft.get("supplier_phone"),
             "amount": row_price,
@@ -186,7 +186,7 @@ def build_visma_export_payload(draft: dict[str, Any]) -> dict[str, Any]:
                 f"{draft.get('expense_category', 'services')} "
                 f"(job {draft.get('job_id')})"
             ),
-            "invoice_date": None,
+            "invoice_date": date.today().isoformat(),
             "due_date": draft.get("due_date"),
             "external_reference": draft.get("invoice_number") or draft.get("job_id"),
             "comments": (

@@ -5956,6 +5956,16 @@ def _assert_finance_visma_approval_for_export(approval) -> str:
     return state
 
 
+def _visma_customer_ref_requires_creation(customer_number: str) -> bool:
+    if not customer_number:
+        return True
+    if "@" in customer_number:
+        return True
+    if customer_number.upper().startswith("AUTO-"):
+        return True
+    return False
+
+
 def _execute_finance_visma_export(
     *,
     db: Session,
@@ -5990,9 +6000,10 @@ def _execute_finance_visma_export(
     invoice_payload = dict(export_payload["invoice"])
     customer_number = str(invoice_payload.get("customerNumber") or "").strip()
     customer_created = False
+    needs_customer_create = _visma_customer_ref_requires_creation(customer_number)
 
     try:
-        if not customer_number and create_customer_if_missing:
+        if needs_customer_create and create_customer_if_missing:
             created = adapter.execute_action(
                 action="create_customer",
                 payload={"customer": customer_payload},
@@ -6005,7 +6016,7 @@ def _execute_finance_visma_export(
                 or ""
             ).strip()
             customer_created = bool(customer_number)
-        elif not customer_number:
+        elif needs_customer_create:
             raise HTTPException(
                 status_code=422,
                 detail=(
