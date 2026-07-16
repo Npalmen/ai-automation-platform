@@ -64,6 +64,26 @@ class VismaClient:
             return list(result.get("Data") or result.get("data") or [])
         return []
 
+    def get_articles(self, *, page_size: int = 10) -> list[dict]:
+        result = self._get(f"articles?$pagesize={page_size}")
+        if isinstance(result, list):
+            return result
+        if isinstance(result, dict):
+            return list(result.get("Data") or result.get("data") or [])
+        return []
+
+    def find_customers_by_name_contains(self, name_fragment: str, *, page_size: int = 5) -> list[dict]:
+        fragment = (name_fragment or "").replace("'", "''")
+        if not fragment:
+            return []
+        path = f"customers?$filter=contains(Name,'{fragment}')&$pagesize={page_size}"
+        result = self._get(path)
+        if isinstance(result, list):
+            return result
+        if isinstance(result, dict):
+            return list(result.get("Data") or result.get("data") or [])
+        return []
+
     def create_customer(self, customer: dict) -> dict:
         return self._post("customers", customer)
 

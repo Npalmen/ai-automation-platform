@@ -310,6 +310,8 @@ class TestVismaExportExecution:
         with patch("app.main._get_successful_finance_visma_export_event", return_value=None), patch(
             "app.main._get_visma_adapter_for_tenant",
             return_value=adapter,
+        ), patch("app.main._resolve_visma_fiscal_year_id", return_value=None), patch(
+            "app.main._resolve_visma_article_id", return_value=None
         ), patch("app.main._claim_finance_visma_export_event", return_value=(event, None)), patch(
             "app.main._finalize_finance_visma_event"
         ), patch("app.main._record_finance_visma_audit"):

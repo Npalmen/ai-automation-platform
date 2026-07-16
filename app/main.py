@@ -6001,6 +6001,63 @@ def _resolve_visma_fiscal_year_id(adapter) -> str | None:
     return None
 
 
+def _resolve_visma_article_id(adapter) -> str | None:
+    try:
+        articles = adapter.client.get_articles(page_size=10)
+    except Exception:
+        return None
+    for article in articles:
+        if not isinstance(article, dict):
+            continue
+        if article.get("IsActive") is False:
+            continue
+        article_id = article.get("Id")
+        if article_id:
+            return str(article_id)
+    if articles and isinstance(articles[0], dict) and articles[0].get("Id"):
+        return str(articles[0]["Id"])
+    return None
+
+
+def _find_visma_customer_match(adapter, customer_payload: dict) -> dict | None:
+    name = str(customer_payload.get("Name") or "").strip()
+    if not name:
+        return None
+    try:
+        matches = adapter.client.find_customers_by_name_contains(name, page_size=5)
+    except Exception:
+        return None
+    email = str(customer_payload.get("Email") or "").strip().lower()
+    for match in matches:
+        if not isinstance(match, dict):
+            continue
+        if email:
+            match_email = str(match.get("Email") or "").strip().lower()
+            if match_email and match_email != email:
+                continue
+        if str(match.get("Name") or "").strip() == name:
+            return match
+    return matches[0] if matches and isinstance(matches[0], dict) else None
+
+
+def _apply_visma_invoice_row_defaults(adapter, invoice_payload: dict) -> None:
+    article_id = _resolve_visma_article_id(adapter)
+    if not article_id:
+        return
+    rows = invoice_payload.get("Rows")
+    if not isinstance(rows, list):
+        return
+    updated_rows: list[dict] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        row_body = dict(row)
+        if not row_body.get("ArticleId"):
+            row_body["ArticleId"] = article_id
+        updated_rows.append(row_body)
+    invoice_payload["Rows"] = updated_rows
+
+
 def _visma_customer_ref_requires_creation(customer_number: str) -> bool:
     if not customer_number:
         return True
@@ -6056,26 +6113,35 @@ def _execute_finance_visma_export(
         terms_of_payment_id = _resolve_visma_terms_of_payment_id(adapter)
         if terms_of_payment_id:
             customer_payload["TermsOfPaymentId"] = terms_of_payment_id
-        if needs_customer_create and create_customer_if_missing:
-            created = adapter.execute_action(
-                action="create_customer",
-                payload={"customer": customer_payload},
-            )
-            created_body = created.get("result") or {}
-            customer_number = str(
-                created_body.get("CustomerNumber")
-                or created_body.get("customerNumber")
-                or ""
-            ).strip()
-            customer_id = created_body.get("Id") or created_body.get("id")
-            customer_created = bool(customer_number or customer_id)
-        elif needs_customer_create:
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    "Visma customer not found and create_customer_if_missing=false."
-                ),
-            )
+        if needs_customer_create:
+            existing_customer = _find_visma_customer_match(adapter, customer_payload)
+            if existing_customer:
+                customer_number = str(
+                    existing_customer.get("CustomerNumber")
+                    or existing_customer.get("customerNumber")
+                    or ""
+                ).strip()
+                customer_id = existing_customer.get("Id") or existing_customer.get("id")
+            elif create_customer_if_missing:
+                created = adapter.execute_action(
+                    action="create_customer",
+                    payload={"customer": customer_payload},
+                )
+                created_body = created.get("result") or {}
+                customer_number = str(
+                    created_body.get("CustomerNumber")
+                    or created_body.get("customerNumber")
+                    or ""
+                ).strip()
+                customer_id = created_body.get("Id") or created_body.get("id")
+                customer_created = bool(customer_number or customer_id)
+            else:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        "Visma customer not found and create_customer_if_missing=false."
+                    ),
+                )
 
         if not customer_number and not customer_id:
             raise HTTPException(
@@ -6092,6 +6158,7 @@ def _execute_finance_visma_export(
         fiscal_year_id = _resolve_visma_fiscal_year_id(adapter)
         if fiscal_year_id:
             invoice_payload["FiscalYearId"] = fiscal_year_id
+        _apply_visma_invoice_row_defaults(adapter, invoice_payload)
         invoice_response = adapter.execute_action(
             action="create_invoice",
             payload={"invoice": invoice_payload},
