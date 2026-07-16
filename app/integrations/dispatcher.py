@@ -24,7 +24,6 @@ from app.integrations.fortnox.mappers import (
     map_invoice_to_fortnox_invoice,
 )
 
-from app.integrations.visma.adapter import VismaAdapter
 from app.integrations.visma.mappers import (
     map_invoice_to_visma_customer,
     map_invoice_to_visma_invoice,
@@ -78,8 +77,8 @@ class IntegrationDispatcher:
             if is_integration_enabled_for_tenant(tenant_id, IntegrationType.FORTNOX):
                 await self._handle(job, IntegrationType.FORTNOX)
 
-            if is_integration_enabled_for_tenant(tenant_id, IntegrationType.VISMA):
-                await self._handle(job, IntegrationType.VISMA)
+            # Visma customer-invoice writes require the explicit finance export
+            # endpoint with approval; never auto-dispatch through this worker.
 
         if job.job_type == "inquiry_processing":
             if is_integration_enabled_for_tenant(tenant_id, IntegrationType.SUPPORT):
@@ -172,24 +171,13 @@ class IntegrationDispatcher:
                 )
 
             elif event.integration_type == "visma":
-                connection_config = get_integration_connection_config(
-                    event.tenant_id,
-                    IntegrationType.VISMA,
+                # Legacy events must not perform writes; finance export is required.
+                event.last_error = (
+                    "visma_writes_disabled_use_finance_export_endpoint"
                 )
-
-                adapter = VismaAdapter(connection_config=connection_config)
-
-                mapped_payload = self._map_visma_payload(event.payload)
-
-                adapter.execute_action(
-                    action="create_customer",
-                    payload={"customer": mapped_payload["customer"]},
-                )
-
-                response = adapter.execute_action(
-                    action="create_invoice",
-                    payload={"invoice": mapped_payload["invoice"]},
-                )
+                event.status = "dead"
+                self.repo.update(event)
+                return
 
             else:
                 response = None

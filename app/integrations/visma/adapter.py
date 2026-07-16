@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from typing import Any
 
 from app.integrations.base import BaseIntegrationAdapter
@@ -70,31 +69,10 @@ class VismaAdapter(BaseIntegrationAdapter):
 
 
 def get_visma_access_token_for_tenant(db, tenant_id: str) -> str | None:
-    """Retrieve a valid Visma access token for a tenant, refreshing if expired."""
-    from app.repositories.postgres.oauth_credential_repository import OAuthCredentialRepository
-    from app.integrations.visma.oauth_service import refresh_access_token
+    """Retrieve a valid Visma access token for a tenant (legacy nullable wrapper)."""
+    from app.integrations.visma.token_resolver import VismaTokenError, resolve_visma_access_token
 
-    record = OAuthCredentialRepository.get(db, tenant_id, "visma")
-    if record is None:
+    try:
+        return resolve_visma_access_token(db, tenant_id, check_allowlist=False)
+    except VismaTokenError:
         return None
-
-    now = datetime.now(timezone.utc)
-    if record.expires_at and record.expires_at < now and record.refresh_token:
-        try:
-            refreshed = refresh_access_token(record.refresh_token)
-            OAuthCredentialRepository.upsert(
-                db=db,
-                tenant_id=tenant_id,
-                provider="visma",
-                access_token=refreshed["access_token"],
-                refresh_token=refreshed["refresh_token"],
-                expires_at=refreshed["expires_at"],
-                scopes=refreshed.get("scopes") or record.scopes,
-            )
-            logger.info("Visma token auto-refreshed for tenant %s", tenant_id)
-            return refreshed["access_token"]
-        except Exception:
-            logger.warning("Visma token refresh failed for tenant %s", tenant_id)
-            return None
-
-    return record.access_token

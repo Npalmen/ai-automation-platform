@@ -160,6 +160,47 @@ def build_invoice_draft(
     }
 
 
+def build_visma_export_payload(draft: dict[str, Any]) -> dict[str, Any]:
+    """Build Visma customer + customer-invoice payload from a finance draft."""
+    from app.integrations.visma.mappers import (
+        map_invoice_to_visma_customer,
+        map_invoice_to_visma_invoice,
+    )
+
+    customer_number = (
+        draft.get("supplier_email")
+        or draft.get("supplier_name")
+        or f"AUTO-{draft.get('job_id', 'UNKNOWN')}"
+    )
+    row_price = draft.get("amount_ex_vat") or draft.get("amount_inc_vat") or 0.0
+    job_payload = {
+        "data": {
+            "customer_name": draft.get("supplier_name") or "Leverantör okänd",
+            "customer_number": str(customer_number)[:50],
+            "email": draft.get("supplier_email"),
+            "phone": draft.get("supplier_phone"),
+            "amount": row_price,
+            "unit_price": row_price,
+            "quantity": 1,
+            "description": (
+                f"{draft.get('expense_category', 'services')} "
+                f"(job {draft.get('job_id')})"
+            ),
+            "invoice_date": None,
+            "due_date": draft.get("due_date"),
+            "external_reference": draft.get("invoice_number") or draft.get("job_id"),
+            "comments": (
+                f"Pre-accounting draft ({draft.get('expense_category')}) "
+                f"konto {draft.get('account_code_suggestion')}"
+            ),
+        }
+    }
+    return {
+        "customer": map_invoice_to_visma_customer(job_payload),
+        "invoice": map_invoice_to_visma_invoice(job_payload),
+    }
+
+
 def build_fortnox_export_payload(draft: dict[str, Any]) -> dict[str, Any]:
     supplier_name = draft.get("supplier_name") or "Leverantör okänd"
     customer_number = (

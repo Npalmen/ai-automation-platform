@@ -1025,6 +1025,16 @@ def approve_request(
             note=request.note,
         )
 
+    # Finance approvals: execute the stored Visma payload after operator approval
+    if approval.next_on_approve == VISMA_EXPORT_ACTION:
+        return _resolve_finance_visma_approval(
+            db=db,
+            approval=approval,
+            approved=True,
+            actor=request.actor,
+            note=request.note,
+        )
+
     job = resolve_approval(
         db=db,
         tenant_id=tenant_id,
@@ -1085,6 +1095,16 @@ def reject_request(
             note=request.note,
         )
 
+    # Finance approvals: close without any external Visma write
+    if approval.next_on_approve == VISMA_EXPORT_ACTION:
+        return _resolve_finance_visma_approval(
+            db=db,
+            approval=approval,
+            approved=False,
+            actor=request.actor,
+            note=request.note,
+        )
+
     job = resolve_approval(
         db=db,
         tenant_id=tenant_id,
@@ -1135,6 +1155,15 @@ def execute_integration_action(
         raise HTTPException(
             status_code=403,
             detail=f"Integration '{integration_type.value}' is not enabled for tenant '{tenant_id}'.",
+        )
+
+    if integration_type == IntegrationType.VISMA:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Visma writes are not available via /integrations/visma/execute. "
+                "Use POST /finance/invoices/{job_id}/visma/export with approval."
+            ),
         )
 
     connection_config = get_integration_connection_config(
@@ -5637,6 +5666,560 @@ def _resolve_finance_fortnox_approval(
     }
 
 
+VISMA_EXPORT_ACTION = "finance_visma_export"
+VISMA_EXPORT_APPROVAL_PREFIX = "finance_visma_export"
+
+
+class FinanceVismaExportRequest(_BaseModel):
+    create_customer_if_missing: bool = True
+    dry_run: bool = False
+
+
+def _finance_visma_idempotency_key(tenant_id: str, job_id: str) -> str:
+    return f"finance:visma_export:{tenant_id}:{job_id}"
+
+
+def _finance_visma_approval_id(tenant_id: str, job_id: str) -> str:
+    return f"{VISMA_EXPORT_APPROVAL_PREFIX}:{tenant_id}:{job_id}"
+
+
+def _require_visma_enabled_for_tenant(db: Session, tenant_id: str) -> None:
+    from app.integrations.enums import IntegrationType
+    from app.integrations.policies import is_integration_enabled_for_tenant
+
+    if not is_integration_enabled_for_tenant(
+        tenant_id,
+        IntegrationType.VISMA,
+        db=db,
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Integration 'visma' is not enabled for tenant '{tenant_id}'.",
+        )
+
+
+def _visma_token_http_exception(exc) -> HTTPException:
+    from app.integrations.visma.token_resolver import (
+        VismaApiUnavailableError,
+        VismaNotConnectedError,
+        VismaProviderDisabledError,
+        VismaRefreshFailedError,
+        VismaTenantMismatchError,
+        VismaTokenError,
+    )
+
+    if isinstance(exc, VismaProviderDisabledError):
+        return HTTPException(status_code=403, detail=str(exc))
+    if isinstance(exc, VismaNotConnectedError):
+        return HTTPException(status_code=400, detail=str(exc))
+    if isinstance(exc, VismaRefreshFailedError):
+        return HTTPException(status_code=401, detail=str(exc))
+    if isinstance(exc, VismaTenantMismatchError):
+        return HTTPException(status_code=403, detail=str(exc))
+    if isinstance(exc, VismaApiUnavailableError):
+        return HTTPException(status_code=503, detail=str(exc))
+    if isinstance(exc, VismaTokenError):
+        return HTTPException(status_code=400, detail=str(exc))
+    return HTTPException(status_code=400, detail=str(exc))
+
+
+def _get_visma_adapter_for_tenant(db: Session, tenant_id: str):
+    from app.core.settings import get_settings
+    from app.integrations.visma.adapter import VismaAdapter
+    from app.integrations.visma.token_resolver import resolve_visma_access_token
+
+    try:
+        access_token = resolve_visma_access_token(
+            db,
+            tenant_id,
+            check_allowlist=True,
+        )
+    except Exception as exc:
+        raise _visma_token_http_exception(exc) from exc
+
+    settings = get_settings()
+    return VismaAdapter(
+        connection_config={
+            "access_token": access_token,
+            "api_url": settings.VISMA_API_URL,
+        }
+    )
+
+
+def _get_finance_visma_export_event(db: Session, tenant_id: str, job_id: str):
+    from app.domain.integrations.models import IntegrationEvent
+
+    key = _finance_visma_idempotency_key(tenant_id, job_id)
+    event = IntegrationRepository(db).get_by_idempotency_key(key)
+    if isinstance(event, IntegrationEvent):
+        return event
+    return None
+
+
+def _get_successful_finance_visma_export_event(db: Session, tenant_id: str, job_id: str):
+    event = _get_finance_visma_export_event(db, tenant_id, job_id)
+    if event is not None and event.status == "success":
+        return event
+    return None
+
+
+def _finance_visma_event_response(event) -> dict:
+    payload = event.payload or {}
+    result = payload.get("result") or {}
+    return {
+        "status": "already_exported",
+        "integration_event_id": event.id,
+        "idempotency_key": event.idempotency_key,
+        "draft": payload.get("draft"),
+        "invoice": result.get("invoice"),
+        "external_invoice_id": result.get("external_invoice_id"),
+        "customer_number": result.get("customer_number"),
+        "customer_created": result.get("customer_created", False),
+    }
+
+
+def _validate_visma_export_payload(export_payload: dict) -> None:
+    invoice = export_payload.get("invoice") or {}
+    rows = invoice.get("rows") or []
+    if not rows:
+        raise HTTPException(
+            status_code=422,
+            detail="Visma export payload is missing invoice rows.",
+        )
+    customer_number = str(invoice.get("customerNumber") or "").strip()
+    customer = export_payload.get("customer") or {}
+    if not customer_number and not customer.get("name"):
+        raise HTTPException(
+            status_code=422,
+            detail="Visma export payload is missing customer identity.",
+        )
+
+
+def _claim_finance_visma_export_event(
+    db: Session,
+    *,
+    tenant_id: str,
+    job_id: str,
+    draft: dict,
+    export_payload: dict,
+):
+    from app.domain.integrations.models import IntegrationEvent
+    from sqlalchemy.exc import IntegrityError
+
+    key = _finance_visma_idempotency_key(tenant_id, job_id)
+    repo = IntegrationRepository(db)
+    existing = repo.get_by_idempotency_key(key)
+    if existing is not None:
+        if existing.status == "success":
+            return None, existing
+        if existing.status == "executing":
+            raise HTTPException(
+                status_code=409,
+                detail="Visma export is already in progress for this job.",
+            )
+        if existing.status == "reconciliation_required":
+            raise HTTPException(
+                status_code=409,
+                detail="Visma export requires reconciliation before retry.",
+            )
+
+    event = IntegrationEvent(
+        tenant_id=tenant_id,
+        job_id=job_id,
+        integration_type="visma",
+        payload={
+            "action": VISMA_EXPORT_ACTION,
+            "request": export_payload,
+            "draft": draft,
+        },
+        status="executing",
+        attempts=1,
+        idempotency_key=key,
+    )
+    try:
+        return repo.create(event), None
+    except IntegrityError:
+        db.rollback()
+        raced = repo.get_by_idempotency_key(key)
+        if raced is not None and raced.status == "success":
+            return None, raced
+        if raced is not None and raced.status == "executing":
+            raise HTTPException(
+                status_code=409,
+                detail="Visma export is already in progress for this job.",
+            ) from None
+        raise HTTPException(
+            status_code=409,
+            detail="Visma export idempotency conflict.",
+        ) from None
+
+
+def _finalize_finance_visma_event(
+    db: Session,
+    event,
+    *,
+    status: str,
+    result: dict | None = None,
+    last_error: str | None = None,
+):
+    payload = dict(event.payload or {})
+    if result is not None:
+        payload["result"] = result
+    event.payload = payload
+    event.status = status
+    event.last_error = last_error
+    IntegrationRepository(db).update(event)
+
+
+def _record_finance_visma_audit(
+    db: Session,
+    *,
+    tenant_id: str,
+    job_id: str,
+    status: str,
+    details: dict,
+) -> None:
+    create_audit_event(
+        db=db,
+        tenant_id=tenant_id,
+        category="integration",
+        action=VISMA_EXPORT_ACTION,
+        status=status,
+        details={
+            "job_id": job_id,
+            "idempotency_key": _finance_visma_idempotency_key(tenant_id, job_id),
+            **details,
+        },
+    )
+
+
+def _extract_visma_external_invoice_id(invoice_result: dict) -> str | None:
+    for key in ("id", "Id", "invoiceId", "InvoiceId", "documentNumber"):
+        value = invoice_result.get(key)
+        if value not in (None, ""):
+            return str(value)
+    return None
+
+
+def _get_finance_visma_approval_record(db: Session, tenant_id: str, job_id: str):
+    return ApprovalRequestRepository.get_by_approval_id(
+        db=db,
+        tenant_id=tenant_id,
+        approval_id=_finance_visma_approval_id(tenant_id, job_id),
+    )
+
+
+def _assert_finance_visma_approval_for_export(approval) -> str:
+    if approval is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Missing approved Visma export approval for this job.",
+        )
+    payload = approval.request_payload or {}
+    if payload.get("next_on_approve") != VISMA_EXPORT_ACTION:
+        raise HTTPException(
+            status_code=403,
+            detail="Approval is not for Visma customer-invoice export.",
+        )
+    finance_context = payload.get("finance_context") or {}
+    if finance_context.get("job_id") and finance_context.get("job_id") != approval.job_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Approval job mismatch for Visma export.",
+        )
+    state = payload.get("state")
+    if state == "pending":
+        raise HTTPException(
+            status_code=409,
+            detail="Visma export approval is pending.",
+        )
+    if state == "rejected":
+        raise HTTPException(
+            status_code=403,
+            detail="Visma export approval was rejected.",
+        )
+    if state != "approved":
+        raise HTTPException(
+            status_code=403,
+            detail="Visma export requires an approved approval record.",
+        )
+    return state
+
+
+def _execute_finance_visma_export(
+    *,
+    db: Session,
+    tenant_id: str,
+    job_id: str,
+    draft: dict,
+    export_payload: dict,
+    create_customer_if_missing: bool,
+) -> dict:
+    import requests
+
+    existing_event = _get_successful_finance_visma_export_event(db, tenant_id, job_id)
+    if existing_event is not None:
+        return _finance_visma_event_response(existing_event)
+
+    _validate_visma_export_payload(export_payload)
+    adapter = _get_visma_adapter_for_tenant(db, tenant_id)
+
+    claimed_event, duplicate_event = _claim_finance_visma_export_event(
+        db,
+        tenant_id=tenant_id,
+        job_id=job_id,
+        draft=draft,
+        export_payload=export_payload,
+    )
+    if duplicate_event is not None:
+        return _finance_visma_event_response(duplicate_event)
+    if claimed_event is None:
+        raise HTTPException(status_code=409, detail="Visma export idempotency conflict.")
+
+    customer_payload = dict(export_payload["customer"])
+    invoice_payload = dict(export_payload["invoice"])
+    customer_number = str(invoice_payload.get("customerNumber") or "").strip()
+    customer_created = False
+
+    try:
+        if not customer_number and create_customer_if_missing:
+            created = adapter.execute_action(
+                action="create_customer",
+                payload={"customer": customer_payload},
+            )
+            created_body = created.get("result") or {}
+            customer_number = str(
+                created_body.get("customerNumber")
+                or created_body.get("id")
+                or customer_payload.get("customerNumber")
+                or ""
+            ).strip()
+            customer_created = bool(customer_number)
+        elif not customer_number:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Visma customer not found and create_customer_if_missing=false."
+                ),
+            )
+
+        if not customer_number:
+            raise HTTPException(
+                status_code=422,
+                detail="Visma customer number is required for invoice export.",
+            )
+
+        invoice_payload["customerNumber"] = customer_number
+        invoice_response = adapter.execute_action(
+            action="create_invoice",
+            payload={"invoice": invoice_payload},
+        )
+        invoice_result = invoice_response.get("result") or {}
+        external_invoice_id = _extract_visma_external_invoice_id(invoice_result)
+        result = {
+            "customer_created": customer_created,
+            "customer_number": customer_number,
+            "external_invoice_id": external_invoice_id,
+            "invoice": invoice_result,
+        }
+        _finalize_finance_visma_event(
+            db,
+            claimed_event,
+            status="success",
+            result=result,
+        )
+        _record_finance_visma_audit(
+            db,
+            tenant_id=tenant_id,
+            job_id=job_id,
+            status="success",
+            details={
+                "customer_created": customer_created,
+                "customer_number": customer_number,
+                "external_invoice_id": external_invoice_id,
+            },
+        )
+        return {
+            "status": "exported",
+            "customer_created": customer_created,
+            "customer_number": customer_number,
+            "external_invoice_id": external_invoice_id,
+            "draft": draft,
+            "invoice": invoice_result,
+            "integration_event_id": getattr(claimed_event, "id", None),
+            "idempotency_key": _finance_visma_idempotency_key(tenant_id, job_id),
+        }
+    except HTTPException:
+        _finalize_finance_visma_event(
+            db,
+            claimed_event,
+            status="failed",
+            last_error="validation_or_http_error",
+        )
+        _record_finance_visma_audit(
+            db,
+            tenant_id=tenant_id,
+            job_id=job_id,
+            status="failed",
+            details={"reason": "validation_or_http_error"},
+        )
+        raise
+    except requests.HTTPError as exc:
+        _finalize_finance_visma_event(
+            db,
+            claimed_event,
+            status="failed",
+            last_error=type(exc).__name__,
+        )
+        _record_finance_visma_audit(
+            db,
+            tenant_id=tenant_id,
+            job_id=job_id,
+            status="failed",
+            details={"reason": "visma_api_http_error", "error_type": type(exc).__name__},
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Visma API rejected the customer-invoice export.",
+        ) from exc
+    except requests.RequestException as exc:
+        _finalize_finance_visma_event(
+            db,
+            claimed_event,
+            status="reconciliation_required",
+            last_error=type(exc).__name__,
+        )
+        _record_finance_visma_audit(
+            db,
+            tenant_id=tenant_id,
+            job_id=job_id,
+            status="reconciliation_required",
+            details={"reason": "network_error", "error_type": type(exc).__name__},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Visma export outcome is unknown; reconciliation is required "
+                "before retry."
+            ),
+        ) from exc
+    except Exception as exc:
+        _finalize_finance_visma_event(
+            db,
+            claimed_event,
+            status="failed",
+            last_error=type(exc).__name__,
+        )
+        _record_finance_visma_audit(
+            db,
+            tenant_id=tenant_id,
+            job_id=job_id,
+            status="failed",
+            details={"reason": "unexpected_error", "error_type": type(exc).__name__},
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Visma customer-invoice export failed.",
+        ) from exc
+
+
+def _create_finance_visma_approval(
+    *,
+    db: Session,
+    tenant_id: str,
+    job_id: str,
+    draft: dict,
+    export_payload: dict,
+    create_customer_if_missing: bool,
+):
+    approval_payload = {
+        "approval_id": _finance_visma_approval_id(tenant_id, job_id),
+        "state": "pending",
+        "channel": "dashboard",
+        "title": f"Visma-export: {draft.get('invoice_number') or job_id}",
+        "summary": (
+            f"Väntande export av fakturaunderlag till Visma "
+            f"({draft.get('amount_inc_vat') or draft.get('amount_ex_vat') or 0} "
+            f"{draft.get('currency', 'SEK')})."
+        ),
+        "requested_by": "system",
+        "requested_at": _utc_now_iso(),
+        "next_on_approve": VISMA_EXPORT_ACTION,
+        "next_on_reject": "manual_review",
+        "finance_context": {
+            "system": "visma",
+            "job_id": job_id,
+            "action": VISMA_EXPORT_ACTION,
+            "idempotency_key": _finance_visma_idempotency_key(tenant_id, job_id),
+        },
+    }
+    delivery_payload = {
+        "draft": draft,
+        "visma_payload": export_payload,
+        "create_customer_if_missing": create_customer_if_missing,
+    }
+    return ApprovalRequestRepository.upsert_from_payload(
+        db=db,
+        tenant_id=tenant_id,
+        job_id=job_id,
+        job_type="invoice",
+        approval_request=approval_payload,
+        delivery_payload=delivery_payload,
+    )
+
+
+def _resolve_finance_visma_approval(
+    *,
+    db: Session,
+    approval,
+    approved: bool,
+    actor: str | None,
+    note: str | None,
+) -> dict:
+    payload = dict(approval.request_payload or {})
+    new_state = "approved" if approved else "rejected"
+    payload["state"] = new_state
+    payload["resolved_at"] = _utc_now_iso()
+    payload["resolved_by"] = actor or "operator"
+    payload["resolution_note"] = note
+
+    result = None
+    if approved:
+        if payload.get("next_on_approve") != VISMA_EXPORT_ACTION:
+            raise HTTPException(
+                status_code=403,
+                detail="Approval is not for Visma customer-invoice export.",
+            )
+        _require_visma_enabled_for_tenant(db, approval.tenant_id)
+        delivery = approval.delivery_payload or {}
+        result = _execute_finance_visma_export(
+            db=db,
+            tenant_id=approval.tenant_id,
+            job_id=approval.job_id,
+            draft=delivery.get("draft") or {},
+            export_payload=delivery.get("visma_payload") or {},
+            create_customer_if_missing=bool(
+                delivery.get("create_customer_if_missing", True)
+            ),
+        )
+
+    ApprovalRequestRepository.upsert_from_payload(
+        db=db,
+        tenant_id=approval.tenant_id,
+        job_id=approval.job_id,
+        job_type=approval.job_type,
+        approval_request=payload,
+        delivery_payload=approval.delivery_payload,
+    )
+
+    return {
+        "approval_id": approval.approval_id,
+        "status": new_state,
+        "job_id": approval.job_id,
+        "export_result": result,
+    }
+
+
 def _extract_material_lines(input_data: dict) -> list[dict]:
     """Extract normalised material line items from operations_workspace.finance."""
     workspace = (input_data or {}).get("operations_workspace") or {}
@@ -5780,6 +6363,117 @@ def finance_fortnox_export(
         }
 
     return _execute_finance_fortnox_export(
+        db=db,
+        tenant_id=tenant_id,
+        job_id=job_id,
+        draft=draft,
+        export_payload=export_payload,
+        create_customer_if_missing=req.create_customer_if_missing,
+    )
+
+
+@app.post("/finance/invoices/{job_id}/visma/preview")
+def finance_visma_export_preview(
+    job_id: str,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """Create a controlled Visma export preview payload, no external writes."""
+    from app.finance.pre_accounting import build_invoice_draft, build_visma_export_payload
+
+    record = _get_invoice_record_or_422(db, tenant_id, job_id)
+    invoice_payload = _extract_invoice_payload_from_history(record)
+    draft = build_invoice_draft(
+        tenant_id=tenant_id,
+        job_id=job_id,
+        input_data=record.input_data or {},
+        invoice_payload=invoice_payload,
+    )
+    export_payload = build_visma_export_payload(draft)
+    return {
+        "status": "preview",
+        "draft": draft,
+        "visma_payload": export_payload,
+    }
+
+
+@app.post("/finance/invoices/{job_id}/visma/export")
+def finance_visma_export(
+    job_id: str,
+    body: FinanceVismaExportRequest | None = None,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_verified_tenant),
+):
+    """
+    Controlled write to Visma for pre-accounting invoice drafts.
+
+    Visma export always requires an approved approval record before any write.
+    """
+    from app.finance.pre_accounting import build_invoice_draft, build_visma_export_payload
+
+    req = body or FinanceVismaExportRequest()
+    record = _get_invoice_record_or_422(db, tenant_id, job_id)
+    invoice_payload = _extract_invoice_payload_from_history(record)
+    draft = build_invoice_draft(
+        tenant_id=tenant_id,
+        job_id=job_id,
+        input_data=record.input_data or {},
+        invoice_payload=invoice_payload,
+    )
+    export_payload = build_visma_export_payload(draft)
+    _validate_visma_export_payload(export_payload)
+
+    if req.dry_run:
+        return {
+            "status": "dry_run",
+            "draft": draft,
+            "visma_payload": export_payload,
+        }
+
+    _require_visma_enabled_for_tenant(db, tenant_id)
+
+    existing_event = _get_successful_finance_visma_export_event(db, tenant_id, job_id)
+    if existing_event is not None:
+        return _finance_visma_event_response(existing_event)
+
+    approval = _get_finance_visma_approval_record(db, tenant_id, job_id)
+    approval_state = (approval.request_payload or {}).get("state") if approval else None
+
+    if approval_state == "rejected":
+        raise HTTPException(
+            status_code=403,
+            detail="Visma export approval was rejected.",
+        )
+    if approval_state == "pending":
+        raise HTTPException(
+            status_code=409,
+            detail="Visma export approval is pending.",
+        )
+    if approval_state != "approved":
+        approval = _create_finance_visma_approval(
+            db=db,
+            tenant_id=tenant_id,
+            job_id=job_id,
+            draft=draft,
+            export_payload=export_payload,
+            create_customer_if_missing=req.create_customer_if_missing,
+        )
+        return {
+            "status": "approval_required",
+            "approval_id": approval.approval_id,
+            "draft": draft,
+            "visma_payload": export_payload,
+            "message": "Visma export queued for approval. No external write was performed.",
+        }
+
+    _assert_finance_visma_approval_for_export(approval)
+    if approval.job_id != job_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Approval job mismatch for Visma export.",
+        )
+
+    return _execute_finance_visma_export(
         db=db,
         tenant_id=tenant_id,
         job_id=job_id,
