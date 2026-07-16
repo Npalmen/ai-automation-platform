@@ -5959,6 +5959,24 @@ def _assert_finance_visma_approval_for_export(approval) -> str:
     return state
 
 
+def _resolve_visma_terms_of_payment_id(adapter) -> str | None:
+    try:
+        terms = adapter.client.get_terms_of_payment()
+    except Exception:
+        return None
+    for term in terms:
+        if not isinstance(term, dict):
+            continue
+        if term.get("AvailableForSales") is False:
+            continue
+        term_id = term.get("Id")
+        if term_id:
+            return str(term_id)
+    if terms and isinstance(terms[0], dict) and terms[0].get("Id"):
+        return str(terms[0]["Id"])
+    return None
+
+
 def _resolve_visma_fiscal_year_id(adapter) -> str | None:
     from datetime import date
 
@@ -6035,6 +6053,9 @@ def _execute_finance_visma_export(
     needs_customer_create = _visma_customer_ref_requires_creation(customer_number)
 
     try:
+        terms_of_payment_id = _resolve_visma_terms_of_payment_id(adapter)
+        if terms_of_payment_id:
+            customer_payload["TermsOfPaymentId"] = terms_of_payment_id
         if needs_customer_create and create_customer_if_missing:
             created = adapter.execute_action(
                 action="create_customer",

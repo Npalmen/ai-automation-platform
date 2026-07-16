@@ -56,6 +56,14 @@ class VismaClient:
             return list(result.get("Data") or result.get("data") or [])
         return []
 
+    def get_terms_of_payment(self) -> list[dict]:
+        result = self._get("termsofpayments")
+        if isinstance(result, list):
+            return result
+        if isinstance(result, dict):
+            return list(result.get("Data") or result.get("data") or [])
+        return []
+
     def create_customer(self, customer: dict) -> dict:
         return self._post("customers", customer)
 
