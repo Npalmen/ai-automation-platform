@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-15 (Sprint 5 Phase 1 value layer — quote draft enrichment, invoice routing, daily report, approval command parser, derived status helper. 25 new tests pass.)
+2026-07-16 (Visma Chapter 2 sandbox E2E on production `T_NIKLAS_DEMO_001` — approval-gated customer-invoice export verified; deploy `0c17256`.)
 
 ## Verification method
 
@@ -795,14 +795,17 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| Code exists | `Verified` | `app/integrations/visma/oauth_service.py`, `oauth_routes.py`, `client.py`, `adapter.py`, `mappers.py` |
+| Code exists | `Verified` | `app/integrations/visma/oauth_service.py`, `oauth_routes.py`, `client.py`, `adapter.py`, `mappers.py`, `token_resolver.py` |
 | OAuth exists | `Verified (code)` | Full authorize → exchange → refresh flow in `oauth_service.py`; `/callback` route and `/integrations/visma/oauth/callback` mounted |
-| Read support | `Unverified` | Client code exists but read actions not confirmed |
-| Write/dispatch support | `Not present` | No write actions confirmed in adapter |
-| Approval-gated | `Unverified` | |
-| Tested | `Partially verified` | `test_visma_oauth.py` exists |
-| Production-ready | No — OAuth flow implemented, no confirmed read/write actions | |
-| First-customer relevance | Low — not required for first customer |
+| OAuth connected (demo tenant) | `Verified — production` | `T_NIKLAS_DEMO_001` sandbox/test account; `POST /integrations/visma/test-read` → `api_readable=true` (2026-07-16) |
+| Read support | `Verified — production` | Company settings, fiscal years, terms of payment, articles, customers, customer invoices (read-only probes) |
+| Write support | `Verified — production (approval-gated)` | `POST /finance/invoices/{job_id}/visma/export` → `approval_required`; approve once → `exported`; idempotent `already_exported` on repeat |
+| Write safety | `Verified` | Tenant OAuth only (`token_resolver`); Visma auto-dispatch disabled; idempotency key per tenant+job; `reconciliation_required` on uncertain network |
+| Export payload | `Verified` | PascalCase fields; `TermsOfPaymentId`, `FiscalYearId`, `ArticleId` on rows resolved from tenant API; synthetic customer lookup before create |
+| Approval-gated | `Verified — production` | `next_on_approve=finance_visma_export`; no write before approval |
+| Tested | `Verified` | `test_visma_oauth.py`, `test_visma_write_safety.py` (23 tests) |
+| Production-ready | `Partially verified` | One successful sandbox export on demo tenant; 5 stale pending approvals from earlier failed attempts need operator rejection |
+| First-customer relevance | Medium — optional pilot path after Fortnox/Gmail slice |
 
 ### Microsoft Mail (Outlook)
 

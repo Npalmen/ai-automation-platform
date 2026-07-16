@@ -313,7 +313,7 @@ Full live verification plan: `docs/10-live-verification-plan.md` — production 
 **Phase H — Monday/Fortnox/Visma safe checks**
 - [ ] Monday integration health reflects correct state.
 - [ ] Fortnox export confirmed approval-gated.
-- [ ] Visma: not_configured (not required for first pilot).
+- [x] Visma sandbox E2E (demo tenant): OAuth connected, allowlist-gated preview/export, approval-gated single export, idempotency — production 2026-07-16 (`0c17256`). Stale pending approvals from failed v1–v5 jobs need operator rejection.
 
 **Phase I — Approval queue E2E**
 - [ ] Test lead → awaiting_approval → approve → completed.
