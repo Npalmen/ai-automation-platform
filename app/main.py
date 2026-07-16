@@ -6031,6 +6031,7 @@ def _execute_finance_visma_export(
         or ""
     ).strip()
     customer_created = False
+    customer_id = None
     needs_customer_create = _visma_customer_ref_requires_creation(customer_number)
 
     try:
@@ -6043,11 +6044,10 @@ def _execute_finance_visma_export(
             customer_number = str(
                 created_body.get("CustomerNumber")
                 or created_body.get("customerNumber")
-                or created_body.get("id")
-                or customer_payload.get("CustomerNumber")
                 or ""
             ).strip()
-            customer_created = bool(customer_number)
+            customer_id = created_body.get("Id") or created_body.get("id")
+            customer_created = bool(customer_number or customer_id)
         elif needs_customer_create:
             raise HTTPException(
                 status_code=422,
@@ -6056,17 +6056,21 @@ def _execute_finance_visma_export(
                 ),
             )
 
-        if not customer_number:
+        if not customer_number and not customer_id:
             raise HTTPException(
                 status_code=422,
-                detail="Visma customer number is required for invoice export.",
+                detail="Visma customer identity is required for invoice export.",
             )
 
-        invoice_payload["CustomerNumber"] = customer_number
+        if customer_id:
+            invoice_payload["CustomerId"] = customer_id
+            invoice_payload.pop("CustomerNumber", None)
+        else:
+            invoice_payload["CustomerNumber"] = customer_number
+        invoice_payload.pop("customerNumber", None)
         fiscal_year_id = _resolve_visma_fiscal_year_id(adapter)
         if fiscal_year_id:
             invoice_payload["FiscalYearId"] = fiscal_year_id
-        invoice_payload.pop("customerNumber", None)
         invoice_response = adapter.execute_action(
             action="create_invoice",
             payload={"invoice": invoice_payload},

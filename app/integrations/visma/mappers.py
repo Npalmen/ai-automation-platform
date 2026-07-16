@@ -6,6 +6,10 @@ def map_invoice_to_visma_customer(job_payload: dict[str, Any]) -> dict[str, Any]
 
     customer: dict[str, Any] = {
         "Name": data.get("customer_name") or "Unknown customer",
+        "IsPrivatePerson": bool(data.get("is_private_person", True)),
+        "InvoiceCity": data.get("city") or data.get("invoice_city") or "Sandboxstad",
+        "InvoicePostalCode": data.get("zip_code") or "11122",
+        "CountryCode": data.get("country_code") or "SE",
     }
 
     if data.get("customer_number"):
