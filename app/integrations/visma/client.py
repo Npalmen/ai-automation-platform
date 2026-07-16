@@ -48,6 +48,14 @@ class VismaClient:
         """Return company settings for the token-authorized company."""
         return self._get(COMPANY_SETTINGS_PATH)
 
+    def get_fiscal_years(self) -> list[dict]:
+        result = self._get("fiscalyears")
+        if isinstance(result, list):
+            return result
+        if isinstance(result, dict):
+            return list(result.get("Data") or result.get("data") or [])
+        return []
+
     def create_customer(self, customer: dict) -> dict:
         return self._post("customers", customer)
 

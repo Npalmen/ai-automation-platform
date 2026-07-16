@@ -4,33 +4,33 @@ from typing import Any
 def map_invoice_to_visma_customer(job_payload: dict[str, Any]) -> dict[str, Any]:
     data = job_payload.get("data", {}) or {}
 
-    customer = {
-        "name": data.get("customer_name") or "Unknown customer",
+    customer: dict[str, Any] = {
+        "Name": data.get("customer_name") or "Unknown customer",
     }
 
     if data.get("customer_number"):
-        customer["customerNumber"] = str(data["customer_number"])
+        customer["CustomerNumber"] = str(data["customer_number"])
 
     if data.get("organization_number"):
-        customer["corporateIdentityNumber"] = data["organization_number"]
+        customer["CorporateIdentityNumber"] = data["organization_number"]
 
     if data.get("email"):
-        customer["email"] = data["email"]
+        customer["Email"] = data["email"]
 
     if data.get("phone"):
-        customer["phone"] = data["phone"]
+        customer["Phone"] = data["phone"]
 
     if data.get("address1"):
-        customer["address"] = data["address1"]
+        customer["Address1"] = data["address1"]
 
     if data.get("zip_code"):
-        customer["zipCode"] = data["zip_code"]
+        customer["ZipCode"] = data["zip_code"]
 
     if data.get("city"):
-        customer["city"] = data["city"]
+        customer["City"] = data["city"]
 
     if data.get("country_code"):
-        customer["countryCode"] = data["country_code"]
+        customer["CountryCode"] = data["country_code"]
 
     return customer
 
@@ -42,26 +42,27 @@ def map_invoice_to_visma_invoice(job_payload: dict[str, Any]) -> dict[str, Any]:
     amount = data.get("amount") or 0
     unit_price = data.get("unit_price") or amount
     description = data.get("description") or data.get("invoice_description") or "Invoice line"
+    vat_percent = data.get("vat_rate", 25)
 
-    invoice = {
-        "customerNumber": str(
+    invoice: dict[str, Any] = {
+        "CustomerNumber": str(
             data.get("customer_number")
             or data.get("customer_no")
             or data.get("customer_id")
             or ""
         ),
-        "invoiceDate": data.get("invoice_date"),
-        "dueDate": data.get("due_date"),
-        "yourReference": data.get("external_reference") or data.get("invoice_number"),
-        "noteText": data.get("comments") or description,
-        "rows": [
+        "InvoiceDate": data.get("invoice_date"),
+        "DueDate": data.get("due_date"),
+        "YourReference": data.get("external_reference") or data.get("invoice_number"),
+        "NoteText": data.get("comments") or description,
+        "Rows": [
             {
-                "text": description,
-                "quantity": quantity,
-                "unitPrice": unit_price,
+                "Text": description,
+                "Quantity": quantity,
+                "UnitPrice": unit_price,
+                "VatPercent": vat_percent,
             }
         ],
     }
 
-    invoice = {k: v for k, v in invoice.items() if v not in (None, "", [])}
-    return invoice
+    return {k: v for k, v in invoice.items() if v not in (None, "", [])}

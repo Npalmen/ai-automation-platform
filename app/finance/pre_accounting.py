@@ -188,6 +188,7 @@ def build_visma_export_payload(draft: dict[str, Any]) -> dict[str, Any]:
             ),
             "invoice_date": date.today().isoformat(),
             "due_date": draft.get("due_date"),
+            "vat_rate": draft.get("vat_rate", 25),
             "external_reference": draft.get("invoice_number") or draft.get("job_id"),
             "comments": (
                 f"Pre-accounting draft ({draft.get('expense_category')}) "

@@ -107,10 +107,10 @@ def _approved_approval():
             "draft": {},
             "visma_payload": {
                 "customer": {"name": "Leverantor AB"},
-                "invoice": {
-                    "customerNumber": "C-1",
-                    "rows": [{"text": "Line", "quantity": 1, "unitPrice": 100}],
-                },
+                    "invoice": {
+                        "CustomerNumber": "C-1",
+                        "Rows": [{"Text": "Line", "Quantity": 1, "UnitPrice": 100}],
+                    },
             },
             "create_customer_if_missing": True,
         },
@@ -319,10 +319,10 @@ class TestVismaExportExecution:
                 job_id="job_visma_1",
                 draft={},
                 export_payload={
-                    "customer": {"name": "Leverantor AB"},
+                    "customer": {"Name": "Leverantor AB"},
                     "invoice": {
-                        "customerNumber": "C-1",
-                        "rows": [{"text": "Line", "quantity": 1, "unitPrice": 100}],
+                        "CustomerNumber": "C-1",
+                        "Rows": [{"Text": "Line", "Quantity": 1, "UnitPrice": 100}],
                     },
                 },
                 create_customer_if_missing=False,
@@ -331,7 +331,7 @@ class TestVismaExportExecution:
         assert response["external_invoice_id"] == "INV-77"
         adapter.execute_action.assert_called_once_with(
             action="create_invoice",
-            payload={"invoice": {"customerNumber": "C-1", "rows": [{"text": "Line", "quantity": 1, "unitPrice": 100}]}},
+            payload={"invoice": {"CustomerNumber": "C-1", "Rows": [{"Text": "Line", "Quantity": 1, "UnitPrice": 100}]}},
         )
 
     def test_duplicate_export_rejected(self):
@@ -352,7 +352,7 @@ class TestVismaExportExecution:
                 draft={},
                 export_payload={
                     "customer": {"name": "A"},
-                    "invoice": {"customerNumber": "C-1", "rows": [{"text": "x"}]},
+                    "invoice": {"CustomerNumber": "C-1", "Rows": [{"Text": "x"}]},
                 },
                 create_customer_if_missing=False,
             )
@@ -374,7 +374,7 @@ class TestVismaExportExecution:
                     draft={},
                     export_payload={
                         "customer": {"name": "A"},
-                        "invoice": {"customerNumber": "C-1", "rows": [{"text": "x"}]},
+                        "invoice": {"CustomerNumber": "C-1", "Rows": [{"Text": "x"}]},
                     },
                     create_customer_if_missing=False,
                 )
@@ -398,7 +398,7 @@ class TestVismaExportExecution:
                     draft={},
                     export_payload={
                         "customer": {"name": "A"},
-                        "invoice": {"customerNumber": "C-1", "rows": [{"text": "x"}]},
+                        "invoice": {"CustomerNumber": "C-1", "Rows": [{"Text": "x"}]},
                     },
                     create_customer_if_missing=False,
                 )
@@ -424,7 +424,7 @@ class TestVismaExportExecution:
                     draft={},
                     export_payload={
                         "customer": {"name": "A"},
-                        "invoice": {"customerNumber": "C-1", "rows": [{"text": "x"}]},
+                        "invoice": {"CustomerNumber": "C-1", "Rows": [{"Text": "x"}]},
                     },
                     create_customer_if_missing=False,
                 )

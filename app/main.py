@@ -5790,15 +5790,18 @@ def _finance_visma_event_response(event) -> dict:
 
 def _validate_visma_export_payload(export_payload: dict) -> None:
     invoice = export_payload.get("invoice") or {}
-    rows = invoice.get("rows") or []
+    rows = invoice.get("Rows") or invoice.get("rows") or []
     if not rows:
         raise HTTPException(
             status_code=422,
             detail="Visma export payload is missing invoice rows.",
         )
-    customer_number = str(invoice.get("customerNumber") or "").strip()
+    customer_number = str(
+        invoice.get("CustomerNumber") or invoice.get("customerNumber") or ""
+    ).strip()
     customer = export_payload.get("customer") or {}
-    if not customer_number and not customer.get("name"):
+    customer_name = customer.get("Name") or customer.get("name")
+    if not customer_number and not customer_name:
         raise HTTPException(
             status_code=422,
             detail="Visma export payload is missing customer identity.",
@@ -5956,6 +5959,30 @@ def _assert_finance_visma_approval_for_export(approval) -> str:
     return state
 
 
+def _resolve_visma_fiscal_year_id(adapter) -> str | None:
+    from datetime import date
+
+    try:
+        years = adapter.client.get_fiscal_years()
+    except Exception:
+        return None
+    today = date.today()
+    for year in years:
+        if not isinstance(year, dict):
+            continue
+        if year.get("IsLockedForAccounting"):
+            continue
+        start = str(year.get("StartDate") or "")[:10]
+        end = str(year.get("EndDate") or "")[:10]
+        if start and end and start <= today.isoformat() <= end:
+            year_id = year.get("Id")
+            if year_id:
+                return str(year_id)
+    if years and isinstance(years[0], dict) and years[0].get("Id"):
+        return str(years[0]["Id"])
+    return None
+
+
 def _visma_customer_ref_requires_creation(customer_number: str) -> bool:
     if not customer_number:
         return True
@@ -5998,7 +6025,11 @@ def _execute_finance_visma_export(
 
     customer_payload = dict(export_payload["customer"])
     invoice_payload = dict(export_payload["invoice"])
-    customer_number = str(invoice_payload.get("customerNumber") or "").strip()
+    customer_number = str(
+        invoice_payload.get("CustomerNumber")
+        or invoice_payload.get("customerNumber")
+        or ""
+    ).strip()
     customer_created = False
     needs_customer_create = _visma_customer_ref_requires_creation(customer_number)
 
@@ -6010,9 +6041,10 @@ def _execute_finance_visma_export(
             )
             created_body = created.get("result") or {}
             customer_number = str(
-                created_body.get("customerNumber")
+                created_body.get("CustomerNumber")
+                or created_body.get("customerNumber")
                 or created_body.get("id")
-                or customer_payload.get("customerNumber")
+                or customer_payload.get("CustomerNumber")
                 or ""
             ).strip()
             customer_created = bool(customer_number)
@@ -6030,7 +6062,11 @@ def _execute_finance_visma_export(
                 detail="Visma customer number is required for invoice export.",
             )
 
-        invoice_payload["customerNumber"] = customer_number
+        invoice_payload["CustomerNumber"] = customer_number
+        fiscal_year_id = _resolve_visma_fiscal_year_id(adapter)
+        if fiscal_year_id:
+            invoice_payload["FiscalYearId"] = fiscal_year_id
+        invoice_payload.pop("customerNumber", None)
         invoice_response = adapter.execute_action(
             action="create_invoice",
             payload={"invoice": invoice_payload},
@@ -6086,11 +6122,13 @@ def _execute_finance_visma_export(
         )
         raise
     except requests.HTTPError as exc:
+        status_code = getattr(getattr(exc, "response", None), "status_code", None)
+        err_label = f"HTTPError:{status_code}" if status_code else "HTTPError"
         _finalize_finance_visma_event(
             db,
             claimed_event,
             status="failed",
-            last_error=type(exc).__name__,
+            last_error=err_label,
         )
         _record_finance_visma_audit(
             db,
