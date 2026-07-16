@@ -24,6 +24,18 @@
 
 ---
 
+## Pilot transition rehearsal (2026-07-16)
+
+| Area | Result |
+|------|--------|
+| **Rehearsal** | PASS — read-only production walkthrough; script `scripts/ops/run_internal_demo_rehearsal_prod.py` |
+| **Demo blockers** | None |
+| **Visma writes** | None during rehearsal |
+| **Polish** | Drain 8 legacy email approvals before pilot; processor detail in `result.processor_history`; no customer portal |
+| **Pilot pack** | `docs/PILOT_TRANSITION.md` |
+
+---
+
 ## 1. Executive summary (2026-07-15 baseline)
 
 ### What is verified

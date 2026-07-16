@@ -338,7 +338,9 @@ Full live verification plan: `docs/10-live-verification-plan.md` — production 
 - [x] **Chapter 2** — Approval-gated sandbox customer-invoice export on `T_NIKLAS_DEMO_001`; idempotency; ArticleId/customer lookup fix (`0c17256`).
 - [x] **Chapter 3** — Rejected 5 stale `finance_visma_export` approvals (pre-ArticleId failed jobs) via `POST /approvals/{id}/reject`; v6 approval unchanged (`approved`); 1 success Visma integration event; diagnostic sandbox artifacts documented (retained).
 - [x] **Release regression** — R1 gate 668 tests + focused Visma 64 + sheets/golden 125 + full suite 3265 passed locally (2026-07-16).
+- [x] **Pilot transition** — Internal demo rehearsal PASS; `docs/PILOT_TRANSITION.md` published (scope, onboarding, ops, metrics, commercial).
 - [ ] **Optional operator cleanup** — Remove duplicate diagnostic Visma sandbox customer/invoice manually in Visma UI if desired (not via production API).
+- [ ] **Before first pilot** — Drain/reject 8 legacy demo `email_send` approvals or use fresh tenant; complete PILOT_READINESS BLOCKER items (offsite backup, restore rehearsal, incident contacts).
 
 ### Sprint 3 — Google Sheets manual export (2026-07-14)
 

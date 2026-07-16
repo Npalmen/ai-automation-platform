@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-16 (Chapter 3: stale Visma approval cleanup, production verification, release regression on `T_NIKLAS_DEMO_001`; production deploy `0c17256`, docs `d92fa4c`+.)
+2026-07-16 (Pilot transition: internal demo rehearsal PASS; pilot scope/onboarding/operations pack in `docs/PILOT_TRANSITION.md`.)
 
 ## Verification method
 
@@ -26,7 +26,8 @@
 |-------|--------|--------|
 | Test suite runs | `Verified` | 3265 passed, 0 failed (run 2026-07-16; includes Visma write-safety + R1 release gate) |
 | Test count: 3265 tests | `Verified` | Run 2026-07-16 after Visma Chapter 3 regression |
-| R1 release gate | `Verified` | `python -m scripts.run_release_gate_r1` — regression 513 + e2e 155 passed (2026-07-16) |
+| Internal demo rehearsal | `Verified — production` | Read-only walkthrough 2026-07-16 on `T_NIKLAS_DEMO_001`; no Visma writes; see `docs/PILOT_TRANSITION.md` Part A |
+| Pilot transition pack | `Verified (docs)` | Scope, onboarding, operations, metrics, commercial draft in `docs/PILOT_TRANSITION.md` |
 | Visma write safety | `Verified` | `test_visma_write_safety.py` + `test_visma_oauth.py` + `test_migrate_visma_oauth_credential.py` — 64 passed (2026-07-16) |
 | Gmail manual-review handoff | `Verified (local)` | `app/workflows/manual_review_handoff.py` — UNREAD + `krowolf-manual-review` label on `manual_review`; queue at `/manual-review/jobs`; resolve via `POST .../resolve`; daily report `unresolved_manual_review`. 15 tests pass. Production backfill: `POST .../reconcile-gmail` on existing demo jobs. |
 | Internal handoff post-approval state | `Verified (local)` | `app/workflows/email_approval_resolution.py` — after final `email_send` approval resolves, job clears stale `awaiting_approval`/pending counts, records action execution, sets `completed` with `customer_case_open=true` for successful `send_internal_handoff`. 12 tests in `tests/test_internal_handoff_completion.py`. |

@@ -53,7 +53,16 @@ Covers:
 - Tenant routing hint and schema overrides
 - Local golden path scenarios (EV charger, solar, debt collection, electrical fault, tenant routing)
 
-### Root / health / production docs tests
+### Pilot transition rehearsal (production, read-only)
+
+```bash
+# On production server — no writes
+python3 /tmp/run_internal_demo_rehearsal_prod.py
+```
+
+See `docs/PILOT_TRANSITION.md` Part A for results and demo narrative.
+
+---
 
 ```bash
 python -m pytest tests/test_root_routing.py tests/test_production_hardening.py -q

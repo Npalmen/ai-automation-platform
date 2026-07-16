@@ -4,7 +4,7 @@
 > **Current verified state:** `docs/01-current-truth.md`
 > **Phase O decision:** CONDITIONAL GO (2026-07-08)
 >
-> This checklist must be completed before the first real customer pilot run.
+> **Pilot transition (scope, onboarding, operations):** see `docs/PILOT_TRANSITION.md`
 > A single operator must be able to read this document and understand exactly
 > what must be done, in what order, and why.
 
@@ -334,7 +334,7 @@
 - [ ] **POST-PILOT** — DB migration tooling (currently uses `create_all` + runtime safeguards).
 - [ ] **POST-PILOT** — Pagination controls in the operator UI jobs list.
 - [ ] **POST-PILOT** — Fortnox access token verified and live invoice export tested end-to-end.
-- [ ] **POST-PILOT** — Visma OAuth flow tested end-to-end.
+- [ ] **POST-PILOT** — Visma OAuth flow tested end-to-end. *(sandbox proof done — see `docs/PILOT_TRANSITION.md`; real-customer writes not released)*
 - [ ] **POST-PILOT** — Microsoft Mail intake configured and tested.
 - [ ] **POST-PILOT** — Self-serve customer onboarding flow.
 - [ ] **POST-PILOT** — Automated restore rehearsal on a schedule.
