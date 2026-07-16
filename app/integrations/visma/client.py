@@ -1,5 +1,13 @@
 import requests
 
+# Read-only company context for the authorized OAuth token (Visma eAccounting API v2).
+COMPANY_SETTINGS_PATH = "companysettings"
+
+
+def build_api_url(api_url: str, path: str) -> str:
+    """Join API base URL and resource path without duplicating version segments."""
+    return f"{api_url.rstrip('/')}/{path.lstrip('/')}"
+
 
 class VismaClient:
     def __init__(
@@ -19,7 +27,7 @@ class VismaClient:
 
     def _get(self, path: str) -> dict:
         response = requests.get(
-            f"{self.api_url}/{path.lstrip('/')}",
+            build_api_url(self.api_url, path),
             headers=self._headers(),
             timeout=30,
         )
@@ -28,7 +36,7 @@ class VismaClient:
 
     def _post(self, path: str, payload: dict) -> dict:
         response = requests.post(
-            f"{self.api_url}/{path.lstrip('/')}",
+            build_api_url(self.api_url, path),
             json=payload,
             headers=self._headers(),
             timeout=30,
@@ -37,7 +45,8 @@ class VismaClient:
         return response.json()
 
     def get_company(self) -> dict:
-        return self._get("company")
+        """Return company settings for the token-authorized company."""
+        return self._get(COMPANY_SETTINGS_PATH)
 
     def create_customer(self, customer: dict) -> dict:
         return self._post("customers", customer)

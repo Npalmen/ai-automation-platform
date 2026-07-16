@@ -19,6 +19,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 # Mock heavy dependencies that are not needed for unit tests.
 # Insert mocks BEFORE any app module is imported to prevent psycopg2 import errors.
@@ -191,7 +192,7 @@ class TestRefreshToken:
 # ---------------------------------------------------------------------------
 
 class TestVismaApiRead:
-    @patch.object(oauth_service, "requests")
+    @patch("app.integrations.visma.client.requests")
     @patch.object(oauth_service, "get_settings")
     def test_api_read_success(self, mock_settings, mock_requests):
         mock_settings.return_value = _mock_settings()
@@ -204,10 +205,11 @@ class TestVismaApiRead:
 
         assert result["name"] == "Test Company AB"
         call_args = mock_requests.get.call_args
+        assert call_args[0][0] == "https://eaccountingapi.vismaonline.com/v2/companysettings"
         headers = call_args[1]["headers"]
         assert headers["Authorization"] == "Bearer valid-token"
 
-    @patch.object(oauth_service, "requests")
+    @patch("app.integrations.visma.client.requests")
     @patch.object(oauth_service, "get_settings")
     def test_api_read_failure_raises(self, mock_settings, mock_requests):
         mock_settings.return_value = _mock_settings()
@@ -217,6 +219,50 @@ class TestVismaApiRead:
 
         with pytest.raises(Exception, match="API Error"):
             oauth_service.test_connection("bad-token")
+
+    @patch("app.integrations.visma.client.requests")
+    @patch.object(oauth_service, "get_settings")
+    def test_api_read_404_maps_to_not_found(self, mock_settings, mock_requests):
+        mock_settings.return_value = _mock_settings()
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_response.raise_for_status.side_effect = requests.HTTPError(response=mock_response)
+        mock_requests.get.return_value = mock_response
+
+        with pytest.raises(requests.HTTPError):
+            oauth_service.test_connection("valid-token")
+
+
+# ---------------------------------------------------------------------------
+# Test: Visma API URL construction
+# ---------------------------------------------------------------------------
+
+class TestVismaClientPaths:
+    def test_build_api_url_avoids_duplicate_slashes(self):
+        from app.integrations.visma.client import COMPANY_SETTINGS_PATH, build_api_url
+
+        assert (
+            build_api_url("https://eaccountingapi.vismaonline.com/v2", COMPANY_SETTINGS_PATH)
+            == "https://eaccountingapi.vismaonline.com/v2/companysettings"
+        )
+        assert (
+            build_api_url("https://eaccountingapi.vismaonline.com/v2/", f"/{COMPANY_SETTINGS_PATH}")
+            == "https://eaccountingapi.vismaonline.com/v2/companysettings"
+        )
+
+    @patch("app.integrations.visma.client.requests")
+    def test_get_company_uses_companysettings_path(self, mock_requests):
+        from app.integrations.visma.client import VismaClient
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"Name": "Example"}
+        mock_response.raise_for_status = MagicMock()
+        mock_requests.get.return_value = mock_response
+
+        VismaClient("token", api_url="https://eaccountingapi.vismaonline.com/v2").get_company()
+
+        assert mock_requests.get.call_args[0][0].endswith("/companysettings")
+        assert "/company" not in mock_requests.get.call_args[0][0].replace("/companysettings", "")
 
 
 # ---------------------------------------------------------------------------

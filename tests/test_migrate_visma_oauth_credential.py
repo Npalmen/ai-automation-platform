@@ -232,6 +232,25 @@ class TestTenantConfigUnchanged:
                             mig.apply_production_import(db, payload, replace=False, settings=settings)
 
 
+class TestDockerPythonTransport:
+    def test_docker_python_uses_stdin_not_shell_quoted_c_flag(self, mig):
+        with patch.object(mig.subprocess, "run") as run_mock:
+            run_mock.return_value = MagicMock(
+                returncode=0,
+                stdout='{"configured": true, "client_id_fingerprint": "abc"}',
+                stderr="",
+            )
+            result = mig._docker_python("import json\nprint(json.dumps({'ok': True}))")
+
+        assert result["ok"] is True
+        kwargs = run_mock.call_args.kwargs
+        assert "import json" in kwargs["input"]
+        assert kwargs.get("encoding") == "utf-8"
+        remote_cmd = run_mock.call_args.args[0][2]
+        assert remote_cmd.endswith("python -")
+        assert "python -c" not in remote_cmd
+
+
 class TestCliValidationOnly:
     def test_validate_only_does_not_migrate(self, mig, sample_record, local_settings):
         db = MagicMock()

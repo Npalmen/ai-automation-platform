@@ -316,7 +316,7 @@ def run_local_validation(
     refreshed = refresh_source_credential(record)
     company_validation = optional_company_test(refreshed["access_token"]) if run_company_test else None
     if company_validation and not company_validation.get("company_test_ok"):
-        raise MigrationError("Visma GET /company validation failed")
+        raise MigrationError("Visma companysettings read validation failed")
 
     payload = build_migration_payload(
         record,
@@ -377,11 +377,15 @@ finally:
 
 
 def _docker_python(code: str) -> dict[str, Any]:
+    """Run Python in the production app container via SSH stdin (Windows-safe quoting)."""
+    remote_cmd = f"sudo docker exec -i {REMOTE_APP_CONTAINER} python -"
     proc = subprocess.run(
-        ["ssh", REMOTE_HOST, f"sudo docker exec {REMOTE_APP_CONTAINER} python -c {json.dumps(code)}"],
+        ["ssh", REMOTE_HOST, remote_cmd],
+        input=code,
         capture_output=True,
         text=True,
         check=False,
+        encoding="utf-8",
     )
     if proc.returncode != 0:
         return {"ok": False, "stderr": (proc.stderr or proc.stdout)[:500]}
@@ -565,7 +569,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--skip-company-test",
         action="store_true",
-        help="Skip GET /company validation during local refresh check",
+        help="Skip companysettings read validation during local refresh check",
     )
     return parser
 

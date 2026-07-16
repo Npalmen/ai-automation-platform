@@ -10,6 +10,7 @@ from urllib.parse import urlencode
 import requests
 
 from app.core.settings import get_settings
+from app.integrations.visma.client import VismaClient
 
 logger = logging.getLogger(__name__)
 
@@ -94,13 +95,5 @@ def refresh_access_token(refresh_token: str) -> dict[str, Any]:
 def test_connection(access_token: str) -> dict[str, Any]:
     """Perform a safe read-only test against the Visma eAccounting API."""
     settings = get_settings()
-    api_url = settings.VISMA_API_URL.rstrip("/")
-
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Accept": "application/json",
-    }
-
-    response = requests.get(f"{api_url}/company", headers=headers, timeout=30)
-    response.raise_for_status()
-    return response.json()
+    client = VismaClient(access_token=access_token, api_url=settings.VISMA_API_URL)
+    return client.get_company()
