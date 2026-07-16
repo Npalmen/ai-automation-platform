@@ -5424,8 +5424,18 @@ def google_sheets_refresh_summary(
     }
 
 
+def _job_record_processor_history(record: JobRecord) -> list:
+    direct = getattr(record, "processor_history", None)
+    if direct:
+        return list(direct)
+    stored = getattr(record, "result", None)
+    if isinstance(stored, dict):
+        return list(stored.get("processor_history") or [])
+    return []
+
+
 def _extract_invoice_payload_from_history(record: JobRecord) -> dict:
-    history = record.processor_history or []
+    history = _job_record_processor_history(record)
     for entry in reversed(history):
         if entry.get("processor") != "invoice_processor":
             continue
