@@ -21,7 +21,7 @@ Run `pip install -r requirements.txt` if tests fail with `ModuleNotFoundError: N
 
 Record the pass count in `docs/01-current-truth.md` after each run.
 
-**Verified 2026-07-07:** Python 3.14.3 — 2746 passed, 0 failed, 4 warnings, 9.87s.
+**Verified 2026-07-16:** Python 3.14.3 — 3265 passed, 0 failed, 4 warnings, ~12s (full suite). R1 release gate: regression 513 + e2e 155 passed (~5.3s). Visma focused set: 64 passed.
 
 ### Core intelligence evals
 

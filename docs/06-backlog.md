@@ -313,7 +313,8 @@ Full live verification plan: `docs/10-live-verification-plan.md` — production 
 **Phase H — Monday/Fortnox/Visma safe checks**
 - [ ] Monday integration health reflects correct state.
 - [ ] Fortnox export confirmed approval-gated.
-- [x] Visma sandbox E2E (demo tenant): OAuth connected, allowlist-gated preview/export, approval-gated single export, idempotency — production 2026-07-16 (`0c17256`). Stale pending approvals from failed v1–v5 jobs need operator rejection.
+- [x] Visma sandbox E2E (demo tenant): OAuth connected, allowlist-gated preview/export, approval-gated single export, idempotency — production 2026-07-16 (`0c17256`).
+- [x] Visma Chapter 3 cleanup: 5 stale `finance_visma_export` pending approvals rejected via normal reject path; v6 approval remains `approved`; no Visma writes during cleanup (2026-07-16).
 
 **Phase I — Approval queue E2E**
 - [ ] Test lead → awaiting_approval → approve → completed.
@@ -331,6 +332,13 @@ Full live verification plan: `docs/10-live-verification-plan.md` — production 
 - [ ] Named support owner confirmed for pilot tenant.
 
 ---
+
+### Visma sandbox Chapters 2–3 (2026-07-16)
+
+- [x] **Chapter 2** — Approval-gated sandbox customer-invoice export on `T_NIKLAS_DEMO_001`; idempotency; ArticleId/customer lookup fix (`0c17256`).
+- [x] **Chapter 3** — Rejected 5 stale `finance_visma_export` approvals (pre-ArticleId failed jobs) via `POST /approvals/{id}/reject`; v6 approval unchanged (`approved`); 1 success Visma integration event; diagnostic sandbox artifacts documented (retained).
+- [x] **Release regression** — R1 gate 668 tests + focused Visma 64 + sheets/golden 125 + full suite 3265 passed locally (2026-07-16).
+- [ ] **Optional operator cleanup** — Remove duplicate diagnostic Visma sandbox customer/invoice manually in Visma UI if desired (not via production API).
 
 ### Sprint 3 — Google Sheets manual export (2026-07-14)
 

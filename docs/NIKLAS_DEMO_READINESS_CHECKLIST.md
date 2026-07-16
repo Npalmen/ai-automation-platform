@@ -62,10 +62,14 @@
 
 | Status | Level | Item | Verification |
 |--------|-------|------|--------------|
-| [ ] | REQUIRED | Visma status checked — read-only framing confirmed | `curl -sS https://api.krowolf.se/integrations/visma/status -H "X-API-Key: NIKLAS_DEMO_TENANT_KEY"` |
-| [ ] | DO_NOT_DO | **DO NOT** create real Visma invoices, customers, or orders during rehearsal | — |
-| [ ] | DO_NOT_DO | **DO NOT** perform Visma production writes of any kind | — |
-| [ ] | DO_NOT_DO | **DO NOT** call `POST /integrations/visma/execute` with write actions | — |
+| [x] | REQUIRED | Visma OAuth connected (sandbox/test account) | `GET /integrations/visma/status` → `connected: true` |
+| [x] | REQUIRED | Visma test-read works | `POST /integrations/visma/test-read` → `api_readable: true` |
+| [x] | REQUIRED | One approval-gated sandbox customer-invoice export verified (v6 job) | Chapter 2 production run 2026-07-16 |
+| [x] | REQUIRED | Stale failed export approvals rejected | Chapter 3 — 5 rejections, v6 remains approved |
+| [ ] | OPTIONAL | Diagnostic sandbox duplicate customer/invoice removed in Visma UI | Manual only — no production API delete |
+| [ ] | DO_NOT_DO | **DO NOT** approve stale v1–v5 export approvals | Rejected in Chapter 3 |
+| [ ] | DO_NOT_DO | **DO NOT** create additional Visma writes during demo rehearsal | — |
+| [ ] | DO_NOT_DO | **DO NOT** call `POST /integrations/visma/execute` with write actions | Blocked in code |
 
 ---
 

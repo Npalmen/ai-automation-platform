@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-16 (Visma Chapter 2 sandbox E2E on production `T_NIKLAS_DEMO_001` — approval-gated customer-invoice export verified; deploy `0c17256`.)
+2026-07-16 (Chapter 3: stale Visma approval cleanup, production verification, release regression on `T_NIKLAS_DEMO_001`; production deploy `0c17256`, docs `d92fa4c`+.)
 
 ## Verification method
 
@@ -24,15 +24,18 @@
 
 | Claim | Status | Detail |
 |-------|--------|--------|
-| Test suite runs | `Verified` | 3165 passed, 0 failed (3140 pre-Sprint 5 + 25 new Sprint 5 tests; run 2026-07-15) |
-| Test count: 3165 tests | `Verified` | Run 2026-07-15 after Sprint 5 Phase 1 value layer |
+| Test suite runs | `Verified` | 3265 passed, 0 failed (run 2026-07-16; includes Visma write-safety + R1 release gate) |
+| Test count: 3265 tests | `Verified` | Run 2026-07-16 after Visma Chapter 3 regression |
+| R1 release gate | `Verified` | `python -m scripts.run_release_gate_r1` — regression 513 + e2e 155 passed (2026-07-16) |
+| Visma write safety | `Verified` | `test_visma_write_safety.py` + `test_visma_oauth.py` + `test_migrate_visma_oauth_credential.py` — 64 passed (2026-07-16) |
 | Gmail manual-review handoff | `Verified (local)` | `app/workflows/manual_review_handoff.py` — UNREAD + `krowolf-manual-review` label on `manual_review`; queue at `/manual-review/jobs`; resolve via `POST .../resolve`; daily report `unresolved_manual_review`. 15 tests pass. Production backfill: `POST .../reconcile-gmail` on existing demo jobs. |
 | Internal handoff post-approval state | `Verified (local)` | `app/workflows/email_approval_resolution.py` — after final `email_send` approval resolves, job clears stale `awaiting_approval`/pending counts, records action execution, sets `completed` with `customer_case_open=true` for successful `send_internal_handoff`. 12 tests in `tests/test_internal_handoff_completion.py`. |
 | Dashboard `ready_cases` | `Verified (local)` | Uses `ApprovalRequestRepository.count_pending_for_tenant` (same source as `/approvals/pending`), not `jobs.status=awaiting_approval`. |
 | Daily summary `internal_handoffs_sent` | `Verified (local)` | Counts distinct successful `send_internal_handoff` action executions in report window; Swedish line when > 0. |
 | Approval via Gmail reply | `Unverified — deferred` | `approval_command_parser.py` parses GODKÄNN/STOPPA/ÄNDRA; not wired to Gmail intake; no approval-request email with embedded reference sent today. |
 | Sprint 4: AI Receptionist test-customer onboarding package | `Added 2026-07-15` | `docs/ai-receptionist-test-customer-onboarding.md`, `docs/ai-receptionist-test-mail-scenarios.md`, `docs/ai-receptionist-mvp-gate.md`, `docs/ai-receptionist-friend-test-guide.md`, `scripts/print_ai_receptionist_test_setup.py` |
-| Sprint 3: Google Sheets manual export endpoint | `Verified — ADDED 2026-07-14` | `POST /integrations/google-sheets/export-job`; gated by `allowed_integrations` + `spreadsheet_id`; fail-closed; audit+integration events; 50 tests in `test_google_sheets_export.py` |
+| Sprint 3: Google Sheets manual export endpoint | `Verified — ADDED 2026-07-14` | `POST /integrations/google-sheets/export-job`; gated by `allowed_integrations` + `spreadsheet_id`; fail-closed; audit+integration events; append-only Leads/Support tabs |
+| Sprint 3: Google Sheets Sammanfattning | `Verified (local + production config)` | Replace-range current-state summary tab; Support free-text limitation may still apply for some fields |
 | Sprint 3: Google Sheets adapter + mock | `Verified — ADDED 2026-07-14` | `GoogleSheetsClient` (real, Sheets v4 REST) and `MockGoogleSheetsClient` (in-memory, for tests) in `app/integrations/google/sheets_client.py` |
 | Sprint 3: Row mapper (Leads/Support/Logg) | `Verified — ADDED 2026-07-14` | `app/integrations/google/sheets_row_mapper.py`; Leads=12 cols, Support=12 cols, Logg=6 cols; extracts sender, processor history, status, source |
 | Sprint 3: No auto-export from Gmail pipeline | `Verified — CONFIRMED 2026-07-14` | gmail_adapter, lead_analyzer_processor, action_dispatch_processor, support_analyzer_processor contain no `google_sheets`/`append_row` references |
@@ -803,9 +806,16 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 | Write safety | `Verified` | Tenant OAuth only (`token_resolver`); Visma auto-dispatch disabled; idempotency key per tenant+job; `reconciliation_required` on uncertain network |
 | Export payload | `Verified` | PascalCase fields; `TermsOfPaymentId`, `FiscalYearId`, `ArticleId` on rows resolved from tenant API; synthetic customer lookup before create |
 | Approval-gated | `Verified — production` | `next_on_approve=finance_visma_export`; no write before approval |
+| Idempotency | `Verified — production` | Repeat export → `already_exported`; one success integration event per job |
+| Auto-dispatch | `Verified — disabled` | Visma legacy dispatcher events marked dead; no automatic Visma writes |
+| Generic execute route | `Verified — blocked` | `POST /integrations/visma/execute` write actions blocked |
+| Uncertain network | `Verified (code)` | Export timeout/network → `reconciliation_required`; no blind retry |
+| Quotations | `Not implemented` | No Visma quote export |
+| Supplier invoices | `Not implemented` | No supplier invoice import |
 | Tested | `Verified` | `test_visma_oauth.py`, `test_visma_write_safety.py` (23 tests) |
-| Production-ready | `Partially verified` | One successful sandbox export on demo tenant; 5 stale pending approvals from earlier failed attempts need operator rejection |
-| First-customer relevance | Medium — optional pilot path after Fortnox/Gmail slice |
+| Production-ready | `Partially verified` | One successful sandbox export on demo tenant; stale v1–v5 approvals rejected 2026-07-16; 5 failed integration events remain historical only |
+| Sandbox artifacts | `Documented` | 2 sandbox customers + 2 Krowolf invoices in Visma test company (1 approval-gated v6 + 1 diagnostic from pre-fix validation); retained — no safe API delete path |
+| First-customer relevance | Medium — optional pilot path after explicit rollout policy |
 
 ### Microsoft Mail (Outlook)
 
