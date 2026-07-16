@@ -7,6 +7,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -247,8 +248,101 @@ class TestDockerPythonTransport:
         assert "import json" in kwargs["input"]
         assert kwargs.get("encoding") == "utf-8"
         remote_cmd = run_mock.call_args.args[0][2]
+        assert f"-w {mig.REMOTE_APP_WORKDIR}" in remote_cmd
         assert remote_cmd.endswith("python -")
         assert "python -c" not in remote_cmd
+
+    def test_bootstrap_import_path_adds_app_root_when_present(self, mig, monkeypatch):
+        monkeypatch.setattr(mig.sys, "path", [])
+
+        def fake_resolve(self):
+            return Path("/tmp/migrate_visma_oauth_credential.py")
+
+        def fake_is_dir(self):
+            normalized = str(self).replace("\\", "/").rstrip("/")
+            return normalized.endswith("/app/app") or normalized == "/app/app"
+
+        monkeypatch.setattr(mig.Path, "resolve", fake_resolve)
+        monkeypatch.setattr(mig.Path, "is_dir", fake_is_dir)
+
+        mig._bootstrap_import_path()
+
+        assert mig.sys.path and mig.sys.path[0] in {"/app", "\\app"}
+
+
+class TestRemoteImportExecution:
+    def test_ssh_remote_import_uses_app_workdir_and_payload_path(self, mig):
+        with patch.object(mig, "_docker_cp_host_to_container") as cp_mock:
+            with patch.object(mig.subprocess, "run") as run_mock:
+                run_mock.return_value = MagicMock(
+                    returncode=0,
+                    stdout='{"status": "imported"}',
+                    stderr="",
+                )
+                mig._ssh_remote_import(
+                    "/tmp/visma_oauth_migration_payload_host.json",
+                    "/tmp/visma_oauth_migration_payload.json",
+                    False,
+                )
+
+        assert cp_mock.call_count == 2
+        remote_cmd = run_mock.call_args.args[0][2]
+        assert f"-w {mig.REMOTE_APP_WORKDIR}" in remote_cmd
+        assert "--remote-import" in remote_cmd
+        assert "--payload /tmp/visma_oauth_migration_payload.json" in remote_cmd
+        assert "--replace" not in remote_cmd
+        assert "super-secret" not in remote_cmd
+
+    def test_ssh_remote_import_failure_does_not_include_payload_contents(self, mig):
+        with patch.object(mig, "_docker_cp_host_to_container"):
+            with patch.object(mig.subprocess, "run") as run_mock:
+                run_mock.return_value = MagicMock(
+                    returncode=1,
+                    stdout="",
+                    stderr="ModuleNotFoundError: No module named 'app'",
+                )
+                with pytest.raises(mig.MigrationError, match="Remote import failed"):
+                    mig._ssh_remote_import(
+                        "/tmp/host-payload.json",
+                        "/tmp/visma_oauth_migration_payload.json",
+                        False,
+                    )
+
+        remote_cmd = run_mock.call_args.args[0][2]
+        assert "payload.json" not in remote_cmd or remote_cmd.endswith(
+            "--payload /tmp/visma_oauth_migration_payload.json"
+        )
+
+    def test_run_migrate_cleans_local_temp_when_remote_import_fails(self, mig, tmp_path):
+        mig.TEMP_DIR = tmp_path
+        payload_path = tmp_path / "visma_oauth_migration_test.json"
+        payload_path.write_text('{"access_token":"secret-at"}', encoding="utf-8")
+
+        with patch.object(mig, "get_settings", return_value=SimpleNamespace(
+            VISMA_CLIENT_ID="id", VISMA_CLIENT_SECRET="secret",
+        )):
+            with patch.object(mig, "fetch_remote_client_fingerprint", return_value="fp"):
+                with patch.object(mig, "remote_production_credential_exists", return_value=False):
+                    with patch.object(mig, "SessionLocal", return_value=MagicMock()):
+                        with patch.object(
+                            mig,
+                            "run_local_validation",
+                            return_value=({"status": "validated"}, {"access_token": "secret-at"}),
+                        ):
+                            with patch.object(mig, "write_secure_payload", return_value=payload_path):
+                                with patch.object(mig, "_scp_script_to_remote"):
+                                    with patch.object(mig, "_scp_to_remote"):
+                                        with patch.object(
+                                            mig,
+                                            "_ssh_remote_import",
+                                            side_effect=mig.MigrationError("Remote import failed"),
+                                        ):
+                                            with patch.object(mig, "_ssh_delete_remote") as delete_mock:
+                                                with pytest.raises(mig.MigrationError):
+                                                    mig.run_migrate(replace=False)
+
+        assert not payload_path.exists()
+        delete_mock.assert_called()
 
 
 class TestCliValidationOnly:

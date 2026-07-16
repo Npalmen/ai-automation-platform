@@ -19,11 +19,24 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy.orm import Session
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+def _bootstrap_import_path() -> None:
+    """Support local repo layout and production container (/opt/krowolf)."""
+    script = Path(__file__).resolve()
+    candidates: list[Path] = [Path("/app"), Path("/opt/krowolf")]
+    if len(script.parents) >= 3:
+        candidates.append(script.parents[2])
+    for root in candidates:
+        if (root / "app").is_dir():
+            root_str = str(root)
+            if root_str not in sys.path:
+                sys.path.insert(0, root_str)
+            return
+
+
+_bootstrap_import_path()
+
+from sqlalchemy.orm import Session
 
 from app.core.audit_service import create_audit_event
 from app.core.settings import Settings, get_settings
@@ -37,6 +50,7 @@ TENANT_ID = "T_NIKLAS_DEMO_001"
 PROVIDER = "visma"
 REMOTE_HOST = "ubuntu@api.krowolf.se"
 REMOTE_APP_CONTAINER = "krowolf-app-1"
+REMOTE_APP_WORKDIR = "/app"
 TEMP_DIR = Path(__file__).resolve().parent / ".tmp" / "visma_oauth_migration"
 
 SECRET_KEYS = frozenset(
@@ -378,7 +392,7 @@ finally:
 
 def _docker_python(code: str) -> dict[str, Any]:
     """Run Python in the production app container via SSH stdin (Windows-safe quoting)."""
-    remote_cmd = f"sudo docker exec -i {REMOTE_APP_CONTAINER} python -"
+    remote_cmd = f"sudo docker exec -i -w {REMOTE_APP_WORKDIR} {REMOTE_APP_CONTAINER} python -"
     proc = subprocess.run(
         ["ssh", REMOTE_HOST, remote_cmd],
         input=code,
@@ -436,7 +450,7 @@ def _ssh_remote_import(remote_payload_host: str, remote_payload_container: str, 
     _docker_cp_host_to_container(remote_payload_host, remote_payload_container)
 
     remote_cmd = (
-        f"sudo docker exec {REMOTE_APP_CONTAINER} python {remote_script_container} "
+        f"sudo docker exec -w {REMOTE_APP_WORKDIR} {REMOTE_APP_CONTAINER} python {remote_script_container} "
         f"--remote-import --payload {remote_payload_container}{replace_flag}"
     )
     proc = subprocess.run(
@@ -466,7 +480,7 @@ def _ssh_delete_remote(host_path: str, container_path: str | None = None) -> Non
             [
                 "ssh",
                 REMOTE_HOST,
-                f"sudo docker exec {REMOTE_APP_CONTAINER} rm -f {container_path}",
+                f"sudo docker exec -w {REMOTE_APP_WORKDIR} {REMOTE_APP_CONTAINER} rm -f {container_path}",
             ],
             capture_output=True,
             text=True,
