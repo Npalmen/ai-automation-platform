@@ -296,13 +296,22 @@ class TestAdminListTenants:
         from app.main import admin_list_tenants
         db = _mock_db()
         recs = records if records is not None else [_make_tenant_record()]
-        with patch("app.repositories.postgres.tenant_config_repository.TenantConfigRepository.list_all",
+        with patch("app.admin.tenant_directory.TenantConfigRepository.list_all",
                    return_value=recs), \
-             patch("app.repositories.postgres.tenant_config_repository.TenantConfigRepository.to_dict",
+             patch("app.admin.tenant_directory.TenantConfigRepository.to_dict",
                    side_effect=lambda r: {"tenant_id": r.tenant_id, "name": r.name, "slug": r.slug,
                                           "status": r.status, "enabled_job_types": [], "allowed_integrations": [],
-                                          "auto_actions": {}, "created_at": None, "updated_at": None}):
-            return admin_list_tenants(db=db)
+                                          "auto_actions": {}, "created_at": None, "updated_at": None}), \
+             patch("app.admin.tenant_directory.collect_all_triage_rows", return_value=[]), \
+             patch("app.admin.tenant_directory._batch_count_by_tenant", return_value={}), \
+             patch("app.admin.tenant_directory._batch_max_job_activity", return_value={}), \
+             patch("app.admin.tenant_directory._batch_max_created_at", return_value={}), \
+             patch("app.admin.tenant_directory._batch_oauth_providers", return_value={}), \
+             patch("app.admin.tenant_directory._batch_integration_event_stats", return_value={}):
+            result = admin_list_tenants(db=db)
+            if hasattr(result, "model_dump"):
+                result = result.model_dump()
+            return result
 
     def test_returns_items_list(self):
         result = self._call()
@@ -324,7 +333,7 @@ class TestAdminListTenants:
     def test_includes_expected_fields(self):
         result = self._call()
         item = result["items"][0]
-        for field in ("tenant_id", "name", "status"):
+        for field in ("tenant_id", "name", "tenant_status"):
             assert field in item
 
 

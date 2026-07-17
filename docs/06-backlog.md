@@ -6,6 +6,163 @@
 
 ---
 
+### Kapitel 8 — System-, backup- och deploystatus (2026-07-17)
+
+- [x] **Metadata scripts** — `write_operation_status.py`, `write_build_metadata.py`; atomic JSON; separate operation vs metadata exit semantics.
+- [x] **Backup/restore scripts** — status files via `BACKUP_STATUS_FILE` / `RESTORE_STATUS_FILE`; `archive_integrity_verified`; verification enums.
+- [x] **Docker build metadata** — Dockerfile build args; CI `release-gate.yml` quoted `--build-arg`.
+- [x] **Backend system status** — `system_status_sources.py`, `system_status_schemas.py`, `system_status.py`; `GET /admin/system/status`.
+- [x] **Scheduler fix** — `_derive_scheduler_signal` nested `scheduler.run_mode` + overview regression.
+- [x] **Tests** — sources, system status, script metadata, build metadata writer.
+- [x] **Frontend system** — `src/features/systemStatus/`; `/ops/system`; runtime/resilience/deploy readiness sections.
+- [x] **Docs** — `docs/01-current-truth.md`, `frontend/README.md`, runbook, `infra/README.md`.
+- [ ] **Manual responsive browser verification** — not executed in this environment.
+- [ ] **Deploy manifest / last_deployed_at** — deferred until deploy pipeline writes allowlisted artifact.
+- [ ] **Release gate runtime artifact** — deferred (CI does not publish to runtime today).
+- [ ] **Production status dir permissions** — requires one-time server `chgrp`/`chmod` per runbook.
+
+---
+
+### Kapitel 7 — Användning, kostnad och kapacitet (2026-07-17)
+
+- [x] **Usage schemas** — `app/admin/usage_schemas.py`; half-open period; `NotMeasuredValue`, `ProxyTimestampMetric`.
+- [x] **Batched repository** — `app/admin/usage_repository.py`; `GROUP BY tenant_id`; Python peak-hour bucketing (SQLite-safe).
+- [x] **Service + routes** — `app/admin/usage.py`; `GET /admin/usage/overview`, `GET /admin/usage/tenants`; single `require_operator_role` auth.
+- [x] **Tests** — `tests/test_admin_usage.py` (period boundaries, not_measured metrics, auth, batch call counts).
+- [x] **Frontend usage** — `src/features/usage/`; `/ops/usage`; tenant rows link to customer detail.
+- [x] **Docs** — `docs/01-current-truth.md`, `frontend/README.md`.
+- [ ] **Manual responsive browser verification** — not executed in this environment.
+- [ ] **AI token instrumentation** — deferred (requires LLM client changes + persistence model).
+- [ ] **Automation rate** — deferred until `audit_events.job_id` or equivalent batchable linkage exists.
+- [ ] **Time-series charts** — deferred (no daily series endpoint).
+
+---
+
+### Kapitel 6 — Incidenthantering (2026-07-17)
+
+- [x] **Incident models** — `app/admin/incident_models.py`; explicit startup import; `create_all()` (no Alembic).
+- [x] **Repository + service** — `incident_repository.py`, `incidents.py`; atomic version updates; single-commit timeline+audit.
+- [x] **Schemas + routes** — typed requests (`extra=forbid`); full `/admin/incidents` surface in `main.py`.
+- [x] **Needs-help linking** — `recommended_incident_action`, `linked_incidents` on detail.
+- [x] **Tests** — `tests/test_admin_incidents.py`; extended needs-help tests.
+- [x] **Frontend incidents** — `src/features/incidents/`; nested `/ops/incidents/:incidentId`; create from needs-help.
+- [x] **Docs** — `docs/01-current-truth.md`, `frontend/README.md`.
+- [ ] **Manual responsive browser verification** — not executed in this environment.
+- [ ] **Auto-incident rules** — deferred until flow validated.
+
+---
+
+### Kapitel 5 — Säkra operatörsåtgärder (2026-07-17)
+
+- [x] **Action registry** — `app/admin/operator_actions.py` + schemas; five safe writes; explicit `execute_*` per action.
+- [x] **Role dependency** — `require_operator_role(allowed_roles)` + `resolve_authenticated_operator` in `admin_auth.py`.
+- [x] **Routes** — pause/resume automation, pause/resume scheduler, reject dispatch approval; `require_same_origin`.
+- [x] **`available_actions`** — needs-help detail + tenant overview; `allowed`/`blocked_reason` for read_only.
+- [x] **Tests** — `tests/test_admin_operator_actions.py`.
+- [x] **Frontend operatorActions** — explicit API/mutations, `OperatorActionsSection` on customer + needs-help detail.
+- [x] **Docs** — `docs/01-current-truth.md`, `frontend/README.md`.
+- [ ] **`job.manual_review.resolve`** — deferred until local-only service variant exists (`blocked_external_risk`).
+- [ ] **Manual responsive browser verification** — not executed in this environment.
+
+---
+
+### Kapitel 4 — Gemensam felkö och Behöver hjälp (2026-07-17)
+
+- [x] **Shared triage normalization** — `dedupe_and_normalize_signals`, latest-per-source integration events, explicit retry/impact enums, runbook allowlist in `operations_triage.py`.
+- [x] **New signals** — `reconciliation_required`, `tenant_config` (active non-demo only); mapping moved to shared triage module.
+- [x] **Needs-help service** — `app/admin/operations_needs_help.py` + schemas; panel severity vocabulary; filtered summary; extended filters.
+- [x] **Routes** — `GET /admin/operations/needs-help` (typed queue), `GET /admin/operations/needs-help/{item_id}` (detail).
+- [x] **Tests** — extended triage/overview tests; `tests/test_admin_operations_needs_help.py`.
+- [x] **Frontend needsHelp** — `src/features/needsHelp/` (`NeedsHelpQueuePage`, `NeedsHelpDetailPage`); nested `/ops/needs-help/:itemId`.
+- [x] **Frontend gates** — typecheck, contracts, build pass.
+- [x] **Docs** — `docs/01-current-truth.md`.
+- [ ] **Manual responsive browser verification** — not executed in this environment.
+
+---
+
+### Kapitel 3 — Kundlista och kunddetalj (2026-07-17)
+
+- [x] **Backend tenant directory** — `app/admin/tenant_directory.py`: enriched `GET /admin/tenants` (batched counts, `last_activity_at`, integration summary, health derivation); `GET /admin/tenants/{id}/overview` detail aggregation.
+- [x] **Pydantic schemas** — `app/admin/tenant_directory_schemas.py`; reuses `PriorityItem` for `recent_errors`.
+- [x] **Tests** — `tests/test_admin_tenant_directory.py` (health/status separation, integration sources, totals, secrets, performance smoke, auth).
+- [x] **Frontend components** — `DataTable`, `FilterBar`, `TenantIdentifier`, `AuditTimeline` (`implemented: true` in contracts).
+- [x] **Frontend customers** — `src/features/customers/` (`CustomersListPage`, `CustomerDetailPage`); nested `/ops/customers/:tenantId`.
+- [x] **Frontend gates** — typecheck, contracts, lint, build pass.
+- [x] **Docs** — `frontend/README.md`, `docs/01-current-truth.md`.
+- [ ] **Manual responsive browser verification** — not executed in this environment.
+
+---
+
+### Kapitel 2 — Global operativ översikt (2026-07-17)
+
+- [x] **Backend overview service** — `app/admin/operations_overview.py`: global counters, stuck-job rule, integration status (gmail health vs event-log for visma/sheets), deterministic priority sort/IDs, platform status, 503 on aggregation failure.
+- [x] **Triage refactor** — `collect_all_triage_rows()` extracted in `operations_triage.py`; shared by needs-help and overview (no behavior change for needs-help).
+- [x] **Pydantic schemas** — `app/admin/operations_overview_schemas.py` with `CounterValue.window_hours`, `system.api`.
+- [x] **Route** — `GET /admin/operations/overview` with `require_admin_api_key`.
+- [x] **Tests** — `tests/test_admin_operations_overview.py` (auth, counters, 503, sorting, IDs, integration rules, performance smoke, secrets).
+- [x] **Frontend overview** — `src/features/overview/` (`OverviewPage`, MetricGrid, PriorityList, integration/system status). TanStack Query `["operations","overview"]`.
+- [x] **Route swap** — `/ops` index → `OverviewPage`.
+- [x] **Frontend gates** — typecheck, contracts, lint, build pass.
+- [x] **Docs** — `frontend/README.md`, `docs/01-current-truth.md`.
+- [ ] **Manual responsive browser verification** — checklist not executed in this environment.
+
+---
+
+### Kapitel 1C — Operations shell and authentication (2026-07-17)
+
+- [x] **Backend auth extensions** — typed `operator` + `environment` on `/auth/admin/me` and session login response; `ADMIN_ROLE`/`ADMIN_DISPLAY_NAME`/`ALLOWED_ORIGINS` settings; fail-closed role validator; `require_same_origin()` on login/logout.
+- [x] **Frontend auth feature** — `src/features/auth/` (AuthProvider, RequireAuth, RequireRole, LoginPage, forbidden/unauthorized).
+- [x] **AppShell** — responsive sidebar/topbar/mobile drawer, environment badge from auth query, operator profile, logout.
+- [x] **Protected routes** — `/ops/login` public only; placeholder pages; `/ops/foundation` + `/ops/design-reference` admin-only; `routePolicy.ts`.
+- [x] **Tests** — extended `test_admin_session.py`; new `/ops/*` smoke tests; auth/tenant regressions.
+- [x] **Security scan** — no admin keys or browser storage for auth in frontend source/build.
+- [x] **Docs** — `frontend/README.md`, `docs/01-current-truth.md`.
+- [ ] **Manual responsive browser verification** — checklist documented, not executed in this environment.
+- [x] **Next step** — Kapitel 2 (global operational overview) may begin once manual verification is done.
+
+---
+
+### Kapitel 1B — Design contracts and visual reference (2026-07-17)
+
+- [x] **JSON contracts** — `frontend/design/krowolf-ui-profile.json` (v1.0.0), `component-contracts.json`, `page-contracts.json`. Nordic Operations direction; 8 status tokens; forbidden patterns documented.
+- [x] **Token pipeline** — `scripts/generate-design-tokens.mjs`, `tokens:generate` npm script, `predev`/`prebuild` hooks, `tailwind.config.js` via `createRequire`, `globals.css` imports generated tokens.
+- [x] **Typed contracts** — `src/design/types.ts` (`keyof typeof` derived unions), `loadContracts.ts`, `resolveJsonModule` enabled.
+- [x] **Contract tests** — `design/contracts.test.mjs` (node:test), `npm run test:contracts`.
+- [x] **10 operator components** — PageHeader, StatusBadge, SeverityBadge, MetricCard, HealthIndicator, EmptyState, ErrorState, LoadingState, ActionDialog (native dialog), CriticalActionDialog (native dialog with reason + confirmation gating).
+- [x] **Design reference** — `/ops/design-reference` with static Swedish demo data; desktop queue table + mobile cards; no API calls.
+- [x] **Governance** — `.cursor/rules/frontend-ui.mdc`.
+- [x] **Tests** — backend `test_ops_design_reference_serves_spa_fallback`; CI `test:contracts` step.
+- [x] **No auth/real data** — intentionally not built.
+- [x] **Next step** — Kapitel 1C (operations shell and authentication).
+
+---
+
+### Kapitel 1A — Operator panel frontend foundation (2026-07-17)
+
+- [x] **`frontend/` scaffolded** — React/TypeScript/Vite with `base: "/ops/"`, strict TS, `@/` alias, Tailwind v3, shadcn/ui baseline (`button`, `badge`), React Router (`basename: /ops`), TanStack Query, minimal `apiClient`. No `lucide-react`; production source maps disabled.
+- [x] **Foundation page** — responsive `FoundationPage` at `/ops` and `/ops/foundation`; `NotFoundPage` catch-all; minimal `FoundationLayout` shell. No auth, no dashboards, no brand design.
+- [x] **FastAPI `/ops` routes** — additive end-of-file routes in `app/main.py`: SPA fallback (`index.html` only), explicit `GET /ops/assets/{path}` with `FileResponse` + traversal guard, 503 when `frontend/dist` missing. Legacy `/ui` and API routes untouched.
+- [x] **Docker multi-stage build** — Node 22 build stage in `Dockerfile`; only `frontend/dist` copied to runtime image. `.dockerignore` excludes `frontend/node_modules` and `frontend/dist`.
+- [x] **CI gates** — `frontend` job in `release-gate.yml` (typecheck, lint, build); `docker` job waits on `tests` + `frontend`.
+- [x] **Tests** — `tests/test_operator_panel_static.py` (12 tests: SPA, assets, 503, traversal, regressions).
+- [x] **`frontend/README.md`** — local dev, build, backend integration, roadmap pointers.
+- [x] **Docker build verification** — not run locally (no Docker CLI in this environment). Awaiting CI `docker` job on push/PR for full PASS.
+- [x] **Next step** — Kapitel 1B (design contract).
+
+---
+
+### Kapitel 0B — Operator panel governance lock (2026-07-17)
+
+- [x] **DEC-024 registered** — `docs/07-decisions.md`. New internal operator panel frontend stack (React/TS/Vite/shadcn/Tailwind/React Router/TanStack) approved, scoped explicitly to the internal operator panel only; supersedes DEC-015 for that scope alone. Includes deployment principle, security principle, responsiveness principle, design-contract governance, legacy-UI policy, and a deploy readiness matrix (Kapitel-1A-blocking vs. production-deploy-blocking items).
+- [x] **Contradicting docs updated** — `docs/00-master-plan.md` ("Forbidden scope now" list) and `docs/05-architecture.md` ("Frontend principle") now reference the DEC-024 exception instead of stating an unqualified prohibition on a new frontend stack.
+- [x] **Legacy-UI policy documented** — inside DEC-024: `app/ui/index.html` frozen, not a design basis for the new panel, not removed/dismantled during initial frontend chapters, function-parity checklist deferred to the legacy-retirement chapter (Kapitel 5 per Kapitel 0A plan).
+- [x] **Caddy investigation** — confirmed `infra/Caddyfile` (real production file) has never been committed to this repo and was not retrieved in this session (no SSH access available). Added `infra/README.md` + `infra/Caddyfile.example`, both explicitly labeled as a non-verified target config, not production truth.
+- [x] **`docs/01-current-truth.md` updated** — new "Operator panel initiative — governance and deploy status" section recording DEC-024, doc updates, legacy status, and Caddy verification status.
+- [x] **No code changed** — Kapitel 0B is documentation/infra-doc only. No `frontend/`, no npm install, no Dockerfile/Compose/route/auth changes, `app/ui/index.html` untouched.
+- [x] **Next step defined** — Kapitel 1A (frontend foundation) may begin; production deploy of the new panel remains blocked on the real Caddy verification per the DEC-024 deploy readiness matrix.
+
+---
+
 ### Niklas Demo — Gmail manual-review handoff + approval queue accuracy (2026-07-15)
 
 - [x] **Gmail manual-review operator handoff** — `manual_review` Gmail jobs now get `krowolf-manual-review` label + UNREAD; state on `job.result.manual_review_handoff`; queue APIs `GET/POST /manual-review/jobs*`; daily summary `unresolved_manual_review` count; 15 tests in `tests/test_manual_review_handoff.py`.

@@ -1,6 +1,9 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.core.admin_session_models import VALID_OPERATOR_ROLES
 
 
 class Settings(BaseSettings):
@@ -34,6 +37,19 @@ class Settings(BaseSettings):
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD_HASH: str = ""
     SESSION_SECRET_KEY: str = ""
+    ADMIN_ROLE: str = "admin"
+    ADMIN_DISPLAY_NAME: str = ""
+    # Comma-separated allowed Origin values for POST /auth/admin/login|logout.
+    # When empty, same-origin is derived from the incoming request URL.
+    ALLOWED_ORIGINS: str = ""
+
+    @field_validator("ADMIN_ROLE")
+    @classmethod
+    def validate_admin_role(cls, value: str) -> str:
+        if value not in VALID_OPERATOR_ROLES:
+            allowed = ", ".join(sorted(VALID_OPERATOR_ROLES))
+            raise ValueError(f"ADMIN_ROLE must be one of: {allowed}")
+        return value
 
     EMAIL_PROVIDER: str = "google_mail"
 
@@ -89,6 +105,15 @@ class Settings(BaseSettings):
     LLM_MAX_TOKENS: int = 1200
     LLM_RETRY_ATTEMPTS: int = 2
     LLM_RETRY_DELAY_SECONDS: float = 0.8
+
+    # System status metadata (Kapitel 8) — same env var names as backup/restore scripts.
+    # Container defaults; host cron uses host paths via inline env (see runbook).
+    BACKUP_STATUS_FILE: str = "/app/storage/status/backup_status.json"
+    RESTORE_STATUS_FILE: str = "/app/storage/status/restore_status.json"
+    BUILD_METADATA_PATH: str = "/app/build-metadata.json"
+    BACKUP_EXPECTED_INTERVAL_HOURS: int = 24
+    BACKUP_MAX_AGE_HOURS: int = 25
+    RESTORE_TEST_MAX_AGE_DAYS: int = 30
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -1,0 +1,37 @@
+# EXAMPLE / TARGET CONFIGURATION — NOT VERIFIED PRODUCTION CONFIG
+#
+# This file is NOT a copy of the live production Caddyfile. The real file at
+# /opt/krowolf/infra/Caddyfile on the production server was not retrieved in
+# Kapitel 0B (2026-07-17) — no SSH credentials/host access were available in
+# this session, and prior sessions already documented SSH auth failures
+# against the production host (see docs/01-current-truth.md).
+#
+# This is a hand-written, inferred target configuration based on:
+#   - docker-compose.prod.yml (caddy -> app:8000, ports 80/443 on caddy only)
+#   - docs/10-live-verification-plan.md / docs/01-current-truth.md, which
+#     confirm api.krowolf.se and app.krowolf.se both resolve to the same
+#     server and both currently reach the same FastAPI app.
+#
+# Do not deploy this file to production without first diffing it against the
+# real, retrieved production Caddyfile. See infra/README.md.
+
+api.krowolf.se {
+	reverse_proxy app:8000
+}
+
+app.krowolf.se {
+	reverse_proxy app:8000
+}
+
+admin.krowolf.se {
+	reverse_proxy app:8000
+}
+
+# Kapitel 1C+ (new operator panel) will need a decision here, not made in
+# Kapitel 0B:
+#   - Reuse one of the existing hosts above (e.g. admin.krowolf.se) for the
+#     new panel once it is packaged into the same app image (DEC-024
+#     deployment principle, Alternative A), with no Caddy change required, or
+#   - Add a new host block once a separate frontend container is introduced
+#     (only if DEC-024's "no separate frontend container in the first
+#     release" position is revisited).

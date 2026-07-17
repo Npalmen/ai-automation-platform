@@ -1,0 +1,166 @@
+{
+  "profile": {
+    "name": "Krowolf Operations",
+    "version": "1.0.0",
+    "product": "operator-panel",
+    "locale": "sv-SE",
+    "direction": "nordic_operations"
+  },
+  "colors": {
+    "page": "#F5F6F4",
+    "surface": {
+      "default": "#FFFFFF",
+      "subtle": "#EEF1EE"
+    },
+    "border": {
+      "default": "#DDE2DE",
+      "strong": "#C5CCC7"
+    },
+    "text": {
+      "primary": "#18201C",
+      "secondary": "#66706A",
+      "muted": "#8B948F",
+      "inverse": "#FFFFFF"
+    },
+    "brand": {
+      "primary": "#1E4939",
+      "primaryHover": "#183D30",
+      "primaryActive": "#123126",
+      "primarySubtle": "#DDEBE4",
+      "primaryBorder": "#B8D2C3"
+    },
+    "status": {
+      "success": "#2F6B4F",
+      "warning": "#9A6B1F",
+      "danger": "#A33B3B",
+      "critical": "#7A1F1F",
+      "information": "#2F5C7A",
+      "neutral": "#66706A",
+      "paused": "#6B5E8A",
+      "unknown": "#8B948F"
+    }
+  },
+  "typography": {
+    "fontFamily": "Inter, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+    "display": { "size": "2rem", "lineHeight": "2.5rem", "weight": "600" },
+    "pageTitle": { "size": "1.5rem", "lineHeight": "2rem", "weight": "600" },
+    "sectionTitle": { "size": "1.125rem", "lineHeight": "1.75rem", "weight": "600" },
+    "cardTitle": { "size": "1rem", "lineHeight": "1.5rem", "weight": "600" },
+    "body": { "size": "0.875rem", "lineHeight": "1.375rem", "weight": "400" },
+    "bodySmall": { "size": "0.8125rem", "lineHeight": "1.25rem", "weight": "400" },
+    "label": { "size": "0.75rem", "lineHeight": "1rem", "weight": "500" },
+    "caption": { "size": "0.6875rem", "lineHeight": "1rem", "weight": "400" },
+    "metric": { "size": "1.75rem", "lineHeight": "2.25rem", "weight": "600" },
+    "table": { "size": "0.8125rem", "lineHeight": "1.25rem", "weight": "400" },
+    "code": { "size": "0.8125rem", "lineHeight": "1.25rem", "weight": "400", "family": "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }
+  },
+  "spacing": {
+    "0": "0",
+    "1": "0.25rem",
+    "2": "0.5rem",
+    "3": "0.75rem",
+    "4": "1rem",
+    "5": "1.25rem",
+    "6": "1.5rem",
+    "8": "2rem",
+    "10": "2.5rem",
+    "12": "3rem",
+    "16": "4rem"
+  },
+  "sizing": {
+    "contentMaxWidth": "80rem",
+    "pagePaddingMobile": "1rem",
+    "pagePaddingTablet": "1.5rem",
+    "pagePaddingDesktop": "2rem",
+    "sidebarWidth": "16rem",
+    "topbarHeight": "3.5rem",
+    "cardPadding": "1rem",
+    "fieldSpacing": "0.75rem",
+    "tableRowDensity": "2.75rem",
+    "dialogWidthSm": "24rem",
+    "dialogWidthMd": "32rem",
+    "dialogWidthLg": "40rem",
+    "touchTargetMin": "2.75rem"
+  },
+  "radii": {
+    "sm": "0.25rem",
+    "md": "0.375rem",
+    "lg": "0.5rem",
+    "xl": "0.75rem",
+    "full": "9999px"
+  },
+  "shadows": {
+    "sm": "0 1px 2px 0 rgba(24, 32, 28, 0.05)",
+    "md": "0 4px 6px -1px rgba(24, 32, 28, 0.08), 0 2px 4px -2px rgba(24, 32, 28, 0.06)",
+    "lg": "0 10px 15px -3px rgba(24, 32, 28, 0.08), 0 4px 6px -4px rgba(24, 32, 28, 0.06)"
+  },
+  "breakpoints": {
+    "xs": 320,
+    "sm": 375,
+    "md": 768,
+    "lg": 1024,
+    "xl": 1366,
+    "2xl": 1440,
+    "3xl": 1920
+  },
+  "responsive": {
+    "zoomSupport": "200%",
+    "pagePadding": {
+      "xs": "1rem",
+      "md": "1.5rem",
+      "lg": "2rem"
+    },
+    "grid": {
+      "mobile": "single-column",
+      "tablet": "two-column where appropriate",
+      "desktop": "multi-column with max-width container"
+    },
+    "navigation": {
+      "mobile": "collapsed or bottom-accessible",
+      "desktop": "sidebar-ready placeholder"
+    },
+    "table": {
+      "mobile": "stacked cards, never squeezed columns",
+      "desktop": "structured row list or table"
+    },
+    "dialog": {
+      "mobile": "near-fullscreen with internal scroll",
+      "desktop": "centered modal with max-width"
+    },
+    "form": {
+      "mobile": "single column, full width fields",
+      "desktop": "grouped fields with consistent spacing"
+    },
+    "overflowPolicy": "no global horizontal scroll; long identifiers break or truncate with title attribute",
+    "informationPriority": "primary operational facts first on mobile, secondary metadata below"
+  },
+  "accessibility": {
+    "minContrastRatio": "4.5:1 for normal text",
+    "focusVisible": "required on all interactive elements",
+    "touchTargetMinPx": 44,
+    "statusNotColorAlone": true,
+    "keyboardNavigation": "required for dialogs and primary actions",
+    "language": "sv-SE for operator-facing copy"
+  },
+  "motion": {
+    "policy": "minimal",
+    "decorativeAnimation": false,
+    "reducedMotionRespect": true
+  },
+  "forbiddenPatterns": [
+    "gradients",
+    "glassmorphism",
+    "neon colors",
+    "decorative animations",
+    "large illustration areas",
+    "random accent colors",
+    "unique border-radius per page",
+    "charts without operational purpose",
+    "icons without text for critical actions",
+    "color as sole status indicator",
+    "global horizontal scroll",
+    "absolute positioning for primary layout",
+    "large cards around every small information bit",
+    "generic English dashboard words when clear Swedish exists"
+  ]
+}

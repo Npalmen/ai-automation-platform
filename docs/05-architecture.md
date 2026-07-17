@@ -210,11 +210,11 @@ The workflow does NOT auto-generate actions. Actions must be provided in `input_
 
 ## Frontend principle
 
-- Single-file `app/ui/index.html` served by FastAPI via `HTMLResponse`.
-- No React, Vite, Tailwind, or build toolchain. (DEC-004)
-- Dark/light mode via CSS tokens. No new design direction without decision.
-- Admin mode shows all views; Customer mode shows safe subset.
-- All business logic in backend; UI only consumes API.
+- Single-file `app/ui/index.html` served by FastAPI via `HTMLResponse`. This remains the customer-facing/legacy frontend principle (DEC-015) and applies unchanged to the customer portal and any frontend work outside the scope below.
+- **Exception (DEC-024):** a new internal Krowolf operator panel (React, TypeScript, Vite, shadcn/ui, Tailwind CSS, React Router, TanStack Query/Table) is approved for that scope only. `app/ui/index.html` is frozen legacy during this transition — not removed, not redesigned to match the new panel, and not the basis for the new panel's design. See `docs/07-decisions.md` DEC-024 for full scope, deployment principle, and legacy retirement conditions.
+- Dark/light mode via CSS tokens. No new design direction for the legacy UI without a decision.
+- Admin mode shows all views; Customer mode shows safe subset (legacy UI, unchanged).
+- All business logic in backend; UI only consumes API — this applies to both the legacy UI and the new operator panel.
 
 ---
 

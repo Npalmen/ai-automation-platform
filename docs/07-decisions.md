@@ -233,3 +233,100 @@ Each decision records a locked product or execution decision. Execution agents m
 **Reason:** Before live verification, the owner needs a simple, readable admin/operator surface for tenant setup, readiness, integration health, approvals, cases, and support triage.  
 **Consequence:** `app/ui/index.html` stays a single-file vanilla HTML/CSS/JS UI with minimal black/white styling. Do not optimize for a polished customer SaaS dashboard before Phase A-C is green and the pilot path is stable.  
 **Can change if:** The master plan is explicitly revised or pilot feedback shows a customer-facing UI improvement is needed for first-customer operation.
+
+---
+
+## DEC-024 — New operator panel frontend stack approved (supersedes DEC-015 for this scope only)
+
+**Status:** Locked
+
+**Decision:** A new internal Krowolf operator panel may be built with a new frontend stack: React, TypeScript, Vite, shadcn/ui, Tailwind CSS, React Router, TanStack Query, and TanStack Table (only where advanced tables justify it).
+
+**Reason:** The product owner has determined that the existing single-file `app/ui/index.html` operator console (DEC-004/DEC-015/DEC-023) is no longer a sustainable foundation for operating the platform at scale across many tenants, and that a structured, typed, testable frontend is required for the internal operator surface specifically. This is a deliberate, explicit product-owner decision made outside the normal roadmap cadence (Kapitel 0A/0B), not an execution-agent judgment call.
+
+**Scope (what this decision covers):**
+- Applies only to Krowolf's **internal operator panel** (the surface used by Krowolf staff to operate the platform across tenants).
+- Does **not** apply to the customer portal, or to any other frontend initiative. DEC-015's restriction on a new frontend stack remains fully in force outside this specific scope.
+- The backend continues to build on the existing FastAPI + PostgreSQL architecture. No backend rewrite is approved by this decision (DEC-014 is unaffected).
+- Existing, working backend logic, auth mechanisms, data models, and endpoints must be reused where suitable, not rebuilt. New endpoints may be added per chapter where a concrete gap is identified, following normal execution rules.
+
+**Deployment principle:**
+- First recommended model: the frontend is built via a Node build stage; the resulting static frontend artifacts are packaged into the existing application image; FastAPI or a same-origin reverse proxy serves the panel.
+- No separate frontend container is introduced in the first release unless a concrete need requires it.
+- This is a first recommended model, not a permanent prohibition on a separate frontend deployment later — a later chapter may revisit this if independent deploy cadence becomes a real need.
+
+**Security principle:**
+- The browser must not store a raw admin API key as normal authentication for the new panel.
+- Normal operator login must use a secure HttpOnly session.
+- Operator identity and role must be derived server-side, not trusted from client state.
+- Critical operator actions must be authorization-checked and audited.
+- Tenant context must never substitute for authentication or authorization.
+
+**Responsiveness principle:**
+- The new panel must be a responsive web application — not two separate applications — supporting mobile, tablet, small laptop, desktop, and large screens.
+- No supported view may have unintended global horizontal scroll, overlapping content, or controls positioned outside the viewport.
+
+**Design governance:**
+- The frontend's visual and functional rules shall be governed by machine-readable design contracts: `krowolf-ui-profile.json`, `component-contracts.json`, `page-contracts.json`.
+- These contracts are created in a later chapter (Kapitel 1B per the Kapitel 0A chapter plan) and become authoritative for the frontend implementation once they exist. They do not exist yet as of this decision.
+
+**Legacy UI policy:**
+- `app/ui/index.html` is frozen legacy as of this decision. It is not removed, restructured, or partially dismantled during the initial frontend chapters (Kapitel 1A–1C and immediately following chapters).
+- It must not be used as the visual or structural basis for the new panel.
+- It remains available and fully functional for existing pilot and operations flows for as long as it exists.
+- New functionality is built in the new panel once frontend work starts, not in legacy UI — unless an acute operational need requires an emergency fix in legacy UI, in which case the fix is applied to legacy UI and noted as a known duplication risk.
+- A function-parity checklist (one line per existing `switchView` capability in `app/ui/index.html`) must exist and be verified complete before legacy UI is removed. This checklist is created in the chapter that begins legacy retirement work (Kapitel 5 per the Kapitel 0A chapter plan), not in this decision and not in Kapitel 0B.
+- Legacy UI is removed only as a single, deliberate action once critical function parity and regression verification are approved for the whole surface — not via ad hoc, view-by-view deletion.
+
+**Supersession — exactly what is overridden:**
+- This decision supersedes **DEC-015 only for the scope defined above** (Krowolf's internal operator panel).
+- DEC-015 remains fully **Locked and in force** for: the customer portal, any other frontend initiative, and any broader rewrite not explicitly approved by this decision.
+- `docs/00-master-plan.md`'s "Forbidden scope now" entries "React/frontend rewrite." and "Ny frontend-stack." are narrowed by this decision to exclude the internal operator panel; they remain in force for all other frontend work (see updated note in that document).
+- DEC-014 ("Keep existing codebase") is unaffected and continues to govern the backend without exception.
+- DEC-023 (pre-live UI is an internal operator console) is unaffected as historical record of why `app/ui/index.html` looks the way it does; it does not block this decision's forward-looking scope.
+
+**Can change if:** The master plan is explicitly revised, or a subsequent decision further restricts or expands this scope.
+
+---
+
+### DEC-024 — Deploy readiness matrix
+
+Tracked here until items are verified, at which point verified items move to `docs/01-current-truth.md`.
+
+**Required before Kapitel 1A (frontend foundation) — all items below must be true before any `frontend/` code is written:**
+
+- [x] New governance decision locked — this entry (DEC-024).
+- [x] Contradicting documents updated — `docs/00-master-plan.md`, `docs/05-architecture.md` (Kapitel 0B).
+- [x] Legacy-UI policy documented — see "Legacy UI policy" above.
+- [x] `frontend/` folder boundary decided — new top-level `frontend/` directory, sibling to `app/`, not nested inside it (decided in Kapitel 0A, restated here; not created in Kapitel 0B).
+- [x] First deployment model documented — see "Deployment principle" above.
+
+**Required before production deploy of the new panel (NOT required before Kapitel 1A):**
+
+- [ ] Actual Caddy routing verified against the real production `infra/Caddyfile` (not retrieved in Kapitel 0B — see Caddy status in `docs/01-current-truth.md`).
+- [ ] Caddy configuration version-controlled or reproducible from a committed source.
+- [ ] Same-origin auth (session cookie + `X-Admin-API-Key`) verified against the real deployment target for the new panel.
+- [ ] Frontend build integrated into the application image (Docker multi-stage build).
+- [ ] Static routes and SPA fallback routing verified (deep links, 404 handling).
+- [ ] Cache policy for static assets verified (does not serve stale bundles after deploy).
+- [ ] Legacy UI (`app/ui/index.html`) confirmed still reachable and functional after the new panel is deployed alongside it.
+- [ ] Rollback path documented (how to revert to legacy-only if the new panel deploy fails).
+
+---
+
+## DEC-025 — Operation status metadata schema (Kapitel 8)
+
+**Status:** Locked  
+**Date:** 2026-07-17
+
+**Decision:** Backup, restore-rehearsal, and Docker build identity use small JSON files with `schema_version: 1`, written atomically (temp + rename), no credentials/commands/paths in payload.
+
+| Artifact | Env / path | Writer |
+|----------|------------|--------|
+| Backup status | `BACKUP_STATUS_FILE` | `scripts/backup_postgres.sh` via `scripts/write_operation_status.py` |
+| Restore status | `RESTORE_STATUS_FILE` | `scripts/restore_postgres_rehearsal.sh` via `scripts/write_operation_status.py` |
+| Build metadata | `BUILD_METADATA_PATH` (`/app/build-metadata.json`) | `scripts/write_build_metadata.py` in Docker build |
+
+Operation exit codes are independent of metadata write success. API reads files only; metadata-write failures after successful operations are visible in script logs, not in system status API.
+
+**Can change if:** A deploy pipeline introduces a new cross-tool artifact format — then extend `schema_version` with a new decision, do not break v1 readers silently.

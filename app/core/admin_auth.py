@@ -27,6 +27,12 @@ import logging
 from fastapi import Header, HTTPException, Request
 from fastapi import status as http_status
 
+from app.core.admin_session import (
+    OperatorIdentity,
+    get_admin_from_session,
+    get_operator_identity,
+    resolve_operator_role,
+)
 from app.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -97,3 +103,74 @@ def require_admin_api_key(
             detail=_MISSING_OR_WRONG,
             headers={"WWW-Authenticate": "AdminApiKey"},
         )
+
+
+def resolve_authenticated_operator(
+    request: Request,
+    x_admin_api_key: str | None = None,
+) -> OperatorIdentity:
+    """
+    Resolve verified operator identity after admin authentication.
+
+    Role is always derived server-side from session or ADMIN_ROLE — never from
+    request body or client-supplied headers beyond credentials.
+    """
+    if request is not None:
+        try:
+            username = get_admin_from_session(request)
+            if username:
+                return get_operator_identity(username)
+        except Exception:
+            pass
+
+    valid_keys = _resolve_admin_keys(get_settings())
+    if not valid_keys:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="Admin access is not configured on this server.",
+            headers={"WWW-Authenticate": "AdminApiKey"},
+        )
+
+    if not x_admin_api_key:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail=_MISSING_OR_WRONG,
+            headers={"WWW-Authenticate": "AdminApiKey"},
+        )
+
+    provided = x_admin_api_key
+    if not any(hmac.compare_digest(k, provided) for k in valid_keys):
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail=_MISSING_OR_WRONG,
+            headers={"WWW-Authenticate": "AdminApiKey"},
+        )
+
+    role = resolve_operator_role(getattr(get_settings(), "ADMIN_ROLE", "admin"))
+    return {
+        "id": "operator-api-key",
+        "display_name": "API Key",
+        "role": role,
+    }
+
+
+def require_operator_role(allowed_roles: frozenset[str]):
+    """
+    Dependency factory: authenticate admin and enforce an explicit role allowlist.
+
+    Returns verified OperatorIdentity for audit on success.
+    """
+
+    def _dependency(
+        request: Request,
+        x_admin_api_key: str | None = Header(default=None),
+    ) -> OperatorIdentity:
+        operator = resolve_authenticated_operator(request, x_admin_api_key)
+        if operator["role"] not in allowed_roles:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="Du saknar behörighet för denna åtgärd.",
+            )
+        return operator
+
+    return _dependency

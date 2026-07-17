@@ -28,16 +28,26 @@ import json
 import logging
 import os
 import time
-from typing import Optional
+from typing import Literal, Optional, TypedDict
 
-from fastapi import Request, Response
+from fastapi import HTTPException, Request, Response, status
 
+from app.core.admin_session_models import VALID_OPERATOR_ROLES
 from app.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
 SESSION_COOKIE = "admin_session"
 SESSION_MAX_AGE = 8 * 3600  # 8 hours
+
+
+class OperatorIdentity(TypedDict):
+    id: str
+    display_name: str
+    role: str
+
+
+OperatorEnvironment = Literal["local", "test", "production"]
 
 
 # ---------------------------------------------------------------------------
@@ -169,3 +179,77 @@ def is_session_auth_configured() -> bool:
         getattr(s, "ADMIN_PASSWORD_HASH", "").strip()
         and getattr(s, "SESSION_SECRET_KEY", "").strip()
     )
+
+
+# ---------------------------------------------------------------------------
+# Operator identity and environment
+# ---------------------------------------------------------------------------
+
+def resolve_operator_role(raw_role: str) -> str:
+    """Return a safe operator role. Invalid values never become admin."""
+    role = raw_role.strip()
+    if role in VALID_OPERATOR_ROLES:
+        return role
+    logger.warning(
+        "Invalid ADMIN_ROLE at runtime (%r) — falling back to read_only",
+        raw_role,
+    )
+    return "read_only"
+
+
+def get_operator_identity(username: str) -> OperatorIdentity:
+    """Derive operator identity from configured admin settings."""
+    s = get_settings()
+    configured_user = getattr(s, "ADMIN_USERNAME", "admin").strip() or "admin"
+    role = resolve_operator_role(getattr(s, "ADMIN_ROLE", "admin"))
+    display_name = getattr(s, "ADMIN_DISPLAY_NAME", "").strip() or configured_user
+    operator_id = f"operator-{username.strip().lower()}"
+    return {
+        "id": operator_id,
+        "display_name": display_name,
+        "role": role,
+    }
+
+
+def resolve_environment() -> OperatorEnvironment:
+    """Map ENV setting to a non-secret operator panel environment label."""
+    env = getattr(get_settings(), "ENV", "dev").strip().lower()
+    if env in ("dev", "development", "local"):
+        return "local"
+    if env == "test":
+        return "test"
+    return "production"
+
+
+def _parse_allowed_origins(raw: str) -> list[str]:
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+def require_same_origin(request: Request) -> None:
+    """
+    Reject cross-origin state-changing admin auth requests.
+
+    When ALLOWED_ORIGINS is configured, Origin must match one entry exactly.
+    Otherwise Origin must match the request's own scheme://host.
+    Missing Origin is allowed for non-browser clients and existing tests.
+    """
+    origin = request.headers.get("origin")
+    if not origin:
+        return
+
+    settings = get_settings()
+    allowed_origins = _parse_allowed_origins(getattr(settings, "ALLOWED_ORIGINS", ""))
+    if allowed_origins:
+        if origin not in allowed_origins:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Ogiltig origin.",
+            )
+        return
+
+    expected = f"{request.url.scheme}://{request.url.netloc}"
+    if origin != expected:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Ogiltig origin.",
+        )

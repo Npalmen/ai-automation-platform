@@ -4,14 +4,42 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_db
 from app.automation.wow_flows import build_automation_case_payload
 from app.core.audit_list_response_schemas import AuditEventListResponse
 from app.core.audit_service import create_audit_event
-from app.core.admin_auth import require_admin_api_key
+from app.core.admin_auth import (
+    require_admin_api_key,
+    require_operator_role,
+    resolve_authenticated_operator,
+)
+from app.admin.operations_overview_schemas import OperationsOverviewResponse
+from app.admin.operations_needs_help_schemas import (
+    NeedsHelpItemDetail,
+    NeedsHelpQueueResponse,
+)
+from app.admin.operator_actions_schemas import OperatorActionRequest, OperatorActionResponse
+from app.admin.incident_schemas import (
+    IncidentAssignSelfRequest,
+    IncidentCreateRequest,
+    IncidentDetail,
+    IncidentFieldUpdateRequest,
+    IncidentListResponse,
+    IncidentNoteRequest,
+    IncidentSignalLinkRequest,
+    IncidentStatusChangeRequest,
+    IncidentTenantLinkRequest,
+    IncidentWriteResponse,
+)
+from app.admin.usage_schemas import (
+    UsageOverviewResponse,
+    UsageTenantListResponse,
+    VALID_USAGE_DAYS,
+)
+from app.admin.system_status_schemas import SystemStatusResponse
 from app.core.auth import get_verified_tenant
 from app.core.config import get_tenant_config
 from app.core.logging import setup_logging
@@ -84,6 +112,7 @@ app = FastAPI(title=settings.APP_NAME, **_openapi_urls_for(settings))
 async def on_startup():
     import app.repositories.postgres  # noqa: F401
     import app.repositories.postgres.oauth_credential_models  # noqa: F401
+    import app.admin.incident_models  # noqa: F401
     from app.repositories.postgres.schema_migrations import (
         ensure_runtime_schema,
         provision_tenant_defaults,
@@ -178,8 +207,18 @@ def operator_ui():
 # ---------------------------------------------------------------------------
 
 import hmac as _hmac
+import logging as _logging
 from fastapi.responses import JSONResponse as _JSONResponse
 from pydantic import BaseModel as _BaseModel
+
+from app.core.admin_session_models import (
+    AdminLoginResponse,
+    AdminLogoutResponse,
+    AdminMeResponse,
+    OperatorInfo,
+)
+
+_admin_auth_logger = _logging.getLogger(__name__)
 
 
 class AdminLoginRequest(_BaseModel):
@@ -187,8 +226,11 @@ class AdminLoginRequest(_BaseModel):
     password: str
 
 
-@app.post("/auth/admin/login", tags=["auth"])
-def admin_login(payload: AdminLoginRequest):
+@app.post("/auth/admin/login", tags=["auth"], response_model=AdminLoginResponse)
+def admin_login(
+    payload: AdminLoginRequest,
+    request: Request,
+):
     """
     Validate admin username + password, set a signed HttpOnly session cookie.
 
@@ -196,16 +238,42 @@ def admin_login(payload: AdminLoginRequest):
     (password is treated as the raw admin API key in that case).
     """
     from app.core.admin_session import (
+        get_operator_identity,
         is_session_auth_configured,
+        require_same_origin,
+        resolve_environment,
         set_admin_session_cookie,
         verify_admin_credentials,
     )
     from app.core.admin_auth import _resolve_admin_keys
 
+    require_same_origin(request)
+
     if is_session_auth_configured():
         if not verify_admin_credentials(payload.username, payload.password):
+            _admin_auth_logger.warning(
+                "admin_login_failed",
+                extra={"username": payload.username.strip().lower()},
+            )
             raise HTTPException(status_code=401, detail="Fel användarnamn eller lösenord.")
-        resp = _JSONResponse(content={"ok": True, "mode": "session"})
+        operator = OperatorInfo(**get_operator_identity(payload.username))
+        environment = resolve_environment()
+        _admin_auth_logger.info(
+            "admin_login_success",
+            extra={
+                "operator_id": operator.id,
+                "role": operator.role,
+                "environment": environment,
+            },
+        )
+        resp = _JSONResponse(
+            content=AdminLoginResponse(
+                ok=True,
+                mode="session",
+                operator=operator,
+                environment=environment,
+            ).model_dump()
+        )
         set_admin_session_cookie(resp, payload.username)
         return resp
 
@@ -215,27 +283,40 @@ def admin_login(payload: AdminLoginRequest):
         raise HTTPException(status_code=401, detail="Admin-autentisering är inte konfigurerad på servern.")
     provided = payload.password.strip()
     if not provided or not any(_hmac.compare_digest(k, provided) for k in valid_keys):
+        _admin_auth_logger.warning("admin_login_failed", extra={"mode": "api_key"})
         raise HTTPException(status_code=401, detail="Fel API-nyckel.")
-    return _JSONResponse(content={"ok": True, "mode": "api_key"})
+    return _JSONResponse(content=AdminLoginResponse(ok=True, mode="api_key").model_dump())
 
 
-@app.post("/auth/admin/logout", tags=["auth"])
-def admin_logout():
+@app.post("/auth/admin/logout", tags=["auth"], response_model=AdminLogoutResponse)
+def admin_logout(request: Request):
     """Clear the admin session cookie."""
-    from app.core.admin_session import clear_admin_session_cookie
-    resp = _JSONResponse(content={"ok": True})
+    from app.core.admin_session import clear_admin_session_cookie, require_same_origin
+
+    require_same_origin(request)
+    resp = _JSONResponse(content=AdminLogoutResponse(ok=True).model_dump())
     clear_admin_session_cookie(resp)
+    _admin_auth_logger.info("admin_logout_success")
     return resp
 
 
-@app.get("/auth/admin/me", tags=["auth"])
+@app.get("/auth/admin/me", tags=["auth"], response_model=AdminMeResponse)
 def admin_me(request: Request):
     """Return current admin identity from session cookie, or 401."""
-    from app.core.admin_session import get_admin_from_session
+    from app.core.admin_session import (
+        get_admin_from_session,
+        get_operator_identity,
+        resolve_environment,
+    )
+
     admin_user = get_admin_from_session(request)
     if not admin_user:
         raise HTTPException(status_code=401, detail="Ingen aktiv adminsession.")
-    return {"username": admin_user, "authenticated": True}
+    return AdminMeResponse(
+        authenticated=True,
+        operator=OperatorInfo(**get_operator_identity(admin_user)),
+        environment=resolve_environment(),
+    )
 
 
 @app.get("/tenant")
@@ -7525,21 +7606,686 @@ def admin_create_tenant(
     }
 
 
-@app.get("/admin/tenants")
+@app.get("/admin/tenants", tags=["admin"])
 def admin_list_tenants(
+    search: str | None = None,
+    status: str | None = None,
+    health: str | None = None,
+    sort: str = "name",
+    order: str = "asc",
+    limit: int = 50,
+    offset: int = 0,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin_api_key),
 ):
-    """List all tenants. Never returns API keys.
+    """List all tenants with operational summary. Never returns API keys.
 
-    Requires X-Admin-API-Key.
+    Requires admin session or X-Admin-API-Key.
     """
-    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
-    records = TenantConfigRepository.list_all(db)
-    return {
-        "items": [TenantConfigRepository.to_dict(r) for r in records],
-        "total": len(records),
-    }
+    from app.admin.tenant_directory import list_admin_tenants
+    from app.admin.tenant_directory_schemas import TenantListResponse
+
+    result = list_admin_tenants(
+        db=db,
+        app_settings=get_settings(),
+        search=search,
+        status=status,
+        health=health,
+        sort=sort,
+        order=order,
+        limit=min(max(limit, 1), 200),
+        offset=max(offset, 0),
+    )
+    return TenantListResponse.model_validate(result)
+
+
+@app.get(
+    "/admin/tenants/{tenant_id}/overview",
+    tags=["admin"],
+)
+def admin_tenant_overview(
+    tenant_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+    x_admin_api_key: str | None = Header(default=None),
+):
+    """Read-only operational detail for a single tenant. No secrets in response."""
+    from app.admin.tenant_directory import get_tenant_detail
+    from app.admin.tenant_directory_schemas import TenantDetailResponse
+
+    operator = resolve_authenticated_operator(request, x_admin_api_key)
+    result = get_tenant_detail(
+        db=db,
+        tenant_id=tenant_id,
+        app_settings=get_settings(),
+        operator_role=operator["role"],
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found.")
+    return TenantDetailResponse.model_validate(result)
+
+
+# ===========================================================================
+# Operator panel safe-write actions (Kapitel 5)
+# ===========================================================================
+
+_OPERATOR_WRITE_ROLES = frozenset({"operations", "admin"})
+_USAGE_READ_ROLES = frozenset({"read_only", "operations", "admin"})
+
+
+def _run_operator_action(handler):
+    """Map operator action domain errors to HTTP responses (fail closed)."""
+    from app.admin.operator_actions import (
+        OperatorActionConflictError,
+        OperatorActionNotFoundError,
+        OperatorActionValidationError,
+        OperatorAuditError,
+    )
+
+    try:
+        return handler()
+    except OperatorActionNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except OperatorActionConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except OperatorActionValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except OperatorAuditError:
+        raise HTTPException(
+            status_code=500,
+            detail="Åtgärden kunde inte verifieras. Kontrollera status innan du försöker igen.",
+        )
+
+
+@app.post(
+    "/admin/tenants/{tenant_id}/actions/pause",
+    tags=["admin"],
+    response_model=OperatorActionResponse,
+)
+def admin_operator_pause_automation(
+    tenant_id: str,
+    body: OperatorActionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.operator_actions import execute_pause_automation
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_operator_action(
+        lambda: execute_pause_automation(
+            db,
+            tenant_id,
+            operator=operator,
+            reason=body.reason,
+            idempotency_key=body.idempotency_key,
+        )
+    )
+
+
+@app.post(
+    "/admin/tenants/{tenant_id}/actions/resume",
+    tags=["admin"],
+    response_model=OperatorActionResponse,
+)
+def admin_operator_resume_automation(
+    tenant_id: str,
+    body: OperatorActionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.operator_actions import execute_resume_automation
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_operator_action(
+        lambda: execute_resume_automation(
+            db,
+            tenant_id,
+            operator=operator,
+            reason=body.reason,
+            idempotency_key=body.idempotency_key,
+        )
+    )
+
+
+@app.post(
+    "/admin/tenants/{tenant_id}/scheduler/pause",
+    tags=["admin"],
+    response_model=OperatorActionResponse,
+)
+def admin_operator_pause_scheduler(
+    tenant_id: str,
+    body: OperatorActionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.operator_actions import execute_pause_scheduler
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_operator_action(
+        lambda: execute_pause_scheduler(
+            db,
+            tenant_id,
+            operator=operator,
+            reason=body.reason,
+            idempotency_key=body.idempotency_key,
+        )
+    )
+
+
+@app.post(
+    "/admin/tenants/{tenant_id}/scheduler/resume",
+    tags=["admin"],
+    response_model=OperatorActionResponse,
+)
+def admin_operator_resume_scheduler(
+    tenant_id: str,
+    body: OperatorActionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.operator_actions import execute_resume_scheduler
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_operator_action(
+        lambda: execute_resume_scheduler(
+            db,
+            tenant_id,
+            operator=operator,
+            reason=body.reason,
+            idempotency_key=body.idempotency_key,
+        )
+    )
+
+
+@app.post(
+    "/admin/tenants/{tenant_id}/approvals/{approval_id}/reject",
+    tags=["admin"],
+    response_model=OperatorActionResponse,
+)
+def admin_operator_reject_approval(
+    tenant_id: str,
+    approval_id: str,
+    body: OperatorActionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.operator_actions import execute_reject_approval
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_operator_action(
+        lambda: execute_reject_approval(
+            db,
+            tenant_id,
+            approval_id,
+            operator=operator,
+            reason=body.reason,
+            idempotency_key=body.idempotency_key,
+        )
+    )
+
+
+# ===========================================================================
+# Incident management (Kapitel 6)
+# ===========================================================================
+
+_OPERATOR_READ_ROLES = frozenset({"read_only", "operations", "admin"})
+
+
+def _run_incident_action(handler):
+    from app.admin.incident_repository import IncidentConflictError, IncidentNotFoundError
+    from app.admin.incidents import IncidentValidationError
+
+    try:
+        return handler()
+    except IncidentNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except IncidentConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except IncidentValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get(
+    "/admin/incidents",
+    tags=["admin"],
+    response_model=IncidentListResponse,
+)
+def admin_list_incidents(
+    request: Request,
+    search: str | None = None,
+    status: str | None = None,
+    severity: str | None = None,
+    tenant_id: str | None = None,
+    owner: str | None = None,
+    updated_since: datetime | None = None,
+    sort: str = "updated_at",
+    order: str = "desc",
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+    x_admin_api_key: str | None = Header(default=None),
+):
+    from app.admin.incidents import list_incidents
+
+    resolve_authenticated_operator(request, x_admin_api_key)
+    return list_incidents(
+        db,
+        search=search,
+        status=status,
+        severity=severity,
+        tenant_id=tenant_id,
+        owner=owner,
+        updated_since=updated_since,
+        sort=sort,
+        order=order,
+        limit=min(max(limit, 1), 200),
+        offset=max(offset, 0),
+    )
+
+
+@app.post(
+    "/admin/incidents",
+    tags=["admin"],
+    response_model=IncidentDetail,
+    status_code=201,
+)
+def admin_create_incident(
+    body: IncidentCreateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.incidents import create_incident
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_incident_action(
+        lambda: create_incident(
+            db,
+            operator=operator,
+            title=body.title,
+            description=body.description,
+            severity=body.severity,
+            tenant_ids=body.tenant_ids,
+            signal_links=[link.model_dump() for link in body.signal_links],
+            reason=body.reason,
+            app_settings=get_settings(),
+        )
+    )
+
+
+@app.get(
+    "/admin/incidents/{incident_id}",
+    tags=["admin"],
+    response_model=IncidentDetail,
+)
+def admin_get_incident(
+    incident_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+    x_admin_api_key: str | None = Header(default=None),
+):
+    from app.admin.incidents import get_incident_detail
+
+    operator = resolve_authenticated_operator(request, x_admin_api_key)
+    result = get_incident_detail(
+        db,
+        incident_id,
+        operator_role=operator["role"],
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Incident '{incident_id}' not found.",
+        )
+    return result
+
+
+@app.patch(
+    "/admin/incidents/{incident_id}",
+    tags=["admin"],
+    response_model=IncidentWriteResponse,
+)
+def admin_update_incident_fields(
+    incident_id: str,
+    body: IncidentFieldUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.incidents import update_fields
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_incident_action(
+        lambda: update_fields(
+            db,
+            incident_id=incident_id,
+            operator=operator,
+            title=body.title,
+            description=body.description,
+            severity=body.severity,
+            reason=body.reason,
+            expected_version=body.expected_version,
+        )
+    )
+
+
+@app.post(
+    "/admin/incidents/{incident_id}/status",
+    tags=["admin"],
+    response_model=IncidentWriteResponse,
+)
+def admin_change_incident_status(
+    incident_id: str,
+    body: IncidentStatusChangeRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.incidents import change_status
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_incident_action(
+        lambda: change_status(
+            db,
+            incident_id=incident_id,
+            operator=operator,
+            target_status=body.target_status,
+            reason=body.reason,
+            resolution_summary=body.resolution_summary,
+            expected_version=body.expected_version,
+        )
+    )
+
+
+@app.post(
+    "/admin/incidents/{incident_id}/notes",
+    tags=["admin"],
+    response_model=IncidentWriteResponse,
+)
+def admin_add_incident_note(
+    incident_id: str,
+    body: IncidentNoteRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.incidents import add_note
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_incident_action(
+        lambda: add_note(
+            db,
+            incident_id=incident_id,
+            operator=operator,
+            message=body.message,
+        )
+    )
+
+
+@app.post(
+    "/admin/incidents/{incident_id}/tenants",
+    tags=["admin"],
+    response_model=IncidentWriteResponse,
+)
+def admin_link_incident_tenant(
+    incident_id: str,
+    body: IncidentTenantLinkRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.incidents import link_tenant
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_incident_action(
+        lambda: link_tenant(
+            db,
+            incident_id=incident_id,
+            operator=operator,
+            tenant_id=body.tenant_id,
+            reason=body.reason,
+        )
+    )
+
+
+@app.delete(
+    "/admin/incidents/{incident_id}/tenants/{tenant_id}",
+    tags=["admin"],
+    response_model=IncidentWriteResponse,
+)
+def admin_unlink_incident_tenant(
+    incident_id: str,
+    tenant_id: str,
+    request: Request,
+    reason: str,
+    confirmation: bool,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.incidents import unlink_tenant
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    if not confirmation:
+        raise HTTPException(status_code=422, detail="confirmation must be true")
+    stripped = reason.strip()
+    if not stripped:
+        raise HTTPException(status_code=422, detail="reason must not be empty")
+    return _run_incident_action(
+        lambda: unlink_tenant(
+            db,
+            incident_id=incident_id,
+            operator=operator,
+            tenant_id=tenant_id,
+            reason=stripped,
+        )
+    )
+
+
+@app.post(
+    "/admin/incidents/{incident_id}/signals",
+    tags=["admin"],
+    response_model=IncidentWriteResponse,
+)
+def admin_link_incident_signal(
+    incident_id: str,
+    body: IncidentSignalLinkRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.incidents import link_signal
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_incident_action(
+        lambda: link_signal(
+            db,
+            incident_id=incident_id,
+            operator=operator,
+            tenant_id=body.tenant_id,
+            signal_id=body.signal_id,
+            reason=body.reason,
+            app_settings=get_settings(),
+        )
+    )
+
+
+@app.delete(
+    "/admin/incidents/{incident_id}/signals/{signal_id}",
+    tags=["admin"],
+    response_model=IncidentWriteResponse,
+)
+def admin_unlink_incident_signal(
+    incident_id: str,
+    signal_id: str,
+    request: Request,
+    reason: str,
+    confirmation: bool,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.incidents import unlink_signal
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    if not confirmation:
+        raise HTTPException(status_code=422, detail="confirmation must be true")
+    stripped = reason.strip()
+    if not stripped:
+        raise HTTPException(status_code=422, detail="reason must not be empty")
+    return _run_incident_action(
+        lambda: unlink_signal(
+            db,
+            incident_id=incident_id,
+            operator=operator,
+            signal_id=signal_id,
+            reason=stripped,
+        )
+    )
+
+
+@app.post(
+    "/admin/incidents/{incident_id}/actions/assign-self",
+    tags=["admin"],
+    response_model=IncidentWriteResponse,
+)
+def admin_assign_incident_self(
+    incident_id: str,
+    body: IncidentAssignSelfRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.incidents import assign_self
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_incident_action(
+        lambda: assign_self(
+            db,
+            incident_id=incident_id,
+            operator=operator,
+            reason=body.reason,
+            expected_version=body.expected_version,
+        )
+    )
+
+
+def _validate_usage_days(days: int) -> int:
+    if days not in VALID_USAGE_DAYS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid days. Valid values: {sorted(VALID_USAGE_DAYS)}",
+        )
+    return days
+
+
+def _parse_optional_bool(value: str | None) -> bool | None:
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    if normalized in ("true", "1", "yes"):
+        return True
+    if normalized in ("false", "0", "no"):
+        return False
+    return None
+
+
+# Usage, cost and capacity (Kapitel 7)
+@app.get(
+    "/admin/usage/overview",
+    tags=["admin"],
+    response_model=UsageOverviewResponse,
+)
+def admin_usage_overview(
+    days: int = 30,
+    db: Session = Depends(get_db),
+    _operator=Depends(require_operator_role(_USAGE_READ_ROLES)),
+):
+    from app.admin.usage import get_usage_overview
+
+    _validate_usage_days(days)
+    return get_usage_overview(db, days=days, app_settings=get_settings())
+
+
+@app.get(
+    "/admin/usage/tenants",
+    tags=["admin"],
+    response_model=UsageTenantListResponse,
+)
+def admin_usage_tenants(
+    days: int = 30,
+    search: str | None = None,
+    tenant_status: str | None = None,
+    attention_status: str | None = None,
+    minimum_jobs: int | None = None,
+    has_operator_burden: str | None = None,
+    ai_cost_status: str | None = None,
+    sort: str = "jobs",
+    order: str = "desc",
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    _operator=Depends(require_operator_role(_USAGE_READ_ROLES)),
+):
+    from app.admin.usage import get_usage_tenants
+
+    _validate_usage_days(days)
+    return get_usage_tenants(
+        db,
+        days=days,
+        app_settings=get_settings(),
+        search=search,
+        tenant_status=tenant_status,
+        attention_status=attention_status,
+        minimum_jobs=minimum_jobs,
+        has_operator_burden=_parse_optional_bool(has_operator_burden),
+        ai_cost_status=ai_cost_status,
+        sort=sort,
+        order=order,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get(
+    "/admin/system/status",
+    tags=["admin"],
+    response_model=SystemStatusResponse,
+)
+def admin_system_status(
+    db: Session = Depends(get_db),
+    _operator=Depends(require_operator_role(_USAGE_READ_ROLES)),
+):
+    from app.admin.system_status import get_system_status
+    from app.admin.system_status_sources import DatabaseUnreachable
+
+    try:
+        return get_system_status(db, app_settings=get_settings())
+    except DatabaseUnreachable:
+        raise HTTPException(
+            status_code=503,
+            detail="Database unavailable for system status",
+        )
 
 
 @app.post("/admin/tenants/{tenant_id}/rotate-key", status_code=200)
@@ -7703,25 +8449,122 @@ def admin_list_audit_events(
     return {"items": items, "total": total, "offset": offset, "limit": min(limit, 500)}
 
 
-@app.get("/admin/operations/needs-help")
-def admin_operations_needs_help(
-    limit: int = 50,
+@app.get(
+    "/admin/operations/overview",
+    tags=["admin"],
+    response_model=OperationsOverviewResponse,
+)
+def admin_operations_overview(
     db: Session = Depends(get_db),
     _: None = Depends(require_admin_api_key),
 ):
     """
+    Global read-only operational overview for the operator panel.
+
+    Aggregates platform counters, integration status, system health,
+    and a bounded priority list. Requires admin authentication.
+    """
+    from app.admin.operations_overview import (
+        OperationsOverviewUnavailable,
+        get_operations_overview,
+    )
+
+    try:
+        return get_operations_overview(db=db, app_settings=get_settings())
+    except OperationsOverviewUnavailable:
+        raise HTTPException(
+            status_code=503,
+            detail="Kunde inte hämta operativ översikt just nu. Försök igen.",
+        )
+
+
+@app.get(
+    "/admin/operations/needs-help",
+    tags=["admin"],
+    response_model=NeedsHelpQueueResponse,
+)
+def admin_operations_needs_help(
+    request: Request,
+    limit: int = 50,
+    offset: int = 0,
+    search: str | None = None,
+    severity: str | None = None,
+    category: str | None = None,
+    tenant_id: str | None = None,
+    source_type: str | None = None,
+    safe_retry: str | None = None,
+    external_impact: str | None = None,
+    minimum_age_hours: int | None = None,
+    sort: str = "priority",
+    order: str = "asc",
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+    x_admin_api_key: str | None = Header(default=None),
+):
+    """
     Super Admin: unified operational triage queue across all tenants.
 
-    Returns actionable rows ordered by severity (critical → high → medium),
-    covering integration errors, failed jobs, stale approvals, failed
-    dispatches, and scheduler/OAuth failures.
-
+    Returns actionable rows ordered by priority, with filtering and pagination.
     Read-only. No external API calls. No secrets in response.
     Requires X-Admin-API-Key.
     """
-    from app.admin.operations_triage import get_admin_needs_help
-    s = get_settings()
-    return get_admin_needs_help(db=db, app_settings=s, limit=min(limit, 200))
+    from app.admin.operations_needs_help import list_needs_help_queue
+
+    operator = resolve_authenticated_operator(request, x_admin_api_key)
+    result = list_needs_help_queue(
+        db=db,
+        app_settings=get_settings(),
+        operator_role=operator["role"],
+        search=search,
+        severity=severity,
+        category=category,
+        tenant_id=tenant_id,
+        source_type=source_type,
+        safe_retry=safe_retry,
+        external_impact=external_impact,
+        minimum_age_hours=minimum_age_hours,
+        sort=sort,
+        order=order,
+        limit=min(max(limit, 1), 200),
+        offset=max(offset, 0),
+    )
+    return NeedsHelpQueueResponse.model_validate(result)
+
+
+@app.get(
+    "/admin/operations/needs-help/{item_id}",
+    tags=["admin"],
+    response_model=NeedsHelpItemDetail,
+)
+def admin_operations_needs_help_detail(
+    item_id: str,
+    request: Request,
+    tenant_id: str | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_api_key),
+    x_admin_api_key: str | None = Header(default=None),
+):
+    """
+    Read-only detail for a single needs-help queue item.
+
+    Optional tenant_id scopes lookup to one tenant; without it a global scan is used.
+    """
+    from app.admin.operations_needs_help import get_needs_help_item
+
+    operator = resolve_authenticated_operator(request, x_admin_api_key)
+    result = get_needs_help_item(
+        db=db,
+        item_id=item_id,
+        app_settings=get_settings(),
+        operator_role=operator["role"],
+        tenant_id=tenant_id,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Needs-help item '{item_id}' not found.",
+        )
+    return NeedsHelpItemDetail.model_validate(result)
 
 
 @app.post("/jobs/{job_id}/auto-dispatch")
@@ -8181,3 +9024,64 @@ def admin_run_all_alerts(
         except Exception as exc:
             results.append({"tenant_id": record.tenant_id, "error": str(exc)})
     return {"results": results, "total": len(results)}
+
+
+# ---------------------------------------------------------------------------
+# Operator panel static frontend (Kapitel 1A / DEC-024)
+# ---------------------------------------------------------------------------
+
+_OPS_DIST_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+
+
+def _ops_index_html() -> str | None:
+    index_path = _OPS_DIST_DIR / "index.html"
+    if not index_path.is_file():
+        return None
+    return index_path.read_text(encoding="utf-8")
+
+
+def _resolve_ops_asset(asset_path: str) -> Path | None:
+    assets_root = (_OPS_DIST_DIR / "assets").resolve()
+    if not assets_root.is_dir():
+        return None
+
+    candidate = (assets_root / asset_path).resolve()
+    try:
+        candidate.relative_to(assets_root)
+    except ValueError:
+        return None
+
+    if candidate.is_file():
+        return candidate
+    return None
+
+
+@app.get("/ops/assets/{asset_path:path}", include_in_schema=False)
+def ops_static_asset(asset_path: str):
+    asset_file = _resolve_ops_asset(asset_path)
+    if asset_file is None:
+        raise HTTPException(status_code=404)
+    return FileResponse(asset_file)
+
+
+@app.get("/ops", response_class=HTMLResponse, include_in_schema=False)
+def ops_spa_root():
+    html = _ops_index_html()
+    if html is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Frontend build not found. Run npm run build in frontend/.",
+        )
+    return HTMLResponse(content=html)
+
+
+@app.get("/ops/{frontend_path:path}", response_class=HTMLResponse, include_in_schema=False)
+def ops_spa_fallback(frontend_path: str):
+    del frontend_path
+    html = _ops_index_html()
+    if html is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Frontend build not found. Run npm run build in frontend/.",
+        )
+    return HTMLResponse(content=html)

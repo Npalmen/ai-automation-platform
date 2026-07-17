@@ -48,15 +48,60 @@ jobs:
       - name: Run full test suite
         run: python -m pytest
 
+  frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Typecheck frontend
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Test design contracts
+        working-directory: frontend
+        run: npm run test:contracts
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
   docker:
     runs-on: ubuntu-latest
-    needs: tests
+    needs: [tests, frontend]
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Build application image
-        run: docker build -t ai-automation-platform:ci .
+        env:
+          BUILD_COMMIT_SHA: ${{ github.sha }}
+        run: |
+          BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          RELEASE_ID="ci-${GITHUB_SHA::7}"
+          docker build \
+            --build-arg "BUILD_COMMIT_SHA=${BUILD_COMMIT_SHA}" \
+            --build-arg "BUILD_TIME=${BUILD_TIME}" \
+            --build-arg "RELEASE_ID=${RELEASE_ID}" \
+            -t ai-automation-platform:ci .
+
+      - name: Verify build metadata in image
+        run: |
+          docker run --rm ai-automation-platform:ci python -c "import json; d=json.load(open('/app/build-metadata.json')); assert d['schema_version']==1; assert d['commit_sha']; assert d['build_time']; assert d['release_id']"
 
       - name: Validate production compose config
         run: docker compose -f docker-compose.prod.yml config

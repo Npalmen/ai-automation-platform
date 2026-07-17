@@ -49,6 +49,13 @@ POSTGRES_DB=ai_platform              # Production database name
 # Backup storage
 BACKUP_DIR=/opt/krowolf/backups     # Where to store local backups
 BACKUP_RETENTION_DAYS=30            # Delete local backups older than N days
+STORAGE_DIR=/opt/krowolf/storage    # Shared with app container via bind mount
+BACKUP_STATUS_FILE=/opt/krowolf/storage/status/backup_status.json
+RESTORE_STATUS_FILE=/opt/krowolf/storage/status/restore_status.json
+
+# App container (.env.production for compose app service) uses container paths:
+# BACKUP_STATUS_FILE=/app/storage/status/backup_status.json
+# RESTORE_STATUS_FILE=/app/storage/status/restore_status.json
 
 # Offsite upload (required for pilot) — see Offsite section below
 OFFSITE_BACKUP_COMMAND=             # Shell command to upload $1 to remote storage
@@ -59,6 +66,24 @@ BACKUP_MIN_SIZE_BYTES=1024          # Alert if newest backup is smaller than N b
 ```
 
 Add these to `env.example` with empty values — they are documented there.
+
+### Status metadata vs operation result
+
+- Backup/restore **operation** exit code reflects pg_dump/restore success only.
+- If the operation succeeds but status JSON cannot be written, the script exits **0** and logs `WARN: metadata write failed` to stderr/cron log.
+- The system status API cannot detect metadata-write failures; it shows **stale** or **not_reported** only.
+
+### Status directory permissions
+
+```bash
+sudo mkdir -p /opt/krowolf/storage/status
+sudo chmod 0750 /opt/krowolf/storage/status
+# Ensure backup user and app container share group read (adjust group as needed):
+# sudo chgrp krowolf /opt/krowolf/storage/status
+# sudo chmod g+rX /opt/krowolf/storage/status
+```
+
+Status files are written with mode `0640`.
 
 ---
 
@@ -72,7 +97,7 @@ ssh ubuntu@api.krowolf.se
 sudo crontab -e
 
 # Add this line:
-0 2 * * * DOCKER_DB_CONTAINER=krowolf-db-1 POSTGRES_DB=ai_platform BACKUP_DIR=/opt/krowolf/backups BACKUP_RETENTION_DAYS=30 /opt/krowolf/scripts/backup_postgres.sh >> /var/log/krowolf-backup.log 2>&1
+0 2 * * * DOCKER_DB_CONTAINER=krowolf-db-1 POSTGRES_DB=ai_platform BACKUP_DIR=/opt/krowolf/backups BACKUP_RETENTION_DAYS=30 BACKUP_STATUS_FILE=/opt/krowolf/storage/status/backup_status.json /opt/krowolf/scripts/backup_postgres.sh >> /var/log/krowolf-backup.log 2>&1
 
 # Verify cron is installed
 sudo crontab -l | grep backup

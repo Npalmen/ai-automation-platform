@@ -106,8 +106,8 @@ Tillåtet före första kund:
 
 Förbjudet före första kund om inte masterplanen ändras explicit:
 
-- React/frontend rewrite.
-- Ny frontend-stack.
+- React/frontend rewrite. *(Undantag: Krowolfs interna operatörspanel är uttryckligen godkänd via `docs/07-decisions.md` DEC-024. Förbudet gäller fortsatt fullt ut för kundportalen och alla andra frontend-initiativ.)*
+- Ny frontend-stack. *(Samma undantag som ovan — endast operatörspanelen, se DEC-024.)*
 - Ny stor arkitektur.
 - Stora nya integrationer som inte krävs för första kund.
 - SSO.

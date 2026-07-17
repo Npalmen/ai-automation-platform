@@ -1,0 +1,21 @@
+@import "./tokens.generated.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-page font-sans text-text-primary;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  dialog::backdrop {
+    background-color: rgba(24, 32, 28, 0.45);
+  }
+}

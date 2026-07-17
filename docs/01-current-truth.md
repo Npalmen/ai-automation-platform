@@ -566,11 +566,205 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 - No NO-GO criteria triggered.
 - Conditions: support email, pending approval review, DB password rotation.
 
+## Operator panel initiative — governance and deploy status (Kapitel 0B, 2026-07-17)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| New operator panel frontend stack (React/TS/Vite/shadcn/Tailwind/React Router/TanStack) | `Locked (decision)` | `docs/07-decisions.md` DEC-024. Supersedes DEC-015 **only** for Krowolf's internal operator panel; DEC-015 remains locked for the customer portal and all other frontend work. |
+| `docs/00-master-plan.md` / `docs/05-architecture.md` frontend restrictions | `Verified — updated` | Both now reference the DEC-024 exception instead of stating an unqualified prohibition. |
+| `app/ui/index.html` legacy status | `Verified (unchanged)` | Frozen legacy per DEC-024; no code changed in Kapitel 0B; remains the only served UI until the new panel exists. |
+| `infra/Caddyfile` (real production reverse-proxy config) | `Not verified` | Never committed to this repo (`git log` shows no history for `infra/` or `Caddyfile`). Referenced only by path in `docker-compose.prod.yml`. Not retrieved in Kapitel 0B — no SSH credentials/host access available in this session; prior sessions already documented SSH auth failure against the production host (see "Post-push deploy / Phase A-C re-run attempt" above). |
+| `infra/Caddyfile.example` | `Added — explicitly NOT verified production truth` | Hand-written target config inferred from `docker-compose.prod.yml` + this file's `app.krowolf.se`/`api.krowolf.se` live-verification entries above. See `infra/README.md`. Must be reconciled with the real file before any production deploy of the new panel. |
+| Deploy readiness for new panel | `Tracked` | Full matrix in `docs/07-decisions.md` under "DEC-024 — Deploy readiness matrix". Kapitel-1A-blocking items are all satisfied by Kapitel 0B; production-deploy-blocking items (real Caddy verification, build integration, etc.) are explicitly not required before Kapitel 1A. |
+
+### Kapitel 1A — Frontend foundation (2026-07-17)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| `frontend/` React/TS/Vite project | `Verified (local)` | `npm run typecheck`, `npm run lint`, `npm run build` pass locally. Tailwind v3 + shadcn/ui baseline (`button`, `badge`). Router `basename: /ops`; routes `/`, `/foundation`, `*`. |
+| FastAPI `/ops` serving | `Verified (tests)` | Additive routes in `app/main.py`: `GET /ops`, `GET /ops/{path}` → SPA `index.html` (503 if build missing); `GET /ops/assets/{path}` → `FileResponse` with path-traversal guard (404 if missing). No `StaticFiles` mount. |
+| Backend tests | `Verified (local)` | `tests/test_operator_panel_static.py` — 12 tests pass (SPA fallback, assets, 503, traversal block, regression on `/health`, `/ui`, `/`, `/jobs`). |
+| CI frontend job | `Verified (written)` | `.github/workflows/release-gate.yml` — new `frontend` job (Node 22: typecheck, lint, build); `docker` job depends on `[tests, frontend]`. |
+| Docker multi-stage build | `Written — not verified locally` | `Dockerfile` adds `node:22-slim` frontend-build stage; `.dockerignore` excludes `frontend/node_modules` and `frontend/dist`. Docker CLI not available in this environment; image build verification deferred to CI. |
+| Legacy UI `app/ui/index.html` | `Verified (unchanged)` | Not modified; `/ui` and host-gated `/` still serve legacy HTML. |
+| `infra/Caddyfile` production truth | `Not verified` | Unchanged from Kapitel 0B. `/ops` path route chosen to avoid Caddy dependency for initial integration. |
+
+### Kapitel 1B — Design contracts and visual reference (2026-07-17)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| JSON design contracts | `Verified (local)` | `frontend/design/krowolf-ui-profile.json`, `component-contracts.json`, `page-contracts.json`. Profile v1.0.0, locale sv-SE, direction nordic_operations. |
+| Token pipeline | `Verified (local)` | `npm run tokens:generate` → `src/styles/tokens.generated.css`; `tailwind.config.js` reads profile via `createRequire`. |
+| Contract tests | `Verified (local)` | `npm run test:contracts` — profile tokens, breakpoints ascending, implemented-component set, page contracts. |
+| Operator components (10) | `Verified (local)` | PageHeader, StatusBadge, SeverityBadge, MetricCard, HealthIndicator, EmptyState, ErrorState, LoadingState, ActionDialog, CriticalActionDialog in `frontend/src/components/operator/`. Variant types derived from JSON; `satisfies Record<...>` enforcement. |
+| Design reference route | `Verified (local)` | `/ops/design-reference` — static demo data only, no API calls. Responsive queue (desktop table / mobile cards). |
+| Backend SPA test | `Verified (local)` | `test_ops_design_reference_serves_spa_fallback` in `tests/test_operator_panel_static.py`. No `app/main.py` changes. |
+| Cursor rule | `Verified (written)` | `.cursor/rules/frontend-ui.mdc` |
+| CI | `Verified (written)` | `npm run test:contracts` added to frontend job in `release-gate.yml`. |
+| Manual responsive browser verification | `Still outstanding` | Documented checklist in `frontend/README.md` not yet executed in this environment. |
+| Kapitel 1A Docker verification | `Still outstanding` | Unchanged by this chapter. |
+
+### Kapitel 2 — Global operativ översikt (2026-07-17)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Overview endpoint | `Verified (tests)` | `GET /admin/operations/overview` — global, read-only, `require_admin_api_key`. Returns typed `OperationsOverviewResponse`. |
+| Counter definitions | `Verified (tests)` | `active_tenants`, `jobs_last_24h` (24h), `pending_approvals`/`open_manual_reviews` (point-in-time), `failed_jobs`/`stuck_jobs` (48h), `integration_errors` (24h). Each counter includes `window_hours`. |
+| Stuck jobs rule | `Verified (tests)` | `pending`/`processing` only, `updated_at < 48h`. Excludes approval wait states. |
+| Aggregation failure | `Verified (tests)` | Mandatory SQL error → 503, no partial counters. Safe logging without connection strings. |
+| Priority list | `Verified (tests)` | Reuses triage signals via `collect_all_triage_rows`; overview-specific sort (severity → external → oldest → stable ID). Stable IDs: `job:`, `approval:`, or `hash:`. |
+| Integration status | `Verified (tests)` | Gmail from health check; Visma/Google Sheets from event log (`unknown` when no events). |
+| Platform status | `Verified (tests)` | Explicit priority: critical → failed → warning → healthy → unknown. |
+| Triage refactor | `Verified (tests)` | `collect_all_triage_rows()` shared; `get_admin_needs_help` behavior unchanged. |
+| Frontend OverviewPage | `Verified (local)` | `/ops` index; read-only; no client-side re-sort; `ErrorState` on 503; `window_hours` drives metric captions. |
+| Backend tests | `Verified (local)` | 29 tests in `test_admin_operations_overview.py`. Performance smoke: 50 mock tenants < 2s. |
+| Frontend gates | `Verified (local)` | typecheck, contracts, lint, build pass. |
+| Inherited N+1 | `Documented` | One `collect_all_triage_rows` call per overview request; not rebuilt in this chapter. |
+| Manual responsive browser verification | `Still outstanding` | Not executed in this environment. |
+| Kapitel 1A Docker verification | `Still outstanding` | Unchanged. |
+| Kapitel 1B browser verification | `Still outstanding` | Unchanged. |
+
+### Kapitel 3 — Kundlista och kunddetalj (2026-07-17)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Tenant list endpoint | `Verified (tests)` | Extended `GET /admin/tenants` — search/filter/sort/pagination; enriched items with `tenant_status`, `health`, `package:null`, `operator_owner:null`, `enabled_modules`, `jobs_last_30d`, `integrations_summary`, batched counts. |
+| Tenant detail endpoint | `Verified (tests)` | `GET /admin/tenants/{tenant_id}/overview` — single read-only aggregation; 404 when missing. |
+| Tenant status vs health | `Verified (tests)` | `tenant_status` (`active`/`inactive`/`unknown`) separate from operational `health`. `paused` only when `automation.demo_mode` or `scheduler.run_mode=paused`. |
+| Last activity | `Verified (tests)` | `last_activity_at` = max of latest job, approval, integration event, audit event (batched `GROUP BY`). |
+| Integration sources | `Verified (tests)` | List: Gmail from triage; Visma/Sheets from OAuth + event log (`unknown` when no signal). Detail: gmail/monday/fortnox from `get_integration_health`; visma/sheets separate. |
+| List totals | `Verified (tests)` | Bounded lists paired with separate true totals (`manual_review.total`, `jobs.total`, `audit.total`, etc.). |
+| Settings allowlist | `Verified (tests)` | No wholesale `settings` serialization; only `to_dict` fields + pause-signal keys via `_get_automation`/`_get_scheduler`. |
+| Frontend customers feature | `Verified (local)` | `/ops/customers` list + `/ops/customers/:tenantId` detail; `DataTable`, `FilterBar`, `TenantIdentifier`, `AuditTimeline`. |
+| Backend tests | `Verified (local)` | `tests/test_admin_tenant_directory.py` (25 tests). Performance smoke: 50 mock tenants < 2s for list. |
+| Frontend gates | `Verified (local)` | typecheck, contracts, lint, build pass. |
+| Inherited N+1 (list) | `Documented` | `collect_all_triage_rows` per list request; approvals/activity/jobs counts batched. |
+| Manual responsive browser verification | `Still outstanding` | Not executed in this environment. |
+
+### Kapitel 4 — Gemensam felkö och Behöver hjälp (2026-07-17)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Shared triage normalization | `Verified (tests)` | `dedupe_and_normalize_signals` + latest-per-source integration events in `collect_all_triage_rows`; consumed by overview, tenant directory, needs-help queue, and legacy `get_admin_needs_help`. |
+| New signal types | `Verified (tests)` | `reconciliation_required` (current-state, not safe to retry); `tenant_config` (active non-demo tenants with empty job types + integrations). |
+| Retry/impact rules | `Verified (tests)` | Per-signal `retryable`/`external_impact` enum (`yes`/`no`/`unknown`/`not_applicable`); no `area.startswith("integration")` default. |
+| Runbook allowlist | `Verified (tests)` | Registry IDs + Swedish labels only in API; no filesystem paths exposed. |
+| Needs-help queue endpoint | `Verified (tests)` | `GET /admin/operations/needs-help` — typed `NeedsHelpQueueResponse`; panel severities (`critical`/`failed`/`warning`/`information`); filtered pre-pagination summary; search/category/source_type/minimum_age_hours filters. |
+| Needs-help detail endpoint | `Verified (tests)` | `GET /admin/operations/needs-help/{item_id}` — optional `tenant_id` for scoped lookup; global scan fallback documented as scaling limitation. |
+| Legacy compatibility | `Verified (tests)` | `get_admin_needs_help()` unchanged for existing consumers/tests; route now uses `list_needs_help_queue`. |
+| Frontend needs-help feature | `Verified (local)` | `/ops/needs-help` queue + `/ops/needs-help/:itemId` detail; summary metrics, filters, DataTable, customer navigation. |
+| Backend tests | `Verified (local)` | Extended `test_admin_operations_triage.py`, `test_admin_operations_overview.py`; new `test_admin_operations_needs_help.py`. |
+| Frontend gates | `Verified (local)` | typecheck, contracts, build pass. |
+| Manual responsive browser verification | `Still outstanding` | Not executed in this environment. |
+
+### Kapitel 7 — Användning, kostnad och kapacitet (2026-07-17)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Usage endpoints | `Verified (tests)` | `GET /admin/usage/overview`, `GET /admin/usage/tenants`; days 7/30/90; read-only. |
+| Period semantics | `Verified (tests)` | Half-open UTC `[start, end)`; comparison contiguous with zero gap/overlap. |
+| Batched aggregation | `Verified (tests)` | Period metrics via fixed `GROUP BY tenant_id` queries; not O(tenants) for period data. |
+| `automation_rate` | `not_measured` | Documented gap: `audit_events` has no indexed `job_id` for operator_action linkage. |
+| `manual_reviews_created` | `not_measured` | `gmail_manual_review_handoffs` counts Gmail audit rows only (`gmail_handoff_applied`). |
+| Terminal job counts | `Proxy` | `jobs_completed`/`jobs_failed` use `updated_at` with `timestamp_basis: updated_at_proxy`. |
+| AI usage/cost | `Honest gaps` | `ai_usage.status=not_measured`; `ai_cost.status=unknown`; no fabricated amounts. |
+| Capacity | `baseline_missing` | `peak_jobs_per_hour` via Python hour-bucketing (dialect-neutral). |
+| `attention_status` | `Documented exception` | Inherits `collect_all_triage_rows()` O(tenants) cost (pre-existing pattern). |
+| Auth | `Verified (tests)` | Single `require_operator_role(_USAGE_READ_ROLES)`; tenant API key rejected. |
+| Frontend usage | `Verified (local)` | `src/features/usage/` — no charts; data-quality section; no dead AI-cost filters. |
+| Backend tests | `Verified (local)` | `tests/test_admin_usage.py`; incidents/needs-help regressions pass. |
+| Frontend gates | `Verified (local)` | typecheck, lint, build pass. |
+| Manual responsive browser verification | `Still outstanding` | Not executed in this environment. |
+| Not built | `Documented` | Billing, subscriptions, time-series charts, per-tenant usage detail page, AI instrumentation. |
+
+### Kapitel 8 — System-, backup- och deploystatus (2026-07-17)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| System status endpoint | `Verified (tests)` | `GET /admin/system/status`; read-only; `require_operator_role(_USAGE_READ_ROLES)`. |
+| Runtime / resilience / deploy readiness | `Verified (tests)` | Three domain statuses; deploy gaps do not auto-fail runtime. |
+| Metadata readers | `Verified (tests)` | Typed `MetadataReadOutcome`; no paths/exceptions in API. |
+| Backup metadata | `Verified (scripts/tests)` | `scripts/backup_postgres.sh` writes `BACKUP_STATUS_FILE`; `archive_integrity_verified` (gunzip -t). |
+| Restore metadata | `Verified (scripts/tests)` | `scripts/restore_postgres_rehearsal.sh` writes `RESTORE_STATUS_FILE`; verification enums. |
+| Build metadata | `Verified (tests)` | `scripts/write_build_metadata.py` + Dockerfile build args; CI docker job passes quoted args. |
+| Metadata write failures | `Documented limitation` | API shows stale/missing only; script log is sole source for write failures. |
+| Shared status paths | `Documented` | Host `/opt/krowolf/storage/status/…` ↔ container `/app/storage/status/…` via bind mount. |
+| `build_time` vs deploy | `Verified (tests)` | `deployment.last_deploy.deployed_at` unknown; never aliased to build time. |
+| Caddy / release gate | `Honest gaps` | Routing: not verified in VCS; release gate: no runtime artifact. |
+| Pilot readiness | `Out of scope` | Not called from system status endpoint. |
+| Scheduler helper fix | `Verified (tests)` | `_derive_scheduler_signal` reads nested `scheduler.run_mode` + legacy fallback. |
+| Frontend system | `Verified (local)` | `src/features/systemStatus/`; `/ops/system`; operations+admin roles. |
+| Backend tests | `Verified (local)` | `tests/test_admin_system_status.py`, `tests/test_system_status_sources.py`, script tests. |
+| Frontend gates | `Verified (local)` | typecheck, contracts, build pass. |
+| Manual responsive browser verification | `Still outstanding` | Not executed in this environment. |
+| Not built | `Documented` | Deploy buttons, backup/restore triggers, shell/SSH, deploy history DB, CI gate artifact in runtime. |
+
+### Kapitel 6 — Incidenthantering (2026-07-17)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Incident models | `Verified (tests)` | `app/admin/incident_models.py` — four FK-free tables; explicit startup import before `create_all()`. |
+| Schema registration test | `Verified (tests)` | SQLite `create_all` proves all four incident tables register. |
+| Status transitions | `Verified (tests)` | Backend-enforced `ALLOWED_TRANSITIONS`; same-status → 409; `closed` terminal. |
+| Concurrency | `Verified (tests)` | Atomic `UPDATE … WHERE version = :expected_version` + rowcount check. |
+| Audit atomicity | `Verified (tests)` | `_add_audit_event_no_commit` + single `db.commit()` per write (not `AuditRepository.create_event`). |
+| Signal identity | `Verified (tests)` | Exact `(tenant_id, signal_id)` match; frozen snapshot at link time. |
+| Owner | `Verified (tests)` | Assign-self only; no owner in create/update request models. |
+| Orphan policy | `Verified (tests)` | Soft-unlink; `tenant_name_snapshot`; no hard deletes. |
+| Routes | `Verified (tests)` | Full CRUD-ish surface under `/admin/incidents`; `require_operator_role` + `require_same_origin` on writes. |
+| Needs-help linking | `Verified (tests)` | `recommended_incident_action`, `linked_incidents.open/closed` on detail. |
+| Frontend incidents | `Verified (local)` | `src/features/incidents/` — list, detail, create dialog, timeline, actions. |
+| Security scan | `Verified (local)` | No secrets headers, no `dangerouslySetInnerHTML` in incidents feature. |
+| Backend tests | `Verified (local)` | `tests/test_admin_incidents.py`; needs-help/operator-actions/tenant-directory/overview regressions pass. |
+| Frontend gates | `Verified (local)` | typecheck, contracts, lint, build pass. |
+| Manual responsive browser verification | `Still outstanding` | Not executed in this environment. |
+| Not built | `Documented` | Auto-incident generation, notifications, attachments, SLA, bulk actions. |
+
+### Kapitel 5 — Säkra operatörsåtgärder (2026-07-17)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Action registry | `Verified (tests)` | Five safe writes only: `tenant.pause_automation`, `tenant.resume_automation`, `tenant.scheduler.pause`, `tenant.scheduler.resume`, `approval.reject`. No generic action engine. |
+| Blocked actions | `Documented` | `job.manual_review.resolve` (Gmail side-effect risk), reclassify/re-extract/replay/approve/critical writes — `Kräver manuell hantering`. |
+| Role enforcement | `Verified (tests)` | `require_operator_role(allowed_roles)` dependency factory; server-derived `OperatorIdentity`; `read_only` → 403 on writes. |
+| Request/response | `Verified (tests)` | `OperatorActionRequest` (`reason`, `confirmation: true`, optional `idempotency_key`); `OperatorActionResponse` with `completed`/`no_change`/etc. |
+| Idempotency | `Verified (tests)` | State-based primary gate (pause/resume/scheduler no-op → `no_change`; approval state conflict → 409). `idempotency_key` audit-only; concurrent duplicate requests documented limitation. |
+| Audit | `Verified (tests)` | `category=operator_action`; allowlisted `details` (operator, reason, safety_class, before/after state). Fail-closed 500 if audit write fails after state change. |
+| Routes | `Verified (tests)` | Explicit POST routes under `/admin/tenants/{tenant_id}/…`; `require_same_origin` (Kapitel 1C). No `X-Tenant-ID` header from frontend. |
+| `available_actions` | `Verified (tests)` | Backend-generated on needs-help detail + tenant overview; state-invalid omitted; `read_only` gets `allowed=false` + `blocked_reason`. |
+| Frontend operatorActions | `Verified (local)` | `src/features/operatorActions/` — explicit API per action, mutations `retry: false`, `OperatorActionsSection` on customer detail + needs-help detail. |
+| Security scan | `Verified (local)` | No `X-Admin-API-Key`, `localStorage`, dynamic execute URLs in `frontend/src` or `dist`. |
+| Backend tests | `Verified (local)` | `tests/test_admin_operator_actions.py`; needs-help/tenant-directory regressions pass. |
+| Frontend gates | `Verified (local)` | typecheck, contracts, lint, build pass. |
+| Manual responsive browser verification | `Still outstanding` | Not executed in this environment. |
+
+### Kapitel 1C — Operations shell and authentication (2026-07-17)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Backend session extensions | `Verified (tests)` | Reuses `/auth/admin/login`, `/auth/admin/logout`, `/auth/admin/me`. Adds typed `operator` + `environment` on `/me` and login (session mode). `ADMIN_ROLE` fail-closed validator in `Settings`. `ALLOWED_ORIGINS` + `require_same_origin()` on login/logout POST. |
+| Operator roles | `Verified (tests)` | `read_only`, `operations`, `admin` via `ADMIN_ROLE`. Invalid config fails startup; runtime defense never grants `admin` on invalid role. |
+| Frontend auth feature | `Verified (local)` | `src/features/auth/` — AuthProvider, RequireAuth, RequireRole, LoginPage, forbidden/unauthorized pages. TanStack Query session state. |
+| AppShell | `Verified (local)` | `AppShell.tsx` — sidebar (desktop), drawer (mobile), topbar, environment badge from `/auth/admin/me`, operator profile, logout. |
+| Protected routes | `Verified (local)` | Live pages: overview, needs-help, customers, incidents, usage, system. `/ops/foundation` and `/ops/design-reference` require `admin`. |
+| Route policy | `Verified (typed)` | `src/routes/routePolicy.ts` documents role requirements per path. |
+| Security scan | `Verified (local)` | No `X-Admin-API-Key`, `localStorage`, `sessionStorage`, or `VITE_` secrets in `frontend/src` or `frontend/dist`. |
+| Backend tests | `Verified (local)` | Extended `tests/test_admin_session.py` (role, environment, origin, secrets). `tests/test_operator_panel_static.py` smoke tests for new `/ops/*` paths. Auth/tenant regressions pass. |
+| Frontend gates | `Verified (local)` | `tokens:generate`, `test:contracts`, `typecheck`, `lint`, `build` pass. |
+| Real operational data | `Not built` | Placeholder pages only. |
+| Tenant context | `Not built` | Reserved in AppShell layout only. |
+| Manual responsive browser verification | `Still outstanding` | Login/AppShell checklist documented; not executed in this environment. |
+| Kapitel 1A Docker verification | `Still outstanding` | Unchanged. |
+| Kapitel 1B browser verification | `Still outstanding` | Unchanged. |
+
+---
+
 ## Repo structure (verified)
 
 | Path | Contents |
 |------|----------|
 | `app/` | Main application package |
+| `frontend/` | Operator panel React/TS/Vite app (Kapitel 1A–5); `frontend/design/` JSON contracts; `frontend/src/features/auth/` + `overview/` + `customers/` + `needsHelp/` + `operatorActions/`; built to `frontend/dist`, served at `/ops` |
 | `app/main.py` | Single-file FastAPI app — all routes defined here (~6900 lines) |
 | `app/ui/index.html` | Single-file frontend (~536 KB) |
 | `app/core/` | Config, auth, settings, tenancy, audit, logging |

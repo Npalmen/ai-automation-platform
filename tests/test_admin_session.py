@@ -24,8 +24,13 @@ Covers:
 - POST /auth/admin/login: wrong password returns 401
 - POST /auth/admin/login: api-key fallback when hash not configured
 - POST /auth/admin/logout: clears cookie
-- GET /auth/admin/me: valid session returns username
+- GET /auth/admin/me: valid session returns operator identity and environment
 - GET /auth/admin/me: no session returns 401
+- invalid ADMIN_ROLE fails Settings validation at startup
+- get_operator_identity never returns admin for invalid runtime role
+- foreign Origin blocked on login/logout
+- same-origin Origin allowed on login/logout
+- no secrets in auth responses
 """
 from __future__ import annotations
 
@@ -37,6 +42,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 
 # ---------------------------------------------------------------------------
@@ -322,6 +328,9 @@ class TestAuthEndpoints:
         settings_mock.SESSION_SECRET_KEY = SECRET
         settings_mock.ADMIN_PASSWORD_HASH = h
         settings_mock.ADMIN_USERNAME = "admin"
+        settings_mock.ADMIN_ROLE = "admin"
+        settings_mock.ADMIN_DISPLAY_NAME = ""
+        settings_mock.ENV = "dev"
         settings_mock.ADMIN_API_KEY = ""
         settings_mock.ADMIN_API_KEYS = ""
 
@@ -336,6 +345,8 @@ class TestAuthEndpoints:
         data = resp.json()
         assert data.get("ok") is True
         assert data.get("mode") == "session"
+        assert data.get("operator", {}).get("role") == "admin"
+        assert data.get("environment") == "local"
 
     def test_login_failure_wrong_password(self):
         from app.core.admin_session import hash_password
@@ -345,6 +356,9 @@ class TestAuthEndpoints:
         settings_mock.SESSION_SECRET_KEY = SECRET
         settings_mock.ADMIN_PASSWORD_HASH = h
         settings_mock.ADMIN_USERNAME = "admin"
+        settings_mock.ADMIN_ROLE = "admin"
+        settings_mock.ADMIN_DISPLAY_NAME = ""
+        settings_mock.ENV = "dev"
         settings_mock.ADMIN_API_KEY = ""
         settings_mock.ADMIN_API_KEYS = ""
 
@@ -413,13 +427,17 @@ class TestAuthEndpoints:
             resp = client.get("/auth/admin/me")
         assert resp.status_code == 401
 
-    def test_me_with_valid_session_returns_username(self):
+    def test_me_with_valid_session_returns_operator_identity(self):
         from app.core.admin_session import create_session_token
 
         token = create_session_token("admin", SECRET)
         settings_mock = MagicMock()
         settings_mock.SESSION_SECRET_KEY = SECRET
         settings_mock.ADMIN_PASSWORD_HASH = "hash"
+        settings_mock.ADMIN_USERNAME = "admin"
+        settings_mock.ADMIN_ROLE = "admin"
+        settings_mock.ADMIN_DISPLAY_NAME = "Krowolf Admin"
+        settings_mock.ENV = "dev"
 
         with patch("app.core.admin_session.get_settings", return_value=settings_mock):
             client = _make_app_client()
@@ -427,5 +445,101 @@ class TestAuthEndpoints:
             resp = client.get("/auth/admin/me")
         assert resp.status_code == 200
         data = resp.json()
-        assert data.get("username") == "admin"
         assert data.get("authenticated") is True
+        assert data.get("environment") == "local"
+        operator = data.get("operator")
+        assert operator["id"] == "operator-admin"
+        assert operator["display_name"] == "Krowolf Admin"
+        assert operator["role"] == "admin"
+        assert SECRET not in resp.text
+
+
+class TestSettingsValidation:
+    def test_invalid_admin_role_raises_validation_error(self):
+        from app.core.settings import Settings
+
+        with pytest.raises(ValidationError):
+            Settings(ADMIN_ROLE="foobar")
+
+
+class TestOperatorIdentity:
+    def test_invalid_runtime_role_never_becomes_admin(self):
+        from app.core.admin_session import get_operator_identity
+
+        settings_mock = MagicMock()
+        settings_mock.ADMIN_USERNAME = "admin"
+        settings_mock.ADMIN_ROLE = "superadmin"
+        settings_mock.ADMIN_DISPLAY_NAME = ""
+
+        with patch("app.core.admin_session.get_settings", return_value=settings_mock):
+            identity = get_operator_identity("admin")
+
+        assert identity["role"] == "read_only"
+        assert identity["role"] != "admin"
+
+
+class TestOriginProtection:
+    def _session_settings(self, password="testpassword"):
+        from app.core.admin_session import hash_password
+
+        h = hash_password(password)
+        settings_mock = MagicMock()
+        settings_mock.SESSION_SECRET_KEY = SECRET
+        settings_mock.ADMIN_PASSWORD_HASH = h
+        settings_mock.ADMIN_USERNAME = "admin"
+        settings_mock.ADMIN_ROLE = "admin"
+        settings_mock.ADMIN_DISPLAY_NAME = ""
+        settings_mock.ENV = "dev"
+        settings_mock.ALLOWED_ORIGINS = ""
+        settings_mock.ADMIN_API_KEY = ""
+        settings_mock.ADMIN_API_KEYS = ""
+        return settings_mock, password
+
+    def test_login_rejects_foreign_origin(self):
+        settings_mock, password = self._session_settings()
+        with patch("app.core.admin_session.get_settings", return_value=settings_mock):
+            with patch("app.main.get_settings", return_value=settings_mock):
+                client = _make_app_client()
+                resp = client.post(
+                    "/auth/admin/login",
+                    json={"username": "admin", "password": password},
+                    headers={"Origin": "https://attacker.example"},
+                )
+        assert resp.status_code == 403
+        assert resp.json().get("detail") == "Ogiltig origin."
+
+    def test_logout_rejects_foreign_origin(self):
+        settings_mock, _ = self._session_settings()
+        with patch("app.core.admin_session.get_settings", return_value=settings_mock):
+            client = _make_app_client()
+            resp = client.post(
+                "/auth/admin/logout",
+                headers={"Origin": "https://attacker.example"},
+            )
+        assert resp.status_code == 403
+
+    def test_login_allows_same_origin(self):
+        settings_mock, password = self._session_settings()
+        with patch("app.core.admin_session.get_settings", return_value=settings_mock):
+            with patch("app.main.get_settings", return_value=settings_mock):
+                client = _make_app_client()
+                resp = client.post(
+                    "/auth/admin/login",
+                    json={"username": "admin", "password": password},
+                    headers={"Origin": "http://testserver"},
+                )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data.get("operator", {}).get("role") == "admin"
+        assert data.get("environment") == "local"
+
+    def test_login_without_origin_still_works(self):
+        settings_mock, password = self._session_settings()
+        with patch("app.core.admin_session.get_settings", return_value=settings_mock):
+            with patch("app.main.get_settings", return_value=settings_mock):
+                client = _make_app_client()
+                resp = client.post(
+                    "/auth/admin/login",
+                    json={"username": "admin", "password": password},
+                )
+        assert resp.status_code == 200

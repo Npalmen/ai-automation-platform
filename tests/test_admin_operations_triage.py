@@ -31,8 +31,12 @@ from app.admin.operations_triage import (
     _failed_pipeline_signals,
     _failed_scheduler_signals,
     _integration_signals,
+    _missing_tenant_config_signals,
+    _reconciliation_required_signals,
+    _resolve_runbook,
     _row,
     _stale_approval_signals,
+    dedupe_and_normalize_signals,
     get_admin_needs_help,
 )
 
@@ -92,8 +96,9 @@ def _make_approval(approval_id="appr-001", tenant_id="T_A", job_id="job-001",
 def _make_integration_event(tenant_id="T_A", job_id="job-001",
                             integration_type="controlled_dispatch",
                             status="failed", last_error="Auth failed",
-                            created_at=None):
+                            created_at=None, event_id=1):
     e = MagicMock()
+    e.id = event_id
     e.tenant_id = tenant_id
     e.job_id = job_id
     e.integration_type = integration_type
@@ -104,8 +109,10 @@ def _make_integration_event(tenant_id="T_A", job_id="job-001",
 
 
 def _make_audit_event(tenant_id="T_A", category="scheduler", action="run_once",
-                      status="failed", details=None, created_at=None):
+                      status="failed", details=None, created_at=None,
+                      event_id="evt-001"):
     e = MagicMock()
+    e.event_id = event_id
     e.tenant_id = tenant_id
     e.category = category
     e.action = action
@@ -318,13 +325,34 @@ class TestStaleApprovalSignals:
 class TestFailedIntegrationEventSignals:
     def test_failed_event_produces_high_row(self):
         db = _mock_db()
-        db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [
+        db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [
             _make_integration_event(integration_type="controlled_dispatch", last_error="401 Unauthorized")
         ]
         rows = _failed_integration_event_signals(db, "T_A", "Acme")
         assert len(rows) == 1
         assert rows[0]["severity"] == "high"
         assert "401 Unauthorized" in rows[0]["detail"]
+        assert rows[0]["external_impact"] == "yes"
+        assert rows[0]["retryable"] == "unknown"
+
+    def test_success_latest_state_suppresses_failed_row(self):
+        db = _mock_db()
+        older_failed = _make_integration_event(
+            status="failed",
+            created_at=datetime.now(timezone.utc) - timedelta(hours=2),
+            event_id=1,
+        )
+        newer_success = _make_integration_event(
+            status="success",
+            created_at=datetime.now(timezone.utc) - timedelta(hours=1),
+            event_id=2,
+        )
+        db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [
+            newer_success,
+            older_failed,
+        ]
+        rows = _failed_integration_event_signals(db, "T_A", "Acme")
+        assert rows == []
 
     def test_no_failed_events_returns_empty(self):
         db = _mock_db()
@@ -426,7 +454,7 @@ class TestGetAdminNeedsHelp:
                       area="pipeline", title="Fail", detail="d",
                       created_at="2026-05-01T09:00:00+00:00")
 
-        def _build_side_effect(db, tenant_id, tenant_name, app_settings):
+        def _build_side_effect(db, tenant_id, tenant_name, app_settings, **kwargs):
             if tenant_id == "T_B":
                 raise RuntimeError("simulated failure")
             return [ok_row]
@@ -479,7 +507,7 @@ class TestGetAdminNeedsHelp:
         t2 = _make_tenant_record("T_B", "Beta")
         now = "2026-05-01T10:00:00+00:00"
 
-        def _build_side_effect(db, tenant_id, tenant_name, app_settings):
+        def _build_side_effect(db, tenant_id, tenant_name, app_settings, **kwargs):
             return [_row(tenant_id=tenant_id, tenant_name=tenant_name,
                          severity="medium", area="x", title="t",
                          detail="d", created_at=now)]
@@ -511,6 +539,122 @@ class TestGetAdminNeedsHelp:
         assert result["critical"] == 2
         assert result["high"] == 1
         assert result["total"] == 3
+
+
+# ---------------------------------------------------------------------------
+# dedupe_and_normalize_signals
+# ---------------------------------------------------------------------------
+
+class TestDedupeAndNormalize:
+    def test_collapses_duplicate_key_keeps_highest_severity(self):
+        rows = [
+            _row(
+                tenant_id="T_A", tenant_name="A", severity="medium", area="pipeline",
+                title="Same", detail="d", job_id="job-1",
+                created_at="2026-01-02T10:00:00+00:00",
+            ),
+            _row(
+                tenant_id="T_A", tenant_name="A", severity="high", area="pipeline",
+                title="Same", detail="d", job_id="job-1",
+                created_at="2026-01-03T10:00:00+00:00",
+            ),
+        ]
+        result = dedupe_and_normalize_signals(rows)
+        assert len(result) == 1
+        assert result[0]["severity"] == "high"
+
+    def test_detected_at_is_earliest_and_last_observed_latest(self):
+        rows = [
+            _row(
+                tenant_id="T_A", tenant_name="A", severity="high", area="pipeline",
+                title="Same", detail="d", job_id="job-1",
+                created_at="2026-01-01T10:00:00+00:00",
+            ),
+            _row(
+                tenant_id="T_A", tenant_name="A", severity="high", area="pipeline",
+                title="Same", detail="d", job_id="job-1",
+                created_at="2026-01-05T10:00:00+00:00",
+            ),
+        ]
+        result = dedupe_and_normalize_signals(rows)
+        assert result[0]["detected_at"] == "2026-01-01T10:00:00+00:00"
+        assert result[0]["last_observed_at"] == "2026-01-05T10:00:00+00:00"
+
+
+class TestReconciliationRequiredSignals:
+    def test_reconciliation_required_produces_critical_row(self):
+        db = _mock_db()
+        db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [
+            _make_integration_event(
+                status="reconciliation_required",
+                integration_type="visma",
+                last_error="Uncertain write",
+            )
+        ]
+        rows = _reconciliation_required_signals(db, "T_A", "Acme")
+        assert len(rows) == 1
+        assert rows[0]["severity"] == "critical"
+        assert rows[0]["area"] == "integration_reconciliation"
+        assert rows[0]["retryable"] == "no"
+        assert rows[0]["external_impact"] == "yes"
+
+    def test_later_success_clears_reconciliation_signal(self):
+        db = _mock_db()
+        recon = _make_integration_event(
+            status="reconciliation_required",
+            created_at=datetime.now(timezone.utc) - timedelta(hours=2),
+            event_id=1,
+        )
+        success = _make_integration_event(
+            status="success",
+            created_at=datetime.now(timezone.utc) - timedelta(hours=1),
+            event_id=2,
+        )
+        db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [
+            success, recon,
+        ]
+        rows = _reconciliation_required_signals(db, "T_A", "Acme")
+        assert rows == []
+
+
+class TestMissingTenantConfigSignals:
+    def _record(self, *, status="active", demo_mode=False, job_types=None, integrations=None):
+        r = MagicMock()
+        r.status = status
+        r.enabled_job_types = job_types or []
+        r.allowed_integrations = integrations or []
+        r.settings = {"automation": {"demo_mode": demo_mode}}
+        return r
+
+    def test_active_empty_config_produces_signal(self):
+        record = self._record()
+        rows = _missing_tenant_config_signals(record, "T_A", "Acme")
+        assert len(rows) == 1
+        assert rows[0]["area"] == "tenant_config"
+        assert rows[0]["retryable"] == "not_applicable"
+
+    def test_inactive_tenant_excluded(self):
+        record = self._record(status="inactive")
+        assert _missing_tenant_config_signals(record, "T_A", "Acme") == []
+
+    def test_demo_mode_excluded(self):
+        record = self._record(demo_mode=True)
+        assert _missing_tenant_config_signals(record, "T_A", "Acme") == []
+
+    def test_configured_tenant_excluded(self):
+        record = self._record(job_types=["lead"])
+        assert _missing_tenant_config_signals(record, "T_A", "Acme") == []
+
+
+class TestRunbookRegistry:
+    def test_resolve_known_runbook(self):
+        result = _resolve_runbook("oauth_integration")
+        assert result is not None
+        assert result["id"] == "oauth_integration"
+        assert "OAuth" in result["label"]
+
+    def test_unknown_runbook_returns_none(self):
+        assert _resolve_runbook("does_not_exist") is None
 
 
 # ---------------------------------------------------------------------------
@@ -551,6 +695,8 @@ class TestNeedsHelpEndpoint:
         body = r.json()
         assert "total" in body
         assert "items" in body
-        assert "critical" in body
-        assert "high" in body
-        assert "medium" in body
+        assert "summary" in body
+        assert "critical" in body["summary"]
+        assert "failed" in body["summary"]
+        assert "warning" in body["summary"]
+        assert "information" in body["summary"]
