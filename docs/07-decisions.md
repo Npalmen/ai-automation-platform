@@ -330,3 +330,26 @@ Tracked here until items are verified, at which point verified items move to `do
 Operation exit codes are independent of metadata write success. API reads files only; metadata-write failures after successful operations are visible in script logs, not in system status API.
 
 **Can change if:** A deploy pipeline introduces a new cross-tool artifact format — then extend `schema_version` with a new decision, do not break v1 readers silently.
+
+---
+
+## DEC-027 — Alert vs incident vs needs-help (Kapitel 10)
+
+**Status:** Locked  
+**Date:** 2026-07-18
+
+**Decision:** Three separate operator surfaces with distinct lifecycles:
+
+| Domain | Purpose | Persistence | Detection |
+|--------|---------|-------------|-----------|
+| **Operator alert** (`operator_alerts`) | Auto-detected operational state from DB/metadata signals | `operator_alerts` table; dedup by `deduplication_key` | Evaluation engine + registry |
+| **Incident** | Operator-managed composite event with timeline, ownership, manual signals | `incidents` tables | Manual create/link only |
+| **Needs-help** | Prioritized work queue of actionable tenant problems | Ephemeral triage rows (read-only aggregation) | Shared signal helpers; enriched with `related_alert_id` when matching alert exists |
+
+**Rules:**
+- Alerts do not replace incidents or needs-help rows.
+- Needs-help enriches matching rows with alert metadata; it does not duplicate alert rows.
+- Total platform/DB outage is **externally_detected** (health script + `ALERT_COMMAND`), not an internal `operator_alerts` type.
+- Tenant legacy email alerts (`app/alerts/engine.py`) remain tenant-scoped; platform operator alerts are separate.
+
+**Can change if:** Master plan explicitly merges domains (not expected for MVP).

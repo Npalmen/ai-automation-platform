@@ -19,9 +19,9 @@ from typing import Any, Literal
 from sqlalchemy.orm import Session
 
 from app.admin.support_console import _get_automation
+from app.admin.alerts.signal_sources import collect_stale_approval_signals
 from app.domain.integrations.models import IntegrationEvent
 from app.health.integration_health import get_integration_health
-from app.repositories.postgres.approval_models import ApprovalRequestRecord
 from app.repositories.postgres.audit_models import AuditEventRecord
 from app.repositories.postgres.job_models import JobRecord
 from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
@@ -30,7 +30,6 @@ SignalState = Literal["yes", "no", "unknown", "not_applicable"]
 
 _SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "info": 3}
 _FAILED_JOBS_WINDOW_H = 48
-_STALE_APPROVAL_WINDOW_H = 24
 _RECENT_ERRORS_WINDOW_D = 7
 _INTEGRATION_EVENT_LOOKBACK_D = 14
 _IMPACT_MAX_LEN = 200
@@ -423,21 +422,11 @@ def _stale_approval_signals(
 ) -> list[dict]:
     """Pending approvals older than 24 hours."""
     rows: list[dict] = []
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=_STALE_APPROVAL_WINDOW_H)
     try:
-        stale = (
-            db.query(ApprovalRequestRecord)
-            .filter(
-                ApprovalRequestRecord.tenant_id == tenant_id,
-                ApprovalRequestRecord.state == "pending",
-                ApprovalRequestRecord.created_at < cutoff,
-            )
-            .order_by(ApprovalRequestRecord.created_at.asc())
-            .limit(5)
-            .all()
-        )
-        for appr in stale:
-            kind = appr.next_on_approve or "pipeline"
+        for sig in collect_stale_approval_signals(
+            db, tenant_id=tenant_id, tenant_name=tenant_name, limit=5
+        ):
+            kind = sig.kind
             area = (
                 "approval_email" if kind == "email_send"
                 else "approval_dispatch" if kind == "controlled_dispatch"
@@ -448,10 +437,7 @@ def _stale_approval_signals(
                 "controlled_dispatch": "Dispatch approval pending > 24 h",
             }
             title = title_map.get(kind, f"Approval pending > 24 h ({kind})")
-            hours = int(
-                (datetime.now(timezone.utc) - _ensure_aware(appr.created_at)).total_seconds() / 3600
-            )
-            ts = appr.created_at.isoformat() if appr.created_at else None
+            ts = sig.created_at.isoformat() if sig.created_at else None
             rows.append(_row(
                 tenant_id=tenant_id,
                 tenant_name=tenant_name,
@@ -459,15 +445,15 @@ def _stale_approval_signals(
                 area=area,
                 title=title,
                 detail=(
-                    f"Approval ID {appr.approval_id[:8]} has been pending for {hours} hours. "
-                    f"Job: {appr.job_id[:8]}."
+                    f"Approval ID {sig.approval_id[:8]} has been pending for {sig.age_hours} hours. "
+                    f"Job: {sig.job_id[:8]}."
                 ),
-                job_id=appr.job_id,
-                approval_id=appr.approval_id,
+                job_id=sig.job_id,
+                approval_id=sig.approval_id,
                 created_at=ts,
                 recommended_action="Review and approve or reject the pending approval.",
                 runbook_ref="pilot_support",
-                source_id=f"approval:{appr.approval_id}",
+                source_id=sig.source_id,
                 source_type="approval",
                 retryable="not_applicable",
                 external_impact="no",
@@ -657,10 +643,78 @@ def _build_tenant_triage(
 # Public API
 # ---------------------------------------------------------------------------
 
+
+def enrich_triage_rows_with_alerts(db: Session, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Enrich existing triage rows with open alert data — no duplicate rows."""
+    from app.admin.alerts.repository import AlertRepository
+
+    active_alerts = AlertRepository.list_active_alerts(db)
+    by_source: dict[tuple[str | None, str, str], Any] = {}
+    unmatched_alerts: list[Any] = []
+    for alert in active_alerts:
+        details = alert.safe_details or {}
+        source_type = str(details.get("source_type") or "")
+        source_id = str(details.get("source_id") or "")
+        if source_type and source_id:
+            by_source[(alert.tenant_id, source_type, source_id)] = alert
+        else:
+            unmatched_alerts.append(alert)
+
+    enriched: list[dict[str, Any]] = []
+    matched_alert_ids: set[str] = set()
+    for row in rows:
+        key = (
+            row.get("tenant_id"),
+            str(row.get("source_type") or ""),
+            str(row.get("source_id") or ""),
+        )
+        alert = by_source.get(key)
+        if alert is not None:
+            row = {
+                **row,
+                "related_alert_id": alert.id,
+                "alert_severity": alert.severity,
+                "alert_status": alert.status,
+                "alert_occurrence_count": alert.occurrence_count,
+            }
+            matched_alert_ids.add(alert.id)
+        enriched.append(row)
+
+    for alert in unmatched_alerts:
+        if alert.id in matched_alert_ids:
+            continue
+        details = alert.safe_details or {}
+        base = _row(
+            tenant_id=alert.tenant_id or "PLATFORM",
+            tenant_name=alert.tenant_id or "System",
+            severity="high" if alert.severity in ("critical", "high") else "medium",
+            area="alert",
+            title=alert.title,
+            detail=alert.summary[:200],
+            recommended_action=str(details.get("recommended_action") or ""),
+            runbook_ref=str(details.get("runbook_ref") or ""),
+            source_id=str(details.get("source_id") or f"alert:{alert.id}"),
+            source_type="alert",
+            retryable="unknown",
+            external_impact="unknown",
+        )
+        base.update(
+            {
+                "related_alert_id": alert.id,
+                "alert_severity": alert.severity,
+                "alert_status": alert.status,
+                "alert_occurrence_count": alert.occurrence_count,
+            }
+        )
+        enriched.append(base)
+    return enriched
+
+
 def collect_all_triage_rows(
     db: Session,
     *,
     app_settings: Any,
+    enrich_alerts: bool = True,
 ) -> list[dict[str, Any]]:
     """
     Collect all triage rows across all DB tenants, normalized and deduped.
@@ -684,7 +738,13 @@ def collect_all_triage_rows(
             all_rows.extend(tenant_rows)
         except Exception:
             pass
-    return dedupe_and_normalize_signals(all_rows)
+    rows = dedupe_and_normalize_signals(all_rows)
+    if enrich_alerts:
+        try:
+            rows = enrich_triage_rows_with_alerts(db, rows)
+        except Exception:
+            pass
+    return rows
 
 
 def get_admin_needs_help(

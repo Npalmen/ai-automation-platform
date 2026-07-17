@@ -115,6 +115,9 @@ class Settings(BaseSettings):
     BACKUP_MAX_AGE_HOURS: int = 25
     RESTORE_TEST_MAX_AGE_DAYS: int = 30
 
+    # Operator alert email (Kapitel 10) — platform allowlist only; empty = in-app only.
+    OPERATOR_ALERT_RECIPIENT: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,

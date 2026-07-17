@@ -33,7 +33,7 @@ Gmail / API  →  POST /jobs  →  Pipeline  →  Policy  →  Approval Queue
 | Support | `app/support/` | Support analyzer, prioritizer, response draft |
 | Onboarding | `app/onboarding/` | Readiness checks, wizard state |
 | Admin | `app/admin/` | Recovery actions, support console |
-| Alerts | `app/alerts/` | Production alerting engine |
+| Alerts | `app/admin/alerts/`, `app/alerts/` | Operator alerts (Kapitel 10) + legacy tenant email engine |
 | Finance | `app/finance/` (implied) | Invoice draft, Fortnox preview/export |
 | Repositories | `app/repositories/postgres/` | SQLAlchemy models and DB access |
 | UI | `app/ui/index.html` | Single-file operator/customer UI |

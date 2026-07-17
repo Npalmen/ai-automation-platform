@@ -447,3 +447,22 @@ def save_alerts_config_for_tenant(
     })
     save_alert_config(db, tenant_id, settings, existing_cfg)
     return get_alerts_config_for_tenant(db, tenant_id)
+
+
+def run_platform_operator_alert_evaluation(
+    db: Session,
+    app_settings: Any,
+    *,
+    max_slice: int = 3,
+    operator_id: str | None = None,
+) -> dict[str, Any]:
+    """Kapitel 10 bridge from legacy alert entry points to operator_alerts."""
+    from app.admin.alerts.evaluation_service import run_alert_evaluation
+
+    return run_alert_evaluation(
+        db,
+        settings=app_settings,
+        dry_run=False,
+        max_slice=max_slice,
+        operator_id=operator_id,
+    )

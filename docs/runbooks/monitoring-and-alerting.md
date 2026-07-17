@@ -399,3 +399,27 @@ sudo grep "\[FAIL\]" /var/log/krowolf-health.log | tail -20
 - `docs/runbooks/incident-response.md` — P1/P2/P3 incident procedures
 - `docs/runbooks/failed-jobs.md` — job failure recovery
 - `docs/PILOT_READINESS_CHECKLIST.md` — monitoring items (REQUIRED/RECOMMENDED)
+
+---
+
+## Platform operator alerts (Kapitel 10)
+
+Internal operator alerts (`operator_alerts`) complement external monitoring:
+
+| Signal class | Source | Example |
+|--------------|--------|---------|
+| `intern_db_detected` | Database queries (jobs, approvals, integration events) | Stale approval, stuck job |
+| `intern_metadata_detected` | Operation status files (backup/restore/build metadata) | Stale backup |
+| `externally_detected` | **Not** stored in `operator_alerts` | Total app/DB outage via `scripts/check_production_health.sh` |
+
+**Total outage:** Use external health checks and `ALERT_COMMAND` (this runbook). The evaluation engine does not emit internal alerts when the database is unreachable.
+
+**In-app alertcenter:** React operator panel at `/ops/alerts` (summary, list, detail, acknowledge/resolve).
+
+**Email defer policy:** Platform email notifications are deferred until `OPERATOR_ALERT_RECIPIENT` is set in server env. Until then, alerts are in-app only.
+
+**Evaluation model:** One advisory lock per run; short transaction per evaluator; evaluator failures logged in run record and audit (`alert.evaluation_evaluator_failed`) without inline meta-alerts.
+
+**Scheduler alerts:** `tenant.scheduler_failed` only when `scheduler.run_mode=scheduled` (expected_state=running). Paused/manual tenants do not generate scheduler failure alerts.
+
+**Legacy tenant email alerts:** `app/alerts/engine.py` remains for per-tenant `settings.alerts.recipient_email`. `GET /admin/alerts/run-all` runs both platform evaluation and legacy tenant passes.

@@ -40,6 +40,14 @@ from app.admin.usage_schemas import (
     VALID_USAGE_DAYS,
 )
 from app.admin.system_status_schemas import SystemStatusResponse
+from app.admin.alerts.schemas import (
+    AlertAcknowledgeRequest,
+    AlertEvaluationRunRequest,
+    AlertResolveRequest,
+    AlertSnoozeRequest,
+    AlertSuppressRequest,
+    OperatorDigestGenerateRequest,
+)
 from app.core.auth import get_verified_tenant
 from app.core.config import get_tenant_config
 from app.core.logging import setup_logging
@@ -113,6 +121,7 @@ async def on_startup():
     import app.repositories.postgres  # noqa: F401
     import app.repositories.postgres.oauth_credential_models  # noqa: F401
     import app.admin.incident_models  # noqa: F401
+    import app.admin.alerts.models  # noqa: F401
     from app.repositories.postgres.schema_migrations import (
         ensure_runtime_schema,
         provision_tenant_defaults,
@@ -7671,6 +7680,7 @@ def admin_tenant_overview(
 # ===========================================================================
 
 _OPERATOR_WRITE_ROLES = frozenset({"operations", "admin"})
+_ADMIN_ROLES = frozenset({"admin"})
 _USAGE_READ_ROLES = frozenset({"read_only", "operations", "admin"})
 
 
@@ -8286,6 +8296,263 @@ def admin_system_status(
             status_code=503,
             detail="Database unavailable for system status",
         )
+
+
+# ---------------------------------------------------------------------------
+# Operator alerts (Kapitel 10)
+# ---------------------------------------------------------------------------
+
+
+def _run_alert_action(fn):
+    from app.admin.alerts.lifecycle import AlertConflictError, AlertValidationError
+
+    try:
+        return fn()
+    except AlertConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except AlertValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/admin/alerts/summary", tags=["admin"])
+def admin_alerts_summary(
+    db: Session = Depends(get_db),
+    _operator=Depends(require_operator_role(_USAGE_READ_ROLES)),
+):
+    from app.admin.alerts.service import get_alert_summary
+
+    return get_alert_summary(db)
+
+
+@app.get("/admin/alerts/registry", tags=["admin"])
+def admin_alerts_registry(
+    _operator=Depends(require_operator_role(_USAGE_READ_ROLES)),
+):
+    from app.admin.alerts.service import get_registry
+
+    return get_registry()
+
+
+@app.get("/admin/alerts", tags=["admin"])
+def admin_list_alerts(
+    db: Session = Depends(get_db),
+    _operator=Depends(require_operator_role(_USAGE_READ_ROLES)),
+    status: str | None = None,
+    severity: str | None = None,
+    tenant_id: str | None = None,
+    alert_type: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    from app.admin.alerts.service import list_alerts
+
+    status_list = [s.strip() for s in status.split(",") if s.strip()] if status else None
+    severity_list = [s.strip() for s in severity.split(",") if s.strip()] if severity else None
+    return list_alerts(
+        db,
+        status=status_list,
+        severity=severity_list,
+        tenant_id=tenant_id,
+        alert_type=alert_type,
+        limit=min(max(limit, 1), 200),
+        offset=max(offset, 0),
+    )
+
+
+@app.get("/admin/alerts/{alert_id}", tags=["admin"])
+def admin_get_alert(
+    alert_id: str,
+    db: Session = Depends(get_db),
+    _operator=Depends(require_operator_role(_USAGE_READ_ROLES)),
+):
+    from app.admin.alerts.service import get_alert_detail
+
+    detail = get_alert_detail(db, alert_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Alert not found.")
+    return detail
+
+
+@app.post("/admin/alerts/{alert_id}/acknowledge", tags=["admin"])
+def admin_acknowledge_alert(
+    alert_id: str,
+    body: AlertAcknowledgeRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.alerts.service import acknowledge
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_alert_action(
+        lambda: acknowledge(
+            db,
+            alert_id=alert_id,
+            operator=operator,
+            version=body.version,
+            reason=body.reason,
+        )
+    )
+
+
+@app.post("/admin/alerts/{alert_id}/snooze", tags=["admin"])
+def admin_snooze_alert(
+    alert_id: str,
+    body: AlertSnoozeRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.alerts.service import snooze
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_alert_action(
+        lambda: snooze(
+            db,
+            alert_id=alert_id,
+            operator=operator,
+            version=body.version,
+            snoozed_until=body.snoozed_until,
+            reason=body.reason,
+        )
+    )
+
+
+@app.post("/admin/alerts/{alert_id}/resolve", tags=["admin"])
+def admin_resolve_alert(
+    alert_id: str,
+    body: AlertResolveRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.alerts.service import resolve
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_alert_action(
+        lambda: resolve(
+            db,
+            alert_id=alert_id,
+            operator=operator,
+            version=body.version,
+            reason=body.reason,
+        )
+    )
+
+
+@app.post("/admin/alerts/{alert_id}/suppress", tags=["admin"])
+def admin_suppress_alert(
+    alert_id: str,
+    body: AlertSuppressRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_ADMIN_ROLES)),
+):
+    from app.admin.alerts.service import suppress
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_alert_action(
+        lambda: suppress(
+            db,
+            alert_id=alert_id,
+            operator=operator,
+            version=body.version,
+            reason=body.reason,
+            expires_at=body.expires_at,
+        )
+    )
+
+
+@app.post("/admin/alert-evaluations/run", tags=["admin"])
+def admin_run_alert_evaluation(
+    body: AlertEvaluationRunRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.alerts.service import run_evaluation
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return run_evaluation(
+        db,
+        operator=operator,
+        settings=get_settings(),
+        dry_run=body.dry_run,
+        scope=body.scope,
+    )
+
+
+@app.get("/admin/alert-evaluations/status", tags=["admin"])
+def admin_alert_evaluation_status(
+    db: Session = Depends(get_db),
+    _operator=Depends(require_operator_role(_USAGE_READ_ROLES)),
+):
+    from app.admin.alerts.service import evaluation_status
+
+    return evaluation_status(db)
+
+
+@app.get("/admin/operator-digests", tags=["admin"])
+def admin_list_operator_digests(
+    db: Session = Depends(get_db),
+    _operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.alerts.service import list_digests
+
+    return list_digests(db)
+
+
+@app.get("/admin/operator-digests/{digest_id}", tags=["admin"])
+def admin_get_operator_digest(
+    digest_id: str,
+    db: Session = Depends(get_db),
+    _operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.alerts.service import get_digest
+
+    digest = get_digest(db, digest_id)
+    if digest is None:
+        raise HTTPException(status_code=404, detail="Digest not found.")
+    return digest
+
+
+@app.post("/admin/operator-digests/generate", tags=["admin"])
+def admin_generate_operator_digest(
+    body: OperatorDigestGenerateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.alerts.service import generate_digest
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return generate_digest(
+        db,
+        digest_date=body.digest_date,
+        timezone=body.timezone,
+    )
+
+
+@app.post("/admin/operator-digests/{digest_id}/send", tags=["admin"])
+def admin_send_operator_digest(
+    digest_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.alerts.service import send_digest
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_alert_action(
+        lambda: send_digest(db, digest_id=digest_id, settings=get_settings())
+    )
 
 
 @app.post("/admin/tenants/{tenant_id}/rotate-key", status_code=200)
@@ -9013,8 +9280,9 @@ def admin_run_all_alerts(
     Requires X-Admin-API-Key.
     """
     from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
-    from app.alerts.engine import run_alert_pass
+    from app.alerts.engine import run_alert_pass, run_platform_operator_alert_evaluation
     s = get_settings()
+    platform_result = run_platform_operator_alert_evaluation(db=db, app_settings=s)
     records = TenantConfigRepository.list_all(db)
     results = []
     for record in records:
@@ -9023,7 +9291,7 @@ def admin_run_all_alerts(
             results.append(result)
         except Exception as exc:
             results.append({"tenant_id": record.tenant_id, "error": str(exc)})
-    return {"results": results, "total": len(results)}
+    return {"platform": platform_result, "results": results, "total": len(results)}
 
 
 # ---------------------------------------------------------------------------

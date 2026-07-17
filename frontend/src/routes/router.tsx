@@ -15,6 +15,9 @@ import { NeedsHelpDetailPage } from "@/features/needsHelp/NeedsHelpDetailPage"
 import { NeedsHelpQueuePage } from "@/features/needsHelp/NeedsHelpQueuePage"
 import { IncidentDetailPage } from "@/features/incidents/IncidentDetailPage"
 import { IncidentsPage } from "@/features/incidents/IncidentsPage"
+import { AlertDetailPage } from "@/features/alerts/AlertDetailPage"
+import { AlertsPage } from "@/features/alerts/AlertsPage"
+import { OperatorDigestsPage } from "@/features/alerts/OperatorDigestsPage"
 import { UsagePage } from "@/features/usage/UsagePage"
 import { SystemPage } from "@/features/systemStatus/SystemPage"
 import { OverviewPage } from "@/features/overview/OverviewPage"
@@ -71,6 +74,17 @@ export const router = createBrowserRouter(
                 { index: true, element: <IncidentsPage /> },
                 { path: ":incidentId", element: <IncidentDetailPage /> },
               ],
+            },
+            {
+              path: "alerts",
+              children: [
+                { index: true, element: <AlertsPage /> },
+                { path: ":alertId", element: <AlertDetailPage /> },
+              ],
+            },
+            {
+              path: "digests",
+              element: <OperatorDigestsPage />,
             },
             {
               path: "usage",

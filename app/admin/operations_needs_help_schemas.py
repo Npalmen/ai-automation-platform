@@ -39,6 +39,10 @@ class NeedsHelpQueueItem(BaseModel):
     external_action_may_have_occurred: SignalState
     link: str
     source_type: str
+    related_alert_id: str | None = None
+    alert_severity: str | None = None
+    alert_status: str | None = None
+    alert_occurrence_count: int | None = None
     available_actions: list[AvailableActionMeta] = []
 
 

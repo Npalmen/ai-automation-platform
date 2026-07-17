@@ -180,5 +180,31 @@
     "errorState": "Kunde inte ladda system.",
     "actionPlacement": "Header.",
     "forbiddenPatterns": ["API-koppling i designreferens."]
+  },
+  "alert-center": {
+    "purpose": "Automatiskt detekterade operatörslarm.",
+    "informationHierarchy": ["Allvar", "Status", "Kund", "Ålder", "Senast detekterad"],
+    "primarySections": ["summaryIndicator", "list", "detail", "actions"],
+    "desktopLayout": "Tabell med filter.",
+    "tabletLayout": "Radlista.",
+    "mobileLayout": "Kort per larm.",
+    "loadingState": "Skeleton-lista.",
+    "emptyState": "Inga aktiva larm.",
+    "errorState": "Kunde inte ladda larm.",
+    "actionPlacement": "Bekräfta/lös i detaljvy.",
+    "forbiddenPatterns": ["Egen severity-mapping utanför API.", "Duplicera needs-help-rader."]
+  },
+  "operator-digest": {
+    "purpose": "Daglig sammanfattning från operator_alerts.",
+    "informationHierarchy": ["Datum", "Prioriterade poster", "Begränsningar"],
+    "primarySections": ["digestList", "items"],
+    "desktopLayout": "Lista med digest-kort.",
+    "tabletLayout": "Lista.",
+    "mobileLayout": "Staplad.",
+    "loadingState": "Skeleton.",
+    "emptyState": "Inga sammanfattningar.",
+    "errorState": "Kunde inte ladda sammanfattningar.",
+    "actionPlacement": "Länk tillbaka till larm.",
+    "forbiddenPatterns": ["Parallell triage-severity.", "Email utan säker recipient."]
   }
 }

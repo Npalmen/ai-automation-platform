@@ -9,6 +9,7 @@ import {
   isRoleAllowed,
 } from "@/features/auth/permissions"
 import { useAuth } from "@/features/auth/AuthProvider"
+import { AlertIndicator } from "@/features/alerts/AlertIndicator"
 import type { Role } from "@/features/auth/types"
 import { cn } from "@/lib/utils"
 
@@ -24,6 +25,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/needs-help", label: "Behöver hjälp", allowedRoles: ["read_only", "operations", "admin"] },
   { to: "/customers", label: "Kunder", allowedRoles: ["read_only", "operations", "admin"] },
   { to: "/incidents", label: "Incidenter", allowedRoles: ["read_only", "operations", "admin"] },
+  { to: "/alerts", label: "Larm", allowedRoles: ["read_only", "operations", "admin"] },
   { to: "/usage", label: "Användning", allowedRoles: ["read_only", "operations", "admin"] },
   { to: "/system", label: "System", allowedRoles: ["operations", "admin"] },
 ]
@@ -173,6 +175,7 @@ export function AppShell() {
               </div>
 
               <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                <AlertIndicator />
                 <EnvironmentBadge environment={environment} />
                 <div className="hidden min-w-0 text-right sm:block">
                   <p className="truncate text-body font-medium">

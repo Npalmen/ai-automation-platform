@@ -883,7 +883,10 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 | `/admin/recovery/{id}/retry|replay-dispatch|reclassify|re-extract|resend-approval|reprocess-gmail` | `Verified (code)` |
 | `/admin/support/{id}/state|pause-automation|resume-automation|force-inbox-sync|disable-scheduler|enable-scheduler|ack-needs-help|clear-acknowledged` | `Verified (code)` |
 | `/admin/usage/analytics`, `/admin/audit-events`, `/admin/operations/needs-help` | `Verified (code)` |
-| `/admin/alerts/run-all` | `Verified (code)` |
+| `/admin/alerts` (summary, list, detail, acknowledge, snooze, resolve, suppress, registry) | `Verified (tests)` — Kapitel 10 |
+| `/admin/alert-evaluations` (run, status) | `Verified (tests)` — Kapitel 10 |
+| `/admin/operator-digests` (list, detail, generate, send) | `Verified (tests)` — Kapitel 10 |
+| `/admin/alerts/run-all` | `Verified (code)` — legacy tenant email + platform evaluation bridge |
 
 ### Other functional endpoints
 

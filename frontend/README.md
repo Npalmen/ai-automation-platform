@@ -45,11 +45,11 @@ Route policy table: `src/routes/routePolicy.ts` (typed, includes foundation/desi
 | Path | Access |
 |------|--------|
 | `/ops/login` | Public |
-| `/ops`, `/ops/needs-help`, `/ops/customers`, `/ops/incidents`, `/ops/usage` | Authenticated (all roles) |
+| `/ops`, `/ops/needs-help`, `/ops/customers`, `/ops/incidents`, `/ops/alerts`, `/ops/digests`, `/ops/usage` | Authenticated (all roles) |
 | `/ops/system` | `operations`, `admin` |
 | `/ops/foundation`, `/ops/design-reference` | `admin` only |
 
-`/ops` (index) is the live **Global översikt** (Kapitel 2). `/ops/needs-help` is the live **Behöver hjälp** queue (Kapitel 4). `/ops/customers` is the live **Kundlista** (Kapitel 3). `/ops/incidents` is the live **Incidenthantering** (Kapitel 6). `/ops/usage` is the live **Användning och kapacitet** (Kapitel 7). `/ops/system` is the live **Systemstatus** (Kapitel 8). Safe operator writes are available from customer detail and needs-help detail (Kapitel 5).
+`/ops` (index) is the live **Global översikt** (Kapitel 2). `/ops/needs-help` is the live **Behöver hjälp** queue (Kapitel 4). `/ops/customers` is the live **Kundlista** (Kapitel 3). `/ops/incidents` is the live **Incidenthantering** (Kapitel 6). `/ops/alerts` is the live **Larmcenter** (Kapitel 10). `/ops/digests` is the live **Operatörssammanfattningar** (Kapitel 10). `/ops/usage` is the live **Användning och kapacitet** (Kapitel 7). `/ops/system` is the live **Systemstatus** (Kapitel 8). Safe operator writes are available from customer detail and needs-help detail (Kapitel 5).
 
 ## Systemstatus (Kapitel 8)
 
@@ -272,11 +272,15 @@ npm run build
 
 ## Responsive manual checklist
 
-Verify login, AppShell, and navigation at 320, 375, 768, 1024, 1366, 1440, 1920 px and 200% zoom:
+Verify login, AppShell, and navigation at 320, 375, 768, 1024, 1100, 1250, 1366, 1440, 1920 px and 125%, 150%, 200% zoom.
+
+**Small-desktop focus (sidebar open):** `/ops/needs-help` and `/ops/usage` at **1280 px** and **1366 px** with **125%** and **150%** zoom — compact row layout must stay readable (no word/character breaks in prose, severity badges intact).
 
 - [ ] No global horizontal scroll
+- [ ] Behöver hjälp + usage use compact rows (not squeezed multi-column tables) between ~768–1199px content width
 - [ ] Login form usable at 320px / 200% zoom
 - [ ] Mobile drawer opens/closes; Escape closes; backdrop blocks interaction
+- [ ] FilterBar fields wrap; reset buttons visible; inputs ≥ 44px touch height
 - [ ] Long Swedish nav labels wrap
 - [ ] Touch targets ≥ 44px on menu and logout
 - [ ] Environment badge visible in topbar
