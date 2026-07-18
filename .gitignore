@@ -36,3 +36,6 @@ frontend/node_modules/
 # Generated verification reports (may contain environment-specific metadata)
 scripts/*_report.json
 scripts/kapitel*_report.json
+
+# Local deploy bundles (git archive output)
+k12-rc-bundle.tar.gz
