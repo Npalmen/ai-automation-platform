@@ -30,7 +30,13 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/system", label: "System", allowedRoles: ["operations", "admin"] },
 ]
 
-function EnvironmentBadge({ environment }: { environment: "local" | "test" | "production" }) {
+function EnvironmentBadge({
+  environment,
+  className,
+}: {
+  environment: "local" | "test" | "production"
+  className?: string
+}) {
   const label = ENVIRONMENT_LABELS[environment]
   return (
     <Badge
@@ -40,6 +46,7 @@ function EnvironmentBadge({ environment }: { environment: "local" | "test" | "pr
         environment === "production"
           ? "border-border text-text-primary"
           : "border-status-information/40 text-text-secondary",
+        className,
       )}
     >
       {label}
@@ -174,9 +181,12 @@ export function AppShell() {
                 </p>
               </div>
 
-              <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+              <div className="flex min-w-0 shrink items-center gap-1.5 sm:gap-3">
                 <AlertIndicator />
-                <EnvironmentBadge environment={environment} />
+                <EnvironmentBadge
+                  environment={environment}
+                  className="hidden sm:inline-flex"
+                />
                 <div className="hidden min-w-0 text-right sm:block">
                   <p className="truncate text-body font-medium">
                     {operator.display_name}
@@ -191,10 +201,14 @@ export function AppShell() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="min-h-11"
+                  className="min-h-11 shrink-0 px-2 sm:px-4"
                   onClick={() => void logout()}
+                  aria-label="Logga ut"
                 >
-                  Logga ut
+                  <span className="sm:hidden" aria-hidden="true">
+                    ↪
+                  </span>
+                  <span className="hidden sm:inline">Logga ut</span>
                 </Button>
               </div>
             </div>

@@ -119,9 +119,10 @@ export function AlertsPage() {
         actions={
           <Link
             to="/digests"
-            className="rounded-md border border-border bg-surface px-3 py-2 text-body text-text-primary"
+            className="max-w-full rounded-md border border-border bg-surface px-3 py-2 text-center text-body text-text-primary sm:text-left"
           >
-            Dagliga sammanfattningar
+            <span className="sm:hidden">Sammanfattningar</span>
+            <span className="hidden sm:inline">Dagliga sammanfattningar</span>
           </Link>
         }
       />

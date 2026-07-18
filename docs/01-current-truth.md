@@ -699,6 +699,26 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 | Manual responsive browser verification | `Still outstanding` | Not executed in this environment. |
 | Not built | `Documented` | Deploy buttons, backup/restore triggers, shell/SSH, deploy history DB, CI gate artifact in runtime. |
 
+### Kapitel 10 — Operator alerts (2026-07-18)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| **Kapitel 10 overall** | `Verified — PASS` | Slice 1 + Slice 2 + Slice 3 E2E/browser verified 2026-07-18. |
+| Migration 011 | `Verified (E2E)` | `operator_alerts`, `alert_evaluation_runs`, `operator_digests`, `notification_deliveries`. |
+| Alert registry | `Verified (E2E)` | 16 types loaded at startup. |
+| Evaluation engine | `Verified (E2E)` | Dedup, advisory lock, dry_run, evaluator error isolation, auto-resolve. |
+| Lifecycle | `Verified (E2E)` | open → redetected → acknowledged → snoozed → resolved → reopened (after grace). |
+| Operator digest | `Verified (E2E)` | Deterministic ordering; `in_app_only` when `OPERATOR_ALERT_RECIPIENT` unset. |
+| Frontend alertcenter | `Verified (E2E)` | `/ops/alerts`, `/ops/alerts/:id`, `/ops/digests`, header `AlertIndicator`. |
+| Responsive browser | `Verified (E2E)` | 320–1440 px + 125/150/200 % zoom; 320 px header overflow fixed in AppShell. |
+| Tenant isolation | `Verified (E2E)` | Cross-tenant filter blocked; suppress admin-only (tests + route policy). |
+| Secrets | `Verified (E2E)` | No tokens/credentials in audit, digest, API responses, or frontend DOM. |
+| Backend tests | `Verified (local)` | `tests/test_admin_alerts.py` (17); + triage/needs-help/incidents/system/auth/session/tenant isolation (216 total in regression bundle). |
+| Frontend gates | `Verified (local)` | typecheck, build, `test:onboarding` (10) pass. |
+| E2E scripts | `Verified (local)` | `scripts/kapitel10_e2e_verify.py` (26 checks), `scripts/kapitel10_reopen_verify.py`. |
+| Not built in UI | `Documented` | Snooze/suppress actions API-only (no detail-page controls yet). |
+| Activity anomaly evaluator | `Preview only` | Slice 3 non-blocking per plan. |
+
 ### Kapitel 6 — Incidenthantering (2026-07-17)
 
 | Item | Status | Notes |
@@ -883,9 +903,9 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 | `/admin/recovery/{id}/retry|replay-dispatch|reclassify|re-extract|resend-approval|reprocess-gmail` | `Verified (code)` |
 | `/admin/support/{id}/state|pause-automation|resume-automation|force-inbox-sync|disable-scheduler|enable-scheduler|ack-needs-help|clear-acknowledged` | `Verified (code)` |
 | `/admin/usage/analytics`, `/admin/audit-events`, `/admin/operations/needs-help` | `Verified (code)` |
-| `/admin/alerts` (summary, list, detail, acknowledge, snooze, resolve, suppress, registry) | `Verified (tests)` — Kapitel 10 |
-| `/admin/alert-evaluations` (run, status) | `Verified (tests)` — Kapitel 10 |
-| `/admin/operator-digests` (list, detail, generate, send) | `Verified (tests)` — Kapitel 10 |
+| `/admin/alerts` (summary, list, detail, acknowledge, snooze, resolve, suppress, registry) | `Verified (E2E)` — Kapitel 10 |
+| `/admin/alert-evaluations` (run, status) | `Verified (E2E)` — Kapitel 10 |
+| `/admin/operator-digests` (list, detail, generate, send) | `Verified (E2E)` — Kapitel 10 |
 | `/admin/alerts/run-all` | `Verified (code)` — legacy tenant email + platform evaluation bridge |
 
 ### Other functional endpoints

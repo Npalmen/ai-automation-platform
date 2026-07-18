@@ -586,7 +586,7 @@ Production deploy and Phase A-C re-run completed on 2026-07-07. Live commit afte
 
 ## Later (Fas 3–4)
 
-- [x] Kapitel 10 — Operator alerts domain (`operator_alerts`), evaluation engine, in-app alertcenter (`/ops/alerts`), digest (`/ops/digests`); 17 tests in `tests/test_admin_alerts.py`. Email delivery deferred until `OPERATOR_ALERT_RECIPIENT` configured.
+- [x] Kapitel 10 — Operator alerts domain (`operator_alerts`), evaluation engine, in-app alertcenter (`/ops/alerts`), digest (`/ops/digests`); E2E + browser verified 2026-07-18 (26 API checks, 216 pytest regression bundle, responsive 320–1440 px). Email delivery deferred until `OPERATOR_ALERT_RECIPIENT` configured.
 - [ ] Stabilize daily operations routine (scheduler, alerts, failed job triage).
 - [ ] Package standard onboarding steps for next customer.
 - [ ] Improve UI where pilot feedback shows clear need.
