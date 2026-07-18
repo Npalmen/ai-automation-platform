@@ -14,8 +14,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-from dotenv import dotenv_values
-
 ROOT = Path(__file__).resolve().parents[1]
 
 ALLOWED_BASE_URLS = frozenset({"https://api.krowolf.se"})
@@ -56,11 +54,27 @@ def resolve_env_path(explicit: str | None = None) -> Path:
     return DEFAULT_ENV_PATHS[0]
 
 
+def _parse_env_file(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
+
+
 def load_browser_env(env_path: Path | None = None) -> dict[str, str]:
     path = env_path or resolve_env_path()
     if not path.is_file():
         return {}
-    values = {k: (v or "").strip() for k, v in dotenv_values(path).items()}
+    try:
+        from dotenv import dotenv_values
+
+        values = {k: (v or "").strip() for k, v in dotenv_values(path).items()}
+    except ImportError:
+        values = _parse_env_file(path)
     for key, value in os.environ.items():
         if key.startswith("K12_BROWSER_") and value.strip():
             values[key] = value.strip()
