@@ -808,7 +808,8 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 | Item | Status | Notes |
 |------|--------|-------|
 | **Slice 1 overall** | `Verified — PARTIAL` | `scripts/kapitel12_slice1_verify.py` → `kapitel12_slice1_report.json`: 61 PASS, 0 FAIL, 4 PARTIAL (2026-07-18). |
-| **Slice 2 overall** | `Verified — PARTIAL` | RC `krowolf-app:rc-865b87165eda` live on pilot 2026-07-18; endpoints+perf+rollback PASS; RB-01 BLOCKED (offsite not configured). |
+| **Slice 2 overall** | `Verified — PASS` | Pilot `api.krowolf.se` 2026-07-18: offsite S3 backup+restore from `ai_platform_2026-07-18-202653`; restore-app verify `:8001` PASS (`k12_restore_app_verify.py`); canonical cron via `krowolf-backup-canonical.sh`; scheduler paused; external side effects 0. |
+| RB-01 offsite backup | `Verified — PASS` | Live S3 upload+fetch+checksum; restore to `ai_platform_restore_test`; report `storage/status/k12_slice2_del3_resume_report.json`. |
 | Profil A/B prestanda | `Verified (pilot RC)` | `k12_rc_perf.py` PASS: overview p95 ≤96 ms, error rate 0%, DB connections 3. |
 | Offsite upload helper | `Verified (tests)` | `offsite_backup_upload.py` + `offsite_backup_s3.py` (S3-compatible); deployed to pilot `/opt/krowolf/scripts/`. |
 | Backup metadata v2 | `Verified (tests)` | `write_operation_status.py` — `checksum_sha256`, `local_status`, `offsite_status`, `offsite_verified`. |
@@ -820,13 +821,18 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 | RB-04 approval-first React | `Verified (local)` | `approval.approve` in operator action registry + `POST …/approve`; React `approveTenantApproval` + needs-help/customer detail wiring. |
 | RB-02 legacy hardening | `Verified (local)` | `/ui` read-only (`LEGACY_UI_READ_ONLY`); `adminApiFetch` blocks non-GET; no `localStorage.setItem(LS_ADMIN_KEY)`; purge on login/logout. |
 | RB-03 recovery UI | `Accepted (RB-03)` | API/runbook only; no React recovery console required for CONDITIONAL GO. |
-| RB-01 offsite backup | `Open — release blocker` | `/opt/krowolf/.env.offsite` missing on pilot; live backup+restore from offsite not executed. Template: `scripts/env.offsite.example`. |
-| Pilot deploy/rollback | `Verified — PASS` | RC deploy ~30 s build; rollback `e77b045d33c1` 20 s (overview/system 404 as expected); forward redeploy 13 s; all endpoints PASS on RC. |
+| Pilot deploy/rollback | `Verified — PASS` | Reproducible RC `56b18882a9aa`; rollback to `rc-865b87165eda` 19 s; forward 14 s; 8/8 endpoints PASS. |
 | Restore verify tables | `Verified (fix)` | `restore_postgres_rehearsal.sh` uses `tenant_configs`, `approval_requests`, etc. |
 | Legacy parity gaps | `Documented` | Recovery console, jobs browser, dedicated manual-review queue remain partial (API/overview/needs-help acceptable per releasebeslut). |
 | Frontend gates | `Verified (local)` | typecheck, contracts, onboarding tests pass in slice script. |
 | Prestanda Profil A/B | `Verified (pilot RC)` | `scripts/k12_rc_perf.py` on live RC; strict 404/schema fail. |
 | Release inventory | `Verified (docs)` | `docs/kapitel-12-release-inventory.md` — Fas 1 plan godkänd 2026-07-18. |
+| **Slice 3 overall** | `Verified — PARTIAL` | Regression **3586 passed / 0 failed** (2026-07-18 slutrunda); security 196 passed; browser/a11y/roles PASS (static+pilot shell); autentiserad browsermatris **väntar på operatörscredentials**; release **CONDITIONAL GO**. |
+| Release decision K12 | `CONDITIONAL GO` | Max 3 pilot tenants; `/ops` primary; legacy `/ui` read-only (beslut B); backend regression grön; full GO blockerad av autentiserad browsermatris. |
+| Browser matrix | `Verified (static+pilot shell)` | 7 viewports, 3 zoom levels, 9 `/ops` routes; pilot login/overview/needs-help HTTP 200; full authenticated matrix requires operator session. |
+| Legacy retirement | `Beslut B` | `docs/kapitel-12-slice3-legacy-parity.md` — read-only fallback; full 410 deferred post-pilot. |
+| Security gate K12 | `Verified — PASS` | 196 passed (`kapitel11_security_bundle` in slice3 script). |
+| Full regression K12 | `Verified — PASS` | **3586 passed, 0 failed**, 4 warnings, ~39 s (2026-07-18); fixes: usage period-bounds patch i tester, malformed legacy routing → `invalid_hint`, schema migration execute-count; frontend typecheck/contracts/onboarding/build PASS; bundle ~552 KB JS. |
 
 ### Kapitel 6 — Incidenthantering (2026-07-17)
 

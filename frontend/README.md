@@ -12,6 +12,14 @@ The legacy single-file UI at `app/ui/index.html` remains in place and continues 
 - All writes use session cookie (`credentials: "include"`) — never `X-Admin-API-Key` from the browser.
 - Run `tests/test_security_secret_scan.py` before release; see `docs/runbooks/security-hardening.md`.
 
+## Kapitel 12 Slice 3 verification
+
+```bash
+python scripts/kapitel12_slice3_verify.py
+```
+
+Reports: `scripts/kapitel12_slice3_report.json`, `scripts/kapitel12_browser_report.json`. Release decision: **CONDITIONAL GO** (see `docs/kapitel-12-release-notes.md`).
+
 ## Stack
 
 - React + TypeScript + Vite

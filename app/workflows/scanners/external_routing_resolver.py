@@ -87,6 +87,8 @@ def resolve_effective_dispatch_hint(
     legacy = legacy_hints.get(job_type)
     if legacy is None:
         return None, MISSING_SOURCE
+    if isinstance(legacy, dict) and not _is_external_dict_hint(legacy):
+        return legacy, LEGACY_SOURCE
     if not _is_external_dict_hint(legacy):
         return None, MISSING_SOURCE
     return legacy, LEGACY_SOURCE

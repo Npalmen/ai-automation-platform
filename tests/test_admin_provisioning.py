@@ -38,6 +38,12 @@ def _mock_db() -> MagicMock:
     return db
 
 
+def _mock_request() -> MagicMock:
+    req = MagicMock()
+    req.headers = {"origin": "http://testserver"}
+    return req
+
+
 def _make_key_record(tenant_id: str = "T_TEST", raw_key: str | None = None, is_active: bool = True):
     raw = raw_key or _generate_raw_key()
     rec = MagicMock()
@@ -350,8 +356,14 @@ class TestAdminRotateKey:
         with patch("app.repositories.postgres.tenant_config_repository.TenantConfigRepository.get",
                    return_value=record), \
              patch("app.repositories.postgres.tenant_api_key_repository.TenantApiKeyRepository.rotate_key",
-                   return_value=("kw_" + "b" * 32, MagicMock())):
-            return admin_rotate_tenant_key(tenant_id=tenant_id, db=db)
+                   return_value=("kw_" + "b" * 32, MagicMock())), \
+             patch("app.core.admin_session.require_same_origin"):
+            return admin_rotate_tenant_key(
+                tenant_id=tenant_id,
+                request=_mock_request(),
+                db=db,
+                operator={"id": "test-op", "role": "admin"},
+            )
 
     def test_rotate_returns_new_api_key(self):
         result = self._call()
@@ -372,9 +384,14 @@ class TestAdminRotateKey:
         with patch("app.repositories.postgres.tenant_config_repository.TenantConfigRepository.get",
                    return_value=_make_tenant_record()), \
              patch("app.repositories.postgres.tenant_api_key_repository.TenantApiKeyRepository.rotate_key",
-                   side_effect=[(k, MagicMock()) for k in keys]):
-            r1 = admin_rotate_tenant_key(tenant_id="T_TEST", db=db)
-            r2 = admin_rotate_tenant_key(tenant_id="T_TEST", db=db)
+                   side_effect=[(k, MagicMock()) for k in keys]), \
+             patch("app.core.admin_session.require_same_origin"):
+            r1 = admin_rotate_tenant_key(
+                tenant_id="T_TEST", request=_mock_request(), db=db, operator={"id": "test-op", "role": "admin"}
+            )
+            r2 = admin_rotate_tenant_key(
+                tenant_id="T_TEST", request=_mock_request(), db=db, operator={"id": "test-op", "role": "admin"}
+            )
         assert r1["api_key"] != r2["api_key"]
 
 
@@ -391,8 +408,15 @@ class TestAdminSetTenantStatus:
         with patch("app.repositories.postgres.tenant_config_repository.TenantConfigRepository.get",
                    return_value=record), \
              patch("app.repositories.postgres.tenant_config_repository.TenantConfigRepository.upsert",
-                   return_value=_make_tenant_record(tenant_id, status=status)):
-            return admin_set_tenant_status(tenant_id=tenant_id, body=AdminTenantStatusRequest(status=status), db=db)
+                   return_value=_make_tenant_record(tenant_id, status=status)), \
+             patch("app.core.admin_session.require_same_origin"):
+            return admin_set_tenant_status(
+                tenant_id=tenant_id,
+                body=AdminTenantStatusRequest(status=status),
+                request=_mock_request(),
+                db=db,
+                operator={"id": "test-op", "role": "admin"},
+            )
 
     def test_set_inactive_returns_correct_status(self):
         result = self._call(status="inactive")
@@ -408,12 +432,15 @@ class TestAdminSetTenantStatus:
         from app.main import admin_set_tenant_status, AdminTenantStatusRequest
         db = _mock_db()
         with patch("app.repositories.postgres.tenant_config_repository.TenantConfigRepository.get",
-                   return_value=_make_tenant_record()):
+                   return_value=_make_tenant_record()), \
+             patch("app.core.admin_session.require_same_origin"):
             with pytest.raises(HTTPException) as exc_info:
                 admin_set_tenant_status(
                     tenant_id="T_TEST",
                     body=AdminTenantStatusRequest(status="suspended"),
+                    request=_mock_request(),
                     db=db,
+                    operator={"id": "test-op", "role": "admin"},
                 )
         assert exc_info.value.status_code == 422
 

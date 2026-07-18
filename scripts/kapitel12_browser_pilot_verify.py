@@ -25,11 +25,6 @@ import requests
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.k12_browser_approval_fixture import (  # noqa: E402
-    cleanup_synthetic_approvals,
-    fixture_summary,
-    setup_synthetic_approval,
-)
 from scripts.k12_browser_cdp import (  # noqa: E402
     CdpBrowser,
     CdpError,
@@ -88,20 +83,25 @@ def _origin(base_url: str) -> str:
     return base_url.rstrip("/")
 
 
+def _api_headers(base_url: str) -> dict[str, str]:
+    return {"Content-Type": "application/json"}
+
+
 def _session_login(base_url: str, username: str, password: str) -> requests.Session:
     sess = requests.Session()
     resp = sess.post(
         f"{base_url}/auth/admin/login",
         json={"username": username, "password": password},
-        headers={"Origin": _origin(base_url), "Content-Type": "application/json"},
+        headers=_api_headers(base_url),
         timeout=30,
     )
-    resp.raise_for_status()
+    if resp.status_code != 200:
+        raise RuntimeError(f"login_http_{resp.status_code}")
     return sess
 
 
 def _session_me(sess: requests.Session, base_url: str) -> dict[str, Any]:
-    resp = sess.get(f"{base_url}/auth/admin/me", headers={"Origin": _origin(base_url)}, timeout=20)
+    resp = sess.get(f"{base_url}/auth/admin/me", timeout=20)
     if resp.status_code != 200:
         return {"status_code": resp.status_code}
     return resp.json()
@@ -110,7 +110,7 @@ def _session_me(sess: requests.Session, base_url: str) -> dict[str, Any]:
 def _session_logout(sess: requests.Session, base_url: str) -> int:
     resp = sess.post(
         f"{base_url}/auth/admin/logout",
-        headers={"Origin": _origin(base_url)},
+        headers={"Content-Type": "application/json"},
         timeout=20,
     )
     return resp.status_code
@@ -125,7 +125,7 @@ def _api_write_probe(
     role: str,
     allowed_status: list[int],
 ) -> tuple[str, int]:
-    headers = {"Origin": _origin(base_url), "Content-Type": "application/json"}
+    headers = _api_headers(base_url)
     body = {
         "reason": "K12 browser matrix verification — synthetic probe.",
         "idempotency_key": f"k12-browser-{uuid.uuid4()}",
@@ -328,7 +328,7 @@ def _run_approval_first(
         return result
     tenant_id = fixture["tenant_id"]
     approval_id = fixture["approval_id"]
-    headers = {"Origin": _origin(base_url), "Content-Type": "application/json"}
+    headers = _api_headers(base_url)
 
     list_resp = sess.get(f"{base_url}/admin/operations/needs-help", headers=headers, timeout=20)
     visible = list_resp.status_code == 200
@@ -389,7 +389,7 @@ def _run_session_states(
     bad_resp = bad.post(
         f"{base_url}/auth/admin/login",
         json={"username": username, "password": "invalid-k12-browser-password"},
-        headers={"Origin": _origin(base_url)},
+        headers=_api_headers(base_url),
         timeout=20,
     )
     checks.add("login_invalid", "PASS" if bad_resp.status_code == 401 else "FAIL", str(bad_resp.status_code))
@@ -453,13 +453,23 @@ def main() -> int:
 
     fixture: dict[str, str] | None = None
     if setup_approval and role in {"operations", "admin"}:
+        from scripts.k12_browser_approval_fixture import (  # noqa: E402
+            cleanup_synthetic_approvals,
+            setup_synthetic_approval,
+        )
+
         try:
             fixture = setup_synthetic_approval(tenant_hint)
             checks.add("approval_fixture_setup", "PASS", fixture["approval_id"][:28])
         except Exception as exc:
             checks.add("approval_fixture_setup", "FAIL", type(exc).__name__)
 
-    sess = _session_login(base_url, username, password)
+    try:
+        sess = _session_login(base_url, username, password)
+    except RuntimeError as exc:
+        checks.add("login", "FAIL", str(exc))
+        _write_failure_report(env, checks, secrets, role=role, status="FAIL")
+        return 1
     me = _session_me(sess, base_url)
     returned_role = ((me.get("operator") or {}).get("role") or "").strip()
     if returned_role != role:
@@ -518,6 +528,8 @@ def main() -> int:
     approval_report = _run_approval_first(sess, base_url, role, checks, fixture)
 
     if fixture and role in {"operations", "admin"}:
+        from scripts.k12_browser_approval_fixture import cleanup_synthetic_approvals  # noqa: E402
+
         try:
             cleanup_synthetic_approvals(tenant_hint)
             checks.add("approval_fixture_cleanup", "PASS", "tenant isolated")
@@ -560,6 +572,8 @@ def main() -> int:
         "checks": checks.items,
     }
     if fixture:
+        from scripts.k12_browser_approval_fixture import fixture_summary  # noqa: E402
+
         report["approval_fixture"] = fixture_summary(fixture)
 
     out_path = role_report_path(env, role)

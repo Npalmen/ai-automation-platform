@@ -51,6 +51,18 @@ python scripts/kapitel12_perf_baseline.py
 
 Reports: `scripts/kapitel12_slice1_report.json`, `scripts/kapitel12_slice2_report.json`, `scripts/kapitel12_perf_report.json`.
 
+### Kapitel 12 Slice 3 verification
+
+```bash
+python scripts/kapitel12_slice3_verify.py
+```
+
+Reports: `scripts/kapitel12_slice3_report.json`, `scripts/kapitel12_browser_report.json`.
+
+**Browser matrix (pilot):** `docs/runbooks/kapitel12-browser-matrix.md` — env `/opt/krowolf/.env.browser-test`; per-role CDP via `kapitel12_browser_pilot_verify.py`.
+
+**Verified 2026-07-18:** Security bundle 196 passed; full suite **3586 passed / 0 failed**; frontend gates PASS; release **CONDITIONAL GO** (authenticated browser matrix pending — see `docs/kapitel-12-release-notes.md`, `docs/kapitel-12-slice3-legacy-parity.md`).
+
 ### Kapitel 11 security regression gate
 
 Run after any change touching auth, admin routes, sessions, OAuth, or operator surfaces:

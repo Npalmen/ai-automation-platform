@@ -421,7 +421,7 @@ Store the new key immediately. It is shown only once.
 
 ## Backup and restore
 
-> **Canonical procedures (Kapitel 12):** `docs/runbooks/backup-and-restore.md` — `backup_postgres.sh`, offsite upload, restore rehearsal, RPO/RTO. Verify with `python scripts/kapitel12_slice2_verify.py`.
+> **Canonical procedures (Kapitel 12):** `docs/runbooks/backup-and-restore.md` — backup, offsite, restore. Release gate: `python scripts/kapitel12_slice3_verify.py` → `kapitel12_slice3_report.json`.
 
 ### Daily backup (run as cron at 02:00)
 ```bash

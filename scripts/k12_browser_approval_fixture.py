@@ -12,9 +12,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
-
 ROOT = Path(__file__).resolve().parents[1]
 
 DEFAULT_TEST_TENANT = "T_K12_BROWSER"
@@ -23,6 +20,8 @@ JOB_PREFIX = "k12-browser-job-"
 
 
 def _engine():
+    from sqlalchemy import create_engine
+
     from app.core.settings import get_settings
 
     settings = get_settings()
@@ -33,6 +32,9 @@ def _engine():
 
 
 def setup_synthetic_approval(tenant_id: str | None = None) -> dict[str, str]:
+    from sqlalchemy import text
+    from sqlalchemy.orm import sessionmaker
+
     tenant = (tenant_id or DEFAULT_TEST_TENANT).strip()
     approval_id = f"{APPROVAL_PREFIX}{uuid.uuid4()}"
     job_id = f"{JOB_PREFIX}{uuid.uuid4()}"
@@ -141,6 +143,9 @@ def setup_synthetic_approval(tenant_id: str | None = None) -> dict[str, str]:
 
 
 def cleanup_synthetic_approvals(tenant_id: str | None = None) -> int:
+    from sqlalchemy import text
+    from sqlalchemy.orm import sessionmaker
+
     tenant = (tenant_id or DEFAULT_TEST_TENANT).strip()
     engine = _engine()
     Session = sessionmaker(bind=engine)

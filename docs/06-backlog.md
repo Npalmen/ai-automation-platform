@@ -17,10 +17,12 @@
 - [x] **Slice 2 verify script** — `scripts/kapitel12_slice2_verify.py` → `kapitel12_slice2_report.json` (PARTIAL; RB-01 BLOCKED locally).
 - [x] **Profil A/B baseline** — `scripts/kapitel12_perf_baseline.py` PASS (TestClient + mocked services; live via `K12_PERF_BASE_URL`).
 - [x] **Slice 2 tester** — `test_kapitel12_backup_offsite.py` (6), `test_kapitel12_incident_drills.py` (6); regression bundle 156 passed.
-- [ ] **RB-01 offsite backup + restore (pilot server)** — configure `OFFSITE_BACKUP_COMMAND` + `OFFSITE_BACKUP_DEST_DIR` (or rclone); run live backup + `restore_from_offsite_rehearsal.sh`; document RPO/RTO.
+- [x] **RB-01 offsite backup + restore (pilot server)** — S3 offsite configured; live backup `ai_platform_2026-07-18-202653`; restore from S3 + app verify `:8001`; canonical cron `krowolf-backup-canonical.sh`; RPO/RTO in `k12_slice2_del3_resume_report.json`.
+- [x] **Kapitel 12 Slice 3 verify** — `scripts/kapitel12_slice3_verify.py`; browser/a11y/roles/legacy/security/regression/docs; release **CONDITIONAL GO** (`kapitel12_slice3_report.json`).
+- [x] **K12 regression cleanup** — 4 failures fixed (usage period bounds, routing `invalid_hint`, schema migration count); full suite **3586/0** (2026-07-18).
 - [ ] **Deploy/rollback live rehearsal** — staging/prod server with Docker.
 - [ ] **Live incident drills** — app/DB/scheduler outage on pilot server.
-- [ ] **Slice 3** — full browser/a11y-matris, GO/CONDITIONAL/NO-GO-beslut.
+- [ ] **Slice 3 autentiserad browsermatris** — följ `docs/runbooks/kapitel12-browser-matrix.md`; env: `/opt/krowolf/.env.browser-test`; kör `k12_verify_browser_env.py` + `kapitel12_browser_pilot_verify.py` per roll; aggregera med `kapitel12_browser_aggregate.py`.
 
 ---
 

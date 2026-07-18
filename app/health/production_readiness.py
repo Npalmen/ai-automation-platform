@@ -37,8 +37,8 @@ from app.repositories.postgres.tenant_config_repository import TenantConfigRepos
 # Module-level imports for test patchability
 from app.health.integration_health import get_integration_health
 from app.onboarding.readiness import get_onboarding_status
-    from app.workflows.scanners.external_routing_resolver import resolve_effective_routing_preview
-    from app.workflows.scanners.routing_preview import resolve_routing_preview
+from app.workflows.scanners.external_routing_resolver import resolve_effective_routing_preview
+from app.workflows.scanners.routing_preview import resolve_routing_preview
 
 _UI_PATH = Path(__file__).parent.parent / "ui" / "index.html"
 

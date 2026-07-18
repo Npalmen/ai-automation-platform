@@ -224,7 +224,8 @@ class TestUsageMetrics:
         )
         usage_db.commit()
 
-        overview = get_usage_overview(usage_db, days=7, app_settings=_settings())
+        with patch("app.admin.usage.compute_period_bounds", return_value=bounds):
+            overview = get_usage_overview(usage_db, days=7, app_settings=_settings())
         assert overview.summary.jobs_received.current == 1
         assert overview.summary.jobs_received.previous == 0
         assert overview.summary.jobs_received.percentage_change is None
@@ -248,7 +249,8 @@ class TestUsageMetrics:
         )
         usage_db.commit()
 
-        overview = get_usage_overview(usage_db, days=30, app_settings=_settings())
+        with patch("app.admin.usage.compute_period_bounds", return_value=bounds):
+            overview = get_usage_overview(usage_db, days=30, app_settings=_settings())
         assert overview.summary.integration_errors.current == 1
 
 

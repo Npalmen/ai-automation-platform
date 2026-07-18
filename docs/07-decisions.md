@@ -439,3 +439,21 @@ Operation exit codes are independent of metadata write success. API reads files 
 5. **Rotation on incident:** If DB or backup compromise suspected — rotate `DATABASE_URL` password, revoke OAuth per tenant via disconnect + reconnect, rotate `ADMIN_API_KEY`/`SESSION_SECRET_KEY`, review `audit_events` for anomalous operator actions.
 
 **Can change if:** Master plan elevates encryption to pre-pilot blocker or assigns delivery to a specific chapter with an explicit deadline.
+
+---
+
+## DEC-029 — Kapitel 12 releasebeslut (CONDITIONAL GO)
+
+**Date:** 2026-07-18  
+**Status:** Active for pilot RC on `api.krowolf.se`
+
+| Item | Decision |
+|------|----------|
+| **Release** | **CONDITIONAL GO** — backend regression **3586/0** (2026-07-18); full GO blocked until authenticated browser matrix on pilot |
+| **Pilot scope** | Max **3** pilot tenants; scheduler **paused** until operator enables per tenant; **`/ops` primary** |
+| **Legacy** | **Beslut B** — `/ui` read-only with deprecation banner; no `localStorage` admin key; full 410 deferred post-first-pilot |
+| **Security** | K11 bundle **PASS** (196 tests) |
+| **RB-01** | **PASS** (S3 offsite + restore verified on pilot) |
+| **Blockers cleared for pilot** | Approval-first React, tenant isolation, backup/restore/cron, session auth |
+| **Accepted for pilot** | F05, F06, F15, F16, CSP gap, recovery without React UI, legacy read-only fallback |
+| **Reports** | `scripts/kapitel12_slice3_report.json`, `docs/kapitel-12-release-notes.md` |
