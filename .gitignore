@@ -6,8 +6,13 @@ __pycache__/
 # Env
 .env
 .env.*
+.env.browser-test
+scripts/.env.browser-test
 .venv/
 venv/
+
+# Browser matrix temp artifacts (may contain failure screenshots)
+scripts/.browser-matrix-tmp/
 
 # OS / Editor
 .DS_Store
