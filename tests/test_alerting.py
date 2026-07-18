@@ -437,5 +437,5 @@ class TestAlertEndpointAuth:
         assert resp.status_code in (401, 403)
 
     def test_admin_run_all_requires_admin_key(self):
-        resp = self._client().get("/admin/alerts/run-all")
+        resp = self._client().post("/admin/alerts/run-all")
         assert resp.status_code == 401

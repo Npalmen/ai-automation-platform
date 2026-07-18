@@ -25,6 +25,10 @@ def _normalize_scopes(raw: str) -> str:
 
 
 def get_auth_url(tenant_id: str) -> str:
+    return get_auth_url_for_state(tenant_id)
+
+
+def get_auth_url_for_state(state: str) -> str:
     settings = get_settings()
     scopes = _normalize_scopes(settings.VISMA_SCOPES)
 
@@ -33,7 +37,7 @@ def get_auth_url(tenant_id: str) -> str:
         "redirect_uri": settings.VISMA_REDIRECT_URI,
         "response_type": "code",
         "scope": scopes,
-        "state": tenant_id,
+        "state": state,
         "prompt": "login",
     }
     return f"{VISMA_AUTHORIZE_URL}?{urlencode(params)}"

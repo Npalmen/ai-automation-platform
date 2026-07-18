@@ -526,6 +526,29 @@ def list_admin_tenants(
     return {"items": page, "total": total}
 
 
+def _onboarding_config_summary(settings: dict | None) -> dict[str, Any]:
+    settings = settings or {}
+    memory = settings.get("memory") or {}
+    lead_config = memory.get("lead_config") or {}
+    intake = settings.get("intake") or {}
+    lead_requirements = dict(lead_config.get("lead_requirements") or {})
+    internal_routing_hints = dict(memory.get("internal_routing_hints") or {})
+    service_profiles = sorted(
+        set(lead_requirements.keys()) | set(internal_routing_hints.keys())
+    )
+    return {
+        "schema_version": settings.get("schema_version"),
+        "service_profiles": service_profiles,
+        "lead_requirements": lead_requirements,
+        "internal_routing_hints": internal_routing_hints,
+        "intake": {
+            "mode": intake.get("mode"),
+            "activation_cutoff_at": intake.get("activation_cutoff_at"),
+            "enforcement": intake.get("enforcement"),
+        },
+    }
+
+
 def get_tenant_detail(
     db: Session,
     tenant_id: str,
@@ -694,5 +717,6 @@ def get_tenant_detail(
         ),
         "usage": usage_block,
         "audit": audit_block,
+        "onboarding_config": _onboarding_config_summary(record.settings),
         "available_actions": available_actions,
     }

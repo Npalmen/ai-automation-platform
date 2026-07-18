@@ -5,17 +5,19 @@ import { DataTable } from "@/components/operator/DataTable"
 import { FilterBar, FilterField } from "@/components/operator/FilterBar"
 import { StatusBadge } from "@/components/operator/StatusBadge"
 import { TenantIdentifier } from "@/components/operator/TenantIdentifier"
+import { useListLayout } from "@/hooks/useListLayout"
 
 import {
   attentionStatusLabel,
-  formatAiCostStatus,
+  formatAiCostTableCell,
+  formatOperatorBurdenTableCell,
   formatTimestamp,
   tenantStatusLabel,
 } from "../formatters"
 import type { UsageTenantFilters, UsageTenantItem } from "../types"
 
 const inputClassName =
-  "min-h-11 w-full rounded-md border border-border bg-page px-3 text-body text-text-primary"
+  "min-h-11 w-full min-w-0 rounded-md border border-border bg-page px-3 text-body text-text-primary"
 
 const STATUS_OPTIONS = [
   { value: "", label: "Alla" },
@@ -42,6 +44,10 @@ const SORT_OPTIONS = [
   { value: "customer", label: "Kundnamn" },
 ] as const
 
+const DEFAULT_FILTERS: UsageTenantFilters = {
+  sort: "jobs",
+}
+
 type UsageTenantTableProps = {
   items: UsageTenantItem[]
   filters: UsageTenantFilters
@@ -58,6 +64,7 @@ export function UsageTenantTable({
   onSearchInputChange,
 }: UsageTenantTableProps) {
   const navigate = useNavigate()
+  const { ref: listLayoutRef, layout } = useListLayout()
 
   const columns = useMemo(
     () => [
@@ -91,8 +98,11 @@ export function UsageTenantTable({
         header: "Operatörsbörda",
         render: (row: UsageTenantItem) => (
           <span className="text-body-small text-text-secondary">
-            {row.operator_actions} åtgärder · {row.open_manual_reviews_current} MR ·{" "}
-            {row.pending_approvals_current} godk.
+            {formatOperatorBurdenTableCell(
+              row.operator_actions,
+              row.open_manual_reviews_current,
+              row.pending_approvals_current,
+            )}
           </span>
         ),
       },
@@ -106,7 +116,7 @@ export function UsageTenantTable({
         header: "AI-kostnad",
         render: (row: UsageTenantItem) => (
           <span className="text-body-small text-text-secondary">
-            {formatAiCostStatus(row.ai_cost)}
+            {formatAiCostTableCell(row.ai_cost)}
           </span>
         ),
       },
@@ -114,7 +124,7 @@ export function UsageTenantTable({
         key: "activity",
         header: "Senaste aktivitet",
         render: (row: UsageTenantItem) => (
-          <span className="text-body-small text-text-secondary">
+          <span className="whitespace-nowrap text-body-small text-text-secondary">
             {formatTimestamp(row.latest_activity_at)}
           </span>
         ),
@@ -126,6 +136,7 @@ export function UsageTenantTable({
           <Link
             to={`/customers/${encodeURIComponent(row.tenant_id)}`}
             className="text-label text-accent hover:underline"
+            onClick={(event) => event.stopPropagation()}
           >
             Öppna kund
           </Link>
@@ -134,6 +145,11 @@ export function UsageTenantTable({
     ],
     [],
   )
+
+  function resetFilters() {
+    onSearchInputChange("")
+    onFiltersChange({ ...DEFAULT_FILTERS })
+  }
 
   return (
     <section aria-labelledby="usage-tenants-heading" className="space-y-4">
@@ -247,9 +263,18 @@ export function UsageTenantTable({
             ))}
           </select>
         </FilterField>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          <button
+            type="button"
+            className="min-h-11 rounded-md border border-border bg-page px-4 text-body text-text-secondary"
+            onClick={resetFilters}
+          >
+            Återställ
+          </button>
+        </div>
       </FilterBar>
 
-      <div className="hidden md:block">
+      <div ref={listLayoutRef} className="min-w-0">
         <DataTable
           columns={columns}
           rows={items}
@@ -257,37 +282,62 @@ export function UsageTenantTable({
           onRowClick={(row) =>
             navigate(`/customers/${encodeURIComponent(row.tenant_id)}`)
           }
+          layout={layout}
           emptyTitle="Inga kunder matchar filtren."
-        />
-      </div>
-
-      <div className="space-y-3 md:hidden">
-        {items.length === 0 ? (
-          <p className="text-body text-text-secondary">Inga kunder matchar filtren.</p>
-        ) : (
-          items.map((row) => (
-            <article
-              key={row.tenant_id}
-              className="space-y-2 rounded-lg border border-border bg-surface p-4"
+          compactRow={(row) => (
+            <button
+              type="button"
+              className="flex w-full min-w-0 items-start justify-between gap-3 rounded-lg border border-border bg-surface p-3 text-left hover:bg-surface-subtle"
+              onClick={() =>
+                navigate(`/customers/${encodeURIComponent(row.tenant_id)}`)
+              }
             >
-              <div className="flex items-start justify-between gap-2">
-                <div>
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium text-text-primary">{row.customer_name}</p>
+                  <StatusBadge
+                    variant={row.attention_status}
+                    label={attentionStatusLabel(row.attention_status)}
+                  />
+                </div>
+                <p className="text-body-small text-text-secondary">
+                  {row.jobs_received} jobb ·{" "}
+                  {formatOperatorBurdenTableCell(
+                    row.operator_actions,
+                    row.open_manual_reviews_current,
+                    row.pending_approvals_current,
+                  )}
+                </p>
+              </div>
+              <span className="shrink-0 text-label text-accent">Öppna</span>
+            </button>
+          )}
+          mobileCard={(row) => (
+            <article className="space-y-2 rounded-lg border border-border bg-surface p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium text-text-primary">{row.customer_name}</p>
+                  <TenantIdentifier tenantId={row.tenant_id} />
                   <p className="text-body-small text-text-secondary">
                     {tenantStatusLabel(row.tenant_status)}
                   </p>
                 </div>
                 <StatusBadge
-            variant={row.attention_status}
-            label={attentionStatusLabel(row.attention_status)}
-          />
+                  variant={row.attention_status}
+                  label={attentionStatusLabel(row.attention_status)}
+                />
               </div>
               <p className="text-body-small text-text-secondary">
-                {row.jobs_received} jobb · {row.operator_actions} åtgärder ·{" "}
-                {row.integration_errors} fel
+                {row.jobs_received} jobb ·{" "}
+                {formatOperatorBurdenTableCell(
+                  row.operator_actions,
+                  row.open_manual_reviews_current,
+                  row.pending_approvals_current,
+                )}{" "}
+                · {row.integration_errors} fel
               </p>
               <p className="text-body-small text-text-muted">
-                AI-kostnad: {formatAiCostStatus(row.ai_cost)}
+                AI-kostnad: {formatAiCostTableCell(row.ai_cost)}
               </p>
               <Link
                 to={`/customers/${encodeURIComponent(row.tenant_id)}`}
@@ -296,8 +346,8 @@ export function UsageTenantTable({
                 Öppna kund
               </Link>
             </article>
-          ))
-        )}
+          )}
+        />
       </div>
     </section>
   )

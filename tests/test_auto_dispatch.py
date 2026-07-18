@@ -128,7 +128,7 @@ def _call_auto_dispatch(
               return_value=mem_settings),
         patch("app.workflows.dispatchers.auto_dispatch.ControlledDispatchEngine", return_value=mock_engine),
         patch("app.workflows.dispatchers.auto_dispatch.DISPATCH_REGISTRY", registry),
-        patch("app.workflows.dispatchers.auto_dispatch.resolve_routing_preview", return_value=rp),
+        patch("app.workflows.dispatchers.auto_dispatch.resolve_effective_routing_preview", return_value=rp),
     ):
         return maybe_auto_dispatch_job(db=db, tenant_id="T1", job=job, settings=_make_settings()), mock_engine
 

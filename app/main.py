@@ -115,6 +115,44 @@ def _openapi_urls_for(app_settings) -> dict:
 
 app = FastAPI(title=settings.APP_NAME, **_openapi_urls_for(settings))
 
+_OPERATOR_WRITE_ROLES = frozenset({"operations", "admin"})
+_ADMIN_ROLES = frozenset({"admin"})
+_USAGE_READ_ROLES = frozenset({"read_only", "operations", "admin"})
+
+
+def _enforce_rate_limit(key: str, *, max_calls: int, window_seconds: float) -> None:
+    from app.core.rate_limit import check_rate_limit
+
+    allowed, retry_after = check_rate_limit(
+        key, max_calls=max_calls, window_seconds=window_seconds
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="För många förfrågningar. Försök igen senare.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
+def _run_recovery_endpoint(handler):
+    from app.admin.recovery_actions import RecoveryAuditError
+
+    try:
+        return handler()
+    except RecoveryAuditError:
+        raise HTTPException(
+            status_code=500,
+            detail="Åtgärden kunde inte verifieras i audit.",
+        )
+
+
+def _secured_support_call(request: Request, operator, handler):
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    _enforce_rate_limit(f"support:{operator['id']}", max_calls=20, window_seconds=3600)
+    return handler()
+
 
 @app.on_event("startup")
 async def on_startup():
@@ -122,6 +160,14 @@ async def on_startup():
     import app.repositories.postgres.oauth_credential_models  # noqa: F401
     import app.admin.incident_models  # noqa: F401
     import app.admin.alerts.models  # noqa: F401
+    import app.admin.onboarding.models  # noqa: F401
+    from app.admin.onboarding.registries import RegistryIntegrityError, validate_registry_integrity
+
+    try:
+        validate_registry_integrity()
+    except RegistryIntegrityError as exc:
+        raise RuntimeError(f"Onboarding registry integrity check failed: {exc}") from exc
+
     from app.repositories.postgres.schema_migrations import (
         ensure_runtime_schema,
         provision_tenant_defaults,
@@ -166,9 +212,28 @@ def visma_oauth_callback_alias(
 
 @app.middleware("http")
 async def tenant_middleware(request: Request, call_next):
-    tenant_id = request.headers.get("X-Tenant-ID", "TENANT_1001")
-    set_current_tenant(tenant_id)
+    # K11: only set context when header is explicitly provided (never default tenant).
+    tenant_id = request.headers.get("X-Tenant-ID")
+    if tenant_id:
+        set_current_tenant(tenant_id)
     response = await call_next(request)
+    return response
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    if _is_production_env(settings):
+        response.headers.setdefault(
+            "Strict-Transport-Security",
+            "max-age=31536000; includeSubDomains",
+        )
+    if request.url.path.startswith(("/ops", "/auth/admin", "/ui")):
+        response.headers.setdefault("Cache-Control", "no-store")
     return response
 
 
@@ -257,6 +322,19 @@ def admin_login(
     from app.core.admin_auth import _resolve_admin_keys
 
     require_same_origin(request)
+
+    from app.core.rate_limit import check_rate_limit
+
+    client_ip = request.client.host if request.client else "unknown"
+    allowed, retry_after = check_rate_limit(
+        f"login:{client_ip}", max_calls=5, window_seconds=60
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="För många inloggningsförsök. Försök igen senare.",
+            headers={"Retry-After": str(retry_after)},
+        )
 
     if is_session_auth_configured():
         if not verify_admin_credentials(payload.username, payload.password):
@@ -3654,13 +3732,18 @@ def get_case(
     processed_at: str | None = r.created_at.isoformat() if r.created_at else None
 
     # --- routing_preview: where this job_type would be routed ---
-    from app.workflows.scanners.routing_preview import resolve_routing_preview, SUPPORTED_JOB_TYPES
+    from app.workflows.scanners.external_routing_resolver import resolve_effective_routing_preview
+    from app.workflows.scanners.routing_preview import SUPPORTED_JOB_TYPES
     from app.repositories.postgres.tenant_config_repository import TenantConfigRepository as _TCR
     _settings = _TCR.get_settings(db, tenant_id)
     _memory = _get_memory(_settings)
     _job_type_str = r.job_type or "unknown"
     routing_preview = (
-        resolve_routing_preview(_memory["routing_hints"], _job_type_str)
+        resolve_effective_routing_preview(
+            job_type=_job_type_str,
+            tenant_settings=_settings,
+            memory=_memory,
+        )
         if _job_type_str in SUPPORTED_JOB_TYPES
         else None
     )
@@ -4993,10 +5076,8 @@ def get_routing_preview(
     tenant_id: str = Depends(get_verified_tenant),
 ):
     """Return routing preview for a single job type based on saved routing hints."""
-    from app.workflows.scanners.routing_preview import (
-        resolve_routing_preview,
-        SUPPORTED_JOB_TYPES,
-    )
+    from app.workflows.scanners.external_routing_resolver import resolve_effective_routing_preview
+    from app.workflows.scanners.routing_preview import SUPPORTED_JOB_TYPES
     from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
 
     if job_type not in SUPPORTED_JOB_TYPES:
@@ -5007,7 +5088,11 @@ def get_routing_preview(
 
     s = TenantConfigRepository.get_settings(db, tenant_id)
     memory = _get_memory(s)
-    return resolve_routing_preview(memory["routing_hints"], job_type)
+    return resolve_effective_routing_preview(
+        job_type=job_type,
+        tenant_settings=s,
+        memory=memory,
+    )
 
 
 @app.get("/tenant/routing-readiness")
@@ -5016,12 +5101,12 @@ def get_routing_readiness(
     tenant_id: str = Depends(get_verified_tenant),
 ):
     """Return routing readiness summary across all supported job types."""
-    from app.workflows.scanners.routing_preview import resolve_routing_readiness
+    from app.workflows.scanners.external_routing_resolver import resolve_effective_routing_readiness
     from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
 
     s = TenantConfigRepository.get_settings(db, tenant_id)
     memory = _get_memory(s)
-    return resolve_routing_readiness(memory["routing_hints"])
+    return resolve_effective_routing_readiness(s, memory)
 
 
 # ---------------------------------------------------------------------------
@@ -5562,7 +5647,7 @@ def _get_successful_finance_export_event(db: Session, tenant_id: str, job_id: st
     from app.domain.integrations.models import IntegrationEvent
 
     key = _finance_fortnox_idempotency_key(tenant_id, job_id)
-    event = IntegrationRepository(db).get_by_idempotency_key(key)
+    event = IntegrationRepository(db).get_by_idempotency_key(key, tenant_id=tenant_id)
     if isinstance(event, IntegrationEvent) and event.status == "success":
         return event
     return None
@@ -5611,7 +5696,7 @@ def _record_finance_fortnox_event(
         return repo.create(record)
     except Exception:
         db.rollback()
-        return repo.get_by_idempotency_key(record.idempotency_key)
+        return repo.get_by_idempotency_key(record.idempotency_key, tenant_id=tenant_id)
 
 
 def _execute_finance_fortnox_export(
@@ -5850,7 +5935,7 @@ def _get_finance_visma_export_event(db: Session, tenant_id: str, job_id: str):
     from app.domain.integrations.models import IntegrationEvent
 
     key = _finance_visma_idempotency_key(tenant_id, job_id)
-    event = IntegrationRepository(db).get_by_idempotency_key(key)
+    event = IntegrationRepository(db).get_by_idempotency_key(key, tenant_id=tenant_id)
     if isinstance(event, IntegrationEvent):
         return event
     return None
@@ -5911,7 +5996,7 @@ def _claim_finance_visma_export_event(
 
     key = _finance_visma_idempotency_key(tenant_id, job_id)
     repo = IntegrationRepository(db)
-    existing = repo.get_by_idempotency_key(key)
+    existing = repo.get_by_idempotency_key(key, tenant_id=tenant_id)
     if existing is not None:
         if existing.status == "success":
             return None, existing
@@ -5943,7 +6028,7 @@ def _claim_finance_visma_export_event(
         return repo.create(event), None
     except IntegrityError:
         db.rollback()
-        raced = repo.get_by_idempotency_key(key)
+        raced = repo.get_by_idempotency_key(key, tenant_id=tenant_id)
         if raced is not None and raced.status == "success":
             return None, raced
         if raced is not None and raced.status == "executing":
@@ -7150,7 +7235,7 @@ def dispatch_preview(
     memory = _get_memory(s)
     policy = _get_dispatch_policy(db, tenant_id, r.job_type or "")
     engine = _make_dispatch_engine(db, tenant_id)
-    result = engine.run(job=r, memory=memory, dry_run=True)
+    result = engine.run(job=r, memory=memory, dry_run=True, tenant_settings=s)
     response = _dispatch_result_to_response(result)
     response.update(policy)
     return response
@@ -7188,7 +7273,7 @@ def dispatch_job(
 
         # Resolve which system/target we'd dispatch to (dry-run preview)
         engine = _make_dispatch_engine(db, tenant_id)
-        dry = engine.run(job=r, memory=memory, dry_run=True)
+        dry = engine.run(job=r, memory=memory, dry_run=True, tenant_settings=s)
         system   = dry.system   or "monday"
         job_type = dry.job_type or (r.job_type or "")
 
@@ -7205,7 +7290,14 @@ def dispatch_job(
                 "message":     "Redan väntande godkännande för detta jobb.",
             }
 
-        routing_hint = memory.get("routing_hints", {}).get(job_type) or {}
+        from app.workflows.scanners.external_routing_resolver import resolve_effective_dispatch_hint
+
+        routing_hint, _ = resolve_effective_dispatch_hint(
+            job_type=job_type,
+            tenant_settings=s,
+            memory=memory,
+        )
+        routing_hint = routing_hint or {}
         approval_req = build_dispatch_approval_request(
             job_id=job_id,
             tenant_id=tenant_id,
@@ -7232,7 +7324,7 @@ def dispatch_job(
     memory = _get_memory(s)
     engine = _make_dispatch_engine(db, tenant_id)
     dispatch_mode = policy.get("policy_mode", "unknown")
-    result = engine.run(job=r, memory=memory, dry_run=False, dispatch_mode=dispatch_mode)
+    result = engine.run(job=r, memory=memory, dry_run=False, dispatch_mode=dispatch_mode, tenant_settings=s)
 
     if result.status == "failed":
         raise HTTPException(status_code=400, detail=result.message)
@@ -7489,12 +7581,16 @@ def demo_seed(
 @app.post("/admin/tenants/{tenant_id}/demo/seed", status_code=201)
 def admin_demo_seed(
     tenant_id: str,
-    request: _DemoSeedRequest | None = None,
+    request: Request,
+    body: _DemoSeedRequest | None = None,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_ADMIN_ROLES)),
 ):
     """Admin variant of demo seed for the explicitly selected tenant."""
-    return _seed_demo_jobs(request=request, db=db, tenant_id=tenant_id)
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _seed_demo_jobs(request=body, db=db, tenant_id=tenant_id)
 
 
 @app.get("/integrations/health")
@@ -7679,11 +7775,6 @@ def admin_tenant_overview(
 # Operator panel safe-write actions (Kapitel 5)
 # ===========================================================================
 
-_OPERATOR_WRITE_ROLES = frozenset({"operations", "admin"})
-_ADMIN_ROLES = frozenset({"admin"})
-_USAGE_READ_ROLES = frozenset({"read_only", "operations", "admin"})
-
-
 def _run_operator_action(handler):
     """Map operator action domain errors to HTTP responses (fail closed)."""
     from app.admin.operator_actions import (
@@ -7809,6 +7900,35 @@ def admin_operator_resume_scheduler(
         lambda: execute_resume_scheduler(
             db,
             tenant_id,
+            operator=operator,
+            reason=body.reason,
+            idempotency_key=body.idempotency_key,
+        )
+    )
+
+
+@app.post(
+    "/admin/tenants/{tenant_id}/approvals/{approval_id}/approve",
+    tags=["admin"],
+    response_model=OperatorActionResponse,
+)
+def admin_operator_approve_approval(
+    tenant_id: str,
+    approval_id: str,
+    body: OperatorActionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
+):
+    from app.admin.operator_actions import execute_approve_approval
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    return _run_operator_action(
+        lambda: execute_approve_approval(
+            db,
+            tenant_id,
+            approval_id,
             operator=operator,
             reason=body.reason,
             idempotency_key=body.idempotency_key,
@@ -8200,6 +8320,15 @@ def admin_assign_incident_self(
     )
 
 
+# ===========================================================================
+# Operator onboarding (Kapitel 9)
+# ===========================================================================
+
+from app.admin.onboarding.routes import router as onboarding_router
+
+app.include_router(onboarding_router)
+
+
 def _validate_usage_days(days: int) -> int:
     if days not in VALID_USAGE_DAYS:
         raise HTTPException(
@@ -8558,33 +8687,30 @@ def admin_send_operator_digest(
 @app.post("/admin/tenants/{tenant_id}/rotate-key", status_code=200)
 def admin_rotate_tenant_key(
     tenant_id: str,
+    request: Request,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_ADMIN_ROLES)),
 ):
-    """Revoke all existing API keys for the tenant and issue a new one.
-
-    The new api_key is shown exactly once. Store it immediately.
-    Requires X-Admin-API-Key.
-    """
+    """Revoke all existing API keys for the tenant and issue a new one."""
+    from app.core.admin_session import require_same_origin
     from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
     from app.repositories.postgres.tenant_api_key_repository import TenantApiKeyRepository
+
+    require_same_origin(request)
 
     if TenantConfigRepository.get(db, tenant_id) is None:
         raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found.")
 
     raw_key, _ = TenantApiKeyRepository.rotate_key(db, tenant_id)
 
-    try:
-        create_audit_event(
-            db=db,
-            tenant_id=tenant_id,
-            category="tenant_management",
-            action="api_key_rotated",
-            status="success",
-            details={},
-        )
-    except Exception:
-        pass
+    create_audit_event(
+        db=db,
+        tenant_id=tenant_id,
+        category="tenant_management",
+        action="api_key_rotated",
+        status="success",
+        details={"operator_id": operator["id"]},
+    )
 
     return {"tenant_id": tenant_id, "api_key": raw_key}
 
@@ -8593,15 +8719,15 @@ def admin_rotate_tenant_key(
 def admin_set_tenant_status(
     tenant_id: str,
     body: AdminTenantStatusRequest,
+    request: Request,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_ADMIN_ROLES)),
 ):
-    """Set a tenant's status to 'active' or 'inactive'.
-
-    Inactive tenants are rejected at auth with 403.
-    Requires X-Admin-API-Key.
-    """
+    """Set a tenant's status to 'active' or 'inactive'."""
+    from app.core.admin_session import require_same_origin
     from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    require_same_origin(request)
 
     if body.status not in _VALID_TENANT_STATUSES:
         raise HTTPException(
@@ -8613,17 +8739,14 @@ def admin_set_tenant_status(
 
     TenantConfigRepository.upsert(db=db, tenant_id=tenant_id, status=body.status)
 
-    try:
-        create_audit_event(
-            db=db,
-            tenant_id=tenant_id,
-            category="tenant_management",
-            action="status_changed",
-            status="success",
-            details={"new_status": body.status},
-        )
-    except Exception:
-        pass
+    create_audit_event(
+        db=db,
+        tenant_id=tenant_id,
+        category="tenant_management",
+        action="status_changed",
+        status="success",
+        details={"new_status": body.status, "operator_id": operator["id"]},
+    )
 
     return {"tenant_id": tenant_id, "status": body.status}
 
@@ -8904,102 +9027,128 @@ class RecoveryActionRequest(_BaseModel):
 @app.post("/admin/recovery/{job_id}/retry")
 def admin_recovery_retry(
     job_id: str,
+    request: Request,
     body: RecoveryActionRequest = RecoveryActionRequest(),
     x_tenant_id: str = Header(...),
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
 ):
     """
     Admin: retry a failed job by resetting state and rerunning the full pipeline.
-    Requires X-Admin-API-Key + X-Tenant-ID headers.
+    Requires operations+ role, same-origin, and X-Tenant-ID.
     """
     from app.admin.recovery_actions import retry_job
-    return retry_job(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=body.actor)
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    _enforce_rate_limit(f"recovery:{operator['id']}", max_calls=20, window_seconds=3600)
+    actor = operator.get("display_name") or body.actor
+    return _run_recovery_endpoint(
+        lambda: retry_job(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=actor)
+    )
 
 
 @app.post("/admin/recovery/{job_id}/replay-dispatch")
 def admin_recovery_replay_dispatch(
     job_id: str,
+    request: Request,
     body: RecoveryActionRequest = RecoveryActionRequest(),
     x_tenant_id: str = Header(...),
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
 ):
-    """
-    Admin: replay the controlled dispatch step only.
-    Idempotency protects against duplicate external sends.
-    Requires X-Admin-API-Key + X-Tenant-ID headers.
-    """
     from app.admin.recovery_actions import replay_dispatch
-    return replay_dispatch(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=body.actor)
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    _enforce_rate_limit(f"recovery:{operator['id']}", max_calls=20, window_seconds=3600)
+    actor = operator.get("display_name") or body.actor
+    return _run_recovery_endpoint(
+        lambda: replay_dispatch(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=actor)
+    )
 
 
 @app.post("/admin/recovery/{job_id}/reclassify")
 def admin_recovery_reclassify(
     job_id: str,
+    request: Request,
     body: RecoveryActionRequest = RecoveryActionRequest(),
     x_tenant_id: str = Header(...),
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
 ):
-    """
-    Admin: force re-run classification (clears all derived state and reruns full pipeline).
-    Overwrites prior classification result with audit trail.
-    Requires X-Admin-API-Key + X-Tenant-ID headers.
-    """
     from app.admin.recovery_actions import reclassify
-    return reclassify(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=body.actor)
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    _enforce_rate_limit(f"recovery:{operator['id']}", max_calls=20, window_seconds=3600)
+    actor = operator.get("display_name") or body.actor
+    return _run_recovery_endpoint(
+        lambda: reclassify(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=actor)
+    )
 
 
 @app.post("/admin/recovery/{job_id}/re-extract")
 def admin_recovery_re_extract(
     job_id: str,
+    request: Request,
     body: RecoveryActionRequest = RecoveryActionRequest(),
     x_tenant_id: str = Header(...),
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
 ):
-    """
-    Admin: re-run entity extraction only (preserves classification result, replaces extraction state).
-    Requires X-Admin-API-Key + X-Tenant-ID headers.
-    """
     from app.admin.recovery_actions import re_extract
-    return re_extract(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=body.actor)
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    _enforce_rate_limit(f"recovery:{operator['id']}", max_calls=20, window_seconds=3600)
+    actor = operator.get("display_name") or body.actor
+    return _run_recovery_endpoint(
+        lambda: re_extract(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=actor)
+    )
 
 
 @app.post("/admin/recovery/{job_id}/resend-approval")
 def admin_recovery_resend_approval(
     job_id: str,
+    request: Request,
     body: RecoveryActionRequest = RecoveryActionRequest(),
     x_tenant_id: str = Header(...),
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
 ):
-    """
-    Admin: resend the approval notification for a stale/lost pending approval.
-    Does not duplicate the approval record — clears delivery metadata and re-dispatches.
-    Requires X-Admin-API-Key + X-Tenant-ID headers.
-    """
     from app.admin.recovery_actions import resend_approval
-    return resend_approval(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=body.actor)
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    _enforce_rate_limit(f"recovery:{operator['id']}", max_calls=20, window_seconds=3600)
+    actor = operator.get("display_name") or body.actor
+    return _run_recovery_endpoint(
+        lambda: resend_approval(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=actor)
+    )
 
 
 @app.post("/admin/recovery/{job_id}/reprocess-gmail")
 def admin_recovery_reprocess_gmail(
     job_id: str,
+    request: Request,
     body: RecoveryActionRequest = RecoveryActionRequest(),
     force: bool = False,
     x_tenant_id: str = Header(...),
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
 ):
-    """
-    Admin: re-fetch and reprocess the original Gmail source message for this job.
-    Uses safe thread-continuation path — no duplicate case creation.
-    Requires X-Admin-API-Key + X-Tenant-ID headers.
-    """
     from app.admin.recovery_actions import reprocess_gmail_source
-    return reprocess_gmail_source(db=db, tenant_id=x_tenant_id, job_id=job_id, actor=body.actor, force=force)
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    _enforce_rate_limit(f"recovery:{operator['id']}", max_calls=20, window_seconds=3600)
+    actor = operator.get("display_name") or body.actor
+    return _run_recovery_endpoint(
+        lambda: reprocess_gmail_source(
+            db=db, tenant_id=x_tenant_id, job_id=job_id, actor=actor, force=force
+        )
+    )
 
 
 # ===========================================================================
@@ -9031,77 +9180,93 @@ def admin_support_state(
 @app.post("/admin/support/{tenant_id}/pause-automation")
 def admin_support_pause_automation(
     tenant_id: str,
+    request: Request,
     body: SupportActionRequest = SupportActionRequest(),
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
 ):
-    """
-    Admin: pause tenant automation (enables demo_mode — blocks live sends and inbox sync).
-    Audited. Requires X-Admin-API-Key.
-    """
     from app.admin.support_console import pause_automation
-    return pause_automation(db=db, tenant_id=tenant_id, actor=body.actor)
+
+    actor = operator.get("display_name") or body.actor
+    return _secured_support_call(
+        request,
+        operator,
+        lambda: pause_automation(db=db, tenant_id=tenant_id, actor=actor),
+    )
 
 
 @app.post("/admin/support/{tenant_id}/resume-automation")
 def admin_support_resume_automation(
     tenant_id: str,
+    request: Request,
     body: SupportActionRequest = SupportActionRequest(),
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
 ):
-    """
-    Admin: resume tenant automation (disables demo_mode).
-    Audited. Requires X-Admin-API-Key.
-    """
     from app.admin.support_console import resume_automation
-    return resume_automation(db=db, tenant_id=tenant_id, actor=body.actor)
+
+    actor = operator.get("display_name") or body.actor
+    return _secured_support_call(
+        request,
+        operator,
+        lambda: resume_automation(db=db, tenant_id=tenant_id, actor=actor),
+    )
 
 
 @app.post("/admin/support/{tenant_id}/force-inbox-sync")
 def admin_support_force_inbox_sync(
     tenant_id: str,
+    request: Request,
     body: SupportActionRequest = SupportActionRequest(),
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
 ):
-    """
-    Admin: force an immediate Gmail inbox sync for the tenant.
-    Bypasses demo_mode guard — admin action is explicit.
-    Audited. Requires X-Admin-API-Key.
-    """
     from app.admin.support_console import force_inbox_sync
-    return force_inbox_sync(db=db, tenant_id=tenant_id, actor=body.actor, app_settings=get_settings())
+
+    actor = operator.get("display_name") or body.actor
+    return _secured_support_call(
+        request,
+        operator,
+        lambda: force_inbox_sync(
+            db=db, tenant_id=tenant_id, actor=actor, app_settings=get_settings()
+        ),
+    )
 
 
 @app.post("/admin/support/{tenant_id}/disable-scheduler")
 def admin_support_disable_scheduler(
     tenant_id: str,
+    request: Request,
     body: SupportActionRequest = SupportActionRequest(),
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
 ):
-    """
-    Admin: pause scheduler for the tenant (sets run_mode=paused).
-    Audited. Requires X-Admin-API-Key.
-    """
     from app.admin.support_console import disable_scheduler
-    return disable_scheduler(db=db, tenant_id=tenant_id, actor=body.actor)
+
+    actor = operator.get("display_name") or body.actor
+    return _secured_support_call(
+        request,
+        operator,
+        lambda: disable_scheduler(db=db, tenant_id=tenant_id, actor=actor),
+    )
 
 
 @app.post("/admin/support/{tenant_id}/enable-scheduler")
 def admin_support_enable_scheduler(
     tenant_id: str,
+    request: Request,
     body: SupportActionRequest = SupportActionRequest(),
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
 ):
-    """
-    Admin: enable scheduler for the tenant (sets run_mode=scheduled).
-    Audited. Requires X-Admin-API-Key.
-    """
     from app.admin.support_console import enable_scheduler
-    return enable_scheduler(db=db, tenant_id=tenant_id, actor=body.actor)
+
+    actor = operator.get("display_name") or body.actor
+    return _secured_support_call(
+        request,
+        operator,
+        lambda: enable_scheduler(db=db, tenant_id=tenant_id, actor=actor),
+    )
 
 
 class AckNeedsHelpRequest(_BaseModel):
@@ -9113,37 +9278,43 @@ class AckNeedsHelpRequest(_BaseModel):
 @app.post("/admin/support/{tenant_id}/ack-needs-help")
 def admin_support_ack_needs_help(
     tenant_id: str,
+    request: Request,
     body: AckNeedsHelpRequest,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
 ):
-    """
-    Admin: acknowledge/claim a needs-help triage item for the tenant.
-    Persisted in tenant settings. Audited. Requires X-Admin-API-Key.
-    """
     from app.admin.support_console import ack_needs_help
-    return ack_needs_help(
-        db=db,
-        tenant_id=tenant_id,
-        item_key=body.item_key,
-        actor=body.actor,
-        note=body.note,
+
+    actor = operator.get("display_name") or body.actor
+    return _secured_support_call(
+        request,
+        operator,
+        lambda: ack_needs_help(
+            db=db,
+            tenant_id=tenant_id,
+            item_key=body.item_key,
+            actor=actor,
+            note=body.note,
+        ),
     )
 
 
 @app.post("/admin/support/{tenant_id}/clear-acknowledged")
 def admin_support_clear_acknowledged(
     tenant_id: str,
+    request: Request,
     body: SupportActionRequest = SupportActionRequest(),
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
 ):
-    """
-    Admin: clear all acknowledged needs-help markers for the tenant.
-    Audited. Requires X-Admin-API-Key.
-    """
     from app.admin.support_console import clear_acknowledged
-    return clear_acknowledged(db=db, tenant_id=tenant_id, actor=body.actor)
+
+    actor = operator.get("display_name") or body.actor
+    return _secured_support_call(
+        request,
+        operator,
+        lambda: clear_acknowledged(db=db, tenant_id=tenant_id, actor=actor),
+    )
 
 
 # ===========================================================================
@@ -9270,17 +9441,22 @@ def run_alerts_endpoint(
     return run_alert_pass(db=db, tenant_id=tenant_id, app_settings=s)
 
 
-@app.get("/admin/alerts/run-all")
+@app.post("/admin/alerts/run-all")
 def admin_run_all_alerts(
+    request: Request,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_api_key),
+    operator=Depends(require_operator_role(_OPERATOR_WRITE_ROLES)),
 ):
     """
     Admin: trigger alert pass for all tenants.
-    Requires X-Admin-API-Key.
+    Requires operations+ role and same-origin.
     """
     from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
     from app.alerts.engine import run_alert_pass, run_platform_operator_alert_evaluation
+    from app.core.admin_session import require_same_origin
+
+    require_same_origin(request)
+    _enforce_rate_limit(f"alert_run_all:{operator['id']}", max_calls=10, window_seconds=60)
     s = get_settings()
     platform_result = run_platform_operator_alert_evaluation(db=db, app_settings=s)
     records = TenantConfigRepository.list_all(db)

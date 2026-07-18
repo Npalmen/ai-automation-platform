@@ -63,3 +63,14 @@ export function rejectTenantApproval(
     withIdempotency(body),
   )
 }
+
+export function approveTenantApproval(
+  tenantId: string,
+  approvalId: string,
+  body: Omit<OperatorActionRequest, "idempotency_key">,
+): Promise<OperatorActionResponse> {
+  return postJson<OperatorActionResponse>(
+    `/admin/tenants/${encodeURIComponent(tenantId)}/approvals/${encodeURIComponent(approvalId)}/approve`,
+    withIdempotency(body),
+  )
+}

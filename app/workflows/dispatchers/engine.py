@@ -17,6 +17,10 @@ from typing import Any
 
 from app.workflows.dispatchers.base import BaseDispatchAdapter, DispatchResult
 from app.workflows.dispatchers.monday_lead_adapter import MondayLeadDispatchAdapter
+from app.workflows.scanners.external_routing_resolver import (
+    CANONICAL_SOURCE,
+    resolve_effective_dispatch_hint,
+)
 from app.workflows.scanners.routing_preview import resolve_routing_preview, SUPPORTED_JOB_TYPES
 
 # ---------------------------------------------------------------------------
@@ -117,15 +121,24 @@ class ControlledDispatchEngine:
         self._tenant_id = tenant_id
         self._settings = settings
 
-    def run(self, job: Any, memory: dict, dry_run: bool = False, dispatch_mode: str = "unknown") -> DispatchResult:
+    def run(
+        self,
+        job: Any,
+        memory: dict,
+        dry_run: bool = False,
+        dispatch_mode: str = "unknown",
+        tenant_settings: dict | None = None,
+    ) -> DispatchResult:
         """
-        Dispatch job using memory.routing_hints.
+        Dispatch job using canonical external routing (settings.integrations.external_routing_targets)
+        with legacy memory.routing_hints fallback.
 
         Parameters
         ----------
-        job      : JobRecord (or any object with .job_id and .job_type attributes)
-        memory   : tenant memory dict (from _get_memory)
-        dry_run  : when True, never write externally
+        job             : JobRecord (or any object with .job_id and .job_type attributes)
+        memory          : tenant memory dict (from _get_memory)
+        tenant_settings : full tenant settings dict (for canonical routing)
+        dry_run         : when True, never write externally
         """
         job_type = str(getattr(job, "job_type", None) or "")
 
@@ -137,28 +150,39 @@ class ControlledDispatchEngine:
                 message=f"Unsupported job type '{job_type}' for dispatch",
             )
 
-        routing_hints = memory.get("routing_hints") or {}
-        preview = resolve_routing_preview(routing_hints, job_type)
+        routing_hint, routing_source = resolve_effective_dispatch_hint(
+            job_type=job_type,
+            tenant_settings=tenant_settings,
+            memory=memory,
+        )
+        if routing_hint is None:
+            return DispatchResult(
+                status="failed",
+                system="unknown",
+                job_type=job_type,
+                message=f"No routing hint saved for job type '{job_type}'. "
+                         "Configure external routing in onboarding or tenant settings.",
+            )
+
+        preview = resolve_routing_preview({job_type: routing_hint}, job_type)
 
         if preview["status"] == "missing_hint":
             return DispatchResult(
                 status="failed",
                 system="unknown",
                 job_type=job_type,
-                message=f"No routing hint saved for job type '{job_type}'. "
-                         "Use POST /tenant/routing-hints/apply to configure routing.",
+                message=f"No routing hint saved for job type '{job_type}'.",
             )
 
-        if preview["status"] == "invalid_hint":
+        if preview["status"] == "invalid_hint" or routing_hint.get("system") == "manual_review":
             return DispatchResult(
                 status="failed",
-                system="unknown",
+                system="manual_review",
                 job_type=job_type,
-                message=f"Routing hint for '{job_type}' is malformed: {preview['message']}",
+                message="Ogiltig canonical routing — manuell granskning krävs.",
             )
 
         system = preview["system"]
-        routing_hint = routing_hints[job_type]
 
         adapter = DISPATCH_REGISTRY.get((system, job_type))
         if adapter is None:
@@ -188,6 +212,8 @@ class ControlledDispatchEngine:
             settings=self._settings,
             dry_run=dry_run,
         )
+        if routing_source == CANONICAL_SOURCE:
+            result.details = {**(result.details or {}), "routing_source": CANONICAL_SOURCE}
 
         # Persist attempt (skip for dry_run and skipped)
         if not dry_run and result.status in ("success", "failed"):

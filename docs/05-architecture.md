@@ -91,10 +91,28 @@ Classification falls back to deterministic keyword rules when `LLM_API_KEY` is n
 
 - Tenant identified via `X-API-Key` header (server-side resolved).
 - `X-Tenant-ID` trusted only in dev mode (when `TENANT_API_KEYS` is empty).
+- **K11:** Tenant middleware does not inject a default tenant when `X-Tenant-ID` is absent.
 - Tenant config stored in `tenant_configs` DB table; static fallback in `app/core/config.py`.
 - Admin operations use `X-Admin-API-Key` + optional `X-Tenant-ID` for tenant-scoped admin access.
 - DB-backed tenant API keys (hashed, `kw_` prefix) take precedence over env-var keys.
 - Inactive tenant returns 403 at auth layer.
+
+---
+
+## Trust boundaries and auth tiers (Kapitel 11)
+
+| Tier | Mechanism | Typical client | Write guards |
+|------|-----------|----------------|--------------|
+| Customer | `X-API-Key` → `tenant_id` | Tenant integrations, customer API | Tenant-scoped only |
+| Operator (browser) | HttpOnly `admin_session` cookie | `/ops` React app | Role + same-origin on mutations |
+| Operator (script) | `X-Admin-API-Key` | curl, release scripts, legacy `/ui` | Role on guarded routes; Origin exempt |
+| Public | None | Health probes | Read-only |
+
+Critical admin mutations are registered in `app/admin/security/critical_actions.py` and verified by `tests/test_admin_security_contracts.py`. Legacy `/admin/*` recovery, support, rotate-key, demo-seed, and alert run-all follow the same role/origin model as modern routes.
+
+Security headers: app middleware (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, HSTS in prod, `Cache-Control: no-store` for operator surfaces). Production proxy: `infra/Caddyfile.example`.
+
+Full inventory: `docs/security/kapitel-11-inventory.md`. Runbook: `docs/runbooks/security-hardening.md`.
 
 ---
 

@@ -20,12 +20,13 @@ class IntegrationRepository:
         self.db.refresh(event)
         return event
 
-    def get_by_idempotency_key(self, key: str):
-        return (
-            self.db.query(IntegrationEvent)
-            .filter(IntegrationEvent.idempotency_key == key)
-            .first()
+    def get_by_idempotency_key(self, key: str, tenant_id: str | None = None):
+        query = self.db.query(IntegrationEvent).filter(
+            IntegrationEvent.idempotency_key == key
         )
+        if tenant_id is not None:
+            query = query.filter(IntegrationEvent.tenant_id == tenant_id)
+        return query.first()
 
     def list_events_for_tenant(
         self,

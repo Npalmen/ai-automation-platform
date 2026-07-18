@@ -333,6 +333,39 @@ Operation exit codes are independent of metadata write success. API reads files 
 
 ---
 
+## DEC-026 — Tenant settings schema v2 for onboarding Slice 2A
+
+**Status:** Locked  
+**Date:** 2026-07-17
+
+**Decision:** Slice 2A materializes onboarding drafts into existing `tenant_configs.settings` JSON (no new SQL migration). Additive `settings.schema_version: 2` with:
+
+| Path | Purpose |
+|------|---------|
+| `memory.lead_config.services[]` | Selected service profiles |
+| `memory.lead_config.lead_requirements[service_type]` | `{required, optional}` field lists (`inherit` not stored) |
+| `memory.internal_routing_hints[service_type]` | Intern profilrouting (ny writes) |
+| `memory.routing_hints` | Legacy mirror + extern dispatch dict fallback (2B) — written only atomically at activate from canonical `external_routing_targets`; **no new onboarding writes**. Runtime reads canonical first (`docs/07-decisions.md` DEC-2B-routing-mirror). |
+| `intake.mode`, `intake.activation_cutoff_at`, `intake.enforcement` | Datastart metadata (`metadata_only`) |
+
+`service_type` is canonical in onboarding; `lead_type` resolved via `app/admin/onboarding/type_mapping.py` only where legacy paths require it.
+
+**Can change if:** Master plan revises canonical config paths or moves intake enforcement beyond metadata-only.
+
+### DEC-2B-routing-mirror — `memory.routing_hints` avvecklingsplan
+
+**Decision:** Canonical external dispatch source is `settings.integrations.external_routing_targets`. `memory.routing_hints` is a **legacy mirror** only.
+
+| Phase | Behavior |
+|-------|----------|
+| Now (Slice 2B) | Onboarding writes canonical draft only; activate mirrors dict hints atomically. Runtime (`ControlledDispatchEngine`, `maybe_auto_dispatch_job`, `/tenant/routing-preview`) reads canonical first, legacy dict fallback second. Invalid canonical fails closed to manual_review — no legacy fallback. |
+| Next | Remove direct `POST /tenant/routing-hints/apply` usage from operator flows; monitor audit `external_routing_materialized`. |
+| Later | Drop legacy mirror write at activate when all tenants have schema v3 + no consumers read `memory.routing_hints` for external dispatch. |
+
+**Can change if:** Master plan defines a different migration window or removes the mirror earlier with a data migration.
+
+---
+
 ## DEC-027 — Alert vs incident vs needs-help (Kapitel 10)
 
 **Status:** Locked  
@@ -353,3 +386,56 @@ Operation exit codes are independent of metadata write success. API reads files 
 - Tenant legacy email alerts (`app/alerts/engine.py`) remain tenant-scoped; platform operator alerts are separate.
 
 **Can change if:** Master plan explicitly merges domains (not expected for MVP).
+
+---
+
+## DEC-028 — Security contracts and accepted limitations (Kapitel 11)
+
+**Status:** Locked  
+**Date:** 2026-07-18
+
+**Decision:** Platform security hardening is enforced via a declarative critical-action registry (`app/admin/security/critical_actions.py`), contract integrity tests (`tests/test_admin_security_contracts.py`), and consistent guards on legacy and modern admin routes.
+
+| Control | Rule |
+|---------|------|
+| Critical writes | `require_operator_role` + `require_same_origin` on cookie mutations |
+| `read_only` | 403 on all mutations (legacy routes included) |
+| State-changing GET | Disallowed — `GET /admin/alerts/run-all` → `POST` |
+| Tenant context | `X-Tenant-ID` middleware does not default a tenant when header absent |
+| Idempotency | Integration idempotency keys scoped by `tenant_id` when provided |
+| Audit | Recovery + operator-alert audit writes fail-closed (500 if audit cannot persist) |
+| OAuth | Legacy Visma `state=tenant_id` callback blocked; onboarding opaque state only |
+| Abuse | In-memory rate limits on login and selected high-risk endpoints |
+| Headers | App middleware + `infra/Caddyfile.example` for `/ops` |
+
+**Accepted limitations (not blocking K11 PASS):**
+
+| ID | Limitation | Plan |
+|----|------------|------|
+| F05 | OAuth tokens plaintext in DB | See **F05 risk acceptance** below — post-pilot encryption; not a Kapitel 12 release-gate item |
+| F14 | Alert suppress UI not in React detail page | API-only; optional UI in later slice |
+| F15 | Single global operator account (`ADMIN_USERNAME` / password) | Per-user operators / SSO deferred |
+| F16 | In-memory rate limiter (per process) | Distributed limiter or edge rate limit in K12 |
+
+### F05 risk acceptance — OAuth tokens plaintext at rest
+
+**Status:** Accepted for pilot and pre-encryption MVP operation  
+**Owner:** Platform operator (Niklas / Krowolf operator owner)  
+**Review date:** 2026-09-30 (or first production DB credential rotation, whichever is earlier)
+
+| Item | Decision |
+|------|----------|
+| **Risk** | `oauth_credentials` table stores access/refresh tokens in plaintext. DB backup leak or unauthorized DB read could expose integration tokens. |
+| **Pilot allowed before encryption?** | **Yes**, with compensating controls below and this explicit acceptance. |
+| **Encryption requirement timing** | **Post-pilot / hardening backlog** — not a blocker for Kapitel 12 release verification gate. Kapitel 12 scope is release/prestanda verification, not token encryption delivery. |
+| **Target implementation** | Application-level encryption or external secrets manager (e.g. envelope encryption with KMS) — tracked as post-pilot security work, not K12 “build chapter”. |
+
+**Compensating controls (required now):**
+
+1. **DB access:** PostgreSQL not exposed publicly; credentials in env only; least-privilege DB user for app (no superuser).
+2. **Backups:** Encrypted at rest on backup volume; backup access restricted to operator owner; no tokens in backup filenames/logs.
+3. **Network:** App reachable only via reverse proxy/TLS; no direct DB port on public internet.
+4. **Audit:** OAuth connect/disconnect/refresh failures logged; operator actions audited; no tokens in API responses, audit payloads, or frontend DOM (verified by `tests/test_security_secret_scan.py`).
+5. **Rotation on incident:** If DB or backup compromise suspected — rotate `DATABASE_URL` password, revoke OAuth per tenant via disconnect + reconnect, rotate `ADMIN_API_KEY`/`SESSION_SECRET_KEY`, review `audit_events` for anomalous operator actions.
+
+**Can change if:** Master plan elevates encryption to pre-pilot blocker or assigns delivery to a specific chapter with an explicit deadline.

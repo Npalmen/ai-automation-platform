@@ -55,12 +55,14 @@ RESTORE_ERROR_CODE=""
 ALL_OK=true
 
 VERIFY_TABLES=(
-    "tenants"
+    "tenant_configs"
     "jobs"
-    "approvals"
+    "approval_requests"
     "oauth_credentials"
     "audit_events"
     "integration_events"
+    "action_executions"
+    "tenant_api_keys"
 )
 
 # ── helpers ───────────────────────────────────────────────────────────────────

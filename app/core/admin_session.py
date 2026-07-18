@@ -112,6 +112,11 @@ def validate_session_token(token: str, secret: str) -> Optional[str]:
 # Cookie helpers
 # ---------------------------------------------------------------------------
 
+def _cookie_secure() -> bool:
+    s = get_settings()
+    return getattr(s, "ENV", "dev") not in ("dev", "development", "local")
+
+
 def set_admin_session_cookie(response: Response, admin_user: str) -> None:
     s = get_settings()
     secret = getattr(s, "SESSION_SECRET_KEY", "").strip()
@@ -125,13 +130,19 @@ def set_admin_session_cookie(response: Response, admin_user: str) -> None:
         httponly=True,
         samesite="strict",
         max_age=SESSION_MAX_AGE,
-        secure=getattr(s, "ENV", "dev") not in ("dev", "development", "local"),
+        secure=_cookie_secure(),
         path="/",
     )
 
 
 def clear_admin_session_cookie(response: Response) -> None:
-    response.delete_cookie(key=SESSION_COOKIE, httponly=True, samesite="strict", path="/")
+    response.delete_cookie(
+        key=SESSION_COOKIE,
+        httponly=True,
+        samesite="strict",
+        path="/",
+        secure=_cookie_secure(),
+    )
 
 
 def get_admin_from_session(request: Request) -> Optional[str]:

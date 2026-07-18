@@ -135,11 +135,20 @@ def load_tenant_context(
             if "services" not in sources:
                 sources.append("services")
 
-    # Routing hints
-    rh = memory.get("routing_hints") or {}
-    if rh:
-        ctx.routing_hints = rh
-        sources.append("routing_hints")
+    # Routing hints — internal_routing_hints preferred; legacy string values in routing_hints as fallback
+    internal_rh = memory.get("internal_routing_hints") or {}
+    legacy_rh = memory.get("routing_hints") or {}
+    merged_rh: dict = {}
+    if internal_rh:
+        merged_rh.update(internal_rh)
+        sources.append("internal_routing_hints")
+    for key, value in legacy_rh.items():
+        if key not in merged_rh and isinstance(value, str):
+            merged_rh[key] = value
+    if merged_rh:
+        ctx.routing_hints = merged_rh
+        if "internal_routing_hints" not in sources and legacy_rh:
+            sources.append("routing_hints")
 
     # System map (scanner results)
     sm = memory.get("system_map") or {}

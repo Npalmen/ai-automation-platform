@@ -9,9 +9,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
+from app.admin.onboarding.errors import OnboardingConflictError
+from app.admin.onboarding.audit_events import (
+    OAUTH_CONNECTION_COMPLETED,
+    OAUTH_CONNECTION_FAILED,
+    emit_onboarding_audit,
+)
+from app.admin.onboarding.oauth_state_service import consume_oauth_state, is_onboarding_oauth_state
+from app.admin.onboarding.integration_verification import IntegrationVerificationStore
+from app.admin.onboarding.repository import OnboardingRepository
 from app.api.dependencies import get_db
 from app.core.auth import get_verified_tenant
-from app.core.settings import get_settings
+from app.core.settings import Settings, get_settings
 from app.integrations.visma.oauth_service import (
     exchange_code,
     get_auth_url,
@@ -23,6 +32,11 @@ from app.repositories.postgres.oauth_credential_repository import OAuthCredentia
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/integrations/visma", tags=["visma-oauth"])
+
+
+def _onboarding_redirect(base: str, *, outcome: str) -> str:
+    separator = "&" if "?" in base else "?"
+    return f"{base}{separator}oauth={outcome}"
 
 
 @router.get("/oauth/start")
@@ -64,36 +78,89 @@ def visma_oauth_callback(
     code: str,
     state: str,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ):
     """Handle Visma OAuth callback — exchange code for tokens and store per-tenant."""
     if not state:
         raise HTTPException(status_code=400, detail="Missing state parameter.")
 
-    tenant_id = state
+    if is_onboarding_oauth_state(state):
+        try:
+            oauth_state = consume_oauth_state(db, state_id=state, settings=settings)
+        except OnboardingConflictError:
+            logger.warning("Onboarding Visma OAuth state rejected")
+            return RedirectResponse(url="/ops/customers?oauth=error", status_code=302)
 
-    try:
-        tokens = exchange_code(code)
-    except Exception as exc:
-        logger.error("Visma OAuth token exchange failed for tenant %s: %s", tenant_id, type(exc).__name__)
-        return RedirectResponse(
-            url="/ui?tab=integrations&visma=error",
-            status_code=302,
+        redirect_base = oauth_state.redirect_target
+        try:
+            tokens = exchange_code(code)
+        except Exception as exc:
+            logger.error(
+                "Visma OAuth token exchange failed for onboarding session %s: %s",
+                oauth_state.session_id,
+                type(exc).__name__,
+            )
+            emit_onboarding_audit(
+                db,
+                tenant_id=oauth_state.tenant_id,
+                action=OAUTH_CONNECTION_FAILED,
+                status="failed",
+                details={
+                    "session_id": oauth_state.session_id,
+                    "provider": "visma",
+                    "error_code": "token_exchange_failed",
+                },
+            )
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+            return RedirectResponse(url=_onboarding_redirect(redirect_base, outcome="error"), status_code=302)
+
+        OAuthCredentialRepository.upsert(
+            db=db,
+            tenant_id=oauth_state.tenant_id,
+            provider="visma",
+            access_token=tokens["access_token"],
+            refresh_token=tokens.get("refresh_token"),
+            expires_at=tokens.get("expires_at"),
+            scopes=tokens.get("scopes"),
+            metadata_json={"connected_via": "onboarding_oauth_callback"},
         )
+        IntegrationVerificationStore.invalidate(
+            db,
+            session_id=oauth_state.session_id,
+            integration_key="visma",
+        )
+        session = OnboardingRepository.get_session(db, oauth_state.session_id)
+        if session is not None:
+            OnboardingRepository.bump_integration_state_revision(session)
+        emit_onboarding_audit(
+            db,
+            tenant_id=oauth_state.tenant_id,
+            action=OAUTH_CONNECTION_COMPLETED,
+            status="succeeded",
+            details={
+                "session_id": oauth_state.session_id,
+                "provider": "visma",
+                "integration_key": "visma",
+            },
+        )
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            return RedirectResponse(url=_onboarding_redirect(redirect_base, outcome="error"), status_code=302)
 
-    OAuthCredentialRepository.upsert(
-        db=db,
-        tenant_id=tenant_id,
-        provider="visma",
-        access_token=tokens["access_token"],
-        refresh_token=tokens.get("refresh_token"),
-        expires_at=tokens.get("expires_at"),
-        scopes=tokens.get("scopes"),
-        metadata_json={"connected_via": "oauth_callback"},
+        logger.info("Visma OAuth connected via onboarding for tenant %s", oauth_state.tenant_id)
+        return RedirectResponse(url=_onboarding_redirect(redirect_base, outcome="complete"), status_code=302)
+
+    # Legacy tenant_id-as-state flow disabled (Kapitel 11 — use onboarding wizard).
+    logger.warning("Rejected legacy Visma OAuth callback with raw tenant state")
+    return RedirectResponse(
+        url="/ops/customers?oauth=error&reason=legacy_oauth_disabled",
+        status_code=302,
     )
-
-    logger.info("Visma OAuth connected for tenant %s", tenant_id)
-
-    return RedirectResponse(url="/ui?tab=integrations&visma=connected", status_code=302)
 
 
 @router.get("/status")

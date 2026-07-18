@@ -26,6 +26,7 @@ ALLOWED_RESTORE_ERRORS = frozenset(
         "safety_refused",
     }
 )
+ALLOWED_OFFSITE_STATUS = frozenset({"success", "failed", "skipped", "not_configured"})
 ALLOWED_VERIFICATION = frozenset({"success", "failed", "not_performed", "unknown"})
 
 
@@ -58,6 +59,13 @@ def _parse_backup_args() -> argparse.Namespace:
     parser.add_argument("--size-bytes", type=int, default=0)
     parser.add_argument("--retention-days", type=int, default=0)
     parser.add_argument("--archive-integrity-verified", choices=("true", "false"), default="false")
+    parser.add_argument("--checksum-sha256", default="")
+    parser.add_argument(
+        "--offsite-status",
+        default="not_configured",
+        choices=sorted(ALLOWED_OFFSITE_STATUS),
+    )
+    parser.add_argument("--offsite-verified", choices=("true", "false"), default="false")
     parser.add_argument("--error-code", default="")
     return parser.parse_args()
 
@@ -90,9 +98,13 @@ def write_backup_status(args: argparse.Namespace) -> None:
         "started_at": args.started_at,
         "completed_at": args.completed_at,
         "status": args.status,
+        "local_status": args.status,
         "size_bytes": args.size_bytes,
         "retention_days": args.retention_days,
         "archive_integrity_verified": args.archive_integrity_verified == "true",
+        "checksum_sha256": args.checksum_sha256 or None,
+        "offsite_status": args.offsite_status,
+        "offsite_verified": args.offsite_verified == "true",
         "error_code": error_code,
     }
     _atomic_write(args.output, payload)

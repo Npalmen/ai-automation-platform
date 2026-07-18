@@ -29,7 +29,7 @@ from app.core.config import get_tenant_config
 from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
 from app.workflows.dispatchers.engine import ControlledDispatchEngine, DISPATCH_REGISTRY
 from app.workflows.dispatchers.policy import resolve_dispatch_policy
-from app.workflows.scanners.routing_preview import resolve_routing_preview
+from app.workflows.scanners.external_routing_resolver import resolve_effective_routing_preview
 
 SUPPORTED_JOB_TYPE   = "lead"
 SUPPORTED_SYSTEM     = "monday"
@@ -84,12 +84,15 @@ def maybe_auto_dispatch_job(
                 reason=f"policy_mode is '{policy['policy_mode']}'; full_auto required for auto-dispatch",
             )
 
-        # --- 3. Check routing hint/readiness ---
+        # --- 3. Check routing hint/readiness (canonical first) ---
         s = TenantConfigRepository.get_settings(db, tenant_id)
         memory = s.get("memory") or {}
-        routing_hints = memory.get("routing_hints") or {}
 
-        preview = resolve_routing_preview(routing_hints, job_type_str)
+        preview = resolve_effective_routing_preview(
+            job_type=job_type_str,
+            tenant_settings=s,
+            memory=memory,
+        )
         if preview["status"] != "ready":
             return AutoDispatchResult(
                 status="skipped",
@@ -113,7 +116,13 @@ def maybe_auto_dispatch_job(
 
         # --- 6. Run dispatch (engine handles duplicate guard internally) ---
         engine = ControlledDispatchEngine(db=db, tenant_id=tenant_id, settings=settings)
-        result = engine.run(job=job, memory=memory, dry_run=False, dispatch_mode="full_auto")
+        result = engine.run(
+            job=job,
+            memory=memory,
+            dry_run=False,
+            dispatch_mode="full_auto",
+            tenant_settings=s,
+        )
 
         return AutoDispatchResult(
             status=result.status,

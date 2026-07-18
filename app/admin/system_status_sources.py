@@ -114,6 +114,57 @@ def read_backup_status(app_settings: Any) -> MetadataReadResult:
     return read_json_metadata_file(path)
 
 
+def summarize_backup_status_for_signals(app_settings: Any) -> dict[str, Any]:
+    """Normalized backup signal for alerts and digests (never raises)."""
+    from datetime import datetime, timezone
+
+    result = read_backup_status(app_settings)
+    if result.outcome != MetadataReadOutcome.VALID or not result.data:
+        return {
+            "available": False,
+            "operation_status": None,
+            "age_hours": None,
+            "message": "Backup metadata unavailable.",
+            "offsite_status": "unknown",
+            "offsite_verified": None,
+        }
+
+    data = result.data
+    completed_raw = data.get("completed_at")
+    age_hours: float | None = None
+    if isinstance(completed_raw, str):
+        try:
+            completed = datetime.fromisoformat(completed_raw.replace("Z", "+00:00"))
+            age_hours = (datetime.now(timezone.utc) - completed).total_seconds() / 3600.0
+        except ValueError:
+            age_hours = None
+
+    op_status = data.get("status") or data.get("local_status")
+    offsite_status = data.get("offsite_status", "unknown")
+    offsite_verified = data.get("offsite_verified")
+    message_parts: list[str] = []
+    if op_status == "failed":
+        message_parts.append("Senaste backup misslyckades.")
+    elif age_hours is not None:
+        message_parts.append(f"Backupålder: {age_hours:.1f}h.")
+    if offsite_status == "not_configured":
+        message_parts.append("Offsite ej konfigurerad.")
+    elif offsite_status == "failed":
+        message_parts.append("Offsite-uppladdning misslyckades.")
+    elif offsite_verified is False:
+        message_parts.append("Offsite ej verifierad.")
+
+    return {
+        "available": True,
+        "operation_status": op_status,
+        "age_hours": age_hours,
+        "message": " ".join(message_parts).strip() or None,
+        "offsite_status": offsite_status,
+        "offsite_verified": offsite_verified if isinstance(offsite_verified, bool) else None,
+        "checksum_sha256": data.get("checksum_sha256"),
+    }
+
+
 def read_restore_status(app_settings: Any) -> MetadataReadResult:
     path = getattr(app_settings, "RESTORE_STATUS_FILE", "")
     if not path:

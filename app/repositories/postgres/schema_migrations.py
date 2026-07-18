@@ -49,6 +49,112 @@ _REQUIRED_TABLES: list[str] = [
     """,
 ]
 
+_ONBOARDING_MIGRATION_STATEMENTS: list[str] = [
+    """
+    CREATE TABLE IF NOT EXISTS onboarding_sessions (
+        id                      VARCHAR(36)  PRIMARY KEY,
+        tenant_id               VARCHAR(32)  NOT NULL,
+        status                  VARCHAR(32)  NOT NULL,
+        current_step            VARCHAR(32)  NOT NULL,
+        version                 INTEGER      NOT NULL DEFAULT 1,
+        readiness_check_version INTEGER      NOT NULL DEFAULT 0,
+        created_at              TIMESTAMPTZ  NOT NULL,
+        updated_at              TIMESTAMPTZ  NOT NULL,
+        completed_at            TIMESTAMPTZ,
+        activated_at            TIMESTAMPTZ,
+        created_by_operator_id  VARCHAR(128) NOT NULL,
+        last_updated_by_operator_id VARCHAR(128) NOT NULL,
+        cancel_reason           TEXT
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_onboarding_sessions_tenant_id ON onboarding_sessions (tenant_id)",
+    "CREATE INDEX IF NOT EXISTS ix_onboarding_sessions_status ON onboarding_sessions (status)",
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_onboarding_sessions_open_per_tenant
+        ON onboarding_sessions (tenant_id)
+        WHERE status IN ('draft', 'in_progress', 'blocked', 'ready_for_review', 'ready_for_activation')
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS onboarding_step_states (
+        session_id              VARCHAR(36)  NOT NULL,
+        step_key                VARCHAR(32)  NOT NULL,
+        step_status             VARCHAR(32)  NOT NULL,
+        verification_level      VARCHAR(32)  NOT NULL DEFAULT 'declared',
+        blocking_issues         JSON,
+        warnings                JSON,
+        updated_at              TIMESTAMPTZ  NOT NULL,
+        verified_at             TIMESTAMPTZ,
+        updated_by_operator_id  VARCHAR(128),
+        PRIMARY KEY (session_id, step_key)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_onboarding_step_states_session_id ON onboarding_step_states (session_id)",
+    """
+    CREATE TABLE IF NOT EXISTS onboarding_step_drafts (
+        session_id              VARCHAR(36)  NOT NULL,
+        step_key                VARCHAR(32)  NOT NULL,
+        payload                 JSON         NOT NULL,
+        updated_at              TIMESTAMPTZ  NOT NULL,
+        PRIMARY KEY (session_id, step_key)
+    )
+    """,
+]
+
+_SLICE2B_MIGRATION_STATEMENTS: list[str] = [
+    "ALTER TABLE onboarding_sessions ADD COLUMN IF NOT EXISTS integration_state_revision INTEGER NOT NULL DEFAULT 0",
+    """
+    CREATE TABLE IF NOT EXISTS onboarding_oauth_states (
+        state_id                VARCHAR(64)  PRIMARY KEY,
+        state_hash              TEXT         NOT NULL,
+        session_id              VARCHAR(36)  NOT NULL,
+        tenant_id               VARCHAR(32)  NOT NULL,
+        operator_id             VARCHAR(128) NOT NULL,
+        provider                VARCHAR(32)  NOT NULL,
+        redirect_target         TEXT         NOT NULL,
+        expires_at              TIMESTAMPTZ  NOT NULL,
+        consumed_at             TIMESTAMPTZ,
+        created_at              TIMESTAMPTZ  NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_onboarding_oauth_states_session ON onboarding_oauth_states (session_id, provider)",
+    "CREATE INDEX IF NOT EXISTS ix_onboarding_oauth_states_expires ON onboarding_oauth_states (expires_at)",
+    """
+    CREATE TABLE IF NOT EXISTS onboarding_integration_verifications (
+        session_id                      VARCHAR(36)  NOT NULL,
+        integration_key                 VARCHAR(32)  NOT NULL,
+        verification_status             VARCHAR(32)  NOT NULL,
+        source_class                    VARCHAR(32)  NOT NULL,
+        verified_at                     TIMESTAMPTZ,
+        verified_by_operator_id         VARCHAR(128),
+        config_fingerprint              VARCHAR(64),
+        integration_state_revision_at_verify INTEGER,
+        error_code                      VARCHAR(64),
+        environment_safe_metadata         JSON,
+        updated_at                      TIMESTAMPTZ  NOT NULL,
+        PRIMARY KEY (session_id, integration_key)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_onboarding_integration_verifications_session ON onboarding_integration_verifications (session_id)",
+    """
+    CREATE TABLE IF NOT EXISTS tenant_resource_bindings (
+        id                      VARCHAR(36)  PRIMARY KEY,
+        resource_type           VARCHAR(64)  NOT NULL,
+        resource_id             VARCHAR(256) NOT NULL,
+        tenant_id               VARCHAR(32)  NOT NULL,
+        session_id              VARCHAR(36)  NOT NULL,
+        status                  VARCHAR(16)  NOT NULL,
+        bound_at                TIMESTAMPTZ  NOT NULL,
+        bound_by_operator_id    VARCHAR(128) NOT NULL,
+        released_at             TIMESTAMPTZ
+    )
+    """,
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_tenant_resource_bindings_active
+        ON tenant_resource_bindings (resource_type, resource_id)
+        WHERE status = 'active'
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_tenant_resource_bindings_tenant ON tenant_resource_bindings (tenant_id, status)",
+]
 
 _OPERATOR_ALERTS_MIGRATION_STATEMENTS: list[str] = [
     """
@@ -220,14 +326,24 @@ def ensure_runtime_schema(engine: Engine) -> None:
                 conn.execute(text(ddl))
                 log.debug("Table/index ensure OK")
 
+            for ddl in _ONBOARDING_MIGRATION_STATEMENTS:
+                conn.execute(text(ddl))
+                log.debug("Onboarding migration OK")
+
+            for ddl in _SLICE2B_MIGRATION_STATEMENTS:
+                conn.execute(text(ddl))
+                log.debug("Slice 2B migration OK")
+
             for ddl in _OPERATOR_ALERTS_MIGRATION_STATEMENTS:
                 conn.execute(text(ddl))
                 log.debug("Operator alerts migration OK")
 
         log.info(
-            "Runtime schema safeguard complete (%d column(s), %d table/index statement(s), %d operator alerts statement(s) checked)",
+            "Runtime schema safeguard complete (%d column(s), %d table/index statement(s), %d onboarding statement(s), %d slice2b statement(s), %d operator alerts statement(s) checked)",
             len(_REQUIRED_COLUMNS),
             len(_REQUIRED_TABLES),
+            len(_ONBOARDING_MIGRATION_STATEMENTS),
+            len(_SLICE2B_MIGRATION_STATEMENTS),
             len(_OPERATOR_ALERTS_MIGRATION_STATEMENTS),
         )
     except Exception as exc:

@@ -9,6 +9,7 @@ import { MetricCard } from "@/components/operator/MetricCard"
 import { PageHeader } from "@/components/operator/PageHeader"
 import { SeverityBadge } from "@/components/operator/SeverityBadge"
 import { TenantIdentifier } from "@/components/operator/TenantIdentifier"
+import { useListLayout } from "@/hooks/useListLayout"
 
 import {
   categoryLabel,
@@ -46,6 +47,7 @@ function openDetail(navigate: ReturnType<typeof useNavigate>, row: NeedsHelpQueu
 
 export function NeedsHelpQueuePage() {
   const navigate = useNavigate()
+  const { ref: listLayoutRef, layout } = useListLayout()
   const [searchInput, setSearchInput] = useState("")
   const [filters, setFilters] = useState<NeedsHelpFilters>({
     sort: "priority",
@@ -58,6 +60,19 @@ export function NeedsHelpQueuePage() {
 
   const columns = useMemo(
     () => [
+      {
+        key: "severity",
+        header: "Allvarlighetsgrad",
+        className: "w-[8.5rem] shrink-0",
+        render: (row: NeedsHelpQueueItem) => (
+          <div className="shrink-0 space-y-1">
+            <SeverityBadge variant={row.severity_badge} />
+            <p className="text-caption text-text-muted">
+              {panelSeverityLabel(row.severity)}
+            </p>
+          </div>
+        ),
+      },
       {
         key: "tenant",
         header: "Kund",
@@ -73,7 +88,7 @@ export function NeedsHelpQueuePage() {
         header: "Problem",
         render: (row: NeedsHelpQueueItem) => (
           <div className="min-w-0 space-y-1">
-            <p className="font-medium text-text-primary">{row.title}</p>
+            <p className="break-words font-medium text-text-primary">{row.title}</p>
             <p className="text-caption text-text-muted">{categoryLabel(row.category)}</p>
           </div>
         ),
@@ -81,10 +96,13 @@ export function NeedsHelpQueuePage() {
       {
         key: "time",
         header: "Tid",
+        className: "whitespace-nowrap",
         render: (row: NeedsHelpQueueItem) => (
           <div className="text-body-small text-text-secondary">
-            <p>{formatAgeHours(row.age_hours)}</p>
-            <p className="hidden sm:block">{formatDetectedAt(row.detected_at)}</p>
+            <p className="whitespace-nowrap">{formatAgeHours(row.age_hours)}</p>
+            <p className="hidden whitespace-nowrap lg:block">
+              {formatDetectedAt(row.detected_at)}
+            </p>
           </div>
         ),
       },
@@ -92,28 +110,16 @@ export function NeedsHelpQueuePage() {
         key: "impact",
         header: "Påverkan",
         render: (row: NeedsHelpQueueItem) => (
-          <p className="max-w-xs break-words text-body-small text-text-secondary">
+          <p className="min-w-0 break-words text-body-small text-text-secondary">
             {row.impact || "—"}
           </p>
-        ),
-      },
-      {
-        key: "severity",
-        header: "Allvarlighetsgrad",
-        render: (row: NeedsHelpQueueItem) => (
-          <div className="space-y-1">
-            <SeverityBadge variant={row.severity_badge} />
-            <p className="text-caption text-text-muted">
-              {panelSeverityLabel(row.severity)}
-            </p>
-          </div>
         ),
       },
       {
         key: "next",
         header: "Nästa åtgärd",
         render: (row: NeedsHelpQueueItem) => (
-          <p className="max-w-xs break-words text-body-small text-text-primary">
+          <p className="min-w-0 break-words text-body-small text-text-primary">
             {row.recommended_action || "—"}
           </p>
         ),
@@ -121,6 +127,16 @@ export function NeedsHelpQueuePage() {
     ],
     [],
   )
+
+  function resetFilters() {
+    setSearchInput("")
+    setFilters({
+      sort: "priority",
+      order: "asc",
+      limit: 50,
+      offset: 0,
+    })
+  }
 
   function applyFilters() {
     setFilters((current) => ({
@@ -304,7 +320,7 @@ export function NeedsHelpQueuePage() {
             }
           />
         </FilterField>
-        <div className="flex items-end">
+        <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
           <button
             type="button"
             className="min-h-11 rounded-md border border-border bg-page px-4 text-body text-text-primary"
@@ -312,18 +328,50 @@ export function NeedsHelpQueuePage() {
           >
             Sök
           </button>
+          <button
+            type="button"
+            className="min-h-11 rounded-md border border-border bg-page px-4 text-body text-text-secondary"
+            onClick={resetFilters}
+          >
+            Återställ
+          </button>
         </div>
       </FilterBar>
 
-      <DataTable
-        columns={columns}
-        rows={data?.items ?? []}
-        getRowKey={(row) => row.id}
-        onRowClick={(row) => openDetail(navigate, row)}
-        loading={isLoading && !data}
-        emptyTitle="Ingen åtgärd behövs"
-        emptyDescription="Inga operativa avvikelser matchar filtren just nu."
-        mobileCard={(row) => (
+      <div ref={listLayoutRef} className="min-w-0">
+        <DataTable
+          columns={columns}
+          rows={data?.items ?? []}
+          getRowKey={(row) => row.id}
+          onRowClick={(row) => openDetail(navigate, row)}
+          layout={layout}
+          loading={isLoading && !data}
+          emptyTitle="Ingen åtgärd behövs"
+          emptyDescription="Inga operativa avvikelser matchar filtren just nu."
+          compactRow={(row) => (
+            <button
+              type="button"
+              className="flex w-full min-w-0 items-start gap-3 rounded-lg border border-border bg-surface p-3 text-left hover:bg-surface-subtle"
+              onClick={() => openDetail(navigate, row)}
+            >
+              <div className="shrink-0">
+                <SeverityBadge variant={row.severity_badge} />
+              </div>
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="font-medium text-text-primary">{row.customer_name}</p>
+                  <span className="shrink-0 whitespace-nowrap text-caption text-text-muted">
+                    {formatAgeHours(row.age_hours)}
+                  </span>
+                </div>
+                <p className="break-words text-body-small text-text-primary">{row.title}</p>
+                <p className="break-words text-body-small text-text-secondary">
+                  {row.recommended_action || "—"}
+                </p>
+              </div>
+            </button>
+          )}
+          mobileCard={(row) => (
           <button
             type="button"
             className="w-full rounded-lg border border-border bg-surface p-4 text-left shadow-sm"
@@ -353,7 +401,8 @@ export function NeedsHelpQueuePage() {
             </p>
           </button>
         )}
-      />
+        />
+      </div>
 
       {data && data.total > (data.limit ?? 50) ? (
         <p className="text-body-small text-text-muted">

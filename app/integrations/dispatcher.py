@@ -92,7 +92,7 @@ class IntegrationDispatcher:
 
         idempotency_key = f"{job.id}-{integration_type.value}"
 
-        existing = self.repo.get_by_idempotency_key(idempotency_key)
+        existing = self.repo.get_by_idempotency_key(idempotency_key, tenant_id=job.tenant_id)
         if existing:
             return
 

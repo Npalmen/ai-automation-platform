@@ -535,7 +535,7 @@ class TestAdminEndpointsAdditional:
         )
 
     def test_admin_alerts_run_all_rejects_wrong_key(self):
-        self._check_admin_required("/admin/alerts/run-all")
+        self._check_admin_required("/admin/alerts/run-all", method="POST")
 
     def test_admin_tenants_rotate_key_rejects_wrong_key(self):
         self._check_admin_required("/admin/tenants/TENANT_1001/rotate-key", method="POST")

@@ -2,7 +2,15 @@
 
 Internal operator panel frontend for Krowolf. This is **not** the customer portal.
 
-The legacy single-file UI at `app/ui/index.html` remains in place and continues to be served at `/` (host-gated) and `/ui`. This React app is served at `/ops`.
+The legacy single-file UI at `app/ui/index.html` remains in place and continues to be served at `/` (host-gated) and `/ui`. **K11:** legacy UI shows a deprecation banner — use `/ops` for operator work. This React app is served at `/ops`.
+
+## Security (Kapitel 11)
+
+- No secrets in browser storage — no `localStorage`/`sessionStorage` for auth or API keys.
+- Route guards in `src/routes/routePolicy.ts` must stay in sync with backend `require_operator_role` (integrity enforced by backend contract tests).
+- Onboarding wizard and operator digests require `operations` or `admin` (not `read_only`).
+- All writes use session cookie (`credentials: "include"`) — never `X-Admin-API-Key` from the browser.
+- Run `tests/test_security_secret_scan.py` before release; see `docs/runbooks/security-hardening.md`.
 
 ## Stack
 
@@ -45,7 +53,9 @@ Route policy table: `src/routes/routePolicy.ts` (typed, includes foundation/desi
 | Path | Access |
 |------|--------|
 | `/ops/login` | Public |
-| `/ops`, `/ops/needs-help`, `/ops/customers`, `/ops/incidents`, `/ops/alerts`, `/ops/digests`, `/ops/usage` | Authenticated (all roles) |
+| `/ops`, `/ops/needs-help`, `/ops/customers`, `/ops/incidents`, `/ops/alerts`, `/ops/usage` | Authenticated (all roles) |
+| `/ops/onboarding`, `/ops/onboarding/*` | `operations`, `admin` |
+| `/ops/digests`, `/ops/digests/*` | `operations`, `admin` |
 | `/ops/system` | `operations`, `admin` |
 | `/ops/foundation`, `/ops/design-reference` | `admin` only |
 

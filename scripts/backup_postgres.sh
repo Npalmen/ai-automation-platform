@@ -51,6 +51,9 @@ STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 BACKUP_FILE="${BACKUP_DIR}/${POSTGRES_DB}_${TIMESTAMP}.sql.gz"
 BACKUP_ID="${POSTGRES_DB}_${TIMESTAMP}"
 BACKUP_SIZE=0
+BACKUP_SHA256=""
+OFFSITE_STATUS="not_configured"
+OFFSITE_VERIFIED="false"
 OPERATION_FAILED=false
 OPERATION_ERROR_CODE=""
 
@@ -82,7 +85,12 @@ _write_backup_metadata() {
         --size-bytes "$BACKUP_SIZE"
         --retention-days "$BACKUP_RETENTION_DAYS"
         --archive-integrity-verified "$integrity"
+        --offsite-status "$OFFSITE_STATUS"
+        --offsite-verified "$OFFSITE_VERIFIED"
     )
+    if [[ -n "$BACKUP_SHA256" ]]; then
+        cmd+=(--checksum-sha256 "$BACKUP_SHA256")
+    fi
     if [[ -n "$error_code" ]]; then
         cmd+=(--error-code "$error_code")
     fi
@@ -142,18 +150,44 @@ gunzip -t "$BACKUP_FILE" || {
 
 log "Backup created successfully: ${BACKUP_FILE} ($(du -h "$BACKUP_FILE" | cut -f1))"
 
+# ── checksum ──────────────────────────────────────────────────────────────────
+
+if command -v sha256sum >/dev/null 2>&1; then
+    BACKUP_SHA256=$(sha256sum "$BACKUP_FILE" | awk '{print $1}')
+elif command -v shasum >/dev/null 2>&1; then
+    BACKUP_SHA256=$(shasum -a 256 "$BACKUP_FILE" | awk '{print $1}')
+else
+    BACKUP_SHA256=$(python3 -c "import hashlib,sys; p=sys.argv[1]; h=hashlib.sha256();
+import pathlib
+with open(p,'rb') as f:
+  [h.update(b) for b in iter(lambda: f.read(1048576), b'')]
+print(h.hexdigest())" "$BACKUP_FILE")
+fi
+log "Backup checksum: sha256:${BACKUP_SHA256:0:12}…"
+
 # ── offsite upload ────────────────────────────────────────────────────────────
 
 if [[ -n "$OFFSITE_BACKUP_COMMAND" ]]; then
     log "Running offsite backup command..."
     eval "$OFFSITE_BACKUP_COMMAND" "$BACKUP_FILE" || {
         OPERATION_ERROR_CODE="offsite_failed"
+        OFFSITE_STATUS="failed"
         fail "Offsite backup command failed"
     }
+    if [[ -f "${BACKUP_FILE}.offsite_verified" ]]; then
+        OFFSITE_STATUS="success"
+        OFFSITE_VERIFIED="true"
+        log "Offsite upload verified (marker present)."
+    else
+        OPERATION_ERROR_CODE="offsite_failed"
+        OFFSITE_STATUS="failed"
+        fail "Offsite backup completed without verification marker"
+    fi
     log "Offsite upload completed."
 else
     warn "OFFSITE_BACKUP_COMMAND is not set. Backup is local only."
     warn "Configure OFFSITE_BACKUP_COMMAND to upload to remote storage (e.g. rclone, aws s3 cp)."
+    OFFSITE_STATUS="not_configured"
 fi
 
 # ── local retention ───────────────────────────────────────────────────────────
@@ -162,8 +196,12 @@ if [[ "$BACKUP_RETENTION_DAYS" -gt 0 ]]; then
     log "Pruning local backups older than ${BACKUP_RETENTION_DAYS} days from ${BACKUP_DIR}..."
     PRUNED=0
     while IFS= read -r -d '' old_file; do
+        if [[ -n "$OFFSITE_BACKUP_COMMAND" && ! -f "${old_file}.offsite_verified" ]]; then
+            log "  Skipping (no verified offsite copy): ${old_file}"
+            continue
+        fi
         log "  Removing old backup: ${old_file}"
-        rm -f "$old_file"
+        rm -f "$old_file" "${old_file}.offsite_verified" 2>/dev/null || true
         PRUNED=$((PRUNED + 1))
     done < <(find "$BACKUP_DIR" -maxdepth 1 -name "${POSTGRES_DB}_*.sql.gz" \
                -mtime "+${BACKUP_RETENTION_DAYS}" -print0 2>/dev/null)

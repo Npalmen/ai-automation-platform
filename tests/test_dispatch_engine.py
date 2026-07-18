@@ -311,6 +311,50 @@ class TestControlledDispatchEngine:
 
         mock_persist.assert_called_once()
 
+    def test_canonical_routing_overrides_legacy_memory(self):
+        engine, _ = self._engine()
+        job = _make_job(job_type="lead")
+        tenant_settings = {
+            "integrations": {
+                "external_routing_targets": {
+                    "lead": {
+                        "target_type": "monday_board",
+                        "board_id": "77",
+                        "board_name": "Canonical",
+                    }
+                }
+            }
+        }
+        memory = _memory_with_lead_hint(_valid_hint(board_id="99", board_name="Legacy"))
+        result = engine.run(
+            job,
+            memory=memory,
+            dry_run=True,
+            tenant_settings=tenant_settings,
+        )
+        assert result.status == "dry_run"
+        assert "Canonical" in result.message
+
+    def test_invalid_canonical_fails_without_legacy_fallback(self):
+        engine, _ = self._engine()
+        job = _make_job(job_type="lead")
+        tenant_settings = {
+            "integrations": {
+                "external_routing_targets": {
+                    "lead": {"target_type": "unknown", "board_id": "1"}
+                }
+            }
+        }
+        memory = _memory_with_lead_hint()
+        result = engine.run(
+            job,
+            memory=memory,
+            dry_run=True,
+            tenant_settings=tenant_settings,
+        )
+        assert result.status == "failed"
+        assert result.system == "manual_review"
+
 
 # ---------------------------------------------------------------------------
 # POST /jobs/{job_id}/dispatch-preview endpoint

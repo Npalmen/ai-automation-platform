@@ -34,6 +34,11 @@ const PRESENTATION: Record<string, ActionPresentation> = {
       "Markerar det väntande dispatch-godkännandet som avslaget. Ingen extern dispatch eller export utförs.",
     primaryLabel: "Avslå godkännande",
   },
+  "approval.approve": {
+    consequence:
+      "Godkänner det väntande godkännandet och utför den konfigurerade åtgärden enligt policy.",
+    primaryLabel: "Godkänn",
+  },
 }
 
 export function getActionPresentation(actionId: string): ActionPresentation {

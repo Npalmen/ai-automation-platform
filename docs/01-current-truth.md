@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-16 (Pilot transition: internal demo rehearsal PASS; pilot scope/onboarding/operations pack in `docs/PILOT_TRANSITION.md`.)
+2026-07-18 (Kapitel 12 Slice 1 PARTIAL; Kapitel 11 security hardening PASS; pilot transition pack in `docs/PILOT_TRANSITION.md`.)
 
 ## Verification method
 
@@ -91,7 +91,7 @@
 | Customer auto-reply uses service-profile questions | `Verified — IMPROVED 2026-07-06` | `action_dispatch_processor._build_lead_default_actions` reads `generated_question_message` from `lead_analyzer_processor`; uses it for the auto-reply body when available; generic fallback maintained. |
 | Customer auto-reply (inquiry) uses service-profile questions | `Verified — IMPROVED 2026-07-06` | `action_dispatch_processor._build_inquiry_default_actions` reads `support_generated_question_message` from `support_analyzer_processor`; uses it for the auto-reply body when available. |
 | Risk-aware customer replies | `Verified` | Sensitive/high-risk leads and inquiries get `_build_sensitive_customer_ack` with `_needs_approval=True`; no legal/financial commitment in reply body. |
-| Tenant routing hints override service profile route | `Verified` | `apply_tenant_overrides()` replaces `default_route` from `tenant_ctx.routing_hints[service_type]`; all other fields preserved. |
+| Tenant routing hints override service profile route | `Verified` | `apply_tenant_overrides()` reads merged hints: `internal_routing_hints` first, then legacy string values in `routing_hints`; dict dispatch values ignored for profile routing. |
 | Tenant-specific required fields via schema seam | `Verified` | `compute_profile_missing_info()` checks `tenant_ctx.schema_for(service_type)`; returns `schema_source="tenant_override"` when override present. |
 | Company name in follow-up questions | `Verified` | `build_profile_question_message()` personalises intro with company name; `generate_question_message()` passes company_name from `tenant_ctx.company_name`. |
 | Debt collection risk: inkassokrav detected | `Verified — FIXED 2026-07-06` | Added "inkassokrav", "inkassobolag", "betalningsanmärkning" to `intelligence_safety._RISK_KEYWORDS["debt_collection"]`. |
@@ -677,6 +677,39 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 | Manual responsive browser verification | `Still outstanding` | Not executed in this environment. |
 | Not built | `Documented` | Billing, subscriptions, time-series charts, per-tenant usage detail page, AI instrumentation. |
 
+### Kapitel 9 — Standardiserad kundonboarding (2026-07-17)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| **Kapitel 9 overall** | `PASS` | Slice 1 + 2A + 2B PASS (Fas B 2026-07-17). |
+| **Slice 2B** | `PASS` | Fas B + Gmail readiness fix (2026-07-18): Monday tenant-bound E2E, Visma preflight, browser integrations UI, Gmail truth API + `POST …/readiness` 200 (typed checks, no 500 on `locally_verified`/`externally_verified` source_class). |
+| **Slice 1** | `Verified — PASS` | Writable steps 1–3, readiness, activate/cancel; registry SoT + activation-plan binding; tests `tests/test_admin_onboarding.py` + `tests/test_admin_onboarding_registries.py`. |
+| **Slice 2A** | `Verified — PASS` | Writable service profile, routing, data start; `GET/PATCH …/service-profile`, `…/routing`, `…/data-start`; materialization to `memory.lead_config`, `memory.internal_routing_hints`, `intake.*`; `tests/test_admin_onboarding_slice2a.py` (13 pass). |
+| Registry source of truth | `Verified (tests)` | `app/admin/onboarding/registries.py`; `GET /admin/onboarding/registries`; frontend loads capabilities/presets from API only. |
+| Registry versioning | `Verified (tests)` | `registry_schema_version` (API shape) vs `registry_revision` (business fingerprint); both exposed on registries + activation-plan. |
+| Runtime evaluation | `Verified (tests)` | `runtime_evaluation.py`; capability lifecycle (`configured_not_running` for followups + paused scheduler); `requires_api_key` derived from `required_runtime`. |
+| Activation plan binding | `Verified (tests)` | `GET …/activation-plan` returns `plan_hash`; `POST …/activate` requires matching hash → `409 stale_activation_plan` on drift. |
+| Registry integrity | `Verified (startup)` | `validate_registry_integrity()` fail-closed in `app/main.py` on_startup. |
+| Migration | `Verified (code)` | `migrations/009_onboarding_sessions.sql` + `schema_migrations.ensure_runtime_schema()`; partial unique index `ux_onboarding_sessions_open_per_tenant`. |
+| ORM / repository | `Verified (tests)` | `app/admin/onboarding/` — sessions, step states, drafts; explicit startup import. |
+| Tenant ID | `Verified (tests)` | Collision-resistant `T_{bucket}_{suffix}`; slug separate; not `T_{SLUG}`. |
+| Create session | `Verified (tests)` | `POST /admin/onboarding` — inactive tenant + session; **no API key** on create. |
+| Writable steps | `Verified (tests)` | `PATCH …/identity`, `…/modules`, `…/automation`, `…/service-profile`, `…/routing`, `…/data-start`, `…/integrations`, `…/external-routing` with optimistic `version` + audit. |
+| Integrations step | `Verified (tests)` | Config-only drafts; `POST …/integrations/{key}/verify` only path to `verified`; Gmail capped at `configured_not_running`; Visma OAuth via opaque state. |
+| Settings materialization (2B) | `Verified (tests)` | Activate writes `settings.schema_version: 3`, `intake.gmail.label_query`, `integrations.external_routing_targets`, legacy `memory.routing_hints` mirror, verification refs. |
+| Runtime routing read | `Verified (tests)` | Dispatch + auto-dispatch + `/tenant/routing-preview` read `settings.integrations.external_routing_targets` first; `memory.routing_hints` dict fallback only; invalid canonical → manual_review (no legacy fallback). |
+| Customer detail config | `Verified (code)` | `GET /admin/tenants/{id}/overview` includes `onboarding_config` read-only summary. |
+| Readiness | `Verified (tests)` | Source classification includes `locally_verified`/`externally_verified`; Gmail checks (`platform_credential`, `label_query`, `tenant_mailbox_access`, `live_intake`, `capability_operational`); legacy/invalid integrations draft fail-closed; global health ≠ tenant verified. |
+| Activation | `Verified (tests)` | Admin-only; transactional; `plan_hash` + `acknowledged_warning_ids` + `readiness_check_version`; scheduler fail-closed (`paused`). |
+| API key | `Verified (code)` | Separate `POST …/api-key` (admin); only when selected capabilities require `api_access` runtime (derived from registry). |
+| Frontend legacy values | `Verified (code)` | Unknown saved capability/preset keys shown read-only; PATCH blocked until operator replaces invalid config. |
+| Legacy `POST /admin/tenants` | `Deprecated for UI` | Scripts only; operator panel uses `/admin/onboarding` exclusively. |
+| Frontend onboarding | `Verified (local)` | `src/features/onboarding/`; `/ops/customers/new`, `/ops/customers/:tenantId/onboarding`; Ny kund on customer list. |
+| Onboarding audit (2B) | `Verified (tests)` | Allowlisted domain events in `audit_events.py`; fail-closed on mutation; no tokens in details; `tests/test_onboarding_audit_events.py`. |
+| Frontend slice 2B | `Verified (tests)` | `IntegrationsStepPanel` — Visma connect/unlink, unrequest, routing reset/preview, Gmail classification; `slice2bWizard.test.mjs` in `npm run test:onboarding`. |
+| Manual responsive browser verification | `Verified (Fas B 2026-07-17)` | Integrations wizard localhost:5173; Visma authorization_required, Gmail classification, routing reset/preview; overflow pass 320×568–1440×900 + 200%; 0 credential fields. |
+| Not built (slice 2B) | `Documented` | External OAuth revoke; Fortnox wizard; Gmail live intake verification (ops runbook only). |
+
 ### Kapitel 8 — System-, backup- och deploystatus (2026-07-17)
 
 | Item | Status | Notes |
@@ -699,6 +732,25 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 | Manual responsive browser verification | `Still outstanding` | Not executed in this environment. |
 | Not built | `Documented` | Deploy buttons, backup/restore triggers, shell/SSH, deploy history DB, CI gate artifact in runtime. |
 
+### Mellankapitel 8B — Responsivitet och testmiljösanering (2026-07-17)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| **Mellankapitel 8B overall** | `Verified — PASS` | Responsivitet + testmiljösanering verifierade 2026-07-17. |
+| `useListLayout` | `Verified (code)` | Content-width tiers: full ≥1200px, compact 768–1199px, cards &lt;768px; conservative initial `compact`. |
+| DataTable layout modes | `Verified (code)` | `compactRow` → `compactColumns` → card fallback; needs-help + usage + customers + incidents wired. |
+| FilterBar | `Verified (code)` | Column wrap on narrow widths; min field width; reset on needs-help/usage. |
+| Manual responsive verification | `Verified — PASS` | 4 vyer (`/ops/needs-help`, `/ops/usage`, `/ops/customers`, `/ops/incidents`) × 10 breakpoint/zoom-lägen (320–1440 px + 125/150/200 %). Korrekt full/compact/cards-växling; ingen global overflow; ingen teckenvis textbrytning; datum/badges och filter intakta; inga layoutblinkningar. |
+| Reset CLI | `Verified (tests)` | `python -m scripts.reset_test_environment` — inventory, purge-tenants, prune-stale-data, seed-baseline. |
+| Execute guards | `Verified (tests)` | Positive ENV + DATABASE_URL fingerprint allowlist; `RESET_TEST_ENVIRONMENT_ALLOWED=yes`; `--confirm LOCAL_TEST_RESET`. |
+| Purge scope | `Verified (tests)` | Explicit `--tenant-id` or `local-standard` allowlist only; unknown tenants never auto-deleted. |
+| Incident purge policy | `Verified (tests)` | Unlink tenant links; shared incidents preserved; orphan timeline/incident deleted last. |
+| Test environment purge | `Verified (local)` | Execute-purge: `TENANT_1001`, `TENANT_2001`, `T_KROWOLF_E2E_TEST` (1619 rader). Legacy-tenants och deras gamla signaler borta. |
+| Baseline seed | `Verified (local)` | `T_LOCAL_OPS_BASELINE` skapad via `seed-baseline --execute` (config + 2 jobs + 1 pending approval). |
+| Demo tenant preserved | `Verified (local)` | `T_NIKLAS_DEMO_001` oförändrad (743 rader kvar efter purge). |
+| `TENANT_2002` orphan | `Known — documented` | 1 completed job utan `tenant_config`; medvetet ej purgat i 8B-körningen; hanteras separat. |
+| Runbooks | `Verified (docs)` | `docs/runbooks/test-data-dependency-map.md`, `local-test-environment-reset.md`. |
+
 ### Kapitel 10 — Operator alerts (2026-07-18)
 
 | Item | Status | Notes |
@@ -718,6 +770,63 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 | E2E scripts | `Verified (local)` | `scripts/kapitel10_e2e_verify.py` (26 checks), `scripts/kapitel10_reopen_verify.py`. |
 | Not built in UI | `Documented` | Snooze/suppress actions API-only (no detail-page controls yet). |
 | Activity anomaly evaluator | `Preview only` | Slice 3 non-blocking per plan. |
+
+### Kapitel 11 — Security hardening (2026-07-18)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| **Kapitel 11 overall** | `Verified — PASS` | Slice 0–3 complete; backend regression 236 passed; Slice 3 E2E script 40 PASS (2026-07-18). |
+| Browser role matrix | `Verified (E2E script)` | `read_only`/`operations`/`admin` via server-side `ADMIN_ROLE` + session cookie (not frontend headers). |
+| Origin/auth matrix | `Verified (E2E script)` | Evil origin blocked; API-key-without-origin allowed for scripts; F06 missing Origin accepted on cookie writes. |
+| Session cookies | `Verified (E2E script)` | HttpOnly + SameSite=strict; logout → 401; React `/ops` has empty localStorage/sessionStorage. |
+| Legacy UI | `Verified (browser)` | Deprecation + read-only banner at `/ui`; writes blocked client-side; admin key not persisted in localStorage; `GET /admin/alerts/run-all` → 404; Visma legacy callback → redirect `legacy_oauth_disabled`. |
+| Proxy/headers | `Verified (partial)` | App middleware: nosniff, DENY, Referrer-Policy, Permissions-Policy, no-store on `/ops` paths. `infra/Caddyfile.example` adds HSTS for production; local `dev_https_proxy` forwards only (no edge headers). CSP not set (open finding, low). |
+| Rate limiting | `Verified (E2E script)` | Login 5/min per IP; Retry-After; isolated keys; `reset_rate_limits_for_tests` test-only. |
+| Responsive (login) | `Verified (browser)` | 320×568 — no horizontal overflow on `/ops/login`. |
+| Slice 3 E2E script | `Verified (local)` | `scripts/kapitel11_slice3_e2e_verify.py` → `kapitel11_slice3_e2e_report.json`. |
+| Inventory | `Verified (docs)` | `docs/security/kapitel-11-inventory.md` — trust boundaries, F01–F16. |
+| Critical-action registry | `Verified (tests)` | `app/admin/security/critical_actions.py`; `tests/test_admin_security_contracts.py`. |
+| Legacy write guards | `Verified (tests)` | Recovery, support, rotate-key, demo-seed, onboarding activate — role + same-origin. |
+| `read_only` mutations | `Verified (tests)` | 403 on all critical writes including legacy routes. |
+| `GET /admin/alerts/run-all` | `Verified (tests)` | Removed; `POST` with `operations`+ role + rate limit. |
+| Audit fail-closed | `Verified (tests)` | `recovery_actions.py`, `alerts/audit_events.py` — no silent skip on mutations. |
+| Tenant middleware | `Verified (tests)` | No default `TENANT_1001` when header absent. |
+| Idempotency tenant scope | `Verified (tests)` | `get_by_idempotency_key(..., tenant_id=...)`. |
+| `get_verified_tenant` admin keys | `Verified (tests)` | `ADMIN_API_KEYS` supported. |
+| Visma legacy OAuth | `Verified (tests)` | `state=tenant_id` callback blocked; onboarding opaque state only. |
+| Rate limits | `Verified (tests)` | Login + recovery/support/run-all; in-memory per process (F16 accepted). |
+| Security headers | `Verified (tests)` | App middleware + `infra/Caddyfile.example`. |
+| Secret scan | `Verified (tests)` | `tests/test_security_secret_scan.py`. |
+| Cross-tenant admin | `Verified (tests)` | `tests/test_admin_cross_tenant_security.py`. |
+| Frontend route policy | `Verified (local)` | Onboarding + digests ops/admin guards; legacy `/ui` deprecation banner. |
+| Backend regression bundle | `Verified (local)` | Security contracts, cross-tenant, secret scan, auth, session, alerts, recovery, tenant isolation. |
+| E2E script | `Verified (local)` | `scripts/kapitel11_security_e2e_verify.py` (headers + guarded routes). |
+| Accepted limitations | `Documented` | F05 OAuth plaintext at rest, F14 suppress UI gap, F15 single operator, F16 in-memory rate limit — DEC-028. |
+
+### Kapitel 12 — Release verification (2026-07-18)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| **Slice 1 overall** | `Verified — PARTIAL` | `scripts/kapitel12_slice1_verify.py` → `kapitel12_slice1_report.json`: 61 PASS, 0 FAIL, 4 PARTIAL (2026-07-18). |
+| **Slice 2 overall** | `Verified — PARTIAL` | RC `krowolf-app:rc-865b87165eda` live on pilot 2026-07-18; endpoints+perf+rollback PASS; RB-01 BLOCKED (offsite not configured). |
+| Profil A/B prestanda | `Verified (pilot RC)` | `k12_rc_perf.py` PASS: overview p95 ≤96 ms, error rate 0%, DB connections 3. |
+| Offsite upload helper | `Verified (tests)` | `offsite_backup_upload.py` + `offsite_backup_s3.py` (S3-compatible); deployed to pilot `/opt/krowolf/scripts/`. |
+| Backup metadata v2 | `Verified (tests)` | `write_operation_status.py` — `checksum_sha256`, `local_status`, `offsite_status`, `offsite_verified`. |
+| Backup alert evaluators | `Verified (tests)` | `summarize_backup_status_for_signals()` fixes stale/failed backup alerts (was broken MetadataReadResult `.get`). |
+| Safe local retention | `Verified (code)` | `backup_postgres.sh` skips prune without `.offsite_verified` when offsite configured. |
+| Golden paths A–I | `Verified (pytest)` | A 41, B 21, C 25, D 106, E 108, F 50, G 18, H 36, I 67 tests passed via slice script. |
+| Roles/auth matrix | `Verified (E2E script)` | `read_only` blocked on approve/reject/recovery/rotate; `operations`+ on writes; session + same-origin on operator routes. |
+| Tenant A/B isolation | `Verified (tests)` | `tests/test_tenant_isolation_http.py` 42 passed; alerts filter + recovery wrong-context checks in slice script. |
+| RB-04 approval-first React | `Verified (local)` | `approval.approve` in operator action registry + `POST …/approve`; React `approveTenantApproval` + needs-help/customer detail wiring. |
+| RB-02 legacy hardening | `Verified (local)` | `/ui` read-only (`LEGACY_UI_READ_ONLY`); `adminApiFetch` blocks non-GET; no `localStorage.setItem(LS_ADMIN_KEY)`; purge on login/logout. |
+| RB-03 recovery UI | `Accepted (RB-03)` | API/runbook only; no React recovery console required for CONDITIONAL GO. |
+| RB-01 offsite backup | `Open — release blocker` | `/opt/krowolf/.env.offsite` missing on pilot; live backup+restore from offsite not executed. Template: `scripts/env.offsite.example`. |
+| Pilot deploy/rollback | `Verified — PASS` | RC deploy ~30 s build; rollback `e77b045d33c1` 20 s (overview/system 404 as expected); forward redeploy 13 s; all endpoints PASS on RC. |
+| Restore verify tables | `Verified (fix)` | `restore_postgres_rehearsal.sh` uses `tenant_configs`, `approval_requests`, etc. |
+| Legacy parity gaps | `Documented` | Recovery console, jobs browser, dedicated manual-review queue remain partial (API/overview/needs-help acceptable per releasebeslut). |
+| Frontend gates | `Verified (local)` | typecheck, contracts, onboarding tests pass in slice script. |
+| Prestanda Profil A/B | `Verified (pilot RC)` | `scripts/k12_rc_perf.py` on live RC; strict 404/schema fail. |
+| Release inventory | `Verified (docs)` | `docs/kapitel-12-release-inventory.md` — Fas 1 plan godkänd 2026-07-18. |
 
 ### Kapitel 6 — Incidenthantering (2026-07-17)
 
@@ -744,8 +853,8 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Action registry | `Verified (tests)` | Five safe writes only: `tenant.pause_automation`, `tenant.resume_automation`, `tenant.scheduler.pause`, `tenant.scheduler.resume`, `approval.reject`. No generic action engine. |
-| Blocked actions | `Documented` | `job.manual_review.resolve` (Gmail side-effect risk), reclassify/re-extract/replay/approve/critical writes — `Kräver manuell hantering`. |
+| Action registry | `Verified (tests)` | Six safe writes: `tenant.pause_automation`, `tenant.resume_automation`, `tenant.scheduler.pause`, `tenant.scheduler.resume`, `approval.reject`, `approval.approve` (`controlled_dispatch`, `email_send` only). No generic action engine. |
+| Blocked actions | `Documented` | `job.manual_review.resolve` (Gmail side-effect risk), reclassify/re-extract/replay/critical writes — `Kräver manuell hantering`. |
 | Role enforcement | `Verified (tests)` | `require_operator_role(allowed_roles)` dependency factory; server-derived `OperatorIdentity`; `read_only` → 403 on writes. |
 | Request/response | `Verified (tests)` | `OperatorActionRequest` (`reason`, `confirmation: true`, optional `idempotency_key`); `OperatorActionResponse` with `completed`/`no_change`/etc. |
 | Idempotency | `Verified (tests)` | State-based primary gate (pause/resume/scheduler no-op → `no_change`; approval state conflict → 409). `idempotency_key` audit-only; concurrent duplicate requests documented limitation. |
@@ -784,7 +893,7 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 | Path | Contents |
 |------|----------|
 | `app/` | Main application package |
-| `frontend/` | Operator panel React/TS/Vite app (Kapitel 1A–5); `frontend/design/` JSON contracts; `frontend/src/features/auth/` + `overview/` + `customers/` + `needsHelp/` + `operatorActions/`; built to `frontend/dist`, served at `/ops` |
+| `frontend/` | Operator panel React/TS/Vite app (Kapitel 1A–9); `frontend/design/` JSON contracts; `frontend/src/features/auth/` + `overview/` + `customers/` + `needsHelp/` + `operatorActions/` + `onboarding/`; built to `frontend/dist`, served at `/ops` |
 | `app/main.py` | Single-file FastAPI app — all routes defined here (~6900 lines) |
 | `app/ui/index.html` | Single-file frontend (~536 KB) |
 | `app/core/` | Config, auth, settings, tenancy, audit, logging |
@@ -898,7 +1007,8 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 
 | Endpoint group | Status |
 |----------------|--------|
-| `/admin/tenants`, `/admin/tenants/overview`, `/admin/tenants/{id}/rotate-key`, `/admin/tenants/{id}/status` | `Verified (code)` |
+| `/admin/onboarding` (+ session sub-routes, `/registries`, `/activation-plan`) | `Verified (tests)` — Kapitel 9 slice 1 |
+| `/admin/tenants`, `/admin/tenants/overview`, `/admin/tenants/{id}/rotate-key`, `/admin/tenants/{id}/status` | `Verified (code)` — legacy script path; UI uses `/admin/onboarding` |
 | `/admin/tenants/{id}/demo/seed` | `Verified (code)` |
 | `/admin/recovery/{id}/retry|replay-dispatch|reclassify|re-extract|resend-approval|reprocess-gmail` | `Verified (code)` |
 | `/admin/support/{id}/state|pause-automation|resume-automation|force-inbox-sync|disable-scheduler|enable-scheduler|ack-needs-help|clear-acknowledged` | `Verified (code)` |

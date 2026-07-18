@@ -519,6 +519,9 @@ pre, code, .json-block {
 </style>
 </head>
 <body>
+<div id="legacy-ui-deprecation" style="background:#7c2d12;color:#fff;padding:8px 12px;font:14px system-ui,sans-serif;text-align:center">
+  Legacy UI (endast läsning) — använd <a href="/ops" style="color:#fde68a">operatörspanelen (/ops)</a> för alla skrivåtgärder.
+</div>
 
 <!-- ═══════════════════════════════════════════════════════
      LOGIN SCREEN
@@ -2907,6 +2910,15 @@ let _tenantAllowedIntegrations = [];  // cached from last renderSetup() / loadSe
 
 const LS_KEY        = 'ui_api_key';
 const LS_ADMIN_KEY  = 'ui_admin_api_key';
+const LEGACY_UI_READ_ONLY = true;
+
+function _legacyAccessLog(view) {
+  console.info('[legacy-ui-access]', { view: view || 'unknown', read_only: LEGACY_UI_READ_ONLY, ts: new Date().toISOString() });
+}
+
+function _purgeLegacyAdminKeyStorage() {
+  try { localStorage.removeItem(LS_ADMIN_KEY); } catch (_) {}
+}
 const LS_ROLE_KEY   = 'ui_role_mode';    // 'admin' | 'customer'
 const LS_SESSION    = 'ui_session';      // 'admin' | 'customer' — set after successful login
 const LS_THEME      = 'ui_theme';        // 'light' | 'dark'
@@ -2948,9 +2960,10 @@ function apiKey() {
 }
 
 function adminKey() {
+  _purgeLegacyAdminKeyStorage();
   const el = document.getElementById('adminKeyInput');
   if (el && el.value.trim()) return el.value.trim();
-  return localStorage.getItem(LS_ADMIN_KEY) || '';
+  return '';
 }
 
 function headers() {
@@ -2976,11 +2989,9 @@ function onKeyInput() {
 }
 
 function onAdminKeyInput() {
-  const key = adminKey();
-  if (key) localStorage.setItem(LS_ADMIN_KEY, key);
-  else     localStorage.removeItem(LS_ADMIN_KEY);
+  _purgeLegacyAdminKeyStorage();
   const banner = document.getElementById('adminKeyBanner');
-  if (banner) banner.style.display = key ? 'none' : 'block';
+  if (banner) banner.style.display = 'block';
 }
 
 // ---------------------------------------------------------------------------
@@ -3037,9 +3048,9 @@ async function doLogin() {
         const data = await res.json().catch(() => ({}));
         // If mode is api_key, store the key for adminApiFetch fallback
         if (data.mode === 'api_key') {
-          localStorage.setItem(LS_ADMIN_KEY, password);
+          _purgeLegacyAdminKeyStorage();
         } else {
-          localStorage.removeItem(LS_ADMIN_KEY); // session cookie handles auth
+          _purgeLegacyAdminKeyStorage();
         }
         localStorage.setItem(LS_ROLE_KEY, 'admin');
         localStorage.setItem(LS_SESSION, 'admin');
@@ -3120,11 +3131,12 @@ function _launchApp(mode, key) {
 
   // Restore keys into topbar inputs
   const apiKey = mode === 'customer' ? key : (localStorage.getItem(LS_KEY) || '');
-  const adminKey = mode === 'admin'  ? key : (localStorage.getItem(LS_ADMIN_KEY) || '');
+  _purgeLegacyAdminKeyStorage();
+  const adminKeyVal = '';
   const keyEl = document.getElementById('apiKeyInput');
   if (keyEl) keyEl.value = apiKey;
   const adminEl = document.getElementById('adminKeyInput');
-  if (adminEl) adminEl.value = adminKey;
+  if (adminEl) adminEl.value = adminKeyVal;
   // Session-mode admin doesn't need a per-tenant API key in the UI.
   const sessionMode = mode === 'admin' && localStorage.getItem(LS_SESSION) === 'admin';
   document.getElementById('authBanner').style.display = (apiKey || sessionMode) ? 'none' : 'block';
@@ -3142,7 +3154,7 @@ function logout() {
   fetch('/auth/admin/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
 
   localStorage.removeItem(LS_SESSION);
-  localStorage.removeItem(LS_ADMIN_KEY);
+  _purgeLegacyAdminKeyStorage();
 
   document.getElementById('sidebar').style.display      = 'none';
   document.getElementById('mainContent').style.display  = 'none';
@@ -3163,14 +3175,15 @@ function logout() {
 }
 
 function initApiKey() {
+  _purgeLegacyAdminKeyStorage();
   const saved = localStorage.getItem(LS_KEY) || '';
   document.getElementById('apiKeyInput').value = saved;
   document.getElementById('authBanner').style.display = saved ? 'none' : 'block';
 
-  // Admin key lives only in localStorage; the visible input in Super Admin tab syncs on load
-  const savedAdmin = localStorage.getItem(LS_ADMIN_KEY) || '';
+  // Legacy admin API key persistence removed (K12) — session cookie or /ops.
+  const savedAdmin = '';
   const adminEl = document.getElementById('adminKeyInput');
-  if (adminEl && !adminEl.value.trim()) adminEl.value = savedAdmin;
+  if (adminEl) adminEl.value = savedAdmin;
 
   // Restore role mode
   const savedRole = localStorage.getItem(LS_ROLE_KEY) || 'admin';
@@ -3267,6 +3280,7 @@ const _VIEW_TITLE = {
 };
 
 function switchView(name) {
+  _legacyAccessLog(name);
   // In customer mode, block admin-only navigation
   if (_uiMode === 'customer' && ADMIN_ONLY_VIEWS.includes(name)) return;
   if (_uiMode === 'admin' && CUSTOMER_ONLY_VIEWS.includes(name)) return;
@@ -4208,11 +4222,10 @@ const _ADMIN_INT_ICON     = { healthy: '✅', warning: '⚠', error: '✕', not_
 async function loadAdminOverview() {
   document.getElementById('adminError').style.display = 'none';
   document.getElementById('adminTable').innerHTML = '<span class="empty">Laddar…</span>';
-  // Pre-fill the visible key input from localStorage when switching to this view
+  // Legacy admin key persistence removed — use session cookie.
   const adminEl = document.getElementById('adminKeyInput');
   if (adminEl && !adminEl.value.trim()) {
-    const saved = localStorage.getItem(LS_ADMIN_KEY) || '';
-    if (saved) adminEl.value = saved;
+    adminEl.value = '';
   }
   const sessionMode = localStorage.getItem(LS_SESSION) === 'admin';
   const aKey = adminKey();
@@ -5307,6 +5320,10 @@ async function apiFetch(path, opts) {
 // Admin-authenticated fetch — merges X-Admin-API-Key into headers.
 // Use for endpoints that require require_admin_api_key dependency.
 async function adminApiFetch(path, opts) {
+  const method = (opts && opts.method) ? String(opts.method).toUpperCase() : 'GET';
+  if (LEGACY_UI_READ_ONLY && method !== 'GET' && method !== 'HEAD') {
+    throw new Error('Skrivåtgärder är avstängda i legacy-UI. Använd /ops.');
+  }
   const h = { ...headers(), ...adminHeaders() };
   // If admin session cookie is present, keep it via credentials: 'same-origin'
   const fetchOpts = { headers: h, credentials: 'same-origin', ...opts };
@@ -9930,24 +9947,11 @@ async function _vismaOAuthTest(btn) {
       try {
         const r = await fetch('/auth/admin/me', { credentials: 'same-origin' });
         if (!r.ok) {
-          // Session cookie expired — check if we have a stored API key to re-validate
-          const storedKey = localStorage.getItem(LS_ADMIN_KEY) || '';
-          if (storedKey) {
-            const r2 = await fetch('/admin/tenants/overview', { headers: { 'X-Admin-API-Key': storedKey } });
-            if (!r2.ok) {
-              // Key also invalid — force re-login
-              localStorage.removeItem(LS_SESSION);
-              initApiKey();
-              _checkDevMode();
-              return;
-            }
-          } else {
-            // No fallback — force re-login
-            localStorage.removeItem(LS_SESSION);
-            initApiKey();
-            _checkDevMode();
-            return;
-          }
+          _purgeLegacyAdminKeyStorage();
+          localStorage.removeItem(LS_SESSION);
+          initApiKey();
+          _checkDevMode();
+          return;
         }
       } catch (_) {
         // Server unreachable in dev mode — proceed with stored session

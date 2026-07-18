@@ -39,6 +39,10 @@ ALLOWED_ALERT_AUDIT_ACTIONS = frozenset(
 )
 
 
+class OperatorAlertAuditError(Exception):
+    """Raised when alert audit write fails or action is not allowlisted."""
+
+
 def write_operator_alert_audit(
     db: Session,
     *,
@@ -47,7 +51,7 @@ def write_operator_alert_audit(
     details: dict[str, Any] | None = None,
 ) -> None:
     if action not in ALLOWED_ALERT_AUDIT_ACTIONS:
-        return
+        raise OperatorAlertAuditError(f"Disallowed alert audit action: {action}")
     from app.core.audit_service import create_audit_event
 
     safe_details: dict[str, Any] = {}
@@ -64,11 +68,14 @@ def write_operator_alert_audit(
             "delivery_id",
         }:
             safe_details[key] = value
-    create_audit_event(
-        db=db,
-        tenant_id=tenant_id or "platform",
-        category="operator_alert",
-        action=action,
-        status="success",
-        details=safe_details,
-    )
+    try:
+        create_audit_event(
+            db=db,
+            tenant_id=tenant_id or "platform",
+            category="operator_alert",
+            action=action,
+            status="success",
+            details=safe_details,
+        )
+    except Exception as exc:
+        raise OperatorAlertAuditError("operator alert audit write failed") from exc

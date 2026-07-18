@@ -101,7 +101,7 @@
     "purpose": "Framtida tabell för strukturerad operativ data.",
     "requiredFields": ["columns", "rows"],
     "visualRules": ["Kompakt radtäthet.", "Horisontell scroll endast inom tabellcontainer om nödvändigt."],
-    "responsiveBehavior": "På mobil: kortlayout, inte ihoppressad tabell.",
+    "responsiveBehavior": "Tre lägen via layout-prop: full (bred tabell), compact (compactRow → compactColumns → kort-fallback), cards (mobilkort). Ingen ihoppressad tabell på smal yta.",
     "loadingState": "Skeleton-rader.",
     "emptyState": "EmptyState under tabellhuvud.",
     "errorState": "ErrorState ovanför eller istället för tabell.",

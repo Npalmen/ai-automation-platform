@@ -60,6 +60,8 @@ export function CriticalActionDialog({
     onClose()
   }
 
+  if (!open) return null
+
   return (
     <dialog
       ref={dialogRef}

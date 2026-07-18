@@ -14,6 +14,7 @@ from app.admin.system_status_sources import (
     read_build_metadata,
     read_json_metadata_file,
     read_restore_status,
+    summarize_backup_status_for_signals,
 )
 
 
@@ -104,3 +105,27 @@ class TestTypedReaders:
     def test_read_restore_status_missing(self, tmp_path: Path):
         result = read_restore_status(_settings(tmp_path))
         assert result.outcome == MetadataReadOutcome.MISSING
+
+    def test_summarize_backup_status_for_signals(self, tmp_path: Path):
+        path = tmp_path / "backup_status.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "backup_id": "x",
+                    "started_at": "2026-07-18T02:00:00Z",
+                    "completed_at": "2026-07-18T02:00:00Z",
+                    "status": "success",
+                    "size_bytes": 100,
+                    "retention_days": 30,
+                    "archive_integrity_verified": True,
+                    "offsite_status": "success",
+                    "offsite_verified": True,
+                }
+            ),
+            encoding="utf-8",
+        )
+        summary = summarize_backup_status_for_signals(_settings(tmp_path))
+        assert summary["available"] is True
+        assert summary["operation_status"] == "success"
+        assert summary["offsite_verified"] is True

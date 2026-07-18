@@ -358,6 +358,13 @@ def _build_backup_resilience(
             "backup_id": data.get("backup_id"),
             "completed_at": data.get("completed_at"),
             "size_bytes": data.get("size_bytes"),
+            "offsite_status": data.get("offsite_status"),
+            "offsite_verified": data.get("offsite_verified"),
+            "checksum_sha256_prefix": (
+                str(data.get("checksum_sha256"))[:12]
+                if data.get("checksum_sha256")
+                else None
+            ),
         },
     )
 

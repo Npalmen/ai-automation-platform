@@ -11,6 +11,8 @@ import { FoundationPage } from "@/pages/FoundationPage"
 import { NotFoundPage } from "@/pages/NotFoundPage"
 import { CustomerDetailPage } from "@/features/customers/CustomerDetailPage"
 import { CustomersListPage } from "@/features/customers/CustomersListPage"
+import { NewCustomerPage } from "@/features/onboarding/NewCustomerPage"
+import { OnboardingWizardPage } from "@/features/onboarding/OnboardingWizardPage"
 import { NeedsHelpDetailPage } from "@/features/needsHelp/NeedsHelpDetailPage"
 import { NeedsHelpQueuePage } from "@/features/needsHelp/NeedsHelpQueuePage"
 import { IncidentDetailPage } from "@/features/incidents/IncidentDetailPage"
@@ -65,6 +67,19 @@ export const router = createBrowserRouter(
               path: "customers",
               children: [
                 { index: true, element: <CustomersListPage /> },
+                {
+                  path: "new",
+                  element: (
+                    <RequireRole allowedRoles={["operations", "admin"]}>
+                      <NewCustomerPage />
+                    </RequireRole>
+                  ),
+                },
+                { path: ":tenantId/onboarding", element: (
+                    <RequireRole allowedRoles={["operations", "admin"]}>
+                      <OnboardingWizardPage />
+                    </RequireRole>
+                  ) },
                 { path: ":tenantId", element: <CustomerDetailPage /> },
               ],
             },
@@ -84,7 +99,11 @@ export const router = createBrowserRouter(
             },
             {
               path: "digests",
-              element: <OperatorDigestsPage />,
+              element: (
+                <RequireRole allowedRoles={["operations", "admin"]}>
+                  <OperatorDigestsPage />
+                </RequireRole>
+              ),
             },
             {
               path: "usage",

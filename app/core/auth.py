@@ -143,14 +143,16 @@ def get_verified_tenant(
 
     # Priority 1: X-Admin-API-Key header + X-Tenant-ID.
     if isinstance(x_admin_api_key, str) and x_admin_api_key:
-        configured_admin_key = getattr(get_settings(), "ADMIN_API_KEY", "").strip()
-        if not configured_admin_key:
+        from app.core.admin_auth import _resolve_admin_keys
+
+        valid_keys = _resolve_admin_keys(get_settings())
+        if not valid_keys:
             raise HTTPException(
                 status_code=http_status.HTTP_401_UNAUTHORIZED,
                 detail="Admin access is not configured on this server.",
                 headers={"WWW-Authenticate": "AdminApiKey"},
             )
-        if not hmac.compare_digest(configured_admin_key, x_admin_api_key):
+        if not any(hmac.compare_digest(k, x_admin_api_key) for k in valid_keys):
             raise HTTPException(
                 status_code=http_status.HTTP_401_UNAUTHORIZED,
                 detail="Missing or invalid admin API key. Provide the X-Admin-API-Key header.",

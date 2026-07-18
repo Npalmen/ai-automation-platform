@@ -9,6 +9,7 @@ import {
   pauseTenantAutomation,
   pauseTenantScheduler,
   rejectTenantApproval,
+  approveTenantApproval,
   resumeTenantAutomation,
   resumeTenantScheduler,
 } from "./api"
@@ -72,6 +73,17 @@ export function useRejectApprovalMutation(tenantId: string, approvalId: string) 
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (body: ActionBody) => rejectTenantApproval(tenantId, approvalId, body),
+    retry: false,
+    onSuccess: () => {
+      invalidateAfterAction(queryClient, tenantId)
+    },
+  })
+}
+
+export function useApproveApprovalMutation(tenantId: string, approvalId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: ActionBody) => approveTenantApproval(tenantId, approvalId, body),
     retry: false,
     onSuccess: () => {
       invalidateAfterAction(queryClient, tenantId)

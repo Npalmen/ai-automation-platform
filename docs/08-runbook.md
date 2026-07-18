@@ -421,6 +421,8 @@ Store the new key immediately. It is shown only once.
 
 ## Backup and restore
 
+> **Canonical procedures (Kapitel 12):** `docs/runbooks/backup-and-restore.md` — `backup_postgres.sh`, offsite upload, restore rehearsal, RPO/RTO. Verify with `python scripts/kapitel12_slice2_verify.py`.
+
 ### Daily backup (run as cron at 02:00)
 ```bash
 pg_dump "$DATABASE_URL" | gzip > /backups/ai_platform_$(date +%Y%m%d_%H%M).sql.gz
@@ -594,3 +596,19 @@ curl -s "http://localhost:8000/customer/activity" \
 - [ ] R1 release gate: 505 regression + 152 E2E = 657 passed
 - [ ] No live credentials used
 - [ ] No external API calls made
+
+---
+
+## Security hardening (Kapitel 11)
+
+Detailed procedures: **`docs/runbooks/security-hardening.md`**
+
+Quick reference:
+
+- Critical admin writes require operator role + same-origin (cookie auth).
+- `read_only` cannot mutate (including legacy `/admin/*` recovery/support routes).
+- Login throttled: 5/min per IP (in-memory; per-instance).
+- Legacy Visma OAuth (`state=tenant_id`) disabled — use onboarding wizard.
+- `GET /admin/alerts/run-all` removed; use `POST /admin/alerts/run-all`.
+- Security headers on API responses; `no-store` on `/ops`, `/auth/admin`, `/ui`.
+- Audit fail-closed on recovery and operator-alert mutations.

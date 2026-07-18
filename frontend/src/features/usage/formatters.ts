@@ -55,6 +55,23 @@ export function formatAiCostStatus(block: AiCostBlock): string {
   return `${block.amount} ${currency}`.trim()
 }
 
+/** Short label for tenant table rows — never repeats long data-quality explanations. */
+export function formatAiCostTableCell(block: AiCostBlock): string {
+  if (block.status === "unknown" || block.amount == null) {
+    return "Ej mätt"
+  }
+  const currency = block.currency ?? ""
+  return `${block.amount} ${currency}`.trim()
+}
+
+export function formatOperatorBurdenTableCell(
+  operatorActions: number,
+  openManualReviews: number,
+  pendingApprovals: number,
+): string {
+  return `${operatorActions} åtg · ${openManualReviews} MR · ${pendingApprovals} godk.`
+}
+
 export function formatNullableNumber(value: number | null | undefined): string {
   if (value == null) return "—"
   return String(value)

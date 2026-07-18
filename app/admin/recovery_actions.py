@@ -84,6 +84,10 @@ def _load_job(db: Session, tenant_id: str, job_id: str) -> Job | None:
     return JobRepository.get_job_by_id(db, tenant_id, job_id)
 
 
+class RecoveryAuditError(Exception):
+    """Raised when recovery audit write fails (fail-closed)."""
+
+
 def _audit(db: Session, tenant_id: str, action: str, status: str, details: dict) -> None:
     try:
         create_audit_event(
@@ -94,8 +98,9 @@ def _audit(db: Session, tenant_id: str, action: str, status: str, details: dict)
             status=status,
             details=details,
         )
-    except Exception:
+    except Exception as exc:
         logger.exception("Failed to write recovery audit event for %s/%s", tenant_id, action)
+        raise RecoveryAuditError("recovery audit write failed") from exc
 
 
 def _strip_processor_history_entry(job: Job, processor_name: str) -> Job:
@@ -185,7 +190,8 @@ def replay_dispatch(db: Session, tenant_id: str, job_id: str, actor: str = "admi
     try:
         app_settings = get_settings()
         tenant_config = get_tenant_config(tenant_id, db)
-        memory = (tenant_config.get("settings") or {}).get("memory") or {}
+        s = tenant_config.get("settings") or {}
+        memory = s.get("memory") or {}
 
         engine = ControlledDispatchEngine(db, tenant_id, app_settings)
 
@@ -198,7 +204,7 @@ def replay_dispatch(db: Session, tenant_id: str, job_id: str, actor: str = "admi
         if record is None:
             return _fail(action_name, job_id, tenant_id, "Job record not found.")
 
-        result = engine.run(record, memory, dry_run=False, dispatch_mode="admin_replay")
+        result = engine.run(record, memory, dry_run=False, dispatch_mode="admin_replay", tenant_settings=s)
     except Exception as exc:
         logger.exception("replay_dispatch error for job %s", job_id)
         _audit(db, tenant_id, action_name, "failed", {"job_id": job_id, "error": "dispatch_error"})

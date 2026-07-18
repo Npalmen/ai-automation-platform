@@ -81,7 +81,7 @@ export function CustomerDetailPage() {
     )
   }
 
-  const { tenant, health, integrations, jobs, approvals, manual_review, recent_errors, usage, audit, available_actions } =
+  const { tenant, health, integrations, jobs, approvals, manual_review, recent_errors, usage, audit, onboarding_config, available_actions } =
     data
 
   const healthCheckIntegrations = [
@@ -138,6 +138,52 @@ export function CustomerDetailPage() {
                     : "Inga"}
                 </dd>
               </div>
+            </dl>
+          </Section>
+
+          <Section title="Onboarding-konfiguration (read-only)">
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <dt className="text-caption text-text-secondary">Settings schema</dt>
+                <dd className="text-body text-text-primary">
+                  {onboarding_config.schema_version ?? "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-caption text-text-secondary">Intake-läge</dt>
+                <dd className="text-body text-text-primary">
+                  {onboarding_config.intake.mode ?? "—"}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-caption text-text-secondary">Serviceprofiler</dt>
+                <dd className="text-body text-text-primary">
+                  {onboarding_config.service_profiles.length > 0
+                    ? onboarding_config.service_profiles.join(", ")
+                    : "Inga"}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-caption text-text-secondary">Intern routing</dt>
+                <dd className="text-body text-text-primary">
+                  {Object.keys(onboarding_config.internal_routing_hints).length > 0
+                    ? Object.entries(onboarding_config.internal_routing_hints)
+                        .map(([k, v]) => `${k} → ${v}`)
+                        .join("; ")
+                    : "Inga overrides"}
+                </dd>
+              </div>
+              {onboarding_config.intake.activation_cutoff_at ? (
+                <div className="sm:col-span-2">
+                  <dt className="text-caption text-text-secondary">Aktiverings-cutoff</dt>
+                  <dd className="text-body text-text-primary">
+                    {onboarding_config.intake.activation_cutoff_at}
+                    {onboarding_config.intake.enforcement
+                      ? ` (${onboarding_config.intake.enforcement})`
+                      : ""}
+                  </dd>
+                </div>
+              ) : null}
             </dl>
           </Section>
 
@@ -216,7 +262,14 @@ export function CustomerDetailPage() {
                     key={item.approval_id}
                     className="rounded-md border border-border bg-page px-3 py-2 text-body-small"
                   >
-                    {item.title ?? item.job_type} · {formatActivityAt(item.created_at)}
+                    <Link
+                      to={`/needs-help/approval:${encodeURIComponent(item.approval_id)}`}
+                      className="font-medium text-text-primary underline"
+                    >
+                      {item.title ?? item.job_type}
+                    </Link>
+                    {" · "}
+                    {formatActivityAt(item.created_at)}
                   </li>
                 ))}
               </ul>

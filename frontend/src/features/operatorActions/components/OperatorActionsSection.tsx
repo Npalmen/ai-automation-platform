@@ -5,6 +5,7 @@ import {
   usePauseAutomationMutation,
   usePauseSchedulerMutation,
   useRejectApprovalMutation,
+  useApproveApprovalMutation,
   useResumeAutomationMutation,
   useResumeSchedulerMutation,
 } from "../mutations"
@@ -40,6 +41,7 @@ function useActionMutation(
   const pauseScheduler = usePauseSchedulerMutation(tenantId)
   const resumeScheduler = useResumeSchedulerMutation(tenantId)
   const rejectApproval = useRejectApprovalMutation(tenantId, approvalId ?? "")
+  const approveApproval = useApproveApprovalMutation(tenantId, approvalId ?? "")
 
   return useMemo(() => {
     switch (actionId) {
@@ -53,6 +55,8 @@ function useActionMutation(
         return resumeScheduler
       case "approval.reject":
         return approvalId ? rejectApproval : null
+      case "approval.approve":
+        return approvalId ? approveApproval : null
       default:
         return null
     }
@@ -62,6 +66,7 @@ function useActionMutation(
     pauseAutomation,
     pauseScheduler,
     rejectApproval,
+    approveApproval,
     resumeAutomation,
     resumeScheduler,
   ])

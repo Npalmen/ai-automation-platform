@@ -8,6 +8,7 @@ import { LoadingState } from "@/components/operator/LoadingState"
 import { PageHeader } from "@/components/operator/PageHeader"
 import { SeverityBadge } from "@/components/operator/SeverityBadge"
 import { StatusBadge } from "@/components/operator/StatusBadge"
+import { useListLayout } from "@/hooks/useListLayout"
 
 import { CreateIncidentDialog } from "./components/CreateIncidentDialog"
 import {
@@ -42,6 +43,7 @@ const SEVERITY_OPTIONS = [
 
 export function IncidentsPage() {
   const navigate = useNavigate()
+  const { ref: listLayoutRef, layout } = useListLayout()
   const [searchInput, setSearchInput] = useState("")
   const [createOpen, setCreateOpen] = useState(false)
   const [filters, setFilters] = useState<IncidentFilters>({
@@ -238,23 +240,38 @@ export function IncidentsPage() {
       )}
 
       {data && data.items.length > 0 && (
-        <>
-          <div className="hidden lg:block">
-            <DataTable
-              columns={columns}
-              rows={data.items}
-              getRowKey={(row) => row.incident_id}
-              onRowClick={(row) =>
-                navigate(`/incidents/${encodeURIComponent(row.incident_id)}`)
-              }
-            />
-          </div>
-          <div className="flex flex-col gap-3 lg:hidden">
-            {data.items.map((item) => (
+        <div ref={listLayoutRef} className="min-w-0">
+          <DataTable
+            columns={columns}
+            rows={data.items}
+            getRowKey={(row) => row.incident_id}
+            onRowClick={(row) =>
+              navigate(`/incidents/${encodeURIComponent(row.incident_id)}`)
+            }
+            layout={layout}
+            compactRow={(item) => (
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(`/incidents/${encodeURIComponent(item.incident_id)}`)
+                }
+                className="flex w-full min-w-0 items-start justify-between gap-3 rounded-lg border border-border bg-surface p-3 text-left hover:bg-surface-subtle"
+              >
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="break-words font-medium text-text-primary">{item.title}</p>
+                  <p className="text-body-small text-text-muted">
+                    {incidentStatusLabel(item.status)} · {formatAgeHours(item.age_hours)}
+                  </p>
+                </div>
+                <div className="shrink-0">
+                  <SeverityBadge variant={item.severity_badge} />
+                </div>
+              </button>
+            )}
+            mobileCard={(item) => (
               <Link
-                key={item.incident_id}
                 to={`/incidents/${encodeURIComponent(item.incident_id)}`}
-                className="rounded-md border border-border bg-surface p-4"
+                className="block rounded-md border border-border bg-surface p-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -267,9 +284,9 @@ export function IncidentsPage() {
                   <SeverityBadge variant={item.severity_badge} />
                 </div>
               </Link>
-            ))}
-          </div>
-        </>
+            )}
+          />
+        </div>
       )}
 
       <CreateIncidentDialog

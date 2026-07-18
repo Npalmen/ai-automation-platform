@@ -28,6 +28,8 @@ Set `OFFSITE_BACKUP_COMMAND` in `/opt/krowolf/.env.production` and verify a test
 |--------|---------|
 | `scripts/backup_postgres.sh` | Create timestamped, compressed backup; prune old locals; optionally upload offsite |
 | `scripts/restore_postgres_rehearsal.sh` | Restore to a separate DB; verify tables; refuse production target |
+| `scripts/restore_from_offsite_rehearsal.sh` | Restore from verified offsite copy; RTO report JSON |
+| `scripts/offsite_backup_upload.py` | Offsite copy with checksum verification (use as `OFFSITE_BACKUP_COMMAND`) |
 | `scripts/check_backup_freshness.sh` | Verify a recent backup exists, is non-empty, and is not corrupted |
 
 ---
@@ -215,6 +217,17 @@ OFFSITE_BACKUP_COMMAND="rsync -az \$1 backup-user@backup-server:/backups/krowolf
 ```bash
 OFFSITE_BACKUP_COMMAND="aws s3 cp \$1 s3://your-bucket-name/krowolf-backups/"
 ```
+
+**Example — built-in Python uploader (pilot/staging; destination must differ from `BACKUP_DIR`):**
+```bash
+OFFSITE_BACKUP_DEST_DIR=/mnt/offsite/krowolf-backups
+OFFSITE_STATUS_FILE=/opt/krowolf/storage/status/offsite_status.json
+OFFSITE_BACKUP_COMMAND="python3 /opt/krowolf/scripts/offsite_backup_upload.py"
+```
+
+The uploader verifies sha256 after copy, writes `.sha256` sidecar offsite, and creates `${BACKUP_FILE}.offsite_verified` locally. Local retention pruning skips files without verified offsite marker when `OFFSITE_BACKUP_COMMAND` is set.
+
+Backup metadata (`backup_status.json`) includes: `checksum_sha256`, `local_status`, `offsite_status`, `offsite_verified`.
 
 ### Important notes on offsite
 

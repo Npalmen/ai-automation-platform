@@ -409,9 +409,9 @@ def evaluate_tenant_scheduler_failed(db: Session, definition: AlertDefinition) -
 
 
 def evaluate_system_backup_stale(db: Session, definition: AlertDefinition, settings: Settings) -> list[AlertCandidate]:
-    from app.admin.system_status_sources import read_backup_status
+    from app.admin.system_status_sources import summarize_backup_status_for_signals
 
-    backup = read_backup_status(settings)
+    backup = summarize_backup_status_for_signals(settings)
     if not backup.get("available"):
         return []
     status = normalize_backup_status(
@@ -450,9 +450,9 @@ def evaluate_system_backup_stale(db: Session, definition: AlertDefinition, setti
 def evaluate_system_backup_last_failed(
     db: Session, definition: AlertDefinition, settings: Settings
 ) -> list[AlertCandidate]:
-    from app.admin.system_status_sources import read_backup_status
+    from app.admin.system_status_sources import summarize_backup_status_for_signals
 
-    backup = read_backup_status(settings)
+    backup = summarize_backup_status_for_signals(settings)
     if not backup.get("available"):
         return []
     status = normalize_backup_status(

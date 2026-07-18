@@ -37,7 +37,8 @@ from app.repositories.postgres.tenant_config_repository import TenantConfigRepos
 # Module-level imports for test patchability
 from app.health.integration_health import get_integration_health
 from app.onboarding.readiness import get_onboarding_status
-from app.workflows.scanners.routing_preview import resolve_routing_preview
+    from app.workflows.scanners.external_routing_resolver import resolve_effective_routing_preview
+    from app.workflows.scanners.routing_preview import resolve_routing_preview
 
 _UI_PATH = Path(__file__).parent.parent / "ui" / "index.html"
 
@@ -121,7 +122,11 @@ def _check_routing_for_lead(db: Session, tenant_id: str) -> tuple[str, str, str]
     settings = TenantConfigRepository.get_settings(db, tenant_id)
     memory = settings.get("memory") or {}
     routing_hints = memory.get("routing_hints") or {}
-    preview = resolve_routing_preview(routing_hints, "lead")
+    preview = resolve_effective_routing_preview(
+        job_type="lead",
+        tenant_settings=settings,
+        memory=memory,
+    )
     status = preview.get("status", "missing_hint")
     if status == "ready":
         system = preview.get("system", "")

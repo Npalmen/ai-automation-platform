@@ -6,6 +6,63 @@
 
 ---
 
+### Kapitel 12 — Release verification (2026-07-18)
+
+- [x] **Fas 1 plan godkänd** — releasebeslut RB-01–RB-04 + prestandaprofiler dokumenterade i `docs/kapitel-12-release-inventory.md`.
+- [x] **RB-04** — `approval.approve` backend + React (`approveTenantApproval`, needs-help/customer detail).
+- [x] **RB-02 (delvis)** — legacy `/ui` read-only; `localStorage` admin key purge; client-side write block.
+- [x] **Slice 1 verify script** — `scripts/kapitel12_slice1_verify.py` → `kapitel12_slice1_report.json`.
+- [x] **Golden paths A–I (pytest)** — 633 tester via slice script; 0 FAIL.
+- [x] **Slice 2 infra** — offsite upload (`offsite_backup_upload.py`), checksum metadata, safe retention, restore-from-offsite script, backup alert fix.
+- [x] **Slice 2 verify script** — `scripts/kapitel12_slice2_verify.py` → `kapitel12_slice2_report.json` (PARTIAL; RB-01 BLOCKED locally).
+- [x] **Profil A/B baseline** — `scripts/kapitel12_perf_baseline.py` PASS (TestClient + mocked services; live via `K12_PERF_BASE_URL`).
+- [x] **Slice 2 tester** — `test_kapitel12_backup_offsite.py` (6), `test_kapitel12_incident_drills.py` (6); regression bundle 156 passed.
+- [ ] **RB-01 offsite backup + restore (pilot server)** — configure `OFFSITE_BACKUP_COMMAND` + `OFFSITE_BACKUP_DEST_DIR` (or rclone); run live backup + `restore_from_offsite_rehearsal.sh`; document RPO/RTO.
+- [ ] **Deploy/rollback live rehearsal** — staging/prod server with Docker.
+- [ ] **Live incident drills** — app/DB/scheduler outage on pilot server.
+- [ ] **Slice 3** — full browser/a11y-matris, GO/CONDITIONAL/NO-GO-beslut.
+
+---
+
+### Mellankapitel 8B — Responsivitet och testmiljösanering (2026-07-17)
+
+- [x] **`useListLayout`** — content-width ResizeObserver; conservative `compact` initial state.
+- [x] **DataTable** — `full` / `compact` / `cards`; `compactRow` → `compactColumns` → card fallback.
+- [x] **Needs help + usage** — compact rows; short AI cost table text; FilterBar reset/wrap.
+- [x] **Incidents + customers** — shared layout hook; compact rows.
+- [x] **Reset CLI** — `scripts/reset_test_environment.py`; `inventory`, `purge-tenants`, `prune-stale-data`, `seed-baseline`.
+- [x] **Guards** — positive ENV + DATABASE_URL fingerprint allowlist; `RESET_TEST_ENVIRONMENT_ALLOWED`.
+- [x] **Incident purge policy** — unlink tenant links; orphan timeline/incident delete last.
+- [x] **Test environment purge** — `TENANT_1001`, `TENANT_2001`, `T_KROWOLF_E2E_TEST` removed; `T_NIKLAS_DEMO_001` preserved.
+- [x] **Baseline seed** — `T_LOCAL_OPS_BASELINE` created via `seed-baseline --execute`.
+- [x] **`TENANT_2002` orphan** — documented; 1 job without `tenant_config`; not purged in 8B run.
+- [x] **Docs** — `docs/runbooks/test-data-dependency-map.md`, `local-test-environment-reset.md`.
+- [x] **Tests** — `tests/test_reset_test_environment.py`.
+- [x] **Manual responsive browser verification** — 4 views × 10 breakpoint/zoom modes; PASS (no global overflow, no character-level text break).
+
+### Low priority (8B follow-up)
+
+- [ ] **seed-baseline CLI reports SKIP despite created/upserted resources** — presentation-only reporting bug in `OperationReport` / execute output; no data or security impact.
+
+---
+
+### Kapitel 9 — Standardiserad kundonboarding (2026-07-17)
+
+- [x] **Inventory gate** — `docs/chapter-9-inventory.md`.
+- [x] **Migration** — `migrations/009_onboarding_sessions.sql`; onboarding tables + partial unique open-session index.
+- [x] **Backend package** — `app/admin/onboarding/` (models, repository, registries, readiness, service, routes).
+- [x] **Slice 1 API** — `POST/GET/PATCH /admin/onboarding` (+ identity/modules/automation, readiness, activate, cancel, api-key, read-only step GETs).
+- [x] **Registry completion (slice 1)** — `GET /admin/onboarding/registries`; `GET …/activation-plan` + `plan_hash` on activate; `runtime_evaluation.py`; startup `validate_registry_integrity()`; frontend consumes registries (no hardcoded options).
+- [x] **Tests** — `tests/test_admin_onboarding.py`, `tests/test_admin_onboarding_registries.py` (25 pass); `frontend/src/features/onboarding/registrySource.test.mjs`.
+- [x] **Frontend wizard** — `src/features/onboarding/`; `/ops/customers/new`, `/ops/customers/:tenantId/onboarding`.
+- [x] **Docs** — `docs/01-current-truth.md`, `docs/runbooks/customer-onboarding.md` (panel-first).
+- [x] **Legacy deprecation note** — `POST /admin/tenants` retained for scripts; no new React usage.
+- [ ] **Manual responsive browser verification** — not executed in this environment.
+- [x] **Slice 2A** — PATCH service profile + nested lead requirements, routing (`internal_routing_hints`), data start; registry extensions; `plan_hash` includes 2A fingerprints; integrations step read-only; customer detail config summary; `tests/test_admin_onboarding_slice2a.py` (13 pass).
+- [ ] **Slice 2B** — Integration OAuth/editor; extern dispatch i `routing_hints`; API-key revoke on cancel.
+
+---
+
 ### Kapitel 8 — System-, backup- och deploystatus (2026-07-17)
 
 - [x] **Metadata scripts** — `write_operation_status.py`, `write_build_metadata.py`; atomic JSON; separate operation vs metadata exit semantics.
@@ -587,6 +644,7 @@ Production deploy and Phase A-C re-run completed on 2026-07-07. Live commit afte
 ## Later (Fas 3–4)
 
 - [x] Kapitel 10 — Operator alerts domain (`operator_alerts`), evaluation engine, in-app alertcenter (`/ops/alerts`), digest (`/ops/digests`); E2E + browser verified 2026-07-18 (26 API checks, 216 pytest regression bundle, responsive 320–1440 px). Email delivery deferred until `OPERATOR_ALERT_RECIPIENT` configured.
+- [x] Kapitel 11 — Samlad säkerhetshärdning (inventory + Slice 1–3): critical-action registry, legacy route guards, audit fail-closed, tenant/idempotency fixes, OAuth legacy callback block, rate limits + security headers, routePolicy sync, secret scan + cross-tenant tests; docs + runbook `docs/runbooks/security-hardening.md`; DEC-028. PASS 2026-07-18.
 - [ ] Stabilize daily operations routine (scheduler, alerts, failed job triage).
 - [ ] Package standard onboarding steps for next customer.
 - [ ] Improve UI where pilot feedback shows clear need.

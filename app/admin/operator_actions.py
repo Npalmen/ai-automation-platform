@@ -32,6 +32,8 @@ _EXECUTOR_ROLES = frozenset({"operations", "admin"})
 # Rejection is only exposed for dispatch approvals whose reject path is verified
 # local-only (resolve_dispatch_approval approved=False).
 _SAFE_REJECT_APPROVAL_KINDS = frozenset({"controlled_dispatch"})
+# Approval from operator panel: dispatch and email_send (approval-first pilot paths).
+_SAFE_APPROVE_APPROVAL_KINDS = frozenset({"controlled_dispatch", "email_send"})
 
 
 class OperatorActionNotFoundError(Exception):
@@ -107,6 +109,15 @@ ACTION_REGISTRY: dict[str, OperatorActionDefinition] = {
         consequence_sv=(
             "Markerar det väntande dispatch-godkännandet som avslaget. Ingen "
             "extern dispatch eller export utförs."
+        ),
+    ),
+    "approval.approve": OperatorActionDefinition(
+        action_id="approval.approve",
+        required_role="operations",
+        label_sv="Godkänn väntande åtgärd",
+        consequence_sv=(
+            "Godkänner det väntande godkännandet och utför den konfigurerade "
+            "åtgärden (dispatch eller e-post) enligt policy."
         ),
     ),
 }
@@ -268,6 +279,11 @@ def _is_state_applicable(action_id: str, resource_state: dict[str, Any]) -> bool
             resource_state.get("approval_state") == "pending"
             and resource_state.get("approval_kind") in _SAFE_REJECT_APPROVAL_KINDS
         )
+    if action_id == "approval.approve":
+        return (
+            resource_state.get("approval_state") == "pending"
+            and resource_state.get("approval_kind") in _SAFE_APPROVE_APPROVAL_KINDS
+        )
     return False
 
 
@@ -290,6 +306,7 @@ def tenant_detail_candidate_actions(
 def needs_help_candidate_actions(item: dict[str, Any]) -> list[str]:
     candidates: list[str] = []
     if item.get("source_type") == "approval" and item.get("_approval_id"):
+        candidates.append("approval.approve")
         candidates.append("approval.reject")
     return candidates
 
@@ -725,6 +742,154 @@ def execute_reject_approval(
         status="completed",
         changed=True,
         message="Dispatch-godkännandet är avslaget.",
+        audit_event_id=audit_id,
+        completed_at=completed_at,
+    )
+
+
+def _resolve_email_approval_for_operator(
+    db: Session,
+    approval,
+    *,
+    actor: str,
+    note: str,
+) -> dict[str, Any]:
+    from app.workflows.action_executor import execute_action
+    from app.workflows.email_approval_resolution import finalize_email_approval_resolution
+
+    now = _utcnow()
+    send_result = None
+    send_error = None
+    delivery = approval.delivery_payload or {}
+    if delivery:
+        try:
+            send_result = execute_action(delivery, db=db)
+        except Exception as exc:
+            send_error = str(exc)
+            logger.error(
+                "Email send failed for approval %s: %s",
+                approval.approval_id,
+                type(exc).__name__,
+            )
+
+    updated_payload = dict(approval.request_payload or {})
+    updated_payload["state"] = "approved"
+    updated_payload["resolved_at"] = now.isoformat()
+    updated_payload["resolved_by"] = actor
+    updated_payload["resolution_note"] = note
+
+    ApprovalRequestRepository.upsert_from_payload(
+        db=db,
+        tenant_id=approval.tenant_id,
+        job_id=approval.job_id,
+        job_type=approval.job_type,
+        approval_request=updated_payload,
+        delivery_payload=approval.delivery_payload,
+    )
+    finalize_email_approval_resolution(
+        db,
+        approval,
+        approved=True,
+        actor=actor,
+        note=note,
+        send_result=send_result,
+        send_error=send_error,
+    )
+    return {"approval_state": "approved", "send_error": send_error}
+
+
+def execute_approve_approval(
+    db: Session,
+    tenant_id: str,
+    approval_id: str,
+    *,
+    operator: OperatorIdentity,
+    reason: str,
+    idempotency_key: str | None,
+) -> OperatorActionResponse:
+    action_id = "approval.approve"
+    requested_at = _utcnow()
+
+    record = ApprovalRequestRepository.get_by_approval_id(
+        db=db, tenant_id=tenant_id, approval_id=approval_id,
+    )
+    if record is None:
+        raise OperatorActionNotFoundError(
+            f"Approval '{approval_id}' not found for tenant '{tenant_id}'."
+        )
+
+    approval_kind = record.next_on_approve or ""
+    if approval_kind not in _SAFE_APPROVE_APPROVAL_KINDS:
+        raise OperatorActionValidationError(
+            "Approval type is not eligible for safe approval from the operator panel."
+        )
+
+    before = {
+        "approval_state": record.state,
+        "approval_kind": approval_kind,
+        "approval_id": approval_id,
+    }
+
+    if record.state != "pending":
+        raise OperatorActionConflictError(
+            f"Approval is already {record.state}."
+        )
+
+    try:
+        if approval_kind == "controlled_dispatch":
+            resolve_dispatch_approval(
+                db=db,
+                tenant_id=tenant_id,
+                approval_id=approval_id,
+                actor=operator["id"],
+                channel="operator_panel",
+                note=reason,
+                approved=True,
+            )
+        else:
+            _resolve_email_approval_for_operator(
+                db,
+                record,
+                actor=operator["id"],
+                note=reason,
+            )
+    except ValueError as exc:
+        message = str(exc)
+        if "already" in message.lower():
+            raise OperatorActionConflictError(message) from exc
+        raise OperatorActionValidationError(message) from exc
+
+    after = {**before, "approval_state": "approved"}
+    completed_at = _utcnow()
+    audit_id = _write_operator_audit(
+        db,
+        tenant_id=tenant_id,
+        action_id=action_id,
+        status="completed",
+        operator=operator,
+        reason=reason,
+        idempotency_key=idempotency_key,
+        resource_type="approval",
+        resource_id=approval_id,
+        changed=True,
+        result="completed",
+        before_state=before,
+        after_state=after,
+        requested_at=requested_at,
+        completed_at=completed_at,
+    )
+    label = (
+        "Dispatch-godkännandet är godkänt."
+        if approval_kind == "controlled_dispatch"
+        else "E-postgodkännandet är godkänt."
+    )
+    return _finalize_response(
+        action_id=action_id,
+        tenant_id=tenant_id,
+        resource_id=approval_id,
+        status="completed",
+        changed=True,
+        message=label,
         audit_event_id=audit_id,
         completed_at=completed_at,
     )

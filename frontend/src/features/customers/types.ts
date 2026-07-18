@@ -143,6 +143,18 @@ export type TenantAuditBlock = {
   recent: TenantAuditEvent[]
 }
 
+export type TenantOnboardingConfigSummary = {
+  schema_version: number | null
+  service_profiles: string[]
+  lead_requirements: Record<string, { required?: string[]; optional?: string[] }>
+  internal_routing_hints: Record<string, string>
+  intake: {
+    mode?: string | null
+    activation_cutoff_at?: string | null
+    enforcement?: string | null
+  }
+}
+
 export type TenantDetailResponse = {
   tenant: TenantBasicInfo
   health: TenantHealth
@@ -153,6 +165,7 @@ export type TenantDetailResponse = {
   recent_errors: PriorityItem[]
   usage: TenantUsageBlock
   audit: TenantAuditBlock
+  onboarding_config: TenantOnboardingConfigSummary
   available_actions: AvailableActionMeta[]
 }
 

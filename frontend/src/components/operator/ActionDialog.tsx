@@ -50,6 +50,8 @@ export function ActionDialog({
     }
   }, [open])
 
+  if (!open) return null
+
   return (
     <dialog
       ref={dialogRef}

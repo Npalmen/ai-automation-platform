@@ -13,6 +13,7 @@ from app.admin.operator_actions import (
     OperatorActionConflictError,
     OperatorActionNotFoundError,
     OperatorActionValidationError,
+    execute_approve_approval,
     execute_pause_automation,
     execute_reject_approval,
     execute_resume_automation,
@@ -387,9 +388,10 @@ class TestNeedsHelpAvailableActions:
             },
         ):
             actions = _attach_available_actions(db, item, "operations")
-        assert len(actions) == 1
-        assert actions[0]["action_id"] == "approval.reject"
-        assert actions[0]["allowed"] is True
+        assert len(actions) == 2
+        ids = {a["action_id"] for a in actions}
+        assert ids == {"approval.approve", "approval.reject"}
+        assert all(a["allowed"] is True for a in actions)
 
     def test_read_only_approval_action_disabled(self):
         from app.admin.operations_needs_help import _attach_available_actions
@@ -409,6 +411,44 @@ class TestNeedsHelpAvailableActions:
             },
         ):
             actions = _attach_available_actions(db, item, "read_only")
-        assert len(actions) == 1
-        assert actions[0]["allowed"] is False
-        assert actions[0]["blocked_reason"] == "insufficient_role"
+        assert len(actions) == 2
+        assert all(a["allowed"] is False for a in actions)
+        assert all(a["blocked_reason"] == "insufficient_role" for a in actions)
+
+
+class TestApproveApproval:
+    def _approval(self, **kwargs):
+        return SimpleNamespace(
+            approval_id="appr-1",
+            tenant_id="T_TEST",
+            job_id="job-1",
+            job_type="lead",
+            state="pending",
+            next_on_approve="controlled_dispatch",
+            request_payload={},
+            delivery_payload=None,
+            **kwargs,
+        )
+
+    def test_approve_dispatch_success(self):
+        db = MagicMock()
+        with patch(
+            "app.admin.operator_actions.ApprovalRequestRepository.get_by_approval_id",
+            return_value=self._approval(),
+        ), patch(
+            "app.admin.operator_actions.resolve_dispatch_approval",
+            return_value={"status": "approved"},
+        ), patch(
+            "app.admin.operator_actions._write_operator_audit",
+            return_value="audit-1",
+        ):
+            result = execute_approve_approval(
+                db,
+                "T_TEST",
+                "appr-1",
+                operator=_operator(),
+                reason="Verifierad dispatch",
+                idempotency_key="k1",
+            )
+        assert result.status == "completed"
+        assert "godkänt" in result.message.lower()

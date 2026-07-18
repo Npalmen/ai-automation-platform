@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.admin.operations_overview_schemas import PriorityItem, StatusLevel
 from app.admin.operator_actions_schemas import AvailableActionMeta
@@ -154,6 +154,14 @@ class TenantAuditBlock(BaseModel):
     recent: list[TenantAuditEvent]
 
 
+class TenantOnboardingConfigSummary(BaseModel):
+    schema_version: int | None = None
+    service_profiles: list[str] = Field(default_factory=list)
+    lead_requirements: dict[str, Any] = Field(default_factory=dict)
+    internal_routing_hints: dict[str, str] = Field(default_factory=dict)
+    intake: dict[str, Any] = Field(default_factory=dict)
+
+
 class TenantDetailResponse(BaseModel):
     tenant: TenantBasicInfo
     health: TenantHealth
@@ -164,4 +172,7 @@ class TenantDetailResponse(BaseModel):
     recent_errors: list[PriorityItem]
     usage: TenantUsageBlock
     audit: TenantAuditBlock
+    onboarding_config: TenantOnboardingConfigSummary = Field(
+        default_factory=TenantOnboardingConfigSummary
+    )
     available_actions: list[AvailableActionMeta] = []

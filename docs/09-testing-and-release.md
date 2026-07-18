@@ -23,6 +23,50 @@ Record the pass count in `docs/01-current-truth.md` after each run.
 
 **Verified 2026-07-16:** Python 3.14.3 — 3265 passed, 0 failed, 4 warnings, ~12s (full suite). R1 release gate: regression 513 + e2e 155 passed (~5.3s). Visma focused set: 64 passed.
 
+### Kapitel 12 Slice 1 + 2 verification
+
+```bash
+python scripts/kapitel12_slice1_verify.py
+python scripts/kapitel12_slice2_verify.py
+python scripts/kapitel12_perf_baseline.py
+python -m pytest tests/test_kapitel12_backup_offsite.py tests/test_kapitel12_incident_drills.py -q
+```
+
+Offsite backup on pilot server (example):
+
+```bash
+export OFFSITE_BACKUP_DEST_DIR=/mnt/offsite/krowolf-backups   # separate mount
+export OFFSITE_BACKUP_COMMAND="python3 /opt/krowolf/scripts/offsite_backup_upload.py"
+export OFFSITE_STATUS_FILE=/opt/krowolf/storage/status/offsite_status.json
+bash /opt/krowolf/scripts/backup_postgres.sh
+bash /opt/krowolf/scripts/restore_from_offsite_rehearsal.sh
+```
+
+Live performance against running server:
+
+```bash
+export K12_PERF_BASE_URL=http://127.0.0.1:8000
+python scripts/kapitel12_perf_baseline.py
+```
+
+Reports: `scripts/kapitel12_slice1_report.json`, `scripts/kapitel12_slice2_report.json`, `scripts/kapitel12_perf_report.json`.
+
+### Kapitel 11 security regression gate
+
+Run after any change touching auth, admin routes, sessions, OAuth, or operator surfaces:
+
+```bash
+python -m pytest tests/test_admin_security_contracts.py tests/test_admin_cross_tenant_security.py tests/test_security_secret_scan.py tests/test_recovery_actions.py tests/test_alerting.py tests/test_admin_alerts.py tests/test_admin_auth.py tests/test_admin_session.py tests/test_tenant_isolation_http.py -q
+```
+
+Optional local E2E (API server running):
+
+```bash
+python scripts/kapitel11_security_e2e_verify.py
+```
+
+Inventory and runbook: `docs/security/kapitel-11-inventory.md`, `docs/runbooks/security-hardening.md`.
+
 ### Core intelligence evals
 
 ```bash

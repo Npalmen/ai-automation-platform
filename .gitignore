@@ -25,3 +25,14 @@ scripts/.dev-certs/
 
 # One-time Visma OAuth migration payloads (never commit)
 scripts/ops/.tmp/
+
+# Cursor IDE
+.cursor/
+
+# Frontend build artifacts
+frontend/dist/
+frontend/node_modules/
+
+# Generated verification reports (may contain environment-specific metadata)
+scripts/*_report.json
+scripts/kapitel*_report.json

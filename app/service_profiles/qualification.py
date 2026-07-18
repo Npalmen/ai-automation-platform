@@ -667,10 +667,11 @@ def apply_tenant_overrides(
     if tenant_ctx is None or not tenant_ctx.context_available:
         return profile
 
-    # Routing hint override: if tenant has a routing_hint for this service_type,
-    # apply it by reconstructing the profile with the new default_route.
+    # Routing hint override: prefer internal_routing_hints (via tenant_ctx.routing_hints merge),
+    # then legacy string values in routing_hints. Dict dispatch values are ignored here.
     routing_hints: dict = getattr(tenant_ctx, "routing_hints", {}) or {}
-    new_route = routing_hints.get(profile.service_type)
+    hint = routing_hints.get(profile.service_type)
+    new_route = hint if isinstance(hint, str) else None
     if new_route and new_route != profile.default_route:
         # dataclasses.replace is not available for frozen DCs in 3.10+, use manual rebuild
         import dataclasses

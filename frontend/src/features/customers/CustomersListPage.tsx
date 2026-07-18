@@ -8,7 +8,10 @@ import { LoadingState } from "@/components/operator/LoadingState"
 import { PageHeader } from "@/components/operator/PageHeader"
 import { StatusBadge } from "@/components/operator/StatusBadge"
 import { TenantIdentifier } from "@/components/operator/TenantIdentifier"
+import { Button } from "@/components/ui/button"
 import type { StatusVariant } from "@/design/types"
+import { useAuth } from "@/features/auth/AuthProvider"
+import { useListLayout } from "@/hooks/useListLayout"
 
 import { formatActivityAt, tenantStatusLabel } from "./formatters"
 import { useTenantsQuery } from "./queries"
@@ -35,6 +38,8 @@ const inputClassName =
 
 export function CustomersListPage() {
   const navigate = useNavigate()
+  const { auth } = useAuth()
+  const { ref: listLayoutRef, layout } = useListLayout()
   const [searchInput, setSearchInput] = useState("")
   const [filters, setFilters] = useState<TenantListFilters>({
     sort: "name",
@@ -42,6 +47,8 @@ export function CustomersListPage() {
   })
 
   const { data, isLoading, isError, error, refetch } = useTenantsQuery(filters)
+
+  const role = auth.status === "authenticated" ? auth.operator.role : null
 
   const columns = useMemo(
     () => [
@@ -142,6 +149,13 @@ export function CustomersListPage() {
             ? `${data.total} kund(er) — sök, filtrera och öppna detaljvy.`
             : "Operativ kundlista över alla tenants."
         }
+        actions={
+          role === "operations" || role === "admin" ? (
+            <Button type="button" onClick={() => navigate("/customers/new")}>
+              Ny kund
+            </Button>
+          ) : undefined
+        }
       />
 
       <FilterBar>
@@ -207,15 +221,35 @@ export function CustomersListPage() {
         </div>
       </FilterBar>
 
-      <DataTable
-        columns={columns}
-        rows={items}
-        getRowKey={(row) => row.tenant_id}
-        onRowClick={(row) => navigate(`/customers/${encodeURIComponent(row.tenant_id)}`)}
-        loading={isLoading && !data}
-        emptyTitle="Inga kunder"
-        emptyDescription="Inga tenants matchar valda filter."
-        mobileCard={(row) => (
+      <div ref={listLayoutRef} className="min-w-0">
+        <DataTable
+          columns={columns}
+          rows={items}
+          getRowKey={(row) => row.tenant_id}
+          onRowClick={(row) => navigate(`/customers/${encodeURIComponent(row.tenant_id)}`)}
+          layout={layout}
+          loading={isLoading && !data}
+          emptyTitle="Inga kunder"
+          emptyDescription="Inga tenants matchar valda filter."
+          compactRow={(row) => (
+            <button
+              type="button"
+              onClick={() => navigate(`/customers/${encodeURIComponent(row.tenant_id)}`)}
+              className="flex w-full min-w-0 items-start justify-between gap-3 rounded-lg border border-border bg-surface p-3 text-left hover:bg-surface-subtle"
+            >
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium text-text-primary">{row.name}</p>
+                  <StatusBadge variant={row.health.level} label={row.health.label} />
+                </div>
+                <TenantIdentifier tenantId={row.tenant_id} />
+                <p className="text-body-small text-text-secondary">
+                  {tenantStatusLabel(row.tenant_status)} · {formatActivityAt(row.last_activity_at)}
+                </p>
+              </div>
+            </button>
+          )}
+          mobileCard={(row) => (
           <button
             type="button"
             onClick={() => navigate(`/customers/${encodeURIComponent(row.tenant_id)}`)}
@@ -234,7 +268,8 @@ export function CustomersListPage() {
             </p>
           </button>
         )}
-      />
+        />
+      </div>
     </div>
   )
 }
