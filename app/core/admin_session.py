@@ -24,6 +24,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
 import os
@@ -236,12 +237,57 @@ def _parse_allowed_origins(raw: str) -> list[str]:
     return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
 
+def _client_is_trusted_proxy(client_host: str) -> bool:
+    """
+    True when the immediate TCP client is a loopback or private-network hop.
+
+    The app service is not published on the host; only reverse-proxy containers
+    on the Docker network reach it directly.
+    """
+    if not client_host:
+        return False
+    if client_host == "testclient":
+        return False
+    if client_host in ("127.0.0.1", "::1"):
+        return True
+    try:
+        ip = ipaddress.ip_address(client_host)
+    except ValueError:
+        return False
+    return ip.is_private or ip.is_loopback
+
+
+def _first_forwarded_value(raw: str) -> str:
+    """Return the closest hop from a comma-separated forwarded header."""
+    return raw.split(",")[0].strip()
+
+
+def _request_public_base_url(request: Request) -> str:
+    """
+    Browser-visible scheme://host for same-origin checks.
+
+    When the request arrives via a trusted reverse proxy, derive the public URL
+    from X-Forwarded-Proto and X-Forwarded-Host. Otherwise use the direct URL.
+    """
+    client_host = request.client.host if request.client else ""
+    if _client_is_trusted_proxy(client_host):
+        forwarded_host = request.headers.get("x-forwarded-host", "").strip()
+        if forwarded_host:
+            host = _first_forwarded_value(forwarded_host)
+            proto_raw = request.headers.get("x-forwarded-proto", "https").strip()
+            proto = _first_forwarded_value(proto_raw).lower()
+            if host and proto in ("http", "https"):
+                return f"{proto}://{host}"
+    return f"{request.url.scheme}://{request.url.netloc}"
+
+
 def require_same_origin(request: Request) -> None:
     """
     Reject cross-origin state-changing admin auth requests.
 
     When ALLOWED_ORIGINS is configured, Origin must match one entry exactly.
-    Otherwise Origin must match the request's own scheme://host.
+    Otherwise Origin must match the browser-visible scheme://host, including
+    values derived from trusted reverse-proxy forwarded headers.
     Missing Origin is allowed for non-browser clients and existing tests.
     """
     origin = request.headers.get("origin")
@@ -258,7 +304,7 @@ def require_same_origin(request: Request) -> None:
             )
         return
 
-    expected = f"{request.url.scheme}://{request.url.netloc}"
+    expected = _request_public_base_url(request)
     if origin != expected:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

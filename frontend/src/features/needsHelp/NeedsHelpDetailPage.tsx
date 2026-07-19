@@ -25,7 +25,7 @@ import { useNeedsHelpItemQuery } from "./queries"
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid gap-1 sm:grid-cols-[10rem_1fr]">
+    <div className="grid min-w-0 gap-1 md:grid-cols-[10rem_1fr]">
       <dt className="text-label text-text-muted">{label}</dt>
       <dd className="break-words text-body text-text-primary">{value}</dd>
     </div>
@@ -83,7 +83,7 @@ export function NeedsHelpDetailPage() {
         actions={
           <Link
             to={data.link}
-            className="inline-flex min-h-11 items-center rounded-md border border-border bg-page px-4 text-body text-text-primary"
+            className="inline-flex max-w-full shrink-0 min-h-11 items-center rounded-md border border-border bg-page px-4 text-body text-text-primary"
           >
             Öppna kund
           </Link>
@@ -99,7 +99,7 @@ export function NeedsHelpDetailPage() {
         </div>
         <dl className="space-y-3">
           <DetailRow label="Kund" value={data.customer_name} />
-          <div className="grid gap-1 sm:grid-cols-[10rem_1fr]">
+          <div className="grid min-w-0 gap-1 md:grid-cols-[10rem_1fr]">
             <dt className="text-label text-text-muted">Tenant</dt>
             <dd>
               <TenantIdentifier tenantId={data.tenant_id} />

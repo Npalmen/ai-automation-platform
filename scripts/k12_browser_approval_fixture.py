@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -39,7 +39,9 @@ def setup_synthetic_approval(tenant_id: str | None = None) -> dict[str, str]:
     approval_id = f"{APPROVAL_PREFIX}{uuid.uuid4()}"
     job_id = f"{JOB_PREFIX}{uuid.uuid4()}"
     now = datetime.now(timezone.utc)
+    stale_created_at = now - timedelta(hours=25)
     payload = {
+        "approval_id": approval_id,
         "state": "pending",
         "channel": "dashboard",
         "title": "K12 browser matrix — controlled dispatch (synthetic)",
@@ -102,7 +104,7 @@ def setup_synthetic_approval(tenant_id: str | None = None) -> dict[str, str]:
                 ON CONFLICT (job_id) DO UPDATE SET updated_at = :now
                 """
             ),
-            {"job_id": job_id, "tenant_id": tenant, "now": now},
+            {"job_id": job_id, "tenant_id": tenant, "now": stale_created_at},
         )
         db.execute(
             text(
@@ -123,7 +125,7 @@ def setup_synthetic_approval(tenant_id: str | None = None) -> dict[str, str]:
                 "approval_id": approval_id,
                 "tenant_id": tenant,
                 "job_id": job_id,
-                "now": now,
+                "now": stale_created_at,
                 "payload": json.dumps(payload),
             },
         )

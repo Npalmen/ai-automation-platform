@@ -61,6 +61,8 @@ Reports: `scripts/kapitel12_slice3_report.json`, `scripts/kapitel12_browser_repo
 
 **Browser matrix (pilot):** `docs/runbooks/kapitel12-browser-matrix.md` — env `/opt/krowolf/.env.browser-test`; per-role CDP via `kapitel12_browser_pilot_verify.py`.
 
+**Verified 2026-07-19:** Browseraggregat PASS (read_only, operations, admin); security bundle **240 passed**; full suite **3589 passed / 0 failed**; frontend gates PASS; release **GO** (see `docs/kapitel-12-release-notes.md`, DEC-030).
+
 **Verified 2026-07-18:** Security bundle 196 passed; full suite **3586 passed / 0 failed**; frontend gates PASS; release **CONDITIONAL GO** (authenticated browser matrix pending — see `docs/kapitel-12-release-notes.md`, `docs/kapitel-12-slice3-legacy-parity.md`).
 
 ### Kapitel 11 security regression gate

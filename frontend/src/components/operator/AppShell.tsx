@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { NavLink, Outlet, useLocation } from "react-router-dom"
 
 import { Badge } from "@/components/ui/badge"
@@ -85,12 +85,17 @@ function SidebarNav({
   )
 }
 
+const MAIN_CONTENT_ID = "main-content"
+
+function focusMainContent() {
+  document.getElementById(MAIN_CONTENT_ID)?.focus()
+}
+
 export function AppShell() {
   const { auth, logout } = useAuth()
   const location = useLocation()
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const drawerRef = useRef<HTMLDivElement>(null)
-  const mainId = useId()
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const operator = auth.status === "authenticated" ? auth.operator : null
@@ -140,8 +145,12 @@ export function AppShell() {
   return (
     <div className="min-h-screen bg-page text-text-primary">
       <a
-        href={`#${mainId}`}
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-surface focus:px-3 focus:py-2"
+        href={`#${MAIN_CONTENT_ID}`}
+        onClick={(event) => {
+          event.preventDefault()
+          focusMainContent()
+        }}
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         Hoppa till huvudinnehåll
       </a>
@@ -160,7 +169,7 @@ export function AppShell() {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-30 border-b border-border bg-surface">
-            <div className="flex min-h-14 items-center gap-3 px-4 py-2 sm:px-6">
+            <div className="flex min-h-14 min-w-0 items-center gap-2 px-4 py-2 md:gap-3 md:px-6">
               <Button
                 ref={menuButtonRef}
                 type="button"
@@ -181,13 +190,13 @@ export function AppShell() {
                 </p>
               </div>
 
-              <div className="flex min-w-0 shrink items-center gap-1.5 sm:gap-3">
+              <div className="flex min-w-0 shrink items-center gap-1.5 md:gap-3">
                 <AlertIndicator />
                 <EnvironmentBadge
                   environment={environment}
-                  className="hidden sm:inline-flex"
+                  className="hidden md:inline-flex"
                 />
-                <div className="hidden min-w-0 text-right sm:block">
+                <div className="hidden min-w-0 text-right md:block">
                   <p className="truncate text-body font-medium">
                     {operator.display_name}
                   </p>
@@ -195,30 +204,33 @@ export function AppShell() {
                     {ROLE_LABELS[operator.role]}
                   </p>
                 </div>
-                <Badge variant="outline" className="sm:hidden">
+                <Badge variant="outline" className="md:hidden">
                   {ROLE_LABELS[operator.role]}
                 </Badge>
                 <Button
                   type="button"
                   variant="outline"
-                  className="min-h-11 shrink-0 px-2 sm:px-4"
+                  className="min-h-11 shrink-0 px-2 md:px-4"
                   onClick={() => void logout()}
                   aria-label="Logga ut"
                 >
-                  <span className="sm:hidden" aria-hidden="true">
+                  <span className="md:hidden" aria-hidden="true">
                     ↪
                   </span>
-                  <span className="hidden sm:inline">Logga ut</span>
+                  <span className="hidden md:inline">Logga ut</span>
                 </Button>
               </div>
             </div>
           </header>
 
           <main
-            id={mainId}
-            className="min-w-0 flex-1 px-4 py-6 sm:px-6"
+            id={MAIN_CONTENT_ID}
+            tabIndex={-1}
+            className="min-w-0 flex-1 px-4 py-6 md:px-6 focus:outline-none"
           >
-            <Outlet />
+            <div className="min-w-0 w-full max-w-full overflow-x-clip">
+              <Outlet />
+            </div>
           </main>
         </div>
       </div>

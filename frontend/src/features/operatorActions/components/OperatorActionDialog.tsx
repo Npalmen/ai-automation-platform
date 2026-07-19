@@ -129,7 +129,7 @@ export function OperatorActionButton({ action, onClick }: OperatorActionButtonPr
     <Button
       type="button"
       variant="outline"
-      className="min-h-11 w-full justify-start sm:w-auto"
+      className="min-h-11 w-full min-w-0 justify-start md:w-auto"
       disabled={disabled}
       title={title}
       onClick={onClick}

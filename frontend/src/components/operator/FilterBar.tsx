@@ -11,7 +11,7 @@ export function FilterBar({ children, className }: FilterBarProps) {
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-col flex-wrap items-stretch gap-3 rounded-lg border border-border bg-surface p-4 sm:flex-row sm:flex-wrap sm:items-end",
+        "flex min-w-0 flex-col flex-wrap items-stretch gap-3 rounded-lg border border-border bg-surface p-4 md:flex-row md:flex-wrap md:items-end",
         className,
       )}
       role="search"
@@ -35,7 +35,7 @@ export function FilterField({
   className,
 }: FilterFieldProps) {
   return (
-    <div className={cn("flex min-w-0 flex-1 flex-col gap-1 sm:min-w-[min(100%,12rem)]", className)}>
+    <div className={cn("flex min-w-0 flex-1 flex-col gap-1 md:min-w-[min(100%,12rem)]", className)}>
       <label htmlFor={htmlFor} className="text-label text-text-secondary">
         {label}
       </label>

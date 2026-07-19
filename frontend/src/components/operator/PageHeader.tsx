@@ -26,7 +26,7 @@ export function PageHeader({
     >
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <h1 className="text-page-title font-semibold text-text-primary">
+          <h1 className="min-w-0 max-w-full break-words [overflow-wrap:anywhere] text-page-title font-semibold text-text-primary">
             {title}
           </h1>
           {status}

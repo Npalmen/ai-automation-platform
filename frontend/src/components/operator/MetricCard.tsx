@@ -36,7 +36,7 @@ export function MetricCard({
       {loading ? (
         <div className="h-8 w-24 animate-pulse rounded bg-surface-subtle" />
       ) : (
-        <p className="text-metric text-text-primary">{value}</p>
+        <p className="min-w-0 break-words text-metric text-text-primary">{value}</p>
       )}
       {helpText ? (
         <p className="break-words text-body-small text-text-muted">{helpText}</p>

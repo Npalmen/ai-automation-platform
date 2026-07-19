@@ -101,6 +101,7 @@ def redact_text(text: str, secrets: set[str]) -> str:
         redacted,
         flags=re.IGNORECASE,
     )
+    redacted = re.sub(r"\bkw_[a-f0-9]{32}\b", "[REDACTED_API_KEY]", redacted)
     return redacted
 
 

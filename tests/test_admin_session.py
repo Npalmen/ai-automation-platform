@@ -543,3 +543,54 @@ class TestOriginProtection:
                     json={"username": "admin", "password": password},
                 )
         assert resp.status_code == 200
+
+    def test_login_allows_origin_via_trusted_proxy_forwarded_headers(self):
+        from app.main import app
+
+        settings_mock, password = self._session_settings()
+        with patch("app.core.admin_session.get_settings", return_value=settings_mock):
+            with patch("app.main.get_settings", return_value=settings_mock):
+                client = TestClient(app, raise_server_exceptions=False, client=("172.18.0.2", 50000))
+                resp = client.post(
+                    "/auth/admin/login",
+                    json={"username": "admin", "password": password},
+                    headers={
+                        "Origin": "https://api.krowolf.se",
+                        "X-Forwarded-Host": "api.krowolf.se",
+                        "X-Forwarded-Proto": "https",
+                    },
+                )
+        assert resp.status_code == 200
+
+    def test_login_rejects_spoofed_forwarded_host_from_untrusted_client(self):
+        from app.main import app
+
+        settings_mock, password = self._session_settings()
+        with patch("app.core.admin_session.get_settings", return_value=settings_mock):
+            with patch("app.main.get_settings", return_value=settings_mock):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/auth/admin/login",
+                    json={"username": "admin", "password": password},
+                    headers={
+                        "Origin": "https://api.krowolf.se",
+                        "X-Forwarded-Host": "api.krowolf.se",
+                        "X-Forwarded-Proto": "https",
+                    },
+                )
+        assert resp.status_code == 403
+
+    def test_login_allows_explicit_allowed_origins(self):
+        from app.main import app
+
+        settings_mock, password = self._session_settings()
+        settings_mock.ALLOWED_ORIGINS = "https://api.krowolf.se"
+        with patch("app.core.admin_session.get_settings", return_value=settings_mock):
+            with patch("app.main.get_settings", return_value=settings_mock):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/auth/admin/login",
+                    json={"username": "admin", "password": password},
+                    headers={"Origin": "https://api.krowolf.se"},
+                )
+        assert resp.status_code == 200

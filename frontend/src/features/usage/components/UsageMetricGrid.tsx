@@ -19,7 +19,7 @@ export function UsageMetricGrid({ overview }: UsageMetricGridProps) {
       <h2 id="usage-metrics-heading" className="mb-3 text-section-title text-text-primary">
         Viktigaste mått
       </h2>
-      <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         <MetricCard
           label="Jobb mottagna"
           value={summary.jobs_received.current}

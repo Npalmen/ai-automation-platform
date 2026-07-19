@@ -827,12 +827,13 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 | Frontend gates | `Verified (local)` | typecheck, contracts, onboarding tests pass in slice script. |
 | Prestanda Profil A/B | `Verified (pilot RC)` | `scripts/k12_rc_perf.py` on live RC; strict 404/schema fail. |
 | Release inventory | `Verified (docs)` | `docs/kapitel-12-release-inventory.md` — Fas 1 plan godkänd 2026-07-18. |
-| **Slice 3 overall** | `Verified — PARTIAL` | Regression **3586 passed / 0 failed** (2026-07-18 slutrunda); security 196 passed; browser/a11y/roles PASS (static+pilot shell); autentiserad browsermatris **väntar på operatörscredentials**; release **CONDITIONAL GO**. |
-| Release decision K12 | `CONDITIONAL GO` | Max 3 pilot tenants; `/ops` primary; legacy `/ui` read-only (beslut B); backend regression grön; full GO blockerad av autentiserad browsermatris. |
-| Browser matrix | `Verified (static+pilot shell)` | 7 viewports, 3 zoom levels, 9 `/ops` routes; pilot login/overview/needs-help HTTP 200; full authenticated matrix requires operator session. |
+| **Slice 3 overall** | `Verified — PASS` | Autentiserad browsermatris **PASS** alla tre roller (2026-07-19 pilot); aggregat `/opt/krowolf/storage/status/kapitel12_browser_report.json`; operations Del 7 + admin suppress/rotation PASS; `credentials_exposed=false`; `external_side_effects=0`. |
+| Release decision K12 | `GO` | Browseraggregat PASS; backend **3589/0**; security **240/0**; frontend gates PASS; pilot `ADMIN_ROLE=admin`; scheduler pausad. |
+| Browser matrix | `Verified (pilot CDP)` | read_only + operations (+ Del 7) + admin PASS; 7 viewports × 3 zoom; `/ops` primära sidor inkl. foundation/design-reference; rapport per roll under `storage/status/k12_browser_*_report.json`. |
+| Browser safe boundaries | `Documented (pilot)` | Suppress **API PASS / UI not_mounted**; recovery/replay/reclassify/re-extract/resend/gmail **not_executed_safe_boundary**; controlled_dispatch approve **not_executed_safe_boundary** — permissions verifierade via security bundle + Del 7. |
 | Legacy retirement | `Beslut B` | `docs/kapitel-12-slice3-legacy-parity.md` — read-only fallback; full 410 deferred post-pilot. |
-| Security gate K12 | `Verified — PASS` | 196 passed (`kapitel11_security_bundle` in slice3 script). |
-| Full regression K12 | `Verified — PASS` | **3586 passed, 0 failed**, 4 warnings, ~39 s (2026-07-18); fixes: usage period-bounds patch i tester, malformed legacy routing → `invalid_hint`, schema migration execute-count; frontend typecheck/contracts/onboarding/build PASS; bundle ~552 KB JS. |
+| Security gate K12 | `Verified — PASS` | **240 passed**, 0 failed (2026-07-19 slutgate). |
+| Full regression K12 | `Verified — PASS` | **3589 passed, 0 failed**, 4 warnings, ~22 s (2026-07-19); scheduler digest-test fix (`send_hour=0`); frontend typecheck/contracts/onboarding/build PASS; bundle ~552 KB JS. |
 
 ### Kapitel 6 — Incidenthantering (2026-07-17)
 

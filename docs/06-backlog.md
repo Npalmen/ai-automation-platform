@@ -22,7 +22,9 @@
 - [x] **K12 regression cleanup** — 4 failures fixed (usage period bounds, routing `invalid_hint`, schema migration count); full suite **3586/0** (2026-07-18).
 - [ ] **Deploy/rollback live rehearsal** — staging/prod server with Docker.
 - [ ] **Live incident drills** — app/DB/scheduler outage on pilot server.
-- [ ] **Slice 3 autentiserad browsermatris** — följ `docs/runbooks/kapitel12-browser-matrix.md`; env: `/opt/krowolf/.env.browser-test`; kör `k12_verify_browser_env.py` + `kapitel12_browser_pilot_verify.py` per roll; aggregera med `kapitel12_browser_aggregate.py`.
+- [x] **Slice 3 autentiserad browsermatris** — read_only + operations (+ Del 7) + admin PASS på pilot (2026-07-19); aggregat `storage/status/kapitel12_browser_report.json`; env `/opt/krowolf/.env.browser-test`; scripts `kapitel12_browser_pilot_verify.py`, `kapitel12_browser_aggregate.py`.
+- [x] **K12 slutgate regression** — **3589 passed / 0 failed** (2026-07-19); scheduler digest-test stabiliserad (`send_hour=0`).
+- [x] **K12 slutgate security** — **240 passed** (K11 bundle, 2026-07-19).
 
 ---
 

@@ -471,7 +471,18 @@ class TestSchedulerRunOnce:
         assert dep.dependency is require_admin_api_key
 
     def test_digest_counted_when_sent(self):
-        r = self._run(run_mode="manual", notif_enabled=True)
+        stored = {
+            "T1": {
+                "scheduler": {"run_mode": "manual"},
+                "notifications": {
+                    "enabled": True,
+                    "recipient_email": "ops@x.com",
+                    "frequency": "daily",
+                    "send_hour": 0,
+                },
+            }
+        }
+        r = self._run(stored_per_tenant=stored, run_mode="manual", notif_enabled=True)
         assert r["digests_sent"] == 1
 
     def test_skipped_counted_when_both_skip(self):

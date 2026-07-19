@@ -19,7 +19,7 @@ export function OperatorDigestsPage() {
         actions={
           <Link
             to="/alerts"
-            className="rounded-md border border-border bg-surface px-3 py-2 text-body text-text-primary"
+            className="inline-flex max-w-full shrink-0 rounded-md border border-border bg-surface px-3 py-2 text-body text-text-primary"
           >
             Till larm
           </Link>
@@ -42,9 +42,9 @@ export function OperatorDigestsPage() {
               key={digest.id}
               className="rounded-lg border border-border bg-surface p-4"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="font-medium text-text-primary">
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="break-words font-medium text-text-primary">
                     {digest.digest_date}
                   </p>
                   <p className="text-body-small text-text-muted">
@@ -58,14 +58,14 @@ export function OperatorDigestsPage() {
               {digest.items.slice(0, 3).map((item) => (
                 <div
                   key={`${digest.id}-${item.priority}`}
-                  className="mt-3 flex items-start gap-2 border-t border-border pt-3"
+                  className="mt-3 flex min-w-0 items-start gap-2 border-t border-border pt-3"
                 >
                   {item.severity ? (
                     <SeverityBadge variant={alertSeverityBadge(item.severity)} />
                   ) : null}
                   <div className="min-w-0">
-                    <p className="text-body text-text-primary">{item.title}</p>
-                    <p className="text-body-small text-text-muted">
+                    <p className="break-words text-body text-text-primary">{item.title}</p>
+                    <p className="break-words text-body-small text-text-muted">
                       {item.summary}
                     </p>
                     {item.severity ? (

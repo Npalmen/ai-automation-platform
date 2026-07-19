@@ -25,10 +25,88 @@ from urllib.parse import urlparse
 
 
 class CdpError(RuntimeError):
-    pass
+    """CDP failure with bounded diagnostic context (no secrets)."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        method: str | None = None,
+        target_url: str | None = None,
+        timeout: float | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.method = method
+        self.target_url = target_url
+        self.timeout = timeout
+
+    def detail(self) -> str:
+        parts = [type(self).__name__, str(self)]
+        if self.method:
+            parts.append(f"method={self.method}")
+        if self.target_url:
+            parts.append(f"target={self.target_url}")
+        if self.timeout is not None:
+            parts.append(f"timeout={self.timeout}s")
+        return " | ".join(parts)
 
 
 def find_chrome_binary(explicit: str | None = None) -> str:
+    if explicit and Path(explicit).is_file():
+        return explicit
+    for name in (
+        "chromium",
+        "chromium-browser",
+        "google-chrome",
+        "google-chrome-stable",
+        "chrome",
+    ):
+        path = shutil.which(name)
+        if path:
+            return path
+    raise CdpError("Chromium/Chrome binary not found on PATH")
+
+
+def _obtain_page_ws_url(port: int, timeout: float = 20.0) -> str:
+    """
+    Return a page-target websocket URL.
+
+    /json/version exposes the browser target where Page.* is unavailable.
+    Page commands require a devtools/page target from /json/new or /json/list.
+    """
+    deadline = time.time() + timeout
+    last_error = "unknown"
+    while time.time() < deadline:
+        for url in (
+            f"http://127.0.0.1:{port}/json/new?about:blank",
+            f"http://127.0.0.1:{port}/json/new",
+        ):
+            for method in ("PUT", "GET"):
+                try:
+                    req = urllib.request.Request(url, method=method)
+                    with urllib.request.urlopen(req, timeout=1) as resp:
+                        data = json.loads(resp.read().decode("utf-8"))
+                    ws_url = data.get("webSocketDebuggerUrl")
+                    if ws_url and "/devtools/page/" in ws_url:
+                        return ws_url
+                except Exception as exc:
+                    last_error = str(exc)
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/list", timeout=1) as resp:
+                targets = json.loads(resp.read().decode("utf-8"))
+            for target in targets:
+                if target.get("type") != "page":
+                    continue
+                ws_url = target.get("webSocketDebuggerUrl")
+                if ws_url and "/devtools/page/" in ws_url:
+                    return ws_url
+        except Exception as exc:
+            last_error = str(exc)
+        time.sleep(0.2)
+    raise CdpError(
+        f"could not obtain page CDP websocket URL ({last_error})",
+        timeout=timeout,
+    )
     if explicit and Path(explicit).is_file():
         return explicit
     for name in (
@@ -132,6 +210,8 @@ class CdpBrowser:
     msg_id: int = 0
     console_errors: list[dict[str, Any]] = field(default_factory=list)
     _temp_profile: Path | None = None
+    debug_port: int | None = None
+    ws_url: str | None = None
 
     def start(self) -> None:
         if self.user_data_dir is None:
@@ -141,6 +221,7 @@ class CdpBrowser:
         port_sock.bind(("127.0.0.1", 0))
         port = port_sock.getsockname()[1]
         port_sock.close()
+        self.debug_port = port
 
         args = [
             self.chrome_path,
@@ -152,36 +233,29 @@ class CdpBrowser:
             "--disable-sync",
             "--disable-extensions",
             "--disable-dev-shm-usage",
+            # Required when the matrix runs as root (sudo/cron on pilot).
             "--no-sandbox",
         ]
         if self.headless:
-            args.append("--headless=new")
+            args.extend(["--headless=new", "--disable-gpu"])
         self.proc = subprocess.Popen(
             args,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             text=True,
         )
-        deadline = time.time() + 20
-        ws_url = None
-        while time.time() < deadline:
-            try:
-                with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=1) as resp:
-                    data = json.loads(resp.read().decode("utf-8"))
-                    ws_url = data.get("webSocketDebuggerUrl")
-                    if ws_url:
-                        break
-            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
-                time.sleep(0.2)
-        if not ws_url:
+        try:
+            ws_url = _obtain_page_ws_url(port, timeout=20.0)
+        except CdpError:
             self.close()
-            raise CdpError("could not obtain CDP websocket URL")
+            raise
+        self.ws_url = ws_url
         self.sock = _ws_connect(ws_url)
-        self.call("Page.enable")
-        self.call("Runtime.enable")
-        self.call("Log.enable")
-        self.call("Network.enable")
-        self.call("DOM.enable")
+        self.call("Page.enable", timeout=15.0)
+        self.call("Runtime.enable", timeout=15.0)
+        self.call("Log.enable", timeout=15.0)
+        self.call("Network.enable", timeout=15.0)
+        self.call("DOM.enable", timeout=15.0)
         self._drain_events(timeout=0.5)
 
     def close(self) -> None:
@@ -237,7 +311,7 @@ class CdpBrowser:
 
     def call(self, method: str, params: dict[str, Any] | None = None, timeout: float = 30.0) -> dict[str, Any]:
         if not self.sock:
-            raise CdpError("browser not started")
+            raise CdpError("browser not started", method=method, target_url=self.ws_url, timeout=timeout)
         self.msg_id += 1
         msg_id = self.msg_id
         payload = {"id": msg_id, "method": method, "params": params or {}}
@@ -261,9 +335,21 @@ class CdpBrowser:
                             )
                 continue
             if "error" in message:
-                raise CdpError(str(message["error"]))
+                err = message["error"]
+                msg = err.get("message") if isinstance(err, dict) else str(err)
+                raise CdpError(
+                    msg or str(err),
+                    method=method,
+                    target_url=self.ws_url,
+                    timeout=timeout,
+                )
             return message.get("result") or {}
-        raise CdpError(f"timeout waiting for {method}")
+        raise CdpError(
+            f"timeout waiting for {method}",
+            method=method,
+            target_url=self.ws_url,
+            timeout=timeout,
+        )
 
     def navigate(self, url: str, timeout: float = 30.0) -> None:
         self.call("Page.navigate", {"url": url})
@@ -275,7 +361,12 @@ class CdpBrowser:
                 self._drain_events(timeout=0.2)
                 return
             time.sleep(0.2)
-        raise CdpError(f"navigation timeout for {url}")
+        raise CdpError(
+            f"navigation timeout for {url}",
+            method="Page.navigate",
+            target_url=url,
+            timeout=timeout,
+        )
 
     def evaluate(self, expression: str, timeout: float = 15.0) -> Any:
         result = self.call(
@@ -288,7 +379,12 @@ class CdpBrowser:
             timeout=timeout,
         )
         if result.get("exceptionDetails"):
-            raise CdpError("javascript exception")
+            raise CdpError(
+                "javascript exception",
+                method="Runtime.evaluate",
+                target_url=self.ws_url,
+                timeout=timeout,
+            )
         return (result.get("result") or {}).get("value")
 
     def set_viewport(self, width: int, height: int) -> None:
@@ -366,13 +462,24 @@ class CdpBrowser:
         return self.evaluate(
             """(() => {
   const skip = document.querySelector('a[href="#main-content"]');
+  const main = document.getElementById('main-content');
   const skipDisplay = skip ? getComputedStyle(skip).display : null;
   const dialog = document.querySelector('[role="dialog"][aria-modal="true"]');
   const labels = Array.from(document.querySelectorAll('label[for]')).length;
   const focusable = document.querySelector('[class*="focus-visible"]') !== null;
+  let skip_focus_works = false;
+  if (skip && main) {
+    skip.focus();
+    skip.click();
+    skip_focus_works = document.activeElement === main;
+  }
+  const doc = document.documentElement;
   return {
     skip_link_present: !!skip,
+    main_content_present: !!main,
     skip_link_hidden_until_focus: skip ? (skipDisplay === 'none' || skip.className.includes('sr-only')) : false,
+    skip_focus_works,
+    document_overflow: doc.scrollWidth > doc.clientWidth,
     aria_modal_dialog_present: !!dialog,
     label_count: labels,
     focus_visible_class_present: focusable,

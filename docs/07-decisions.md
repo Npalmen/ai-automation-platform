@@ -442,10 +442,25 @@ Operation exit codes are independent of metadata write success. API reads files 
 
 ---
 
+## DEC-030 — Kapitel 12 slutgate GO (2026-07-19)
+
+**Date:** 2026-07-19  
+**Status:** Active — pilot `api.krowolf.se`, `ADMIN_ROLE=admin`
+
+| Item | Decision |
+|------|----------|
+| **Release** | **GO** — browseraggregat PASS (read_only, operations, admin); backend **3589/0**; security **240/0**; frontend gates PASS |
+| **Pilot operator role** | **`ADMIN_ROLE=admin`** — avsedd pilotroll; ingen återställning till operations efter slutgate |
+| **Browser safe boundaries** | Accepterade pilotbegränsningar (ej PARTIAL-blocker): suppress UI **not_mounted** (API PASS); recovery/replay/reclassify/re-extract/resend/gmail **not_executed_safe_boundary**; approve controlled_dispatch **not_executed_safe_boundary** — motsvarande permissions/kontrakt verifierade via security bundle + syntetiska prober |
+| **Post-pilot UI gap** | Alert suppress-knapp i React `/ops/alerts/{id}` — backend klar, UI ej monterad (F14) |
+| **Reports** | `/opt/krowolf/storage/status/kapitel12_browser_report.json`, per-roll `k12_browser_*_report.json` |
+
+---
+
 ## DEC-029 — Kapitel 12 releasebeslut (CONDITIONAL GO)
 
 **Date:** 2026-07-18  
-**Status:** Active for pilot RC on `api.krowolf.se`
+**Status:** Superseded by **DEC-030** for release gate; retained for history
 
 | Item | Decision |
 |------|----------|

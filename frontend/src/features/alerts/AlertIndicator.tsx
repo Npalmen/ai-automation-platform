@@ -10,7 +10,7 @@ export function AlertIndicator() {
   return (
     <Link
       to="/alerts"
-      className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-surface px-3 text-body text-text-primary hover:bg-surface-subtle"
+      className="inline-flex min-h-11 min-w-0 max-w-full items-center gap-2 rounded-md border border-border bg-surface px-2 text-body text-text-primary hover:bg-surface-subtle md:px-3"
       aria-label={
         urgentCount > 0
           ? `${urgentCount} kritiska eller höga larm`
@@ -18,7 +18,7 @@ export function AlertIndicator() {
       }
     >
       <span aria-hidden="true">🔔</span>
-      <span className="hidden sm:inline">Larm</span>
+      <span className="hidden md:inline">Larm</span>
       {urgentCount > 0 ? (
         <Badge variant="outline" className="border-status-danger text-status-danger">
           {urgentCount}

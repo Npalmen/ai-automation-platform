@@ -16,7 +16,10 @@
 # real, retrieved production Caddyfile. See infra/README.md.
 
 api.krowolf.se {
-	reverse_proxy app:8000
+	reverse_proxy app:8000 {
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
+	}
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
@@ -26,7 +29,10 @@ api.krowolf.se {
 }
 
 app.krowolf.se {
-	reverse_proxy app:8000
+	reverse_proxy app:8000 {
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
+	}
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
@@ -38,7 +44,10 @@ app.krowolf.se {
 }
 
 admin.krowolf.se {
-	reverse_proxy app:8000
+	reverse_proxy app:8000 {
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
+	}
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"

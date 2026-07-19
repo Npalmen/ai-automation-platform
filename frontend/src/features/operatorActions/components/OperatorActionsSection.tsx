@@ -97,7 +97,7 @@ export function OperatorActionsSection({
         Säkra driftåtgärder med obligatorisk anledning och bekräftelse. Tillgänglighet
         styrs av backend utifrån aktuellt läge och din roll.
       </p>
-      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap">
+      <div className="flex min-w-0 flex-col gap-2 md:flex-row md:flex-wrap">
         {actions.map((action) => (
           <OperatorActionButton
             key={action.action_id}

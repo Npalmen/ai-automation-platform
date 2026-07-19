@@ -263,7 +263,7 @@ export function UsageTenantTable({
             ))}
           </select>
         </FilterField>
-        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+        <div className="flex w-full flex-wrap gap-2 md:w-auto">
           <button
             type="button"
             className="min-h-11 rounded-md border border-border bg-page px-4 text-body text-text-secondary"

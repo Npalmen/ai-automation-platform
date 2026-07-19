@@ -16,7 +16,7 @@ export function UsageCapacitySection({ capacity }: UsageCapacitySectionProps) {
       <p className="mb-3 text-body-small text-text-muted">
         Baslinje saknas — inga konfigurerade varningsgränser.
       </p>
-      <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         <MetricCard
           label="Jobb per dag (snitt)"
           value={formatNullableNumber(capacity.jobs_per_day_average)}
