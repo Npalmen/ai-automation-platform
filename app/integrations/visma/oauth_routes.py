@@ -15,7 +15,8 @@ from app.admin.onboarding.audit_events import (
     OAUTH_CONNECTION_FAILED,
     emit_onboarding_audit,
 )
-from app.admin.onboarding.oauth_state_service import consume_oauth_state, is_onboarding_oauth_state
+from app.admin.onboarding.oauth_state_service import consume_oauth_state
+from app.integrations.oauth_state_resolver import lookup_oauth_state_source
 from app.admin.onboarding.integration_verification import IntegrationVerificationStore
 from app.admin.onboarding.repository import OnboardingRepository
 from app.api.dependencies import get_db
@@ -84,7 +85,9 @@ def visma_oauth_callback(
     if not state:
         raise HTTPException(status_code=400, detail="Missing state parameter.")
 
-    if is_onboarding_oauth_state(state):
+    state_source = lookup_oauth_state_source(db, state)
+
+    if state_source == "onboarding":
         try:
             oauth_state = consume_oauth_state(db, state_id=state, settings=settings)
         except OnboardingConflictError:

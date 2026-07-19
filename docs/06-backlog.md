@@ -622,12 +622,30 @@ Production deploy and Phase A-C re-run completed on 2026-07-07. Live commit afte
 - [ ] Production `docker-compose` currently contains DB password directly. Rotate and move DB password to `.env.production` after live verification checkpoint.
 - [x] SQLAlchemy SQL echo verbose in production — FIXED in Phase N. `DB_ECHO: bool = False` now default; `database.py` uses `echo=settings.DB_ECHO`. Committed `01f5763`, Docker image rebuilt, SQL echo eliminated in production.
 
+### Pilotdrift Försteg — Tenant Google Mail OAuth (2026-07-19)
+
+- [x] **Backend OAuth flow** — signed state, admin connect/disconnect/status, callback, code exchange, tenant `oauth_credentials` upsert with refresh preservation, auto refresh, test-read, health + onboarding wiring.
+- [x] **Operator panel UI** — `GmailIntegrationPanel` on customer detail + onboarding connect button; states not_connected/connecting/connected/reconnect_required/error; no tokens in UI.
+- [x] **Pilot scope contract** — `gmail.readonly` + `gmail.modify` only; `gmail.send` deferred until send paths are DB-wired and approved.
+- [x] **Security tests** — `tests/test_google_oauth_security.py` (state tenant binding, revoked refresh, cross-tenant, secret scan, same-origin).
+- [x] **Tests** — OAuth bundle 108+ security tests pass locally.
+- [x] **GCP setup doc** — `docs/google-cloud-oauth-setup.md`.
+- [x] **Callback state routing fix** — DB lookup replaces onboarding heuristic (`oauth_state_resolver.py`); deployed `rc-929ee642b1e1`.
+- [x] **Live connect `T_NIKLAS_DEMO_001`** — tenant `oauth_credentials`, `credential_source=tenant_oauth`, test-read + refresh + dry-run PASS (2026-07-19).
+- [x] **7-day soak started** — baseline + daily scripts; soak log `docs/niklas-gmail-soak-log.md`; scheduler remains paused.
+- [ ] **7-day soak complete** — confirm automatic refresh without manual Playground updates across 7 days.
+- [ ] **Scope re-consent before external pilot** — Google grant for pilot account still includes legacy `gmail.send` + `spreadsheets`; Krowolf uses only `readonly` + `modify` during soak; clean re-consent required before first external customer (new GCP consent screen / account without legacy grants).
+
+### Blocker — Gmail send via platform-env (not read-only pilot)
+
+- [ ] **`action_executor.py` send-gap** — `_build_email_result` and related paths call `get_integration_connection_config(...)` without `db=`, so approved email sends may resolve **platform-env** tokens instead of tenant `oauth_credentials`. **Does not block read-only pilot** (scan, test-read, dry-run). Blocks future Gmail-send until wired. See `docs/06-backlog.md` Pilotdrift Försteg send-gap.
+
 ### Pre-live blockers (require live environment)
 
 - [ ] `ADMIN_API_KEY` must be set to strong random value in production.
 - [ ] Correct admin-key success path must be verified with real `ADMIN_API_KEY` against a read-only admin endpoint such as `GET /admin/tenants`; do not print the key in reports.
 - [ ] Operator must confirm `ENV=production`, non-empty `ADMIN_API_KEY`, `DATABASE_URL`, latest deployed code/container, Caddy/reverse proxy running, and DB backup completed before Phase D.
-- [ ] Gmail OAuth flow must be completed for pilot tenant (`GET /auth/gmail/start?tenant_id=...`).
+- [ ] Gmail OAuth flow must be completed for pilot tenant via `POST /admin/tenants/T_NIKLAS_DEMO_001/integrations/google_mail/connect` (legacy `/oauth/start` disabled — 410).
 - [x] Monday `MONDAY_API_KEY` is SET (len=227) and `MONDAY_BOARD_ID` is SET — Phase L confirmed. Live item-creation not tested (intentional — no write in verification).
 - [ ] DB backup must be run before first live onboarding.
 - [ ] `python scripts/smoke_check.py --base-url <url> --expect-production` must pass.
@@ -637,7 +655,7 @@ Production deploy and Phase A-C re-run completed on 2026-07-07. Live commit afte
 ## Next (Fas 2 — First Customer Pilot)
 
 - [ ] Complete local pre-live setup checklist in `docs/02-first-customer-plan.md` against live server.
-- [ ] Connect Gmail inbox to pilot tenant (live OAuth flow).
+- [ ] Connect Gmail inbox to pilot tenant (live OAuth flow via operator panel — not Playground).
 - [ ] Verify inbox sync reads real mail and creates cases.
 - [ ] Verify customer-facing UI shows correct dashboard for pilot tenant.
 - [ ] Verify approval-gated email flow works for pilot tenant.

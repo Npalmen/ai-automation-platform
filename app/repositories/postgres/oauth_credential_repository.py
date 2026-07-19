@@ -46,10 +46,14 @@ class OAuthCredentialRepository:
             db.add(record)
         else:
             record.access_token = access_token
-            record.refresh_token = refresh_token
-            record.expires_at = expires_at
-            record.scopes = scopes
-            record.metadata_json = metadata_json
+            if refresh_token is not None:
+                record.refresh_token = refresh_token
+            if expires_at is not None:
+                record.expires_at = expires_at
+            if scopes is not None:
+                record.scopes = scopes
+            if metadata_json is not None:
+                record.metadata_json = metadata_json
             record.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(record)

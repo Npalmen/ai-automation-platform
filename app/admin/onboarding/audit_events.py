@@ -55,6 +55,11 @@ ALLOWLISTED_ONBOARDING_AUDIT_ACTIONS = frozenset(
         # transitional patched aliases
         "onboarding.integrations_patched",
         "onboarding.external_routing_patched",
+        # Google Mail OAuth (operator panel + callback)
+        "integration.google_mail.oauth_started",
+        "integration.google_mail.oauth_connected",
+        "integration.google_mail.oauth_failed",
+        "integration.google_mail.oauth_disconnected",
     }
 )
 

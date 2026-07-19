@@ -156,6 +156,24 @@ _SLICE2B_MIGRATION_STATEMENTS: list[str] = [
     "CREATE INDEX IF NOT EXISTS ix_tenant_resource_bindings_tenant ON tenant_resource_bindings (tenant_id, status)",
 ]
 
+_INTEGRATION_OAUTH_STATE_MIGRATION_STATEMENTS: list[str] = [
+    """
+    CREATE TABLE IF NOT EXISTS integration_oauth_states (
+        state_id                VARCHAR(64)  PRIMARY KEY,
+        state_hash              TEXT         NOT NULL,
+        tenant_id               VARCHAR(32)  NOT NULL,
+        operator_id             VARCHAR(128) NOT NULL,
+        provider                VARCHAR(32)  NOT NULL,
+        redirect_target         TEXT         NOT NULL,
+        expires_at              TIMESTAMPTZ  NOT NULL,
+        consumed_at             TIMESTAMPTZ,
+        created_at              TIMESTAMPTZ  NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_integration_oauth_states_tenant ON integration_oauth_states (tenant_id, provider)",
+    "CREATE INDEX IF NOT EXISTS ix_integration_oauth_states_expires ON integration_oauth_states (expires_at)",
+]
+
 _OPERATOR_ALERTS_MIGRATION_STATEMENTS: list[str] = [
     """
     CREATE TABLE IF NOT EXISTS operator_alerts (
@@ -333,6 +351,10 @@ def ensure_runtime_schema(engine: Engine) -> None:
             for ddl in _SLICE2B_MIGRATION_STATEMENTS:
                 conn.execute(text(ddl))
                 log.debug("Slice 2B migration OK")
+
+            for ddl in _INTEGRATION_OAUTH_STATE_MIGRATION_STATEMENTS:
+                conn.execute(text(ddl))
+                log.debug("Integration OAuth state migration OK")
 
             for ddl in _OPERATOR_ALERTS_MIGRATION_STATEMENTS:
                 conn.execute(text(ddl))

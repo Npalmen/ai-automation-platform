@@ -162,7 +162,7 @@ export function IntegrationsStepPanel({
               >
                 Verifiera
               </Button>
-              {item.integration_key === "visma" ? (
+              {item.integration_key === "visma" || item.integration_key === "gmail" ? (
                 <>
                   <Button
                     type="button"
@@ -172,7 +172,7 @@ export function IntegrationsStepPanel({
                     onClick={() =>
                       void connectMutation
                         .mutateAsync({
-                          integrationKey: "visma",
+                          integrationKey: item.integration_key,
                           version,
                           redirect_target: redirectTarget,
                         })
@@ -181,9 +181,15 @@ export function IntegrationsStepPanel({
                         })
                     }
                   >
-                    {item.connected ? "Återanslut Visma" : "Anslut Visma"}
+                    {item.integration_key === "gmail"
+                      ? item.connected
+                        ? "Återanslut Google"
+                        : "Anslut Google"
+                      : item.connected
+                        ? "Återanslut Visma"
+                        : "Anslut Visma"}
                   </Button>
-                  {item.connected ? (
+                  {item.integration_key === "visma" && item.connected ? (
                     <Button
                       type="button"
                       size="sm"
@@ -220,6 +226,12 @@ export function IntegrationsStepPanel({
             item.lifecycle_status === "authorization_required" ? (
               <p className="mt-2 text-body-small text-status-warning">
                 Auktorisering krävs — anslut Visma via OAuth innan verifiering.
+              </p>
+            ) : null}
+            {item.integration_key === "gmail" &&
+            item.lifecycle_status === "authorization_required" ? (
+              <p className="mt-2 text-body-small text-status-warning">
+                Auktorisering krävs — anslut Google via OAuth innan verifiering.
               </p>
             ) : null}
           </div>

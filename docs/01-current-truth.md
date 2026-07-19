@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-18 (Kapitel 12 Slice 1 PARTIAL; Kapitel 11 security hardening PASS; pilot transition pack in `docs/PILOT_TRANSITION.md`.)
+2026-07-19 (Pilotdrift Försteg — tenant Google Mail OAuth live on `T_NIKLAS_DEMO_001`; 7-day Gmail soak Day 0 baseline.)
 
 ## Verification method
 
@@ -30,6 +30,7 @@
 | Pilot transition pack | `Verified (docs)` | Scope, onboarding, operations, metrics, commercial draft in `docs/PILOT_TRANSITION.md` |
 | Visma write safety | `Verified` | `test_visma_write_safety.py` + `test_visma_oauth.py` + `test_migrate_visma_oauth_credential.py` — 64 passed (2026-07-16) |
 | Gmail manual-review handoff | `Verified (local)` | `app/workflows/manual_review_handoff.py` — UNREAD + `krowolf-manual-review` label on `manual_review`; queue at `/manual-review/jobs`; resolve via `POST .../resolve`; daily report `unresolved_manual_review`. 15 tests pass. Production backfill: `POST .../reconcile-gmail` on existing demo jobs. |
+| Tenant Google Mail OAuth (operator panel) | `Verified (local + pilot)` | Signed single-use state (`integration_oauth_states`, 15 min TTL); admin connect; callback DB routing fix (`oauth_state_resolver`); tenant credential in `oauth_credentials`; auto refresh via `oauth_token_resolver`; legacy `/oauth/start` returns 410. **Pilot `T_NIKLAS_DEMO_001` live connect verified 2026-07-19** (`credential_source=tenant_oauth`, test-read + refresh + dry-run PASS). 7-day soak started (`docs/niklas-gmail-soak-log.md`). Stored Google grant may include legacy `gmail.send` + `spreadsheets` — Krowolf uses only `readonly` + `modify` during soak. |
 | Internal handoff post-approval state | `Verified (local)` | `app/workflows/email_approval_resolution.py` — after final `email_send` approval resolves, job clears stale `awaiting_approval`/pending counts, records action execution, sets `completed` with `customer_case_open=true` for successful `send_internal_handoff`. 12 tests in `tests/test_internal_handoff_completion.py`. |
 | Dashboard `ready_cases` | `Verified (local)` | Uses `ApprovalRequestRepository.count_pending_for_tenant` (same source as `/approvals/pending`), not `jobs.status=awaiting_approval`. |
 | Daily summary `internal_handoffs_sent` | `Verified (local)` | Counts distinct successful `send_internal_handoff` action executions in report window; Swedish line when > 0. |

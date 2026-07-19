@@ -49,6 +49,7 @@ from app.core.settings import Settings
 from app.integrations.google.sheets_auth import resolve_google_sheets_access_token
 from app.integrations.google.sheets_client import GoogleSheetsClient
 from app.integrations.monday.client import MondayClient
+from app.integrations.google.oauth_service import get_auth_url_for_state as google_auth_url_for_state
 from app.integrations.visma.oauth_service import (
     get_auth_url_for_state,
     refresh_access_token,
@@ -59,8 +60,8 @@ from app.repositories.postgres.oauth_credential_repository import OAuthCredentia
 from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 
 _LABEL_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
-_CONNECTABLE = frozenset({"visma"})
-_ADMIN_UNLINK = frozenset({"visma"})
+_CONNECTABLE = frozenset({"visma", "gmail"})
+_ADMIN_UNLINK = frozenset({"visma", "gmail"})
 
 
 def _session_ops():
@@ -90,6 +91,17 @@ def _required_integration_keys(modules_payload: dict, draft: IntegrationsDraftPa
     required = _required_integrations_for_capabilities(caps)
     requested = set(draft.requested_integrations or modules_payload.get("integrations") or [])
     return required | requested
+
+
+def _google_mail_oauth_row(db: Session, tenant_id: str) -> OAuthCredentialRecord | None:
+    return (
+        db.query(OAuthCredentialRecord)
+        .filter(
+            OAuthCredentialRecord.tenant_id == tenant_id,
+            OAuthCredentialRecord.provider == "google_mail",
+        )
+        .first()
+    )
 
 
 def _visma_oauth_row(db: Session, tenant_id: str) -> OAuthCredentialRecord | None:
@@ -190,15 +202,25 @@ def _compute_lifecycle(
 
     if integration_key == "gmail":
         requested = draft.gmail.requested or required
+        row = _google_mail_oauth_row(db, tenant.tenant_id)
         configured = requested and _gmail_label_valid(draft.gmail.label_scope_slug)
-        platform_credential = bool(settings.GOOGLE_MAIL_ACCESS_TOKEN)
-        connected = platform_credential
+        platform_credential = row is not None or bool(settings.GOOGLE_MAIL_ACCESS_TOKEN)
+        connected = row is not None or bool(settings.GOOGLE_MAIL_ACCESS_TOKEN)
         if configured and verified:
             lifecycle = "configured_not_running"
-            source_class = "locally_verified"
+            source_class = (
+                verification.source_class
+                if verification
+                else ("tenant_oauth" if row else "platform_env")
+            )
         elif configured:
             lifecycle = "configured"
-            source_class = "locally_verified"
+            source_class = "tenant_oauth" if row else "platform_env"
+        elif connected:
+            lifecycle = "connected"
+            source_class = "tenant_oauth" if row else "platform_env"
+        elif configured and not connected:
+            lifecycle = "authorization_required"
         elif requested:
             lifecycle = "selected"
         else:
@@ -514,18 +536,35 @@ def connect_integration(
     if session.status not in OPEN_SESSION_STATUSES:
         raise OnboardingValidationError("Session is not writable.")
 
-    if not settings.VISMA_CLIENT_ID or not settings.VISMA_REDIRECT_URI:
-        raise OnboardingValidationError("Visma OAuth is not configured.")
+    if integration_key == "visma":
+        if not settings.VISMA_CLIENT_ID or not settings.VISMA_REDIRECT_URI:
+            raise OnboardingValidationError("Visma OAuth is not configured.")
+        provider = "visma"
+        state_id, _ = create_oauth_state(
+            db,
+            session=session,
+            operator_id=operator["id"],
+            provider=provider,
+            redirect_target=redirect_target,
+            settings=settings,
+        )
+        url = get_auth_url_for_state(state_id)
+    elif integration_key == "gmail":
+        if not settings.GOOGLE_OAUTH_CLIENT_ID or not settings.GOOGLE_OAUTH_REDIRECT_URI:
+            raise OnboardingValidationError("Google OAuth is not configured.")
+        provider = "google_mail"
+        state_id, _ = create_oauth_state(
+            db,
+            session=session,
+            operator_id=operator["id"],
+            provider=provider,
+            redirect_target=redirect_target,
+            settings=settings,
+        )
+        url = google_auth_url_for_state(state_id)
+    else:
+        raise OnboardingValidationError(f"Integration '{integration_key}' does not support connect.")
 
-    state_id, _ = create_oauth_state(
-        db,
-        session=session,
-        operator_id=operator["id"],
-        provider="visma",
-        redirect_target=redirect_target,
-        settings=settings,
-    )
-    url = get_auth_url_for_state(state_id)
     emit_onboarding_audit(
         db,
         tenant_id=session.tenant_id,
@@ -534,7 +573,7 @@ def connect_integration(
         details=_session_ops()._operator_audit_details(
             operator,
             session_id=session_id,
-            extra={"provider": "visma", "integration_key": integration_key},
+            extra={"provider": provider, "integration_key": integration_key},
         ),
     )
     try:
@@ -544,7 +583,7 @@ def connect_integration(
         from app.admin.onboarding.errors import OnboardingAuditError
 
         raise OnboardingAuditError("Audit could not be recorded.") from exc
-    return {"authorization_url": url, "provider": "visma", "state_id": state_id}
+    return {"authorization_url": url, "provider": provider, "state_id": state_id}
 
 
 def get_integration_status(

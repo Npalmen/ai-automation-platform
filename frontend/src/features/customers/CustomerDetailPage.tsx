@@ -10,9 +10,9 @@ import { PageHeader } from "@/components/operator/PageHeader"
 import { StatusBadge } from "@/components/operator/StatusBadge"
 import { TenantIdentifier } from "@/components/operator/TenantIdentifier"
 import { PriorityList } from "@/features/overview/components/PriorityList"
-import {
-  OperatorActionsSection,
+import { OperatorActionsSection,
 } from "@/features/operatorActions/components/OperatorActionsSection"
+import { GmailIntegrationPanel } from "@/features/customers/GmailIntegrationPanel"
 import { ApiError } from "@/api/client"
 
 import { formatActivityAt, integrationSummaryLabel, tenantStatusLabel } from "./formatters"
@@ -198,7 +198,8 @@ export function CustomerDetailPage() {
           />
 
           <Section title="Integrationer (hälsokontroll)">
-            <div className="flex flex-col gap-3">
+            <GmailIntegrationPanel tenantId={tenant.tenant_id} />
+            <div className="mt-3 flex flex-col gap-3">
               {healthCheckIntegrations.map(([key, item]) => (
                 <HealthIndicator
                   key={key}

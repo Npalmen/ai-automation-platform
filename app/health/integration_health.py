@@ -118,23 +118,37 @@ def _check(key: str, status: str, description: str) -> dict:
     return {"key": key, "check": key, "status": status, "description": description, "message": description}
 
 def _check_gmail(settings: dict, app_settings: Any, db: Session, tenant_id: str) -> dict:
+    from app.repositories.postgres.oauth_credential_repository import OAuthCredentialRepository
+
     checks = []
-    configured = bool(getattr(app_settings, "GOOGLE_MAIL_ACCESS_TOKEN", ""))
+    oauth_row = OAuthCredentialRepository.get(db, tenant_id, "google_mail")
+    platform_token = bool(getattr(app_settings, "GOOGLE_MAIL_ACCESS_TOKEN", ""))
+    configured = oauth_row is not None or platform_token
     last_success_at = None
     last_error_at = None
     last_error_message = None
     token_expired = False
 
-    # Check 1: config present
     checks.append(_check(
         "config_present",
         "pass" if configured else "fail",
         "Gmail-anslutning konfigurerad." if configured
-        else "Gmail-anslutning saknas — konfigurera OAuth-uppgifter.",
+        else "Gmail-anslutning saknas — anslut Google via operatörspanelen.",
     ))
 
     if configured:
-        # Check 2: token expiry (invalid_grant in recent failures)
+        if oauth_row is not None and oauth_row.expires_at is not None:
+            from datetime import datetime, timezone, timedelta
+
+            expires = oauth_row.expires_at
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=timezone.utc)
+            if expires <= datetime.now(timezone.utc) + timedelta(minutes=5) and oauth_row.refresh_token:
+                checks.append(_check(
+                    "token_valid",
+                    "warning",
+                    "Access token nära utgång — förnyas automatiskt vid nästa anrop.",
+                ))
         token_expired = _has_token_expiry_error(db, tenant_id, "gmail")
         if token_expired:
             checks.append(_check("token_valid", "fail",

@@ -3,9 +3,13 @@ from __future__ import annotations
 
 import os
 import re
+from typing import TYPE_CHECKING
 
 from app.core.settings import get_settings
 from app.integrations.enums import IntegrationType
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 
 def _normalize_tenant_key(tenant_id: str) -> str:
@@ -48,9 +52,9 @@ def _as_bool(value) -> bool:
 def get_integration_connection_config(
     tenant_id: str,
     integration_type: IntegrationType,
+    db: "Session | None" = None,
 ) -> dict:
     settings = get_settings()
-    
 
     if integration_type == IntegrationType.SLACK:
         return {
@@ -94,6 +98,10 @@ def get_integration_connection_config(
         }
 
     if integration_type == IntegrationType.GOOGLE_MAIL:
+        if db is not None:
+            from app.integrations.google.oauth_token_resolver import resolve_google_mail_connection_config
+
+            return resolve_google_mail_connection_config(tenant_id, db=db, settings=settings)
         return {
             "access_token": settings.GOOGLE_MAIL_ACCESS_TOKEN,
             "api_url": settings.GOOGLE_MAIL_API_URL,
@@ -101,6 +109,7 @@ def get_integration_connection_config(
             "refresh_token": settings.GOOGLE_OAUTH_REFRESH_TOKEN,
             "client_id": settings.GOOGLE_OAUTH_CLIENT_ID,
             "client_secret": settings.GOOGLE_OAUTH_CLIENT_SECRET,
+            "credential_source": "platform_env",
         }
 
     if integration_type == IntegrationType.GOOGLE_CALENDAR:

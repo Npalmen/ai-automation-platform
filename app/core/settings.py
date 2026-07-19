@@ -87,6 +87,11 @@ class Settings(BaseSettings):
     GOOGLE_OAUTH_REFRESH_TOKEN: str = ""
     GOOGLE_OAUTH_CLIENT_ID: str = ""
     GOOGLE_OAUTH_CLIENT_SECRET: str = ""
+    GOOGLE_OAUTH_REDIRECT_URI: str = ""
+    GOOGLE_OAUTH_SCOPES: str = (
+        "https://www.googleapis.com/auth/gmail.readonly "
+        "https://www.googleapis.com/auth/gmail.modify"
+    )
 
     GOOGLE_CALENDAR_API_URL: str = "https://www.googleapis.com/calendar/v3"
     GOOGLE_CALENDAR_ACCESS_TOKEN: str = ""

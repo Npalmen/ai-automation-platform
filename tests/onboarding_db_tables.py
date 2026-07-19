@@ -14,6 +14,7 @@ from app.repositories.postgres.audit_models import AuditEventRecord
 from app.repositories.postgres.oauth_credential_models import OAuthCredentialRecord
 from app.repositories.postgres.tenant_api_key_models import TenantApiKeyRecord
 from app.repositories.postgres.tenant_config_models import TenantConfigRecord
+from app.integrations.oauth_state_models import IntegrationOAuthStateRecord
 
 
 def onboarding_sqlite_tables() -> list:
@@ -26,6 +27,7 @@ def onboarding_sqlite_tables() -> list:
         OnboardingOAuthStateRecord.__table__,
         TenantResourceBindingRecord.__table__,
         OAuthCredentialRecord.__table__,
+        IntegrationOAuthStateRecord.__table__,
         AuditEventRecord.__table__,
         TenantApiKeyRecord.__table__,
     ]

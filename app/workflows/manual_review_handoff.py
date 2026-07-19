@@ -110,10 +110,11 @@ def _merge_handoff_state(job: Job, updates: dict[str, Any]) -> Job:
     return job
 
 
-def _get_gmail_adapter(tenant_id: str):
+def _get_gmail_adapter(tenant_id: str, db: Session | None = None):
     connection_config = get_integration_connection_config(
         tenant_id=tenant_id,
         integration_type=IntegrationType.GOOGLE_MAIL,
+        db=db,
     )
     return get_integration_adapter(
         integration_type=IntegrationType.GOOGLE_MAIL,
@@ -181,7 +182,7 @@ def apply_manual_review_handoff(
     gmail_updates: dict[str, Any] = {}
     if not already_complete:
         try:
-            mail_adapter = adapter or _get_gmail_adapter(job.tenant_id)
+            mail_adapter = adapter or _get_gmail_adapter(job.tenant_id, db=db)
             gmail_updates = _apply_gmail_labels(mail_adapter, message_id)
         except Exception as exc:
             gmail_error = str(exc)
@@ -291,7 +292,7 @@ def resolve_manual_review_job(
 
     if message_id and handoff.get("gmail_handoff_complete"):
         try:
-            mail_adapter = adapter or _get_gmail_adapter(job.tenant_id)
+            mail_adapter = adapter or _get_gmail_adapter(job.tenant_id, db=db)
             gmail_result = _remove_gmail_manual_review_label(
                 mail_adapter,
                 message_id,

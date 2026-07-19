@@ -196,7 +196,12 @@ async def on_startup():
 
 # Visma OAuth router
 from app.integrations.visma.oauth_routes import router as visma_oauth_router
+from app.integrations.google.oauth_routes import router as google_mail_oauth_router
+from app.admin.google_oauth import router as admin_google_oauth_router
+
 app.include_router(visma_oauth_router)
+app.include_router(google_mail_oauth_router)
+app.include_router(admin_google_oauth_router)
 
 
 @app.get("/callback", include_in_schema=False)
@@ -1509,6 +1514,7 @@ def _run_gmail_inbox_sync(
     connection_config = get_integration_connection_config(
         tenant_id=tenant_id,
         integration_type=IntegrationType.GOOGLE_MAIL,
+        db=db,
     )
     adapter = get_integration_adapter(
         integration_type=IntegrationType.GOOGLE_MAIL,

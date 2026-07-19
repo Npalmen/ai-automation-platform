@@ -64,6 +64,15 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+@pytest.fixture(autouse=True)
+def _no_tenant_oauth_row(monkeypatch):
+    """Gmail health tests use MagicMock DB; skip ORM oauth credential lookup."""
+    monkeypatch.setattr(
+        "app.repositories.postgres.oauth_credential_repository.OAuthCredentialRepository.get",
+        staticmethod(lambda db, tenant_id, provider: None),
+    )
+
+
 def _audit_record(action="gmail_inbox_sync", status="success", tenant_id="t-1"):
     r = MagicMock()
     r.action = action
