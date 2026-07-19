@@ -286,11 +286,10 @@ def _write_audit(db: Session, tenant_id: str, before: dict[str, Any], deleted: d
         AuditEventRecord(
             event_id=str(uuid4()),
             tenant_id=tenant_id,
+            category="platform",
             action=RESET_AUDIT_ACTION,
-            actor="platform",
-            resource_type="tenant",
-            resource_id=tenant_id,
-            details_json={
+            status="succeeded",
+            details={
                 "before": before,
                 "deleted": deleted,
                 "preserved": [
@@ -301,6 +300,7 @@ def _write_audit(db: Session, tenant_id: str, before: dict[str, Any], deleted: d
                     "scheduler_paused",
                 ],
             },
+            created_at=datetime.now(timezone.utc),
         )
     )
 
