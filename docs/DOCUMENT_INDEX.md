@@ -1,7 +1,7 @@
 # Document Index (Canonical)
 
 > **Governing hierarchy:** `docs/00-master-plan.md` → this index → listed canonical docs → deprecated/archive docs.
-> Last updated: **2026-07-20** (Stabilization chapter — pilot baseline `krowolf-pilot-baseline-20260720`).
+> Last updated: **2026-07-20** (Stabilization reconciliation — tag `krowolf-pilot-baseline-20260720-final`).
 
 ---
 
@@ -30,12 +30,13 @@
 
 | Item | Value |
 |------|-------|
-| Canonical Git commit | `e9fb16d` (+ stabilization ops scripts in follow-up commit) |
-| Git tag | `krowolf-pilot-baseline-20260720` |
-| Pilot tenant | `T_NIKLAS_DEMO_001` only |
-| Scheduler | `paused` |
-| Gmail | `credential_source=tenant_oauth`, send disabled |
-| Image tag pattern | `krowolf-app:rc-<sha12>` |
+| **Canonical Git commit** | `krowolf-pilot-baseline-20260720-final` (see `git rev-parse`) |
+| **Historical tag** | `krowolf-pilot-baseline-20260720` → `7855151` (superseded, retained) |
+| **Pilot tenant** | `T_NIKLAS_DEMO_001` only |
+| **Scheduler** | `paused` |
+| **Gmail** | `credential_source=tenant_oauth`, send disabled |
+| **Deploy model** | Modell A — Git HEAD = canonical; RC-bundle + `krowolf-app:rc-<sha12>` |
+| **Image tag pattern** | `krowolf-app:rc-<sha12>` |
 
 ---
 

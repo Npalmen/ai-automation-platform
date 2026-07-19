@@ -48,6 +48,27 @@ Google token grant for `niklas.palm@sol-f.se` includes older scopes (`gmail.send
 
 ---
 
+## Day 2 — post-stabilization clean baseline (2026-07-20)
+
+Stabilization chapter completed. Operational data reset; soak may proceed.
+
+| Metric | Value |
+|--------|-------|
+| jobs | 0 |
+| approvals | 0 |
+| tenant alerts (open) | 0 |
+| incidents | 0 |
+| integration_events | 0 |
+| audit_events | 1 (reset summary) |
+| credential_source | tenant_oauth |
+| scheduler | paused |
+| backup | success, offsite verified |
+| baseline report | `/opt/krowolf/storage/status/niklas_live_clean_baseline.json` |
+| pre-clean archive | `/opt/krowolf/storage/status/pre_live_niklas_archive.json` |
+| **ready_for_soak_day_1** | **true** (live scan still needs 3–5 new unread labeled messages) |
+
+---
+
 ## Day 1 (2026-07-19)
 
 - Daily report: `/opt/krowolf/storage/status/gmail_soak/day_01_2026-07-19.json`

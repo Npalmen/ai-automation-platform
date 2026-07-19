@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-20 (Stabilization chapter — pilot baseline reconciliation; canonical tag `krowolf-pilot-baseline-20260720`; single tenant `T_NIKLAS_DEMO_001`; scheduler paused; Gmail tenant OAuth live.)
+2026-07-20 (Stabilization reconciliation — canonical tag `krowolf-pilot-baseline-20260720-final`; clean Niklas baseline; soak Dag 1 ready.)
 
 ## Verification method
 

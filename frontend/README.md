@@ -18,7 +18,18 @@ The legacy single-file UI at `app/ui/index.html` remains in place and continues 
 python scripts/kapitel12_slice3_verify.py
 ```
 
-Reports: `scripts/kapitel12_slice3_report.json`, `scripts/kapitel12_browser_report.json`. Release decision: **CONDITIONAL GO** (see `docs/kapitel-12-release-notes.md`).
+Reports: `scripts/kapitel12_slice3_report.json`, `scripts/kapitel12_browser_report.json`. Release decision: **GO** (DEC-030). Pilot: single tenant `T_NIKLAS_DEMO_001`, Gmail OAuth via `GmailIntegrationPanel` at `/ops/customers/:tenantId`.
+
+## Pilot Gmail integration (operator panel)
+
+| Component | Path |
+|-----------|------|
+| UI panel | `src/features/customers/GmailIntegrationPanel.tsx` |
+| Connect flow | Admin session → `POST .../integrations/google_mail/oauth/start` → Google consent → callback |
+| Status | `GET /admin/tenants/{id}/integrations/google_mail/status` |
+| Test-read | `POST /integrations/google_mail/test-read` (tenant API key, server-side) |
+
+Gmail send is **not** enabled in pilot. Scopes: `gmail.readonly`, `gmail.modify` only.
 
 ## Stack
 

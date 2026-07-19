@@ -472,3 +472,19 @@ Operation exit codes are independent of metadata write success. API reads files 
 | **Blockers cleared for pilot** | Approval-first React, tenant isolation, backup/restore/cron, session auth |
 | **Accepted for pilot** | F05, F06, F15, F16, CSP gap, recovery without React UI, legacy read-only fallback |
 | **Reports** | `scripts/kapitel12_slice3_report.json`, `docs/kapitel-12-release-notes.md` |
+
+---
+
+## DEC-031 — Pilot stabilization baseline (2026-07-20)
+
+**Status:** Active — `api.krowolf.se`, single tenant `T_NIKLAS_DEMO_001`
+
+| Topic | Decision |
+|-------|----------|
+| **Canonical tag** | `krowolf-pilot-baseline-20260720-final` on final reconciliation commit (immutable; earlier tag `krowolf-pilot-baseline-20260720` on `7855151` retained for history) |
+| **Deploy model** | **Modell A** — server Git HEAD aligned to `origin/main`; runtime files (`.env.*`, `storage/`, `backups/`, tenant keys) gitignored and preserved; product code deployed via RC-bundle + Docker image |
+| **Tenant scope** | Exactly **one** tenant: `T_NIKLAS_DEMO_001` |
+| **Gmail** | Tenant OAuth only; Krowolf uses `readonly` + `modify`; send disabled; legacy grant scope superset tolerated but not invoked |
+| **Scheduler** | **Paused** until explicit operator enable after soak |
+| **Operational data** | Clean baseline (jobs/approvals/tenant-alerts=0); pre-clean archive at `pre_live_niklas_archive.json` |
+| **Next step** | Soak Dag 1 live scan — blocked on operator test emails only |

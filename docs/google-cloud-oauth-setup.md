@@ -69,12 +69,25 @@ GOOGLE_MAIL_USER_ID=
 - Refresh tokens lagras endast i DB; exponeras aldrig i API/UI
 - Client secret endast i server-env
 
+## Live status (2026-07-20)
+
+| Check | Status |
+|-------|--------|
+| Tenant `T_NIKLAS_DEMO_001` connected | PASS |
+| `credential_source` | `tenant_oauth` |
+| Test-read | PASS |
+| Krowolf scopes used | `readonly` + `modify` only |
+| Stored grant scope superset | May include `gmail.send`, `spreadsheets` — **not invoked** |
+| Gmail send | **Disabled** |
+| Scheduler | **Paused** |
+
 ## Checklista före intern live
 
 - [ ] Redirect URI matchar exakt i GCP och `GOOGLE_OAUTH_REDIRECT_URI`
 - [ ] Test user tillagd i GCP om app är i Testing
 - [ ] Consent scopes = readonly + modify (inte send)
 - [ ] `GOOGLE_OAUTH_*` satt i produktion utan att committas
-- [ ] Tenant ansluten via UI (inte Playground)
-- [ ] `test-read` + dry-run scan PASS
-- [ ] Scheduler fortfarande **paused**
+- [x] Tenant ansluten via UI (inte Playground)
+- [x] `test-read` PASS
+- [x] Scheduler fortfarande **paused**
+- [ ] Dry-run/live scan under soak — se `docs/niklas-gmail-soak-log.md`

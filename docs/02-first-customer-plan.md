@@ -241,6 +241,37 @@ Full self-service onboarding UI for this is deferred. For the first pilot custom
 
 ---
 
+## Pilot baseline — T_NIKLAS_DEMO_001 (2026-07-20)
+
+> **Status:** Clean operational baseline PASS. Redo för soak Dag 1 (live scan väntar på 3–5 nya olästa mejl).
+
+| Item | Value |
+|------|--------|
+| Pilot tenant | `T_NIKLAS_DEMO_001` only (whitelist cleanup 2026-07-19) |
+| Canonical commit | See `docs/DOCUMENT_INDEX.md` — tag `krowolf-pilot-baseline-20260720-final` |
+| Gmail OAuth | Tenant-bound (`credential_source=tenant_oauth`) via `/ops/customers/...` |
+| Krowolf Gmail scopes | `gmail.readonly`, `gmail.modify` only |
+| Stored Google grant | May include legacy scope superset (`gmail.send`, `spreadsheets`) — **do not invoke** |
+| Gmail send | **Disabled** — approval-first; `action_executor` send-gap documented in backlog |
+| Scheduler | **Paused** — manual scans only during soak |
+| Legacy `/ui` | Read-only — use `/ops` |
+| Backup | Offsite S3 verified; canonical cron `krowolf-backup-canonical.sh` |
+
+### Go/no-go för soak Dag 1
+
+- [x] Kapitel 12 GO (DEC-030)
+- [x] Tenant OAuth connected + test-read PASS
+- [x] Clean baseline: jobs=0, approvals=0, tenant alerts=0
+- [x] Scheduler paused
+- [ ] Operator adds 3–5 new unread messages under `label:krowolf-demo-niklas`
+- [ ] First live scan (`pilot_gmail_soak_first_scan.py`) — **not run yet**
+
+### Deprecated pilot docs
+
+Do not use for current truth: `docs/NIKLAS_DEMO_SETUP.md`, `docs/niklas-demo-production-testlog.md`, `docs/MARTENS_DEMO_*`. See `docs/DOCUMENT_INDEX.md`.
+
+---
+
 ## Pilot success criteria
 
 After the pilot is live, the following define success:

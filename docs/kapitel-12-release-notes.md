@@ -17,7 +17,21 @@
 | Frontend gates | PASS |
 | **Overall** | **GO** |
 
-**Pilot scope:** max 3 tenants; scheduler paused until operator enable; `/ops` primary UI; legacy `/ui` read-only only.
+**Pilot scope:** exactly **1** tenant (`T_NIKLAS_DEMO_001`); scheduler **paused**; `/ops` primary UI; legacy `/ui` read-only only; Gmail send **disabled**; tenant OAuth **connected**.
+
+## Stabilization baseline (2026-07-20)
+
+| Item | Status |
+|------|--------|
+| Tenant whitelist | PASS — only `T_NIKLAS_DEMO_001` |
+| Operational clean | PASS — jobs/approvals/tenant-alerts = 0 |
+| Gmail OAuth | PASS — `credential_source=tenant_oauth`, test-read PASS |
+| Canonical tag | `krowolf-pilot-baseline-20260720-final` |
+| Deploy | RC-bundle + `krowolf-app:rc-<sha12>` |
+| Soak Dag 1 | **Ready** — awaiting operator test emails |
+
+Pre-clean archive: `/opt/krowolf/storage/status/pre_live_niklas_archive.json`  
+Post-clean baseline: `/opt/krowolf/storage/status/niklas_live_clean_baseline.json`
 
 ## Browser matrix (2026-07-19)
 
@@ -78,7 +92,7 @@ These are **not** counted as executed PASS and do **not** block the browser aggr
 - Alert suppress: API only, ingen UI-knapp (F14)
 - OAuth tokens plaintext (F05, accepterad DEC-028)
 - CSP ej satt (accepterad)
-- Max 3 pilottenants rekommenderas; scheduler pausad tills operatör aktiverar
+- Max 1 pilottenant (`T_NIKLAS_DEMO_001`); scheduler pausad tills operatör aktiverar efter soak
 - Rapport-redaction: fält som innehåller substring `admin` kan visas som `[REDACTED]` om browser-credentials innehåller samma substring — körlogg bekräftar roll
 
 ## Operatör — start

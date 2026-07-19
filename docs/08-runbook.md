@@ -645,3 +645,23 @@ sudo bash /opt/krowolf/scripts/k12_pilot_rc_deploy.sh <COMMIT_SHA>
 ```
 
 Preserves: `.env.production`, `.env.offsite`, `.env.browser-test`, `storage/`, `backups/`, tenant key files.
+
+### Deploy model A (canonical)
+
+Server Git HEAD **must** match `origin/main` canonical commit. Product code is deployed via:
+
+1. `k12_create_rc_bundle.sh` → tarball (excludes `.env*`, `storage/`, `node_modules`)
+2. `k12_pilot_sync_bundle.sh` → sync `app/`, `frontend/`, `scripts/`, etc. to `/opt/krowolf`
+3. `k12_pilot_rc_deploy.sh <COMMIT_SHA>` → build image with `BUILD_COMMIT_SHA`, recreate `krowolf-app-1` only
+
+**Git reconciliation on server** (after inventory + backup):
+
+```bash
+cd /opt/krowolf
+sudo git -c safe.directory=/opt/krowolf fetch origin main
+sudo git -c safe.directory=/opt/krowolf reset --hard origin/main
+```
+
+Runtime files (`.env.*`, `storage/`, `backups/`, `tenant_keys/`) are gitignored and preserved. Caddy config outside repo is unchanged unless explicitly updated.
+
+**Do not** use server Git HEAD as deploy source if it diverges — always deploy from canonical `origin/main` commit via bundle.

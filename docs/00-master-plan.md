@@ -265,7 +265,11 @@ Alla låsta beslut finns i `docs/07-decisions.md` (DEC-001 till DEC-022).
 
 ## Current next allowed work
 
-Fas 1 — Current Truth Audit:
+**Pilot operational baseline (2026-07-20):** Kapitel 12 **GO** (DEC-030). Pilot `api.krowolf.se` kör en ren operativ baslinje med exakt en tenant (`T_NIKLAS_DEMO_001`), scheduler **paused**, tenantbunden Gmail OAuth (`gmail.readonly` + `gmail.modify`), Gmail send **disabled**, och clean operational data (jobs/approvals/tenant-alerts = 0). Nästa tillåtna operativa steg: **soak Dag 1** enligt `docs/niklas-gmail-soak-log.md` — ingen scheduler-aktivering och ingen Gmail-scan utan explicit operatörsbeslut.
+
+**Deploy source of truth:** `origin/main` + canonical tag `krowolf-pilot-baseline-20260720-final`. Server deploy via RC-bundle (`k12_pilot_sync_bundle.sh`) + image build (`k12_pilot_rc_deploy.sh`). Se `docs/08-runbook.md` och `docs/DOCUMENT_INDEX.md`.
+
+Fas 1 — Current Truth Audit (fortlöpande):
 
 1. Kör tester och notera faktiskt resultat.
 2. Kontrollera endpoints och notera vad som faktiskt fungerar.

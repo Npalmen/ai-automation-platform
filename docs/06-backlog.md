@@ -15,7 +15,8 @@
 - [x] **Del J clean baseline** — `scripts/ops/niklas_live_clean_baseline.json` via `niklas_live_clean_baseline.py`.
 - [x] **Document index** — `docs/DOCUMENT_INDEX.md` (canonical vs deprecated).
 - [x] **Local gates** — R1 release gate 524+157 passed; secret scan 4 passed; frontend typecheck + contracts + build PASS.
-- [ ] **Pilot image redeploy** — sync server product tree to canonical commit; rebuild `krowolf-app:rc-<sha>`.
+- [x] **Pilot image redeploy** — RC-bundle + `krowolf-app:rc-<sha>` from canonical commit.
+- [x] **Documentation reconciliation** — PASS (`docs/DOCUMENT_INDEX.md`, DEC-031).
 - [ ] **Soak Dag 1 live scan** — blocked until operator adds 3–5 new unread labeled emails (`docs/niklas-gmail-soak-log.md`).
 
 ---
