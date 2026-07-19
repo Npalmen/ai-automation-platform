@@ -612,3 +612,36 @@ Quick reference:
 - `GET /admin/alerts/run-all` removed; use `POST /admin/alerts/run-all`.
 - Security headers on API responses; `no-store` on `/ops`, `/auth/admin`, `/ui`.
 - Audit fail-closed on recovery and operator-alert mutations.
+
+---
+
+## Pilot stabilization baseline (2026-07-20)
+
+**Canonical:** Git tag `krowolf-pilot-baseline-20260720`; document index `docs/DOCUMENT_INDEX.md`.
+
+| Check | Expected |
+|-------|----------|
+| Tenants | Exactly `T_NIKLAS_DEMO_001` |
+| Scheduler | `paused` (all tenants) |
+| Gmail | `credential_source=tenant_oauth`; test-read PASS |
+| External writes | Disabled; no Gmail scan during stabilization |
+| Backup | Offsite verified before any operational reset |
+
+**Scripts (run inside app container with `PYTHONPATH=/app`):**
+
+```bash
+python3 scripts/ops/stabilization_preflight.py
+python3 scripts/ops/pre_live_niklas_archive.py T_NIKLAS_DEMO_001
+python3 scripts/ops/niklas_operational_reset.py --dry-run
+python3 scripts/ops/niklas_operational_reset.py --confirm-production-cleanup --execute
+python3 scripts/ops/niklas_live_clean_baseline.py T_NIKLAS_DEMO_001
+```
+
+**Deploy from canonical commit (on server):**
+
+```bash
+sudo bash /opt/krowolf/scripts/k12_pilot_sync_bundle.sh /tmp/k12-rc-bundle.tar.gz
+sudo bash /opt/krowolf/scripts/k12_pilot_rc_deploy.sh <COMMIT_SHA>
+```
+
+Preserves: `.env.production`, `.env.offsite`, `.env.browser-test`, `storage/`, `backups/`, tenant key files.

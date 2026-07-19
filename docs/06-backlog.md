@@ -6,7 +6,19 @@
 
 ---
 
-### Kapitel 12 — Release verification (2026-07-18)
+### Stabilization chapter — pilot baseline (2026-07-20)
+
+- [x] **Del A preflight script** — `scripts/ops/stabilization_preflight.py` (health, tenant whitelist, scheduler, OAuth source, backup).
+- [x] **Del D server inventory** — `scripts/ops/stabilization_server_inventory.sh` → `storage/status/stabilization_server_inventory.json`.
+- [x] **Del H archive** — `scripts/ops/pre_live_niklas_archive.py` → `pre_live_niklas_archive.json`.
+- [x] **Del I operational reset** — `scripts/ops/niklas_operational_reset.py` (jobs/approvals/alerts/incidents/events; preserves OAuth + tenant config).
+- [x] **Del J clean baseline** — `scripts/ops/niklas_live_clean_baseline.json` via `niklas_live_clean_baseline.py`.
+- [x] **Document index** — `docs/DOCUMENT_INDEX.md` (canonical vs deprecated).
+- [x] **Local gates** — R1 release gate 524+157 passed; secret scan 4 passed; frontend typecheck + contracts + build PASS.
+- [ ] **Pilot image redeploy** — sync server product tree to canonical commit; rebuild `krowolf-app:rc-<sha>`.
+- [ ] **Soak Dag 1 live scan** — blocked until operator adds 3–5 new unread labeled emails (`docs/niklas-gmail-soak-log.md`).
+
+---
 
 - [x] **Fas 1 plan godkänd** — releasebeslut RB-01–RB-04 + prestandaprofiler dokumenterade i `docs/kapitel-12-release-inventory.md`.
 - [x] **RB-04** — `approval.approve` backend + React (`approveTenantApproval`, needs-help/customer detail).

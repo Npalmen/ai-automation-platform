@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-19 (Pilotdrift Försteg — tenant Google Mail OAuth live on `T_NIKLAS_DEMO_001`; 7-day Gmail soak Day 0 baseline.)
+2026-07-20 (Stabilization chapter — pilot baseline reconciliation; canonical tag `krowolf-pilot-baseline-20260720`; single tenant `T_NIKLAS_DEMO_001`; scheduler paused; Gmail tenant OAuth live.)
 
 ## Verification method
 
