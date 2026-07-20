@@ -176,7 +176,7 @@ class TestIntegrationSignals:
         health_data = {
             "overall_status": "error",
             "systems": {
-                "gmail": {
+                "google_mail": {
                     "status": "error",
                     "recommended_action": "Fix Gmail config.",
                 }
@@ -184,7 +184,17 @@ class TestIntegrationSignals:
             "recent_errors": [],
             "runbook_signals": [],
         }
-        with patch("app.admin.operations_triage.get_integration_health", return_value=health_data):
+        with (
+            patch("app.admin.operations_triage.get_integration_health", return_value=health_data),
+            patch(
+                "app.admin.operations_triage.derive_integration_selection",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "app.admin.operations_triage.should_raise_tenant_warning",
+                return_value=True,
+            ),
+        ):
             rows = _integration_signals(db, "T_A", "Acme", s)
         assert len(rows) == 1
         assert rows[0]["severity"] == "critical"
@@ -202,9 +212,19 @@ class TestIntegrationSignals:
             "recent_errors": [],
             "runbook_signals": [],
         }
-        with patch("app.admin.operations_triage.get_integration_health", return_value=health_data):
+        with (
+            patch("app.admin.operations_triage.get_integration_health", return_value=health_data),
+            patch(
+                "app.admin.operations_triage.derive_integration_selection",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "app.admin.operations_triage.should_raise_tenant_warning",
+                return_value=True,
+            ),
+        ):
             rows = _integration_signals(db, "T_A", "Acme", s)
-        assert rows[0]["severity"] == "high"
+        assert rows[0]["severity"] == "medium"
 
     def test_warning_yields_medium_severity(self):
         db = _mock_db()
@@ -212,12 +232,22 @@ class TestIntegrationSignals:
         health_data = {
             "overall_status": "warning",
             "systems": {
-                "gmail": {"status": "warning", "recommended_action": "Run scan."}
+                "google_mail": {"status": "warning", "recommended_action": "Run scan."}
             },
             "recent_errors": [],
             "runbook_signals": [],
         }
-        with patch("app.admin.operations_triage.get_integration_health", return_value=health_data):
+        with (
+            patch("app.admin.operations_triage.get_integration_health", return_value=health_data),
+            patch(
+                "app.admin.operations_triage.derive_integration_selection",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "app.admin.operations_triage.should_raise_tenant_warning",
+                return_value=True,
+            ),
+        ):
             rows = _integration_signals(db, "T_A", "Acme", s)
         assert rows[0]["severity"] == "medium"
 

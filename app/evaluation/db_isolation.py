@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import uuid
 from contextlib import contextmanager
 from typing import Iterator
 
 from sqlalchemy import create_engine, event, text
+from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.repositories.postgres.action_execution_models import ActionExecutionRecord
@@ -16,6 +18,17 @@ from app.repositories.postgres.database import Base
 from app.repositories.postgres.decision_record_models import DecisionRecordRow
 from app.repositories.postgres.job_models import JobRecord
 from app.repositories.postgres.tenant_config_models import TenantConfigRecord
+from app.repositories.postgres.schema_migrations import ensure_runtime_schema
+from app.tools.test_environment.guards import verify_database_fingerprint
+
+TENANT_BOUND_TABLES: tuple[tuple[str, str], ...] = (
+    ("jobs", "tenant_id"),
+    ("approval_requests", "tenant_id"),
+    ("decision_records", "tenant_id"),
+    ("action_executions", "tenant_id"),
+    ("audit_events", "tenant_id"),
+    ("tenant_configs", "tenant_id"),
+)
 
 
 def _eval_tables():
@@ -35,6 +48,8 @@ def _install_sqlite_event_sequence_hook(engine) -> None:
 
     @event.listens_for(DecisionRecordRow, "before_insert")
     def _assign_event_sequence(mapper, connection, target):
+        if connection.dialect.name != "sqlite":
+            return
         if getattr(target, "event_sequence", None) is None:
             result = connection.execute(
                 DecisionRecordRow.__table__.select().with_only_columns(
@@ -102,3 +117,108 @@ def assert_tenant_clean(session: Session, tenant_id: str) -> None:
     dirty = {k: v for k, v in counts.items() if v > 0}
     if dirty:
         raise AssertionError(f"Tenant {tenant_id} not clean after scenario: {dirty}")
+
+
+_EVAL_PG_DATABASE_NAME = "ai_platform_eval"
+_ALLOWED_EVAL_HOSTS = frozenset({"localhost", "127.0.0.1"})
+
+
+def require_eval_pg_database_url() -> str:
+    env = os.environ.get("ENV", "").strip()
+    if env != "test":
+        raise RuntimeError(
+            f"ENV must be exactly 'test' for PostgreSQL eval tests, got {env!r}"
+        )
+
+    if os.environ.get("EVAL_HARNESS_PG_ALLOWED", "").strip().lower() != "yes":
+        raise RuntimeError("EVAL_HARNESS_PG_ALLOWED=yes is required for PostgreSQL eval tests")
+
+    url = os.environ.get("EVAL_DATABASE_URL", "").strip()
+    if not url:
+        raise RuntimeError("EVAL_DATABASE_URL is required for PostgreSQL eval tests")
+
+    parsed = make_url(url)
+    host = (parsed.host or "").strip().lower()
+    if host not in _ALLOWED_EVAL_HOSTS:
+        raise RuntimeError(
+            f"EVAL_DATABASE_URL host must be localhost or 127.0.0.1, got {host!r}"
+        )
+
+    database_name = (parsed.database or "").strip()
+    if database_name == "ai_platform":
+        raise RuntimeError(
+            "EVAL_DATABASE_URL must not use the dev database ai_platform"
+        )
+    if database_name != _EVAL_PG_DATABASE_NAME:
+        raise RuntimeError(
+            "EVAL_DATABASE_URL database must be exactly "
+            f"{_EVAL_PG_DATABASE_NAME!r}, got {database_name!r}"
+        )
+
+    ok, reason = verify_database_fingerprint(url)
+    if not ok:
+        raise RuntimeError(f"EVAL_DATABASE_URL rejected by fingerprint guard: {reason}")
+    return url
+
+
+def create_eval_pg_engine() -> Engine:
+    return create_engine(require_eval_pg_database_url(), pool_pre_ping=True)
+
+
+def provision_eval_pg_engine() -> Engine:
+    engine = create_eval_pg_engine()
+    Base.metadata.create_all(bind=engine, tables=_eval_tables())
+    ensure_runtime_schema(engine)
+    return engine
+
+
+def purge_eval_tenant(engine: Engine, tenant_id: str) -> None:
+    with engine.begin() as conn:
+        for table, column in TENANT_BOUND_TABLES:
+            conn.execute(text(f"DELETE FROM {table} WHERE {column} = :tid"), {"tid": tenant_id})
+
+
+def count_tenant_rows_fresh(engine: Engine, tenant_id: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    with engine.connect() as conn:
+        for table, column in TENANT_BOUND_TABLES:
+            row = conn.execute(
+                text(f"SELECT COUNT(*) FROM {table} WHERE {column} = :tid"),
+                {"tid": tenant_id},
+            ).scalar()
+            counts[table] = int(row or 0)
+    return counts
+
+
+def assert_tenant_purged(engine: Engine, tenant_id: str) -> None:
+    counts = count_tenant_rows_fresh(engine, tenant_id)
+    dirty = {k: v for k, v in counts.items() if v > 0}
+    if dirty:
+        raise AssertionError(f"Tenant {tenant_id} not purged: {dirty}")
+
+
+def assert_tenant_purged_via_new_engine(database_url: str, tenant_id: str) -> None:
+    """Verify purge visibility from a brand-new engine after dispose."""
+    engine = create_engine(database_url, pool_pre_ping=True)
+    try:
+        assert_tenant_purged(engine, tenant_id)
+    finally:
+        engine.dispose()
+
+
+@contextmanager
+def eval_pg_db_session(engine: Engine | None = None) -> Iterator[Session]:
+    """Production-like commit semantics for PostgreSQL eval scenarios."""
+    owned_engine = engine is None
+    engine = engine or provision_eval_pg_engine()
+    session = sessionmaker(bind=engine)()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+        if owned_engine:
+            engine.dispose()
