@@ -3,32 +3,15 @@ import { NavLink, Outlet, useLocation } from "react-router-dom"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { AlertIndicator } from "@/features/alerts/AlertIndicator"
 import {
   ENVIRONMENT_LABELS,
   ROLE_LABELS,
-  isRoleAllowed,
 } from "@/features/auth/permissions"
 import { useAuth } from "@/features/auth/AuthProvider"
-import { AlertIndicator } from "@/features/alerts/AlertIndicator"
-import type { Role } from "@/features/auth/types"
 import { cn } from "@/lib/utils"
 
-type NavItem = {
-  to: string
-  label: string
-  end?: boolean
-  allowedRoles: readonly Role[]
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { to: "/", label: "Översikt", end: true, allowedRoles: ["read_only", "operations", "admin"] },
-  { to: "/needs-help", label: "Behöver hjälp", allowedRoles: ["read_only", "operations", "admin"] },
-  { to: "/customers", label: "Kunder", allowedRoles: ["read_only", "operations", "admin"] },
-  { to: "/incidents", label: "Incidenter", allowedRoles: ["read_only", "operations", "admin"] },
-  { to: "/alerts", label: "Larm", allowedRoles: ["read_only", "operations", "admin"] },
-  { to: "/usage", label: "Användning", allowedRoles: ["read_only", "operations", "admin"] },
-  { to: "/system", label: "System", allowedRoles: ["operations", "admin"] },
-]
+import { visibleNavItemsForRole, type NavItem } from "./navConfig"
 
 function EnvironmentBadge({
   environment,
@@ -100,12 +83,7 @@ export function AppShell() {
 
   const operator = auth.status === "authenticated" ? auth.operator : null
   const environment = auth.status === "authenticated" ? auth.environment : null
-  const visibleNavItems =
-    operator === null
-      ? []
-      : NAV_ITEMS.filter((item) =>
-          isRoleAllowed(operator.role, item.allowedRoles),
-        )
+  const visibleNavItems = visibleNavItemsForRole(operator?.role)
 
   useEffect(() => {
     // Close mobile navigation after client-side route changes.

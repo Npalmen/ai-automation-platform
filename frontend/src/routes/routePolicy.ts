@@ -1,4 +1,5 @@
 import type { Role } from "@/features/auth/types"
+import { isRoleAllowed } from "@/features/auth/permissions"
 
 export type RoutePolicy = {
   path: string
@@ -24,7 +25,7 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
 ]
 
 function routeAllowsRole(route: RoutePolicy, role: Role): boolean {
-  return route.allowedRoles.includes(role)
+  return isRoleAllowed(role, route.allowedRoles)
 }
 
 export const ROUTE_POLICY_COVERAGE: Record<Role, readonly RoutePolicy[]> = {
