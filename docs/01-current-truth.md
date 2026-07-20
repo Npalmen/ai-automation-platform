@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-20 (Onboarding 2.0 pilot deploy + sign-off — RC `rc-f077aa5dda23`; tenant whitelist restored to `T_NIKLAS_DEMO_001` only; Gmail soak not resumed.)
+2026-07-21 (Slice A integration selection — canonical on `main`; pilot redeploy from main pending this session; prior pilot RC `a99c33c` on feature branch superseded.)
 
 ## Verification method
 
@@ -24,6 +24,7 @@
 
 | Claim | Status | Detail |
 |-------|--------|--------|
+| Integration selection Slice A (tenant health gating) | `Verified — local` | Canonical keys (`google_mail` + legacy `gmail` alias at ingest); `selection_resolver` derives `not_selected` / `selected_optional` / `selected_required` / `migration_review_required` from credentials + `allowed_integrations` (no migration 015). Unselected integrations → `not_applicable` tenant health; no triage/alert/customer-detail warning. Platform capabilities (e.g. Fortnox) separated from tenant warnings. Alert suppression reason: `integration_not_selected_after_selection_model_migration`. Commit on `main` after cherry-pick from `a99c33c`. Tests: `test_integration_selection_parity.py`, `test_integration_health.py`, `test_admin_tenant_directory.py`, `test_super_admin.py` — 144 passed (2026-07-21). Pilot canonical redeploy: see last verified date. |
 | Test suite runs | `Verified` | 3265 passed, 0 failed (run 2026-07-16; includes Visma write-safety + R1 release gate) |
 | Test count: 3265 tests | `Verified` | Run 2026-07-16 after Visma Chapter 3 regression |
 | Internal demo rehearsal | `Verified — production` | Read-only walkthrough 2026-07-16 on `T_NIKLAS_DEMO_001`; no Visma writes; see `docs/PILOT_TRANSITION.md` Part A |
