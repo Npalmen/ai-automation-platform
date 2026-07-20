@@ -312,9 +312,9 @@ def _integration_allowed_for_action(
     if integration_type is None:
         return True
 
-    from app.integrations.policies import is_integration_enabled_for_tenant
+    from app.integrations.policies import is_external_write_enabled_for_integration
 
-    return is_integration_enabled_for_tenant(tenant_id, integration_type, db=db)
+    return is_external_write_enabled_for_integration(tenant_id, integration_type, db=db)
 
 
 def execute_action(
