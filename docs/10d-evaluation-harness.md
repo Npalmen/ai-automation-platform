@@ -51,15 +51,6 @@ python scripts/run_eval_harness.py --baseline tests/evaluation/baselines/k2d-bas
 
 S01, S08, S10, S14, S15, S16, S17, S18
 
-## PostgreSQL eval tier (2D.1)
+## Known gap (blocker for separate fix)
 
-Blocking verification before 2D.1 sign-off:
-
-```bash
-set EVAL_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_platform_eval
-set EVAL_HARNESS_PG_ALLOWED=yes
-set ENV=test
-pytest -m pg_eval -q
-```
-
-Uses `ensure_runtime_schema()` (deployment migration path) and `migrations/015_decision_records.sql` for upgrade tests. Tenant cleanup is verified via explicit purge + new connection (not outer rollback).
+Email approval resolution (`_resolve_email_approval`) does not yet write full `execution_intent` / `execution_outcome` DecisionRecords — S18 asserts `action_authorization` + real execution telemetry until production hook exists.

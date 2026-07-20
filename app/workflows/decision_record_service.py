@@ -208,33 +208,6 @@ def record_action_authorization(
     return operation_id
 
 
-def record_action_approval_resolution(
-    db: Session,
-    trace: DecisionTraceSession | None,
-    job,
-    *,
-    approval_id: str,
-    operation_id: str,
-    action_type: str,
-    approved: bool,
-    fingerprint: str | None = None,
-    key_version: int | None = None,
-) -> str | None:
-    resolution = "approved" if approved else "rejected"
-    return append_record(
-        db,
-        trace,
-        job,
-        record_type=DecisionRecordType.ACTION_APPROVAL_RESOLUTION,
-        idempotency_key=f"action_approval_resolution:{approval_id}:{resolution}",
-        action_type=action_type,
-        action_operation_id=operation_id,
-        action_fingerprint=fingerprint,
-        fingerprint_key_version=key_version,
-        metadata={"approval_id": approval_id, "resolution": resolution},
-    )
-
-
 def record_execution_intent(
     db: Session,
     trace: DecisionTraceSession | None,

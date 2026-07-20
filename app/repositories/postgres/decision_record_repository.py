@@ -115,22 +115,6 @@ class DecisionRecordRepository:
         return list(db.execute(stmt).scalars().all())
 
     @staticmethod
-    def get_action_authorization(
-        db: Session,
-        *,
-        tenant_id: str,
-        action_operation_id: str,
-    ):
-        for row in DecisionRecordRepository.list_for_operation(
-            db,
-            tenant_id=tenant_id,
-            action_operation_id=action_operation_id,
-        ):
-            if row.record_type == "action_authorization":
-                return row
-        return None
-
-    @staticmethod
     def latest_operation_state(
         db: Session,
         *,

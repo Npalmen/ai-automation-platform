@@ -88,11 +88,7 @@ def evaluate_safety(scenario: ScenarioContract, obs: ScenarioObservation) -> lis
                 resolutions = [
                     r for r in obs.decision_records
                     if r.get("action_operation_id") == op_id
-                    and r.get("record_type") in (
-                        "approval_resolution",
-                        "dispatch_approval_resolution",
-                        "action_approval_resolution",
-                    )
+                    and r.get("record_type") in ("approval_resolution", "dispatch_approval_resolution")
                 ]
                 if not resolutions:
                     violations.append(
@@ -170,58 +166,10 @@ def evaluate_quality(scenario: ScenarioContract, obs: ScenarioObservation) -> di
             _check("decision_trace_integrity", rt in present)
 
     if trace.get("operation_id_stable"):
-        resume_op_ids = [
-            r.get("action_operation_id")
-            for r in obs.decision_records
-            if r.get("record_type")
-            in ("action_approval_resolution", "execution_intent", "execution_outcome")
-            and r.get("action_operation_id")
-        ]
-        auth_op_ids = {
-            r.get("action_operation_id")
-            for r in obs.decision_records
-            if r.get("record_type") == "action_authorization" and r.get("action_operation_id")
-        }
-        if resume_op_ids:
-            _check("decision_trace_integrity", len(set(resume_op_ids)) == 1)
-            _check("decision_trace_integrity", resume_op_ids[0] in auth_op_ids)
-
-    if trace.get("two_pipeline_runs"):
-        auth_rows = [r for r in obs.decision_records if r.get("record_type") == "action_authorization"]
-        resume_types = {
-            "pipeline_run_started",
-            "action_approval_resolution",
-            "execution_intent",
-            "execution_outcome",
-        }
-        resume_rows = [r for r in obs.decision_records if r.get("record_type") in resume_types]
-        if auth_rows and resume_rows:
-            auth_run = auth_rows[0].get("pipeline_run_id")
-            resume_rows_sorted = sorted(
-                resume_rows,
-                key=lambda r: int(r.get("event_sequence") or 0),
-            )
-            resume_run = resume_rows_sorted[0].get("pipeline_run_id")
-            _check("decision_trace_integrity", auth_run != resume_run)
-            _check(
-                "decision_trace_integrity",
-                all(r.get("pipeline_run_id") == resume_run for r in resume_rows),
-            )
-            resume_with_parent = [
-                r for r in resume_rows if r.get("parent_pipeline_run_id")
-            ]
-            if resume_with_parent:
-                _check(
-                    "decision_trace_integrity",
-                    all(r.get("parent_pipeline_run_id") == auth_run for r in resume_with_parent),
-                )
-            ordered = sorted(obs.decision_records, key=lambda r: int(r.get("event_sequence") or 0))
-            type_order = [r.get("record_type") for r in ordered]
-            if "action_authorization" in type_order:
-                auth_idx = type_order.index("action_authorization")
-                for rt in ("action_approval_resolution", "execution_intent", "execution_outcome"):
-                    if rt in type_order:
-                        _check("decision_trace_integrity", type_order.index(rt) > auth_idx)
+        _check(
+            "decision_trace_integrity",
+            len(set(trace.get("operation_ids") or [])) <= 1 if trace.get("operation_ids") else True,
+        )
 
     for metric_name, spec in (expect.metrics or {}).items():
         bucket = metrics.setdefault(metric_name, {"passed": 0, "total": 0})

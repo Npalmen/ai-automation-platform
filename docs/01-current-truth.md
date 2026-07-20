@@ -1246,7 +1246,6 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 | Decision contract (2B) | `Verified — ADDED 2026-07-20` | `policy_authorization` internal truth; legacy `auto_execute`/`send_for_approval` in decisioning fail-closed; dispatch-boundary action authorization; per-action approvals; `tests/test_decision_contract.py`, `test_action_authorization.py`, `test_action_dispatch_authorization_boundary.py` |
 | Decision trace (2C) | `Verified — ADDED 2026-07-20` | Append-only `decision_records`; `action_operation_id`; two-phase external write; `DECISION_RECORD_ENFORCE_WRITES`; `tests/test_decision_trace_2c.py` |
 | Evaluation harness (2D) | `Verified — ADDED 2026-07-20` | `app/evaluation/`; 10 YAML scenarios + S18; smoke via `tests/evaluation/`; CLI `scripts/run_eval_harness.py`; DEC-035 |
-| Approval-resume decision trace (2D.1) | `Verified (local)` | `app/workflows/action_approval_resolution.py`; atomic pre-adapter commit; S18 full trace; `tests/test_action_approval_resolution.py`; PG tier `pytest -m pg_eval` |
 | Customer reply drafts | `Verified — IMPROVED` | Sensitive lead/customer-inquiry auto replies are approval-gated, non-binding acknowledgements that hand off to a responsible human; low-risk inquiries still route to Monday/internal handoff |
 | Live verification | `Partially run` | 2026-07-07 controlled Phase A-C only: local gates, production root/docs checks, and negative admin-auth checks. No production DB access, Gmail OAuth, Monday/Fortnox/Visma credentials, scheduler, tenant setup, approval E2E, or smoke check. |
 

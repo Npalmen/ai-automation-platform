@@ -196,68 +196,6 @@ class ApprovalRequestRepository:
         return record
 
     @staticmethod
-    def transition_state_if_pending(
-        db: Session,
-        *,
-        tenant_id: str,
-        approval_id: str,
-        new_state: str,
-        resolved_at: datetime,
-        resolved_by: str | None,
-        resolution_note: str | None,
-    ) -> ApprovalRequestRecord | None:
-        """Atomically transition pending → new_state. Returns None if row missing."""
-        from sqlalchemy import update
-
-        record = ApprovalRequestRepository.get_by_approval_id(
-            db=db,
-            tenant_id=tenant_id,
-            approval_id=approval_id,
-        )
-        if record is None:
-            return None
-        if record.state != "pending":
-            return record
-
-        payload = dict(record.request_payload or {})
-        payload["state"] = new_state
-        payload["resolved_at"] = resolved_at.isoformat()
-        payload["resolved_by"] = resolved_by
-        payload["resolution_note"] = resolution_note
-
-        stmt = (
-            update(ApprovalRequestRecord)
-            .where(
-                ApprovalRequestRecord.tenant_id == tenant_id,
-                ApprovalRequestRecord.approval_id == approval_id,
-                ApprovalRequestRecord.state == "pending",
-            )
-            .values(
-                state=new_state,
-                resolved_at=resolved_at,
-                resolved_by=resolved_by,
-                resolution_note=resolution_note,
-                request_payload=payload,
-                updated_at=_utcnow(),
-            )
-        )
-        result = db.execute(stmt)
-        db.flush()
-        if result.rowcount == 0:
-            return ApprovalRequestRepository.get_by_approval_id(
-                db=db,
-                tenant_id=tenant_id,
-                approval_id=approval_id,
-            )
-        record.state = new_state
-        record.resolved_at = resolved_at
-        record.resolved_by = resolved_by
-        record.resolution_note = resolution_note
-        record.request_payload = payload
-        record.updated_at = _utcnow()
-        return record
-
-    @staticmethod
     def find_pending_dispatch_approval(
         db: Session,
         tenant_id: str,

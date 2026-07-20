@@ -365,7 +365,6 @@ class TestProcessActionDispatchEmailApproval:
 # ---------------------------------------------------------------------------
 
 _EXEC = "app.workflows.action_executor.execute_action"
-_RESOLVE = "app.workflows.action_approval_resolution.resolve_per_action_approval"
 _UPSERT = "app.repositories.postgres.approval_repository.ApprovalRequestRepository.upsert_from_payload"
 _FINALIZE = "app.workflows.email_approval_resolution.finalize_email_approval_resolution"
 
@@ -394,40 +393,31 @@ class TestResolveEmailApproval:
 
     def test_approve_calls_execute_action(self):
         from app.main import _resolve_email_approval
-        from app.workflows.action_approval_resolution import ActionApprovalResolutionResult
-
         db = MagicMock()
         approval = self._make_approval_record()
 
-        with patch(_RESOLVE) as mock_resolve:
-            mock_resolve.return_value = ActionApprovalResolutionResult(
-                approval_id=approval.approval_id,
-                job_id=approval.job_id,
-                approval_state="approved",
-                execution_state="succeeded",
-                send_result={"status": "sent"},
-            )
+        with (
+            patch(_EXEC, return_value={"status": "sent"}) as mock_exec,
+            patch(_UPSERT),
+            patch(_FINALIZE),
+        ):
             result = _resolve_email_approval(db, approval, approved=True, actor="operator")
 
-        mock_resolve.assert_called_once()
+        mock_exec.assert_called_once()
+        call_payload = mock_exec.call_args[0][0]
+        assert call_payload["to"] == "customer@example.com"
         assert result["status"] == "approved"
-        assert result["approval_state"] == "approved"
 
     def test_approve_returns_send_result(self):
         from app.main import _resolve_email_approval
-        from app.workflows.action_approval_resolution import ActionApprovalResolutionResult
-
         db = MagicMock()
         approval = self._make_approval_record()
 
-        with patch(_RESOLVE) as mock_resolve:
-            mock_resolve.return_value = ActionApprovalResolutionResult(
-                approval_id=approval.approval_id,
-                job_id=approval.job_id,
-                approval_state="approved",
-                execution_state="succeeded",
-                send_result={"status": "sent", "message_id": "msg123"},
-            )
+        with (
+            patch(_EXEC, return_value={"status": "sent", "message_id": "msg123"}),
+            patch(_UPSERT),
+            patch(_FINALIZE),
+        ):
             result = _resolve_email_approval(db, approval, approved=True)
 
         assert result["send_result"]["message_id"] == "msg123"
@@ -435,124 +425,100 @@ class TestResolveEmailApproval:
 
     def test_reject_does_not_call_execute_action(self):
         from app.main import _resolve_email_approval
-        from app.workflows.action_approval_resolution import ActionApprovalResolutionResult
-
         db = MagicMock()
         approval = self._make_approval_record()
 
-        with patch(_RESOLVE) as mock_resolve:
-            mock_resolve.return_value = ActionApprovalResolutionResult(
-                approval_id=approval.approval_id,
-                job_id=approval.job_id,
-                approval_state="rejected",
-                execution_state="not_executed",
-            )
+        with (
+            patch(_EXEC) as mock_exec,
+            patch(_UPSERT),
+            patch(_FINALIZE),
+        ):
             result = _resolve_email_approval(db, approval, approved=False, actor="operator")
 
-        mock_resolve.assert_called_once_with(
-            db, approval, approved=False, actor="operator", note=None,
-        )
+        mock_exec.assert_not_called()
         assert result["status"] == "rejected"
         assert result["send_result"] is None
 
     def test_approve_send_failure_captured_in_response(self):
         from app.main import _resolve_email_approval
-        from app.workflows.action_approval_resolution import ActionApprovalResolutionResult
-
         db = MagicMock()
         approval = self._make_approval_record()
 
-        with patch(_RESOLVE) as mock_resolve:
-            mock_resolve.return_value = ActionApprovalResolutionResult(
-                approval_id=approval.approval_id,
-                job_id=approval.job_id,
-                approval_state="approved",
-                execution_state="failed",
-                send_error="Gmail unavailable",
-            )
+        with (
+            patch(_EXEC, side_effect=RuntimeError("Gmail unavailable")),
+            patch(_UPSERT),
+            patch(_FINALIZE),
+        ):
             result = _resolve_email_approval(db, approval, approved=True)
 
+        # Should NOT raise — failure is captured
         assert result["status"] == "approved"
-        assert result["approval_state"] == "approved"
         assert "Gmail unavailable" in result["send_error"]
         assert result["send_result"] is None
 
     def test_approved_state_persisted(self):
         from app.main import _resolve_email_approval
-        from app.workflows.action_approval_resolution import ActionApprovalResolutionResult
-
         db = MagicMock()
         approval = self._make_approval_record()
 
-        with patch(_RESOLVE) as mock_resolve:
-            mock_resolve.return_value = ActionApprovalResolutionResult(
-                approval_id=approval.approval_id,
-                job_id=approval.job_id,
-                approval_state="approved",
-                execution_state="succeeded",
-            )
+        upserted_payloads = []
+
+        with (
+            patch(_EXEC, return_value={"status": "sent"}),
+            patch(_UPSERT, side_effect=lambda **kw: upserted_payloads.append(kw["approval_request"])),
+            patch(_FINALIZE),
+        ):
             _resolve_email_approval(db, approval, approved=True, actor="anna", note="Ser bra ut")
 
-        mock_resolve.assert_called_once_with(
-            db, approval, approved=True, actor="anna", note="Ser bra ut",
-        )
+        assert upserted_payloads
+        saved = upserted_payloads[0]
+        assert saved["state"] == "approved"
+        assert saved["resolved_by"] == "anna"
+        assert saved["resolution_note"] == "Ser bra ut"
 
     def test_rejected_state_persisted(self):
         from app.main import _resolve_email_approval
-        from app.workflows.action_approval_resolution import ActionApprovalResolutionResult
-
         db = MagicMock()
         approval = self._make_approval_record()
 
-        with patch(_RESOLVE) as mock_resolve:
-            mock_resolve.return_value = ActionApprovalResolutionResult(
-                approval_id=approval.approval_id,
-                job_id=approval.job_id,
-                approval_state="rejected",
-                execution_state="not_executed",
-            )
+        upserted_payloads = []
+
+        with (
+            patch(_EXEC),
+            patch(_UPSERT, side_effect=lambda **kw: upserted_payloads.append(kw["approval_request"])),
+            patch(_FINALIZE),
+        ):
             _resolve_email_approval(db, approval, approved=False)
 
-        mock_resolve.assert_called_once_with(
-            db, approval, approved=False, actor=None, note=None,
-        )
+        saved = upserted_payloads[0]
+        assert saved["state"] == "rejected"
 
     def test_approve_without_delivery_payload_does_not_crash(self):
         from app.main import _resolve_email_approval
-        from app.workflows.action_approval_resolution import ActionApprovalResolutionResult
-
         db = MagicMock()
         approval = self._make_approval_record()
         approval.delivery_payload = None
 
-        with patch(_RESOLVE) as mock_resolve:
-            mock_resolve.return_value = ActionApprovalResolutionResult(
-                approval_id=approval.approval_id,
-                job_id=approval.job_id,
-                approval_state="pending",
-                contract_conflict="empty delivery_payload",
-            )
+        with (
+            patch(_EXEC) as mock_exec,
+            patch(_UPSERT),
+            patch(_FINALIZE),
+        ):
             result = _resolve_email_approval(db, approval, approved=True)
 
-        assert result["approval_state"] == "pending"
+        mock_exec.assert_not_called()
+        assert result["status"] == "approved"
 
     def test_double_approve_is_idempotent(self):
         """Second approve on already-resolved approval must not re-execute action."""
         from app.main import _resolve_email_approval
-        from app.workflows.action_approval_resolution import ActionApprovalResolutionResult
-
         db = MagicMock()
         approval = self._make_approval_record(state="approved")
 
-        with patch(_RESOLVE) as mock_resolve:
-            mock_resolve.return_value = ActionApprovalResolutionResult(
-                approval_id=approval.approval_id,
-                job_id=approval.job_id,
-                approval_state="approved",
-                idempotent=True,
-            )
+        with patch(_EXEC) as mock_exec:
             result = _resolve_email_approval(db, approval, approved=True)
 
+        mock_exec.assert_not_called()
         assert result["status"] == "approved"
         assert result.get("idempotent") is True
 

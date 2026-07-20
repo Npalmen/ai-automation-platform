@@ -295,14 +295,14 @@ class EvalHarnessRunner:
 
     def _approve_action(self, db: Session, job: Job, approval_index: int) -> Job:
         from app.repositories.postgres.approval_repository import ApprovalRequestRepository
-        from app.workflows.action_approval_resolution import resolve_per_action_approval
+        from app.main import _resolve_email_approval
 
         pending = ApprovalRequestRepository.list_for_job(db, tenant_id=job.tenant_id, job_id=job.job_id)
         pending = [p for p in pending if (p.state or "") == "pending"]
         if approval_index >= len(pending):
             raise HarnessError(f"No pending approval at index {approval_index}")
         approval = pending[approval_index]
-        resolve_per_action_approval(db, approval, approved=True, actor="eval_operator")
+        _resolve_email_approval(db, approval, approved=True, actor="eval_operator")
         refreshed = JobRepository.get_job_by_id(db, job.tenant_id, job.job_id)
         return refreshed or job
 

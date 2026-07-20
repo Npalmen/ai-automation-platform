@@ -1102,17 +1102,104 @@ def _resolve_email_approval(
     actor: str | None = None,
     note: str | None = None,
 ) -> dict:
-    """Mark an email approval approved/rejected; execute external action when approved."""
-    from app.workflows.action_approval_resolution import resolve_per_action_approval
+    """Mark an email approval approved/rejected; send the email when approved."""
+    from datetime import datetime, timezone
+    from app.workflows.action_executor import execute_action
 
-    result = resolve_per_action_approval(
+    now = datetime.now(timezone.utc)
+    new_state = "approved" if approved else "rejected"
+
+    if approval.state in ("approved", "rejected"):
+        return {
+            "approval_id": approval.approval_id,
+            "status": approval.state,
+            "job_id": approval.job_id,
+            "send_result": None,
+            "send_error": None,
+            "idempotent": True,
+        }
+
+    send_result = None
+    send_error = None
+
+    if approved:
+        delivery = dict(approval.delivery_payload or {})
+        request_payload = approval.request_payload or {}
+        operation_id = request_payload.get("action_operation_id")
+        if operation_id:
+            delivery["_action_operation_id"] = operation_id
+        fingerprint = request_payload.get("action_fingerprint")
+        if fingerprint:
+            delivery["_action_fingerprint"] = fingerprint
+        if delivery:
+            try:
+                from app.domain.workflows.enums import JobType
+                from app.domain.workflows.models import Job
+
+                try:
+                    job_type = JobType(approval.job_type or "customer_inquiry")
+                except ValueError:
+                    job_type = JobType.CUSTOMER_INQUIRY
+                job = Job(
+                    job_id=approval.job_id,
+                    tenant_id=approval.tenant_id,
+                    job_type=job_type,
+                    input_data={},
+                )
+                if db is not None:
+                    try:
+                        from app.repositories.postgres.job_repository import JobRepository
+
+                        loaded = JobRepository.get_job_by_id(db, approval.tenant_id, approval.job_id)
+                        if loaded is not None and isinstance(loaded.job_id, str):
+                            job = loaded
+                    except (TypeError, ValueError, AttributeError):
+                        pass
+                send_result = execute_action(delivery, db=db, job=job, trace=None)
+            except Exception as exc:
+                send_error = str(exc)
+                # Do not raise — record the failure but complete the approval
+                import logging
+                logging.getLogger(__name__).error(
+                    "Email send failed for approval %s: %s",
+                    approval.approval_id, exc,
+                )
+
+    # Update approval record state
+    updated_payload = dict(approval.request_payload or {})
+    updated_payload["state"] = new_state
+    updated_payload["resolved_at"] = now.isoformat()
+    updated_payload["resolved_by"] = actor or "operator"
+    updated_payload["resolution_note"] = note
+
+    ApprovalRequestRepository.upsert_from_payload(
+        db=db,
+        tenant_id=approval.tenant_id,
+        job_id=approval.job_id,
+        job_type=approval.job_type,
+        approval_request=updated_payload,
+        delivery_payload=approval.delivery_payload,
+    )
+
+    from app.workflows.email_approval_resolution import finalize_email_approval_resolution
+
+    finalize_email_approval_resolution(
         db,
         approval,
         approved=approved,
         actor=actor,
         note=note,
+        send_result=send_result,
+        send_error=send_error,
     )
-    return result.to_api_dict()
+
+    return {
+        "approval_id": approval.approval_id,
+        "status": new_state,
+        "job_id": approval.job_id,
+        "send_result": send_result,
+        "send_error": send_error,
+    }
 
 
 @app.post("/approvals/{approval_id}/approve")

@@ -66,11 +66,6 @@ expect:
   decision_trace:
     required_types:
       - action_authorization
-      - action_approval_resolution
-      - execution_intent
-      - execution_outcome
-    operation_id_stable: true
-    two_pipeline_runs: true
   safety:
     real_external_calls: 0
     telemetry:

@@ -754,23 +754,48 @@ def _resolve_email_approval_for_operator(
     actor: str,
     note: str,
 ) -> dict[str, Any]:
-    from app.workflows.action_approval_resolution import resolve_per_action_approval
+    from app.workflows.action_executor import execute_action
+    from app.workflows.email_approval_resolution import finalize_email_approval_resolution
 
-    result = resolve_per_action_approval(
+    now = _utcnow()
+    send_result = None
+    send_error = None
+    delivery = approval.delivery_payload or {}
+    if delivery:
+        try:
+            send_result = execute_action(delivery, db=db)
+        except Exception as exc:
+            send_error = str(exc)
+            logger.error(
+                "Email send failed for approval %s: %s",
+                approval.approval_id,
+                type(exc).__name__,
+            )
+
+    updated_payload = dict(approval.request_payload or {})
+    updated_payload["state"] = "approved"
+    updated_payload["resolved_at"] = now.isoformat()
+    updated_payload["resolved_by"] = actor
+    updated_payload["resolution_note"] = note
+
+    ApprovalRequestRepository.upsert_from_payload(
+        db=db,
+        tenant_id=approval.tenant_id,
+        job_id=approval.job_id,
+        job_type=approval.job_type,
+        approval_request=updated_payload,
+        delivery_payload=approval.delivery_payload,
+    )
+    finalize_email_approval_resolution(
         db,
         approval,
         approved=True,
         actor=actor,
         note=note,
+        send_result=send_result,
+        send_error=send_error,
     )
-    if result.contract_conflict:
-        raise ValueError(result.contract_conflict)
-    return {
-        "approval_state": result.approval_state,
-        "execution_state": result.execution_state,
-        "send_error": result.send_error,
-        "reconciliation_required": result.reconciliation_required,
-    }
+    return {"approval_state": "approved", "send_error": send_error}
 
 
 def execute_approve_approval(

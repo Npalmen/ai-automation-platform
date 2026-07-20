@@ -1,7 +1,7 @@
 {
   "allowed_dialects": ["postgresql", "postgres", "sqlite"],
   "allowed_hosts": ["localhost", "127.0.0.1", "", "memory"],
-  "allowed_database_names": ["ai_platform", "ai_platform_test", "ai_platform_eval", ":memory:"],
-  "allowed_database_suffixes": ["_test", "_eval"],
+  "allowed_database_names": ["ai_platform", "ai_platform_test", ":memory:"],
+  "allowed_database_suffixes": ["_test"],
   "allowed_sqlite_path_prefixes": ["./storage/", "storage/", ":memory:"]
 }

@@ -17,7 +17,3 @@ class OperationConflict(DecisionTraceError):
 
 class ReconciliationRequired(DecisionTraceError):
     """External execution outcome unknown — manual reconciliation required."""
-
-
-class ContractConflict(DecisionTraceError):
-    """Approval execution blocked due to authorization / metadata contract mismatch."""

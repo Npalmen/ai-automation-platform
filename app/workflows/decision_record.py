@@ -9,7 +9,6 @@ METADATA_MAX_BYTES = 2048
 
 ALLOWED_METADATA_KEYS = frozenset({
     "approval_id",
-    "resolution",
     "execution_id",
     "audit_event_id",
     "operator_actor",
