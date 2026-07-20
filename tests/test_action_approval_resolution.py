@@ -42,6 +42,8 @@ def approval_db():
 
     @event.listens_for(DecisionRecordRow, "before_insert")
     def _assign_event_sequence(mapper, connection, target):
+        if connection.dialect.name != "sqlite":
+            return
         if getattr(target, "event_sequence", None) is None:
             result = connection.execute(
                 DecisionRecordRow.__table__.select().with_only_columns(

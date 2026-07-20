@@ -205,8 +205,12 @@ class ApprovalRequestRepository:
         resolved_at: datetime,
         resolved_by: str | None,
         resolution_note: str | None,
-    ) -> ApprovalRequestRecord | None:
-        """Atomically transition pending → new_state. Returns None if row missing."""
+    ) -> tuple[ApprovalRequestRecord | None, bool]:
+        """Atomically transition pending → new_state.
+
+        Returns (record, won_cas). ``won_cas`` is True only when this call executed
+        the pending-state UPDATE (rowcount > 0).
+        """
         from sqlalchemy import update
 
         record = ApprovalRequestRepository.get_by_approval_id(
@@ -215,9 +219,9 @@ class ApprovalRequestRepository:
             approval_id=approval_id,
         )
         if record is None:
-            return None
+            return None, False
         if record.state != "pending":
-            return record
+            return record, False
 
         payload = dict(record.request_payload or {})
         payload["state"] = new_state
@@ -244,18 +248,19 @@ class ApprovalRequestRepository:
         result = db.execute(stmt)
         db.flush()
         if result.rowcount == 0:
-            return ApprovalRequestRepository.get_by_approval_id(
+            record = ApprovalRequestRepository.get_by_approval_id(
                 db=db,
                 tenant_id=tenant_id,
                 approval_id=approval_id,
             )
+            return record, False
         record.state = new_state
         record.resolved_at = resolved_at
         record.resolved_by = resolved_by
         record.resolution_note = resolution_note
         record.request_payload = payload
         record.updated_at = _utcnow()
-        return record
+        return record, True
 
     @staticmethod
     def find_pending_dispatch_approval(

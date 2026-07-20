@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from typing import Iterator
 
 from sqlalchemy import create_engine, event, text
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.repositories.postgres.action_execution_models import ActionExecutionRecord
@@ -48,6 +48,8 @@ def _install_sqlite_event_sequence_hook(engine) -> None:
 
     @event.listens_for(DecisionRecordRow, "before_insert")
     def _assign_event_sequence(mapper, connection, target):
+        if connection.dialect.name != "sqlite":
+            return
         if getattr(target, "event_sequence", None) is None:
             result = connection.execute(
                 DecisionRecordRow.__table__.select().with_only_columns(
@@ -117,21 +119,54 @@ def assert_tenant_clean(session: Session, tenant_id: str) -> None:
         raise AssertionError(f"Tenant {tenant_id} not clean after scenario: {dirty}")
 
 
+_EVAL_PG_DATABASE_NAME = "ai_platform_eval"
+_ALLOWED_EVAL_HOSTS = frozenset({"localhost", "127.0.0.1"})
+
+
 def require_eval_pg_database_url() -> str:
+    env = os.environ.get("ENV", "").strip()
+    if env != "test":
+        raise RuntimeError(
+            f"ENV must be exactly 'test' for PostgreSQL eval tests, got {env!r}"
+        )
+
+    if os.environ.get("EVAL_HARNESS_PG_ALLOWED", "").strip().lower() != "yes":
+        raise RuntimeError("EVAL_HARNESS_PG_ALLOWED=yes is required for PostgreSQL eval tests")
+
     url = os.environ.get("EVAL_DATABASE_URL", "").strip()
     if not url:
         raise RuntimeError("EVAL_DATABASE_URL is required for PostgreSQL eval tests")
-    if os.environ.get("EVAL_HARNESS_PG_ALLOWED", "").strip().lower() != "yes":
-        raise RuntimeError("EVAL_HARNESS_PG_ALLOWED=yes is required for PostgreSQL eval tests")
+
+    parsed = make_url(url)
+    host = (parsed.host or "").strip().lower()
+    if host not in _ALLOWED_EVAL_HOSTS:
+        raise RuntimeError(
+            f"EVAL_DATABASE_URL host must be localhost or 127.0.0.1, got {host!r}"
+        )
+
+    database_name = (parsed.database or "").strip()
+    if database_name == "ai_platform":
+        raise RuntimeError(
+            "EVAL_DATABASE_URL must not use the dev database ai_platform"
+        )
+    if database_name != _EVAL_PG_DATABASE_NAME:
+        raise RuntimeError(
+            "EVAL_DATABASE_URL database must be exactly "
+            f"{_EVAL_PG_DATABASE_NAME!r}, got {database_name!r}"
+        )
+
     ok, reason = verify_database_fingerprint(url)
     if not ok:
         raise RuntimeError(f"EVAL_DATABASE_URL rejected by fingerprint guard: {reason}")
     return url
 
 
+def create_eval_pg_engine() -> Engine:
+    return create_engine(require_eval_pg_database_url(), pool_pre_ping=True)
+
+
 def provision_eval_pg_engine() -> Engine:
-    url = require_eval_pg_database_url()
-    engine = create_engine(url, pool_pre_ping=True)
+    engine = create_eval_pg_engine()
     Base.metadata.create_all(bind=engine, tables=_eval_tables())
     ensure_runtime_schema(engine)
     return engine
@@ -160,6 +195,15 @@ def assert_tenant_purged(engine: Engine, tenant_id: str) -> None:
     dirty = {k: v for k, v in counts.items() if v > 0}
     if dirty:
         raise AssertionError(f"Tenant {tenant_id} not purged: {dirty}")
+
+
+def assert_tenant_purged_via_new_engine(database_url: str, tenant_id: str) -> None:
+    """Verify purge visibility from a brand-new engine after dispose."""
+    engine = create_engine(database_url, pool_pre_ping=True)
+    try:
+        assert_tenant_purged(engine, tenant_id)
+    finally:
+        engine.dispose()
 
 
 @contextmanager

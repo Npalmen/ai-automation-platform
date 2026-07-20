@@ -53,13 +53,32 @@ S01, S08, S10, S14, S15, S16, S17, S18
 
 ## PostgreSQL eval tier (2D.1)
 
-Blocking verification before 2D.1 sign-off:
+**Status:** Verified (blocking sign-off complete) — 2026-07-21
 
-```bash
-set EVAL_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_platform_eval
-set EVAL_HARNESS_PG_ALLOWED=yes
-set ENV=test
+Blocking verification before 2D.1 merge:
+
+```powershell
+# Idempotent eval database (local PostgreSQL)
+python scripts/ensure_eval_pg_database.py
+
+$env:ENV = "test"
+$env:EVAL_HARNESS_PG_ALLOWED = "yes"
+$env:EVAL_DATABASE_URL = "postgresql://<user>:<password>@localhost:5432/ai_platform_eval"
 pytest -m pg_eval -q
 ```
 
-Uses `ensure_runtime_schema()` (deployment migration path) and `migrations/015_decision_records.sql` for upgrade tests. Tenant cleanup is verified via explicit purge + new connection (not outer rollback).
+Requirements enforced by `require_eval_pg_database_url()`:
+
+- `ENV` must be exactly `test`
+- `EVAL_HARNESS_PG_ALLOWED=yes`
+- database name must be exactly `ai_platform_eval` (never `ai_platform`)
+- host must be `localhost` or `127.0.0.1`
+
+Migration verification (no `create_all` / `ensure_runtime_schema` as proof):
+
+1. **Empty DB path:** `reset_public_schema` → `apply_pre_migration_baseline` (create_tables.py equivalent) → SQL files `009`…`015`
+2. **Upgrade path:** same baseline → `009`…`014` → `015_decision_records.sql`
+
+Tenant cleanup: explicit `purge_eval_tenant` + verification via **new engine** after `dispose()`.
+
+**CI gap:** `.github/workflows/release-gate.yml` runs `python -m pytest` without `EVAL_*` env vars, so `pg_eval` is skipped in CI unless configured. Local Docker/PostgreSQL verification above is the authoritative 2D.1 sign-off gate until CI is extended.

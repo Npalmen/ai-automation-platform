@@ -189,7 +189,7 @@ def _commit_pre_adapter_phase(
     note: str | None,
 ) -> DecisionTraceSession:
     now = _utcnow()
-    transitioned = ApprovalRequestRepository.transition_state_if_pending(
+    transitioned, won = ApprovalRequestRepository.transition_state_if_pending(
         db,
         tenant_id=approval.tenant_id,
         approval_id=approval.approval_id,
@@ -200,6 +200,8 @@ def _commit_pre_adapter_phase(
     )
     if transitioned is None:
         raise ContractConflict("approval record not found")
+    if not won:
+        raise ContractConflict("approval already resolved")
     if transitioned.state != "approved":
         raise ContractConflict(f"approval transition failed, state={transitioned.state}")
 
@@ -248,7 +250,7 @@ def _commit_reject_phase(
     note: str | None,
 ) -> None:
     now = _utcnow()
-    transitioned = ApprovalRequestRepository.transition_state_if_pending(
+    transitioned, won = ApprovalRequestRepository.transition_state_if_pending(
         db,
         tenant_id=approval.tenant_id,
         approval_id=approval.approval_id,
@@ -259,6 +261,8 @@ def _commit_reject_phase(
     )
     if transitioned is None:
         raise ContractConflict("approval record not found")
+    if not won:
+        raise ContractConflict("approval already resolved")
     if transitioned.state != "rejected":
         raise ContractConflict(f"approval reject transition failed, state={transitioned.state}")
 
@@ -312,7 +316,7 @@ def resolve_per_action_approval(
                 resolved_at=now,
                 resolved_by=actor or "operator",
                 resolution_note=note,
-            )
+            )[0]
             db.commit()
             finalize_email_approval_resolution(
                 db, approval, approved=False, actor=actor, note=note,
@@ -406,6 +410,19 @@ def resolve_per_action_approval(
                 actor=actor,
                 note=note,
             )
+        except ContractConflict as exc:
+            if str(exc) == "approval already resolved":
+                db.rollback()
+                refreshed = ApprovalRequestRepository.get_by_approval_id(
+                    db,
+                    tenant_id=approval.tenant_id,
+                    approval_id=approval.approval_id,
+                )
+                if refreshed is not None:
+                    approval.state = refreshed.state
+                return _idempotent_result(db, approval, operation_id=operation_id)
+            db.rollback()
+            raise
         except Exception:
             db.rollback()
             raise
@@ -449,7 +466,7 @@ def resolve_per_action_approval(
 
     if not is_external:
         now = _utcnow()
-        ApprovalRequestRepository.transition_state_if_pending(
+        transitioned, won = ApprovalRequestRepository.transition_state_if_pending(
             db,
             tenant_id=approval.tenant_id,
             approval_id=approval.approval_id,
@@ -458,8 +475,9 @@ def resolve_per_action_approval(
             resolved_by=actor or "operator",
             resolution_note=note,
         )
-        db.commit()
-        approval.state = "approved"
+        if transitioned is not None and won:
+            db.commit()
+            approval.state = "approved"
         execution_state = execution_state or (
             ExecutionStatus.SUCCEEDED.value if send_result else "not_executed"
         )

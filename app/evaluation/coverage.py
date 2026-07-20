@@ -15,7 +15,11 @@ SAFETY_GATE_COVERAGE: dict[str, str] = {
     "S-CNT-03": "tests/evaluation/test_harness_self.py::test_db_rollback_clears_tenant_rows",
     "S-INF-01": "tests/evaluation/test_harness_self.py::test_readiness_fails_without_migration",
     "S-DATA-01": "S20_data_deletion_request",
-    "S-PG-01": "tests/evaluation/test_pg_eval_isolation.py::test_pg_migration_015_from_empty",
+    "S-PG-01": "tests/evaluation/test_pg_eval_isolation.py::test_pg_migration_chain_from_empty_database",
     "S-PG-02": "tests/evaluation/test_pg_eval_isolation.py::test_pg_tenant_purge_after_scenario",
     "S-PG-03": "tests/evaluation/test_pg_eval_isolation.py::test_concurrent_approval_cas_single_execution",
+    "S-PG-04": "tests/evaluation/test_pg_eval_isolation.py::test_pg_migration_014_to_015_upgrade_path",
+    "S-PG-05": "tests/evaluation/test_pg_eval_isolation.py::test_pg_concurrent_append_if_absent",
+    "S-PG-06": "tests/evaluation/test_pg_eval_isolation.py::test_pg_decision_trace_readiness_with_migration_015",
+    "S-PG-07": "tests/evaluation/test_pg_eval_isolation.py::test_pg_decision_trace_readiness_without_migration_015",
 }

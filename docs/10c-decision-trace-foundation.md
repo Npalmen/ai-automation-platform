@@ -33,6 +33,8 @@ Append-only `decision_records` table and runtime instrumentation. Evaluation Har
 
 Per-action approval resume (2D.1): steps 2–4 run in the **approval-resume pipeline run** after operator approval. Steps 2 (`execution_intent`) and approval CAS are committed atomically **before** the adapter call. `action_approval_resolution` is recorded between `pipeline_run_started` and `execution_intent`. `parent_pipeline_run_id` links to the original `action_authorization` run.
 
+**Verified (PostgreSQL, 2026-07-21):** concurrent approval CAS yields exactly one winner and one idempotent loser; one `action_approval_resolution`, one `execution_intent`, one `execution_outcome`, one fake adapter call per `action_operation_id`; unresolved pending intent blocks blind retry (S21); cross-tenant isolation unchanged (S22).
+
 If adapter may have succeeded but outcome persist fails → `outcome_unknown`, block automatic adapter retry, `reconciliation_required`.
 
 ## Migration
