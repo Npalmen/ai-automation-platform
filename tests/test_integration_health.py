@@ -123,14 +123,14 @@ def _settings_with_monday_scan(scan_status="success"):
 class TestBuildRunbookSignals:
     def test_returns_empty_when_all_healthy_and_no_errors(self):
         systems = {
-            "gmail": {"status": "healthy"},
+            "google_mail": {"status": "healthy"},
             "monday": {"status": "healthy"},
         }
         assert _build_runbook_signals(systems, []) == []
 
     def test_critical_signal_when_not_configured(self):
         systems = {
-            "gmail": {"status": "not_configured"},
+            "google_mail": {"status": "not_configured"},
             "monday": {"status": "healthy"},
         }
         signals = _build_runbook_signals(systems, [])
@@ -138,7 +138,7 @@ class TestBuildRunbookSignals:
 
     def test_warning_signal_when_recent_errors_exist(self):
         systems = {
-            "gmail": {"status": "healthy"},
+            "google_mail": {"status": "healthy"},
             "monday": {"status": "healthy"},
         }
         signals = _build_runbook_signals(
@@ -312,45 +312,52 @@ class TestCheckMonday:
 class TestOverallStatus:
     def test_healthy_when_all_healthy(self):
         systems = {
-            "gmail":  {"status": "healthy"},
+            "google_mail":  {"status": "healthy"},
             "monday": {"status": "healthy"},
         }
         assert _overall_status(systems) == "healthy"
 
     def test_warning_when_one_warning(self):
         systems = {
-            "gmail":  {"status": "healthy"},
+            "google_mail":  {"status": "healthy"},
             "monday": {"status": "warning"},
         }
         assert _overall_status(systems) == "warning"
 
     def test_warning_when_one_not_configured(self):
         systems = {
-            "gmail":  {"status": "not_configured"},
+            "google_mail":  {"status": "not_configured"},
             "monday": {"status": "healthy"},
         }
         assert _overall_status(systems) == "warning"
 
     def test_error_when_one_error(self):
         systems = {
-            "gmail":  {"status": "error"},
+            "google_mail":  {"status": "error"},
             "monday": {"status": "healthy"},
         }
         assert _overall_status(systems) == "error"
 
     def test_error_takes_priority_over_warning(self):
         systems = {
-            "gmail":  {"status": "error"},
+            "google_mail":  {"status": "error"},
             "monday": {"status": "warning"},
         }
         assert _overall_status(systems) == "error"
 
     def test_warning_when_both_not_configured(self):
         systems = {
-            "gmail":  {"status": "not_configured"},
+            "google_mail":  {"status": "not_configured"},
             "monday": {"status": "not_configured"},
         }
         assert _overall_status(systems) == "warning"
+
+    def test_healthy_when_all_not_applicable(self):
+        systems = {
+            "google_mail": {"status": "not_applicable"},
+            "fortnox": {"status": "not_applicable"},
+        }
+        assert _overall_status(systems) == "healthy"
 
 
 # ---------------------------------------------------------------------------
@@ -400,16 +407,27 @@ class TestRecentErrors:
 # ---------------------------------------------------------------------------
 
 class TestGetIntegrationHealth:
-    def _run(self, db=None, tenant_id="t-1", app_settings=None, settings_return=None):
+    def _tenant(self, allowed=None):
+        r = MagicMock()
+        r.tenant_id = "t-1"
+        r.allowed_integrations = allowed if allowed is not None else ["google_mail", "monday", "fortnox"]
+        r.settings = {}
+        return r
+
+    def _run(self, db=None, tenant_id="t-1", app_settings=None, settings_return=None, allowed=None):
         if db is None:
             db = _mock_db()
         if app_settings is None:
             app_settings = _app_settings()
         if settings_return is None:
             settings_return = {}
+        tenant = self._tenant(allowed=allowed)
         with patch(
             "app.health.integration_health.TenantConfigRepository.get_settings",
             return_value=settings_return,
+        ), patch(
+            "app.health.integration_health.TenantConfigRepository.get",
+            return_value=tenant,
         ):
             return get_integration_health(db, tenant_id, app_settings=app_settings)
 
@@ -421,19 +439,26 @@ class TestGetIntegrationHealth:
         assert "recent_errors" in result
         assert "runbook_signals" in result
 
-    def test_systems_include_gmail_and_monday(self):
+    def test_systems_include_google_mail_and_monday(self):
         result = self._run()
-        assert "gmail" in result["systems"]
+        assert "google_mail" in result["systems"]
         assert "monday" in result["systems"]
         assert "fortnox" in result["systems"]
 
-    def test_default_not_configured_both_systems(self):
+    def test_unselected_systems_not_applicable_when_not_allowed(self):
+        result = self._run(allowed=[])
+        assert result["systems"]["google_mail"]["status"] == "not_applicable"
+        assert result["systems"]["monday"]["status"] == "not_applicable"
+        assert result["systems"]["fortnox"]["status"] == "not_applicable"
+        assert result["overall_status"] == "healthy"
+
+    def test_default_not_configured_for_selected_systems(self):
         result = self._run()
-        assert result["systems"]["gmail"]["status"] == "not_configured"
+        assert result["systems"]["google_mail"]["status"] == "not_configured"
         assert result["systems"]["monday"]["status"] == "not_configured"
         assert result["systems"]["fortnox"]["status"] == "not_configured"
 
-    def test_overall_warning_when_both_not_configured(self):
+    def test_overall_warning_when_selected_systems_not_configured(self):
         result = self._run()
         assert result["overall_status"] == "warning"
 
@@ -450,9 +475,9 @@ class TestGetIntegrationHealth:
         assert "secret_google_token" not in result_str
         assert "secret_monday_key" not in result_str
 
-    def test_gmail_configured_returns_non_not_configured(self):
+    def test_google_mail_configured_returns_non_not_configured(self):
         result = self._run(app_settings=_app_settings(google_mail="tok"))
-        assert result["systems"]["gmail"]["status"] != "not_configured"
+        assert result["systems"]["google_mail"]["status"] != "not_configured"
 
     def test_monday_configured_returns_non_not_configured(self):
         result = self._run(app_settings=_app_settings(monday_api="key"))
@@ -512,31 +537,35 @@ class TestGetIntegrationHealth:
 
     def test_system_health_dict_has_required_fields(self):
         result = self._run()
-        for system_name in ("gmail", "monday"):
+        for system_name in ("google_mail", "monday"):
             s = result["systems"][system_name]
             for field in ("status", "configured", "last_success_at", "last_error_at",
                           "last_error_message", "checks", "recommended_action"):
                 assert field in s, f"Missing field '{field}' in {system_name}"
 
     def test_overall_error_when_gmail_error(self):
-        # Simulate gmail configured but failed_checks present:
-        # configured=True but force status to "error"
+        tenant = self._tenant(allowed=["google_mail", "monday"])
+        error_block = {
+            "status": "error", "configured": True, "last_success_at": None,
+            "last_error_at": None, "last_error_message": None,
+            "checks": [], "recommended_action": "Fix it.",
+        }
+        healthy_block = {
+            "status": "healthy", "configured": True, "last_success_at": None,
+            "last_error_at": None, "last_error_message": None,
+            "checks": [], "recommended_action": "",
+        }
         with patch(
             "app.health.integration_health.TenantConfigRepository.get_settings",
             return_value={},
         ), patch(
-            "app.health.integration_health._check_gmail",
-            return_value={
-                "status": "error", "configured": True, "last_success_at": None,
-                "last_error_at": None, "last_error_message": None,
-                "checks": [], "recommended_action": "Fix it.",
-            },
-        ), patch(
-            "app.health.integration_health._check_monday",
-            return_value={
-                "status": "healthy", "configured": True, "last_success_at": None,
-                "last_error_at": None, "last_error_message": None,
-                "checks": [], "recommended_action": "",
+            "app.health.integration_health.TenantConfigRepository.get",
+            return_value=tenant,
+        ), patch.dict(
+            "app.health.integration_health._TENANT_CHECKERS",
+            {
+                "google_mail": lambda *args, **kwargs: error_block,
+                "monday": lambda *args, **kwargs: healthy_block,
             },
         ), patch(
             "app.health.integration_health._recent_errors",
@@ -636,9 +665,16 @@ class TestCheckFortnox:
         assert result["recommended_action"] == ""
 
     def test_systems_include_fortnox_in_health_response(self):
+        tenant = MagicMock()
+        tenant.tenant_id = "t-1"
+        tenant.allowed_integrations = ["fortnox"]
+        tenant.settings = {}
         with patch(
             "app.health.integration_health.TenantConfigRepository.get_settings",
             return_value={},
+        ), patch(
+            "app.health.integration_health.TenantConfigRepository.get",
+            return_value=tenant,
         ):
             result = get_integration_health(
                 _mock_db(), "t-1",
@@ -651,7 +687,7 @@ class TestCheckFortnox:
 class TestRunbookSignalsFortnox:
     def test_critical_signal_for_fortnox_error(self):
         systems = {
-            "gmail":   {"status": "healthy"},
+            "google_mail":   {"status": "healthy"},
             "monday":  {"status": "healthy"},
             "fortnox": {"status": "error"},
         }
@@ -663,7 +699,7 @@ class TestRunbookSignalsFortnox:
 
     def test_warning_signal_for_fortnox_warning(self):
         systems = {
-            "gmail":   {"status": "healthy"},
+            "google_mail":   {"status": "healthy"},
             "monday":  {"status": "healthy"},
             "fortnox": {"status": "warning"},
         }
@@ -675,7 +711,7 @@ class TestRunbookSignalsFortnox:
 
     def test_no_fortnox_signal_when_healthy(self):
         systems = {
-            "gmail":   {"status": "healthy"},
+            "google_mail":   {"status": "healthy"},
             "monday":  {"status": "healthy"},
             "fortnox": {"status": "healthy"},
         }
@@ -686,7 +722,7 @@ class TestRunbookSignalsFortnox:
     def test_no_fortnox_signal_when_not_configured(self):
         """not_configured Fortnox is not flagged as critical (it may not be in use)."""
         systems = {
-            "gmail":   {"status": "healthy"},
+            "google_mail":   {"status": "healthy"},
             "monday":  {"status": "healthy"},
             "fortnox": {"status": "not_configured"},
         }

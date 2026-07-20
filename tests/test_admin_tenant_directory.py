@@ -61,7 +61,7 @@ def _tenant(
     r.status = status
     r.settings = settings or {}
     r.enabled_job_types = enabled_job_types or ["lead"]
-    r.allowed_integrations = allowed_integrations or ["gmail"]
+    r.allowed_integrations = allowed_integrations or ["google_mail"]
     r.created_at = datetime(2025, 1, 1, tzinfo=timezone.utc)
     r.updated_at = datetime(2025, 6, 1, tzinfo=timezone.utc)
     return r
@@ -159,7 +159,7 @@ class TestIntegrationsSummary:
             "severity": "critical",
         }]
         summary = _integrations_summary_for_tenant("T_A", triage, set(), {})
-        assert summary["gmail"] == "failed"
+        assert summary["google_mail"] == "failed"
         assert summary["visma"] == "unknown"
 
 
@@ -275,7 +275,7 @@ class TestGetTenantDetail:
         ), patch(
             "app.admin.tenant_directory.get_integration_health",
             return_value={"systems": {
-                "gmail": {"status": "healthy"},
+                "google_mail": {"status": "healthy"},
                 "monday": {"status": "not_configured"},
                 "fortnox": {"status": "not_configured"},
             }},

@@ -12,7 +12,7 @@ export type TenantHealth = {
 }
 
 export type IntegrationSummary = {
-  gmail: IntegrationSummaryStatus
+  google_mail: IntegrationSummaryStatus
   visma: IntegrationSummaryStatus
   google_sheets: IntegrationSummaryStatus
 }
@@ -66,9 +66,9 @@ export type TenantIntegrationStatus = {
 }
 
 export type TenantIntegrationsBlock = {
-  gmail: TenantIntegrationStatus
-  monday: TenantIntegrationStatus
-  fortnox: TenantIntegrationStatus
+  google_mail: TenantIntegrationStatus | null
+  monday: TenantIntegrationStatus | null
+  fortnox: TenantIntegrationStatus | null
   visma: TenantIntegrationStatus
   google_sheets: TenantIntegrationStatus
 }

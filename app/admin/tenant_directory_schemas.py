@@ -21,7 +21,7 @@ class TenantHealth(BaseModel):
 
 
 class IntegrationSummary(BaseModel):
-    gmail: IntegrationSummaryStatus
+    google_mail: IntegrationSummaryStatus
     visma: IntegrationSummaryStatus
     google_sheets: IntegrationSummaryStatus
 
@@ -75,9 +75,9 @@ class TenantIntegrationStatus(BaseModel):
 
 
 class TenantIntegrationsBlock(BaseModel):
-    gmail: TenantIntegrationStatus
-    monday: TenantIntegrationStatus
-    fortnox: TenantIntegrationStatus
+    google_mail: TenantIntegrationStatus | None = None
+    monday: TenantIntegrationStatus | None = None
+    fortnox: TenantIntegrationStatus | None = None
     visma: TenantIntegrationStatus
     google_sheets: TenantIntegrationStatus
 
