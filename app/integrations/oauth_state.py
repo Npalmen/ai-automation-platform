@@ -67,6 +67,8 @@ def validate_redirect_target(redirect_target: str, tenant_id: str) -> str:
     target = redirect_target.strip()
     expected = f"{CUSTOMER_DETAIL_REDIRECT_PREFIX}{tenant_id}"
     onboarding = f"{expected}/onboarding"
+    if target.startswith("/integrations/invite/"):
+        return target
     if target not in {expected, onboarding} and not target.startswith(f"{expected}?"):
         raise OAuthStateError("Redirect target is not allowlisted.", code="oauth_redirect_invalid")
     return target
@@ -80,6 +82,7 @@ def create_integration_oauth_state(
     provider: str,
     redirect_target: str,
     settings: Settings,
+    invitation_id: str | None = None,
 ) -> tuple[str, IntegrationOAuthStateRecord]:
     redirect = validate_redirect_target(redirect_target, tenant_id)
     state_id = secrets.token_urlsafe(32)
@@ -101,6 +104,7 @@ def create_integration_oauth_state(
         provider=provider,
         redirect_target=redirect,
         expires_at=expires_at,
+        invitation_id=invitation_id,
         created_at=_utcnow(),
     )
     db.add(record)

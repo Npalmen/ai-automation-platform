@@ -488,3 +488,24 @@ Operation exit codes are independent of metadata write success. API reads files 
 | **Scheduler** | **Paused** until explicit operator enable after soak |
 | **Operational data** | Clean baseline (jobs/approvals/tenant-alerts=0); pre-clean archive at `pre_live_niklas_archive.json` |
 | **Next step** | Soak Dag 1 live scan — blocked on operator test emails only |
+
+---
+
+## DEC-032 — Onboarding 2.0 architecture (2026-07-20)
+
+**Status:** Active — feature branch `feature/onboarding-2.0`
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **Paus är driftstatus** | `paused` ∉ `lifecycle_status`; use `settings.scheduler.run_mode` / `settings.operations.paused` |
+| 2 | **super_admin via operator-ID** | `SUPER_ADMIN_OPERATOR_IDS` binds to stable `OperatorInfo.id` |
+| 3 | **Archive = admin; delete = super_admin** | Archive/restore: admin; permanent test-tenant delete: super_admin only |
+| 4 | **TenantDeletionService** | API + CLI share `app/admin/tenant_lifecycle/deletion_service.py` |
+| 5 | **OAuth state DB lookup only** | `oauth_state_resolver`; no opaque heuristics on callback path |
+| 6 | **Readiness ↔ config_version** | Stale readiness when `config_version` changes after last check |
+| 7 | **Immutable activation snapshots** | `tenant_activation_snapshots` append-only |
+| 8 | **Intake UTC + dedupe alerts** | Gmail `internalDate` → UTC; dedupe per tenant+dedupe_key |
+| 9 | **Service catalog in service_profiles/** | Onboarding is presenter/filter only |
+| 10 | **Connected account after invite** | Store/display `connected_account_email`; never tokens in UI |
+
+Reference: `docs/onboarding-2.0-architecture.md`

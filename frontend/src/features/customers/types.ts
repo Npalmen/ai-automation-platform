@@ -143,6 +143,19 @@ export type TenantAuditBlock = {
   recent: TenantAuditEvent[]
 }
 
+export type TenantLifecycleSummary = {
+  tenant_id: string
+  lifecycle_status: string
+  lifecycle_label_sv: string
+  config_version: number
+  is_test_tenant: boolean
+  operations_paused: boolean
+  scheduler_run_mode: string | null
+  lifecycle_updated_at: string | null
+  lifecycle_updated_by: string | null
+  last_config_updated_by: string | null
+}
+
 export type TenantOnboardingConfigSummary = {
   schema_version: number | null
   service_profiles: string[]
@@ -166,6 +179,7 @@ export type TenantDetailResponse = {
   usage: TenantUsageBlock
   audit: TenantAuditBlock
   onboarding_config: TenantOnboardingConfigSummary
+  lifecycle?: TenantLifecycleSummary | null
   available_actions: AvailableActionMeta[]
 }
 

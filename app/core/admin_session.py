@@ -209,13 +209,25 @@ def resolve_operator_role(raw_role: str) -> str:
     return "read_only"
 
 
+def _parse_super_admin_operator_ids() -> frozenset[str]:
+    raw = getattr(get_settings(), "SUPER_ADMIN_OPERATOR_IDS", "") or ""
+    return frozenset(item.strip() for item in raw.split(",") if item.strip())
+
+
+def is_super_admin_operator(operator: OperatorIdentity) -> bool:
+    """True when operator.id is listed in SUPER_ADMIN_OPERATOR_IDS."""
+    return operator["id"] in _parse_super_admin_operator_ids()
+
+
 def get_operator_identity(username: str) -> OperatorIdentity:
     """Derive operator identity from configured admin settings."""
     s = get_settings()
     configured_user = getattr(s, "ADMIN_USERNAME", "admin").strip() or "admin"
     role = resolve_operator_role(getattr(s, "ADMIN_ROLE", "admin"))
-    display_name = getattr(s, "ADMIN_DISPLAY_NAME", "").strip() or configured_user
     operator_id = f"operator-{username.strip().lower()}"
+    if operator_id in _parse_super_admin_operator_ids():
+        role = "super_admin"
+    display_name = getattr(s, "ADMIN_DISPLAY_NAME", "").strip() or configured_user
     return {
         "id": operator_id,
         "display_name": display_name,

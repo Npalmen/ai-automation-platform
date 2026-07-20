@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-LeadFieldMode = Literal["required", "optional", "inherit"]
+LeadFieldMode = Literal["required", "optional", "inherit", "skip"]
 
 
 class ServiceProfileDraftPayload(BaseModel):

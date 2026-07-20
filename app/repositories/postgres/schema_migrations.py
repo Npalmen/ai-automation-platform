@@ -18,6 +18,14 @@ _REQUIRED_COLUMNS: list[tuple[str, str, str]] = [
     ("tenant_configs", "status", "VARCHAR DEFAULT 'active'"),
     ("tenant_configs", "created_at", "TIMESTAMPTZ"),
     ("tenant_configs", "updated_at", "TIMESTAMPTZ"),
+    ("tenant_configs", "lifecycle_status", "VARCHAR(32) NOT NULL DEFAULT 'onboarding'"),
+    ("tenant_configs", "config_version", "INTEGER NOT NULL DEFAULT 1"),
+    ("tenant_configs", "lifecycle_updated_at", "TIMESTAMPTZ"),
+    ("tenant_configs", "lifecycle_updated_by", "VARCHAR(128)"),
+    ("tenant_configs", "is_test_tenant", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("tenant_configs", "last_config_updated_by", "VARCHAR(128)"),
+    ("tenant_configs", "readiness_config_version", "INTEGER"),
+    ("tenant_configs", "readiness_checked_at", "TIMESTAMPTZ"),
 ]
 
 _REQUIRED_TABLES: list[str] = [
@@ -269,6 +277,46 @@ _OPERATOR_ALERTS_MIGRATION_STATEMENTS: list[str] = [
     "CREATE INDEX IF NOT EXISTS ix_notification_deliveries_status ON notification_deliveries (status, next_attempt_at)",
 ]
 
+_ONBOARDING_2_MIGRATION_STATEMENTS: list[str] = [
+    "CREATE INDEX IF NOT EXISTS ix_tenant_configs_lifecycle_status ON tenant_configs (lifecycle_status)",
+    """
+    CREATE TABLE IF NOT EXISTS integration_invitations (
+        id                          VARCHAR(36)  PRIMARY KEY,
+        tenant_id                   VARCHAR(32)  NOT NULL,
+        integration_key             VARCHAR(32)  NOT NULL,
+        contact_name                VARCHAR(256),
+        contact_email               VARCHAR(256) NOT NULL,
+        token_hash                  TEXT         NOT NULL,
+        status                      VARCHAR(32)  NOT NULL DEFAULT 'pending',
+        expires_at                  TIMESTAMPTZ  NOT NULL,
+        revoked_at                  TIMESTAMPTZ,
+        consumed_at                 TIMESTAMPTZ,
+        connected_account_email     VARCHAR(256),
+        created_by_operator_id      VARCHAR(128) NOT NULL,
+        created_at                  TIMESTAMPTZ  NOT NULL,
+        message_optional            TEXT
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_integration_invitations_tenant ON integration_invitations (tenant_id, integration_key)",
+    "CREATE INDEX IF NOT EXISTS ix_integration_invitations_status ON integration_invitations (status, expires_at)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_integration_invitations_token_hash ON integration_invitations (token_hash)",
+    """
+    CREATE TABLE IF NOT EXISTS tenant_activation_snapshots (
+        id                          VARCHAR(36)  PRIMARY KEY,
+        tenant_id                   VARCHAR(32)  NOT NULL,
+        config_version              INTEGER      NOT NULL,
+        plan_hash                   VARCHAR(64)  NOT NULL,
+        readiness_check_version     INTEGER      NOT NULL,
+        snapshot_json               JSON         NOT NULL,
+        activated_by_operator_id    VARCHAR(128) NOT NULL,
+        activated_at                TIMESTAMPTZ  NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_tenant_activation_snapshots_tenant ON tenant_activation_snapshots (tenant_id, activated_at DESC)",
+    "ALTER TABLE integration_oauth_states ADD COLUMN IF NOT EXISTS invitation_id VARCHAR(36)",
+    "UPDATE tenant_configs SET lifecycle_status = 'active' WHERE status = 'active' AND lifecycle_status = 'onboarding'",
+]
+
 
 # Tenant branding/settings defaults provisioned at startup.
 # Each entry: (tenant_id, settings_key, default_value_dict)
@@ -360,13 +408,18 @@ def ensure_runtime_schema(engine: Engine) -> None:
                 conn.execute(text(ddl))
                 log.debug("Operator alerts migration OK")
 
+            for ddl in _ONBOARDING_2_MIGRATION_STATEMENTS:
+                conn.execute(text(ddl))
+                log.debug("Onboarding 2.0 migration OK")
+
         log.info(
-            "Runtime schema safeguard complete (%d column(s), %d table/index statement(s), %d onboarding statement(s), %d slice2b statement(s), %d operator alerts statement(s) checked)",
+            "Runtime schema safeguard complete (%d column(s), %d table/index statement(s), %d onboarding statement(s), %d slice2b statement(s), %d operator alerts statement(s), %d onboarding 2.0 statement(s) checked)",
             len(_REQUIRED_COLUMNS),
             len(_REQUIRED_TABLES),
             len(_ONBOARDING_MIGRATION_STATEMENTS),
             len(_SLICE2B_MIGRATION_STATEMENTS),
             len(_OPERATOR_ALERTS_MIGRATION_STATEMENTS),
+            len(_ONBOARDING_2_MIGRATION_STATEMENTS),
         )
     except Exception as exc:
         log.error(

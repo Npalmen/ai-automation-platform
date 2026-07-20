@@ -23,6 +23,7 @@
 | `docs/kapitel-12-release-notes.md` | Kapitel 12 GO decision and release scope |
 | `frontend/README.md` | Frontend build, contracts, operator panel |
 | `docs/DOCUMENT_INDEX.md` | This file |
+| `docs/onboarding-2.0-architecture.md` | Onboarding 2.0 architecture (DEC-032) |
 
 ---
 

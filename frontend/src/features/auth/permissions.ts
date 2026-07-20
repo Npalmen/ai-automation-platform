@@ -14,6 +14,7 @@ export const ROLE_LABELS = {
   read_only: "Läsbehörighet",
   operations: "Drift",
   admin: "Admin",
+  super_admin: "Superadmin",
 } satisfies Record<Role, string>
 
 export const ENVIRONMENT_LABELS = {

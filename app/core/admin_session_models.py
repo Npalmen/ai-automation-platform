@@ -5,10 +5,12 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-OperatorRole = Literal["read_only", "operations", "admin"]
+OperatorRole = Literal["read_only", "operations", "admin", "super_admin"]
 OperatorEnvironment = Literal["local", "test", "production"]
 
-VALID_OPERATOR_ROLES: frozenset[str] = frozenset({"read_only", "operations", "admin"})
+VALID_OPERATOR_ROLES: frozenset[str] = frozenset(
+    {"read_only", "operations", "admin", "super_admin"}
+)
 
 
 class OperatorInfo(BaseModel):

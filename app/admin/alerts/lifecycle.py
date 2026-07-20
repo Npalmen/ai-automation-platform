@@ -68,6 +68,15 @@ def apply_candidate(
     """Returns action: created|updated|reopened|unchanged and record."""
     now = _utcnow()
     existing = AlertRepository.get_active_by_dedup_key(db, candidate.deduplication_key)
+    if existing is None:
+        existing = (
+            db.query(OperatorAlertRecord)
+            .filter(
+                OperatorAlertRecord.deduplication_key == candidate.deduplication_key,
+                OperatorAlertRecord.status == "suppressed",
+            )
+            .first()
+        )
 
     if existing is None:
         resolved = (

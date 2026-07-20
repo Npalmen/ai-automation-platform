@@ -7,6 +7,7 @@ from typing import Literal
 
 from app.admin.onboarding.registries import PRODUCT_CAPABILITIES
 from app.admin.onboarding.type_mapping import SERVICE_TYPE_LEAD_TYPE_MAP_VERSION, lead_type_for_service_type
+from app.service_profiles.catalog import SERVICE_CATALOG, get_catalog_entry
 from app.service_profiles.registry import get_profile, list_profiles
 
 Availability = Literal["available", "read_only", "deferred"]
@@ -18,7 +19,24 @@ INTERNAL_ROUTING_DESTINATIONS: tuple[str, ...] = (
     "support",
     "invoice",
     "manual_review",
+    "service",
+    "finance",
+    "emergency",
+    "management",
+    "other",
 )
+
+ROUTING_DESTINATION_LABELS_SV: dict[str, str] = {
+    "sales": "Försäljning",
+    "support": "Kundservice",
+    "invoice": "Ekonomi",
+    "manual_review": "Manuell granskning",
+    "service": "Service",
+    "finance": "Ekonomi",
+    "emergency": "Akut/jour",
+    "management": "Ledning",
+    "other": "Övrigt",
+}
 
 # Not selectable in onboarding slice 2A
 _DEFERRED_SERVICE_TYPES = frozenset({"debt_collection_risk", "invoice_generic"})
@@ -84,14 +102,17 @@ def profiles_for_onboarding() -> list:
         else:
             availability = "available"
             supported = True
+        entry = get_catalog_entry(profile.service_type)
+        label = entry.display_name_sv if entry else profile.service_type.replace("_", " ").title()
+        description = entry.description_sv if entry else (profile.reply_opener or profile.follow_up_intro or "")
         result.append(
             {
                 "key": profile.service_type,
-                "label": profile.follow_up_intro.split("—")[0].strip()[:40]
-                if profile.follow_up_intro
-                else profile.service_type.replace("_", " ").title(),
-                "description": profile.reply_opener or profile.follow_up_intro or "",
+                "label": label,
+                "description": description,
                 "category": profile.family,
+                "industry_keys": list(entry.industry_keys) if entry else [],
+                "module_keys": list(entry.module_keys) if entry else [],
                 "supported_job_types": [lead_type_for_service_type(profile.service_type) or "unknown"],
                 "required_fields_summary": list(profile.required_fields),
                 "optional_fields_summary": list(profile.optional_fields),
@@ -105,14 +126,7 @@ def profiles_for_onboarding() -> list:
                 ],
             }
         )
-    # Fix labels from registry profile names
-    for item in result:
-        p = get_profile(item["key"])
-        if p:
-            item["label"] = item["key"].replace("_", " ").title()
-            if p.reply_opener:
-                item["description"] = p.reply_opener
-    return sorted(result, key=lambda x: x["key"])
+    return sorted(result, key=lambda x: x["label"])
 
 
 def lead_field_registry() -> list[dict[str, str]]:

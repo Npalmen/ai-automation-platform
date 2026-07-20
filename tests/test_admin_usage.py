@@ -192,7 +192,8 @@ class TestUsageMetrics:
         )
         usage_db.commit()
 
-        overview = get_usage_overview(usage_db, days=30, app_settings=_settings())
+        with patch("app.admin.usage.compute_period_bounds", return_value=bounds):
+            overview = get_usage_overview(usage_db, days=30, app_settings=_settings())
         assert overview.summary.jobs_completed.current.value == 1
         assert overview.summary.jobs_completed.current.timestamp_basis == "updated_at_proxy"
         assert overview.summary.automation_rate.status == "not_measured"

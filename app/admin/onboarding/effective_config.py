@@ -16,6 +16,7 @@ from app.admin.onboarding.slice2a_registry import (
     recommended_profiles_for_capabilities,
 )
 from app.admin.onboarding.type_mapping import lead_type_for_service_type
+from app.admin.onboarding.field_mode import resolve_field_mode
 from app.service_profiles.registry import get_profile
 
 INTAKE_ENFORCEMENT_METADATA_ONLY = "metadata_only"
@@ -65,7 +66,7 @@ def validate_service_profile_draft(
         for field_key, mode in fields.items():
             if field_key not in allowed_field_keys or field_key not in profile_fields:
                 errors.append(f"Unknown field '{field_key}' for profile '{service_type}'")
-            if mode not in ("required", "optional", "inherit"):
+            if mode not in ("required", "optional", "inherit", "skip"):
                 errors.append(f"Invalid mode for {service_type}.{field_key}")
     return errors
 
@@ -96,26 +97,26 @@ def build_effective_service_config(
         field_details: list[dict[str, Any]] = []
         all_fields = list(dict.fromkeys([*profile.required_fields, *profile.optional_fields]))
         for field_key in all_fields:
-            mode = field_overrides.get(field_key, "inherit")
-            platform_default = "required" if field_key in profile.required_fields else "optional"
-            if mode == "inherit":
-                effective = platform_default
-                source = "platform_default"
-            else:
-                effective = mode
-                source = "tenant_override"
+            resolved = resolve_field_mode(
+                field_key=field_key,
+                profile=profile,
+                override=field_overrides.get(field_key),
+            )
+            effective = resolved["effective"]
             field_details.append(
                 {
                     "field_key": field_key,
-                    "platform_default": platform_default,
-                    "override": None if mode == "inherit" else mode,
+                    "platform_default": resolved["platform_default"],
+                    "override": None if resolved["override"] == "inherit" else resolved["override"],
                     "effective": effective,
-                    "source": source,
+                    "source": resolved["source"],
+                    "override_label_sv": resolved["override_label_sv"],
+                    "effective_label_sv": resolved["effective_label_sv"],
                 }
             )
             if effective == "required":
                 required.append(field_key)
-            else:
+            elif effective == "optional":
                 optional.append(field_key)
         profiles_out.append(
             {
@@ -234,8 +235,8 @@ def build_effective_data_start(data_start_payload: dict | None) -> dict[str, Any
         "mode_valid": mode_valid,
         "cutoff_strategy": "server_generated_at_activation",
         "cutoff_strategy_status": "passed" if mode_valid else "failed",
-        "runtime_enforcement": "not_verifiable",
-        "enforcement": INTAKE_ENFORCEMENT_METADATA_ONLY,
+        "runtime_enforcement": "enforced" if mode_valid else "not_verifiable",
+        "enforcement": "utc_internal_date" if mode_valid else INTAKE_ENFORCEMENT_METADATA_ONLY,
         "recommended": bool(mode_def and mode_def.recommended),
         "valid": mode_valid,
         "errors": [] if mode_valid else [f"Unsupported data start mode: {draft.mode}"],

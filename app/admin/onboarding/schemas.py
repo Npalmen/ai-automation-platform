@@ -62,6 +62,7 @@ class IdentityPatchRequest(BaseModel):
     phone: str | None = None
     timezone: str | None = None
     language: str | None = None
+    industries: list[str] | None = None
     version: int
 
 
@@ -100,6 +101,7 @@ class OnboardingSessionResponse(BaseModel):
     activated_at: datetime | None = None
     company_name: str | None = None
     slug: str | None = None
+    industries: list[str] = Field(default_factory=list)
     capabilities: list[str] = Field(default_factory=list)
     integrations: list[str] = Field(default_factory=list)
     preset_key: str | None = None
@@ -118,6 +120,18 @@ class ReadinessCheckItem(BaseModel):
     message: str
     source_class: ReadinessSourceClass
     step_key: str | None = None
+    status: str | None = None
+    title_sv: str | None = None
+    explanation_sv: str | None = None
+    blocking: bool | None = None
+    action_link: str | None = None
+    checked_at: datetime | None = None
+
+
+class ReadinessGroup(BaseModel):
+    group_key: str
+    group_label_sv: str
+    checks: list[ReadinessCheckItem] = Field(default_factory=list)
 
 
 class ReadinessResponse(BaseModel):
@@ -129,6 +143,8 @@ class ReadinessResponse(BaseModel):
     not_applicable: list[ReadinessCheckItem]
     not_verifiable: list[ReadinessCheckItem]
     last_checked_at: datetime
+    groups: list[ReadinessGroup] = Field(default_factory=list)
+    stale: bool = False
 
 
 class ActivateRequest(BaseModel):

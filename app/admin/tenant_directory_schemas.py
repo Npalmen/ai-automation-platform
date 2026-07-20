@@ -162,6 +162,18 @@ class TenantOnboardingConfigSummary(BaseModel):
     intake: dict[str, Any] = Field(default_factory=dict)
 
 
+class TenantLifecycleSummary(BaseModel):
+    lifecycle_status: str
+    lifecycle_label_sv: str
+    config_version: int
+    is_test_tenant: bool = False
+    operations_paused: bool = False
+    scheduler_run_mode: str | None = None
+    lifecycle_updated_at: datetime | None = None
+    lifecycle_updated_by: str | None = None
+    last_config_updated_by: str | None = None
+
+
 class TenantDetailResponse(BaseModel):
     tenant: TenantBasicInfo
     health: TenantHealth
@@ -175,4 +187,5 @@ class TenantDetailResponse(BaseModel):
     onboarding_config: TenantOnboardingConfigSummary = Field(
         default_factory=TenantOnboardingConfigSummary
     )
+    lifecycle: TenantLifecycleSummary | None = None
     available_actions: list[AvailableActionMeta] = []

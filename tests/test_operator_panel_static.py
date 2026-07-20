@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -123,13 +125,18 @@ def test_jobs_route_unchanged(monkeypatch: pytest.MonkeyPatch):
     get_settings.cache_clear()
     monkeypatch.setattr(auth_module, "_API_KEY_MAP", None)
 
-    response = _client().get(
-        "/jobs",
-        headers={
-            "X-Tenant-ID": "TENANT_1001",
-            "X-API-Key": "test-tenant-key",
-        },
-    )
+    with (
+        patch("app.main.JobRepository.list_jobs", return_value=[]),
+        patch("app.main.JobRepository.count_jobs", return_value=0),
+        patch("app.main.get_db", return_value=MagicMock()),
+    ):
+        response = _client().get(
+            "/jobs",
+            headers={
+                "X-Tenant-ID": "TENANT_1001",
+                "X-API-Key": "test-tenant-key",
+            },
+        )
 
     assert response.status_code == 200
 

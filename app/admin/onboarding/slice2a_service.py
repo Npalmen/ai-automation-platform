@@ -199,7 +199,7 @@ def patch_service_profile_step(
         verification_level=verification_level,
         operator_id=operator["id"],
     )
-    session.current_step = "routing"
+    session.current_step = "automation"
     _session_ops()._sync_readonly_step_states(
         db, session_id=session_id, tenant=tenant, settings=settings, operator_id=operator["id"]
     )

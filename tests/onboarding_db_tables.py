@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from app.admin.tenant_lifecycle.invitation_models import IntegrationInvitationRecord
+from app.admin.tenant_lifecycle.models import TenantActivationSnapshotRecord
 from app.admin.onboarding.models import (
     OnboardingIntegrationVerificationRecord,
     OnboardingOAuthStateRecord,
@@ -30,4 +32,6 @@ def onboarding_sqlite_tables() -> list:
         IntegrationOAuthStateRecord.__table__,
         AuditEventRecord.__table__,
         TenantApiKeyRecord.__table__,
+        TenantActivationSnapshotRecord.__table__,
+        IntegrationInvitationRecord.__table__,
     ]

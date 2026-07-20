@@ -163,11 +163,11 @@ def google_mail_oauth_callback(
         logger.info("Google Mail OAuth connected via onboarding for tenant %s", tenant_id)
         return RedirectResponse(url=_redirect_with_outcome(redirect_base, "complete"), status_code=302)
 
-    if state_source != "integration":
+    if state_source != "integration" and state_source != "invite":
         logger.warning("Google OAuth callback state not found in any state table")
         return RedirectResponse(url="/ops/customers?oauth=error&reason=oauth_state_invalid", status_code=302)
 
-    # Operator panel / integration oauth state (DB-backed; no admin session cookie required)
+    # Operator panel / customer invite integration oauth state (DB-backed)
     try:
         oauth_state = consume_integration_oauth_state(
             db, state_id=state, provider=PROVIDER, settings=settings
@@ -181,16 +181,30 @@ def google_mail_oauth_callback(
 
     redirect_base = oauth_state.redirect_target
     tenant_id = oauth_state.tenant_id
+    connected_via = "invite_oauth_callback" if state_source == "invite" else "operator_oauth_callback"
     try:
         tokens = exchange_code(code)
         existing = OAuthCredentialRepository.get(db, tenant_id, PROVIDER)
+        email = fetch_user_email(tokens["access_token"])
         _persist_tokens(
             db,
             tenant_id=tenant_id,
             tokens=tokens,
             existing_refresh=existing.refresh_token if existing else None,
-            connected_via="operator_oauth_callback",
+            connected_via=connected_via,
         )
+        if state_source == "invite" and getattr(oauth_state, "invitation_id", None):
+            from app.admin.tenant_lifecycle.invitation_models import IntegrationInvitationRecord
+            from app.admin.tenant_lifecycle.invitation_service import consume_invitation
+
+            invitation = (
+                db.query(IntegrationInvitationRecord)
+                .filter(IntegrationInvitationRecord.id == oauth_state.invitation_id)
+                .with_for_update()
+                .first()
+            )
+            if invitation is not None:
+                consume_invitation(db, invitation, connected_account_email=email)
         emit_onboarding_audit(
             db,
             tenant_id=tenant_id,

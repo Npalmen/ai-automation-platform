@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.admin.onboarding.industry_registry import list_industries
 from app.admin.onboarding.registries import (
     AUTOMATION_PRESETS,
     INTEGRATIONS,
@@ -16,6 +17,7 @@ from app.admin.onboarding.registry_schemas import (
     RegistryCapabilityOut,
     RegistryDataStartModeOut,
     RegistryExternalRoutingTargetOut,
+    RegistryIndustryOut,
     RegistryIntegrationOut,
     RegistryLeadFieldOut,
     RegistryRoutingDestinationOut,
@@ -25,6 +27,7 @@ from app.admin.onboarding.registry_schemas import (
 from app.admin.onboarding.slice2a_registry import (
     DATA_START_MODES,
     INTERNAL_ROUTING_DESTINATIONS,
+    ROUTING_DESTINATION_LABELS_SV,
     lead_field_registry,
     profiles_for_onboarding,
 )
@@ -39,9 +42,14 @@ _RUNTIME_ACTIVATION_NOTES = {
 
 _ROUTING_LABELS = {
     "sales": "Försäljning",
-    "support": "Support",
+    "support": "Kundservice",
     "invoice": "Faktura",
     "manual_review": "Manuell granskning",
+    "service": "Service",
+    "finance": "Ekonomi",
+    "emergency": "Akut/jour",
+    "management": "Ledning",
+    "other": "Övrigt",
 }
 
 
@@ -123,8 +131,20 @@ def present_registries() -> OnboardingRegistriesResponse:
         RegistryLeadFieldOut(**item) for item in lead_field_registry()
     ]
     routing_destinations = [
-        RegistryRoutingDestinationOut(key=k, label=_ROUTING_LABELS.get(k, k))
+        RegistryRoutingDestinationOut(
+            key=k,
+            label=ROUTING_DESTINATION_LABELS_SV.get(k, _ROUTING_LABELS.get(k, k)),
+        )
         for k in INTERNAL_ROUTING_DESTINATIONS
+    ]
+    industries = [
+        RegistryIndustryOut(
+            key=item["key"],
+            label=item["label"],
+            description=item["description"],
+            suggested_service_keys=item["suggested_service_keys"],
+        )
+        for item in list_industries()
     ]
     data_start_modes = [
         RegistryDataStartModeOut(
@@ -150,4 +170,5 @@ def present_registries() -> OnboardingRegistriesResponse:
         routing_destinations=routing_destinations,
         data_start_modes=data_start_modes,
         external_routing_targets=external_routing_targets,
+        industries=industries,
     )

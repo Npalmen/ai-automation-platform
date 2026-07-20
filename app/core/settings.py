@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     SESSION_SECRET_KEY: str = ""
     ADMIN_ROLE: str = "admin"
     ADMIN_DISPLAY_NAME: str = ""
+    # Comma-separated stable operator IDs (OperatorInfo.id) granted super_admin.
+    SUPER_ADMIN_OPERATOR_IDS: str = ""
     # Comma-separated allowed Origin values for POST /auth/admin/login|logout.
     # When empty, same-origin is derived from the incoming request URL.
     ALLOWED_ORIGINS: str = ""

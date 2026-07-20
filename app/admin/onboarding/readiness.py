@@ -24,6 +24,89 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+_STEP_LABELS_SV: dict[str, str] = {
+    "identity": "Företag",
+    "modules": "Moduler",
+    "service_profile": "Tjänster",
+    "automation": "Automation",
+    "routing": "Routing",
+    "integrations": "Integrationer",
+    "data_start": "Datastart",
+    "readiness": "Readiness",
+    "review": "Aktivering",
+}
+
+
+def _enrich_check(
+    check: dict[str, Any],
+    *,
+    status: str,
+    blocking: bool,
+    checked_at: datetime,
+) -> dict[str, Any]:
+    step_key = check.get("step_key") or "general"
+    return {
+        **check,
+        "status": status,
+        "title_sv": check.get("message", "")[:80],
+        "explanation_sv": check.get("message", ""),
+        "blocking": blocking,
+        "action_link": f"/ops/customers/{{tenant_id}}/onboarding?step={step_key}",
+        "checked_at": checked_at.isoformat(),
+        "group_key": step_key,
+        "group_label_sv": _STEP_LABELS_SV.get(step_key, step_key),
+    }
+
+
+def _build_readiness_groups(
+    *,
+    blocking: list[dict],
+    warnings: list[dict],
+    passed: list[dict],
+    not_applicable: list[dict],
+    not_verifiable: list[dict],
+    checked_at: datetime,
+) -> list[dict[str, Any]]:
+    groups: dict[str, dict[str, Any]] = {}
+
+    def _ensure(key: str) -> dict[str, Any]:
+        if key not in groups:
+            groups[key] = {
+                "group_key": key,
+                "group_label_sv": _STEP_LABELS_SV.get(key, key),
+                "checks": [],
+            }
+        return groups[key]
+
+    for item in blocking:
+        key = item.get("step_key") or "general"
+        _ensure(key)["checks"].append(
+            _enrich_check(item, status="fail", blocking=True, checked_at=checked_at)
+        )
+    for item in warnings:
+        key = item.get("step_key") or "general"
+        _ensure(key)["checks"].append(
+            _enrich_check(item, status="warning", blocking=False, checked_at=checked_at)
+        )
+    for item in passed:
+        key = item.get("step_key") or "general"
+        _ensure(key)["checks"].append(
+            _enrich_check(item, status="pass", blocking=False, checked_at=checked_at)
+        )
+    for item in not_applicable:
+        key = item.get("step_key") or "general"
+        _ensure(key)["checks"].append(
+            _enrich_check(item, status="not_applicable", blocking=False, checked_at=checked_at)
+        )
+    for item in not_verifiable:
+        key = item.get("step_key") or "general"
+        _ensure(key)["checks"].append(
+            _enrich_check(item, status="not_verifiable", blocking=False, checked_at=checked_at)
+        )
+    order = list(_STEP_LABELS_SV.keys()) + ["general"]
+    return sorted(groups.values(), key=lambda g: order.index(g["group_key"]) if g["group_key"] in order else 99)
+
+
 def _check(
     *,
     id: str,
@@ -260,6 +343,29 @@ def compute_readiness(
     not_applicable: list[dict] = []
     not_verifiable: list[dict] = []
     forces_ready_with_warnings = False
+
+    saved_readiness_version = getattr(tenant, "readiness_config_version", None)
+    current_config_version = int(getattr(tenant, "config_version", 1) or 1)
+    if saved_readiness_version is not None and saved_readiness_version != current_config_version:
+        blocking.append(
+            _check(
+                id="readiness.stale_config_version",
+                message="Readiness är inaktuell efter config-ändring. Kör readiness igen.",
+                source_class="tenant_specific",
+                step_key="readiness",
+            )
+        )
+        return {
+            "overall_status": "not_ready",
+            "check_version": check_version,
+            "blocking_checks": blocking,
+            "warnings": warnings,
+            "passed_checks": passed,
+            "not_applicable": not_applicable,
+            "not_verifiable": not_verifiable,
+            "last_checked_at": _utcnow(),
+            "stale": True,
+        }
 
     if not identity_payload.get("company_name"):
         blocking.append(
@@ -567,15 +673,36 @@ def compute_readiness(
                 step_key="data_start",
             )
         )
+    elif details.get("runtime_enforcement") == "enforced":
+        passed.append(
+            _check(
+                id="data_start.runtime_enforcement",
+                message="Intake-cutoff enforced i Gmail-pipeline (UTC/internalDate).",
+                source_class="tenant_specific",
+                step_key="data_start",
+            )
+        )
+    else:
         warnings.append(
             _check(
                 id="warning.data_start.runtime_enforcement",
-                message="Gamla mejl blockeras inte tekniskt av plattformen ännu.",
-                source_class="not_verifiable",
+                message="Automatisk behandling är blockerad tills kunden aktiveras.",
+                source_class="tenant_specific",
                 step_key="data_start",
             )
         )
         forces_ready_with_warnings = True
+
+    lifecycle_status = getattr(tenant, "lifecycle_status", None) or "onboarding"
+    if lifecycle_status != "active":
+        warnings.append(
+            _check(
+                id="warning.lifecycle.not_active",
+                message="Automatisk behandling är blockerad tills kunden aktiveras.",
+                source_class="tenant_specific",
+                step_key="readiness",
+            )
+        )
 
     if data["blocks_activation"]:
         blocking.append(
@@ -613,6 +740,7 @@ def compute_readiness(
     else:
         overall = "ready"
 
+    checked_at = _utcnow()
     return {
         "overall_status": overall,
         "check_version": check_version,
@@ -621,5 +749,14 @@ def compute_readiness(
         "passed_checks": passed,
         "not_applicable": not_applicable,
         "not_verifiable": not_verifiable,
-        "last_checked_at": _utcnow(),
+        "last_checked_at": checked_at,
+        "groups": _build_readiness_groups(
+            blocking=blocking,
+            warnings=warnings,
+            passed=passed,
+            not_applicable=not_applicable,
+            not_verifiable=not_verifiable,
+            checked_at=checked_at,
+        ),
+        "stale": False,
     }

@@ -6,6 +6,8 @@ import { useAlertSummaryQuery } from "@/features/alerts/queries"
 export function AlertIndicator() {
   const { data } = useAlertSummaryQuery()
   const urgentCount = (data?.open_critical ?? 0) + (data?.open_high ?? 0)
+  const warningCount = data?.open_warning ?? 0
+  const totalOpen = data?.total_open ?? 0
 
   return (
     <Link
@@ -14,7 +16,14 @@ export function AlertIndicator() {
       aria-label={
         urgentCount > 0
           ? `${urgentCount} kritiska eller höga larm`
-          : "Inga kritiska larm"
+          : warningCount > 0
+            ? `${warningCount} varningslarm`
+            : "Inga aktiva larm"
+      }
+      title={
+        totalOpen > 0
+          ? `${totalOpen} öppna larm (kritiska: ${data?.open_critical ?? 0}, höga: ${data?.open_high ?? 0})`
+          : "Inga öppna larm"
       }
     >
       <span aria-hidden="true">🔔</span>
@@ -22,6 +31,10 @@ export function AlertIndicator() {
       {urgentCount > 0 ? (
         <Badge variant="outline" className="border-status-danger text-status-danger">
           {urgentCount}
+        </Badge>
+      ) : warningCount > 0 ? (
+        <Badge variant="outline" className="border-status-warning text-status-warning">
+          {warningCount}
         </Badge>
       ) : null}
     </Link>

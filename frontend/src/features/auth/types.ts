@@ -1,4 +1,4 @@
-export type Role = "read_only" | "operations" | "admin"
+export type Role = "read_only" | "operations" | "admin" | "super_admin"
 
 export type OperatorEnvironment = "local" | "test" | "production"
 

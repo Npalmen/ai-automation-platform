@@ -692,6 +692,11 @@ def get_tenant_detail(
         )
     ]
 
+    from app.admin.tenant_lifecycle.constants import LIFECYCLE_LABELS_SV
+    from app.admin.tenant_lifecycle.service import present_lifecycle
+
+    lifecycle_block = present_lifecycle(record)
+
     return {
         "tenant": {
             "tenant_id": tenant_id,
@@ -718,5 +723,6 @@ def get_tenant_detail(
         "usage": usage_block,
         "audit": audit_block,
         "onboarding_config": _onboarding_config_summary(record.settings),
+        "lifecycle": lifecycle_block,
         "available_actions": available_actions,
     }

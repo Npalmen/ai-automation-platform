@@ -1570,6 +1570,42 @@ def _run_gmail_inbox_sync(
             continue
 
         msg = detail_result.get("message") or {}
+
+        from app.repositories.postgres.tenant_config_models import TenantConfigRecord
+        from app.workflows.intake_enforcement import evaluate_intake_gate
+
+        tenant_row = (
+            db.query(TenantConfigRecord)
+            .filter(TenantConfigRecord.tenant_id == tenant_id)
+            .first()
+        )
+        lifecycle_status = getattr(tenant_row, "lifecycle_status", None) or "active"
+        intake_settings = (tenant_row.settings or {}).get("intake") if tenant_row else {}
+        intake_gate = evaluate_intake_gate(
+            tenant_id=tenant_id,
+            lifecycle_status=lifecycle_status,
+            intake_settings=intake_settings,
+            message_internal_date_ms=msg.get("internal_date"),
+        )
+        if not intake_gate.get("allowed"):
+            skipped_messages.append({
+                "message_id": message_id,
+                "reason": intake_gate.get("reason"),
+                "dedupe_key": intake_gate.get("dedupe_key"),
+            })
+            try:
+                from app.workflows.intake_alerts import maybe_emit_intake_skip_alert
+
+                maybe_emit_intake_skip_alert(
+                    db,
+                    tenant_id=tenant_id,
+                    dedupe_key=intake_gate.get("dedupe_key"),
+                    reason=intake_gate.get("reason"),
+                )
+            except Exception:
+                pass
+            continue
+
         sender_name, sender_email = _parse_from_header(msg.get("from", ""))
 
         subject = _clean_gmail_subject(msg.get("subject") or "(no subject)")
@@ -3154,11 +3190,35 @@ def _run_scheduler_pass(tenant_id: str, db: "Session", now_utc: "datetime") -> d
     """Run one scheduler pass for a single tenant. Returns per-tenant result dict."""
     from datetime import datetime, timezone
     from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 
     s = get_settings()
+    tenant_record = (
+        db.query(TenantConfigRecord)
+        .filter(TenantConfigRecord.tenant_id == tenant_id)
+        .first()
+    )
+    lifecycle_status: str | None = None
+    if tenant_record is not None:
+        raw_lifecycle = getattr(tenant_record, "lifecycle_status", None)
+        if isinstance(raw_lifecycle, str) and raw_lifecycle.strip():
+            lifecycle_status = raw_lifecycle.strip()
+    if lifecycle_status is not None and lifecycle_status != "active":
+        return {
+            "tenant_id": tenant_id,
+            "skipped": True,
+            "reason": f"lifecycle_status={lifecycle_status}",
+            "inbox_sync": {"skipped": True, "reason": f"lifecycle_status={lifecycle_status}"},
+            "digest": {"skipped": True, "reason": f"lifecycle_status={lifecycle_status}"},
+            "sla": {"skipped": True, "reason": f"lifecycle_status={lifecycle_status}"},
+        }
+
     ctrl = TenantConfigRepository.get_settings(db, tenant_id)
     sched = ctrl.get("scheduler") or {}
     run_mode = sched.get("run_mode") or "manual"
+    operations = ctrl.get("operations") or {}
+    if operations.get("paused"):
+        run_mode = "paused"
     state = ctrl.get("scheduler_state") or {}
     demo_mode = _is_demo_mode_enabled(ctrl)
 
@@ -8331,8 +8391,14 @@ def admin_assign_incident_self(
 # ===========================================================================
 
 from app.admin.onboarding.routes import router as onboarding_router
+from app.admin.tenant_lifecycle.invitation_routes import admin_router as integration_invitations_admin_router
+from app.admin.tenant_lifecycle.invitation_routes import public_router as integration_invitations_public_router
+from app.admin.tenant_lifecycle.routes import router as tenant_lifecycle_router
 
 app.include_router(onboarding_router)
+app.include_router(tenant_lifecycle_router)
+app.include_router(integration_invitations_admin_router)
+app.include_router(integration_invitations_public_router)
 
 
 def _validate_usage_days(days: int) -> int:

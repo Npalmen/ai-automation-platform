@@ -1,23 +1,12 @@
 """
-Onboarding readiness service.
+Onboarding readiness service (legacy tenant API).
 
-Computes a tenant's onboarding checklist from existing platform state.
-All checks are deterministic and read-only — no external API calls.
+DEPRECATED for operator onboarding wizard — use
+`app.admin.onboarding.readiness.compute_readiness` (Readiness 2.0, DEC-032).
+This module remains for the legacy `/onboarding/status` tenant checklist.
 
-Step keys and completion rules:
-  tenant_created        — tenant row exists in tenant_configs
-  gmail_ready           — GOOGLE_MAIL_ACCESS_TOKEN set OR Gmail scan succeeded before
-  monday_ready          — MONDAY_API_KEY set OR Monday scan succeeded before
-  systems_scanned       — workflow_scan.systems_scanned contains gmail or monday
-  routing_hints_saved   — at least one valid routing hint (has system + target.board_id)
-  automation_policy_set — auto_actions has at least one configured job type
-  test_lead_created     — at least one lead job exists for tenant (any status)
-  dispatch_verified     — at least one successful controlled_dispatch event exists
-
-Overall status:
-  not_started  — 0 steps complete
-  in_progress  — 1–7 steps complete
-  ready        — all 8 steps complete
+Step keys: tenant_created, gmail_ready, monday_ready, systems_scanned,
+routing_hints_saved, automation_policy_set, test_lead_created, dispatch_verified.
 """
 
 from __future__ import annotations

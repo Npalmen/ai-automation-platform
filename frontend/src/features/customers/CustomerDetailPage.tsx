@@ -12,6 +12,7 @@ import { TenantIdentifier } from "@/components/operator/TenantIdentifier"
 import { PriorityList } from "@/features/overview/components/PriorityList"
 import { OperatorActionsSection,
 } from "@/features/operatorActions/components/OperatorActionsSection"
+import { CustomerLifecyclePanel } from "@/features/customers/CustomerLifecyclePanel"
 import { GmailIntegrationPanel } from "@/features/customers/GmailIntegrationPanel"
 import { ApiError } from "@/api/client"
 
@@ -81,7 +82,7 @@ export function CustomerDetailPage() {
     )
   }
 
-  const { tenant, health, integrations, jobs, approvals, manual_review, recent_errors, usage, audit, onboarding_config, available_actions } =
+  const { tenant, health, integrations, jobs, approvals, manual_review, recent_errors, usage, audit, onboarding_config, lifecycle, available_actions } =
     data
 
   const healthCheckIntegrations = [
@@ -102,12 +103,26 @@ export function CustomerDetailPage() {
         description={health.summary}
         status={<StatusBadge variant={health.level} label={health.label} />}
         actions={
-          <Link
-            to="/customers"
-            className="rounded-md border border-border bg-surface px-3 py-2 text-label text-text-primary hover:bg-surface-subtle"
-          >
-            Tillbaka
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              to={`/customers/${tenant.tenant_id}/onboarding`}
+              className="rounded-md border border-border bg-surface px-3 py-2 text-label text-text-primary hover:bg-surface-subtle"
+            >
+              Fortsätt onboarding
+            </Link>
+            <Link
+              to={`/customers/${tenant.tenant_id}/onboarding?step=readiness`}
+              className="rounded-md border border-border bg-surface px-3 py-2 text-label text-text-primary hover:bg-surface-subtle"
+            >
+              Readiness
+            </Link>
+            <Link
+              to="/customers"
+              className="rounded-md border border-border bg-surface px-3 py-2 text-label text-text-primary hover:bg-surface-subtle"
+            >
+              Tillbaka
+            </Link>
+          </div>
         }
       />
 
@@ -303,6 +318,8 @@ export function CustomerDetailPage() {
         </div>
 
         <div className="flex min-w-0 flex-col gap-6">
+          <CustomerLifecyclePanel tenantId={tenant.tenant_id} initialLifecycle={lifecycle ?? null} />
+
           <Section title="Användning (30 d)">
             <div className="grid gap-3 sm:grid-cols-2">
               <MetricCard label="Jobb skapade" value={usage.jobs_created} />

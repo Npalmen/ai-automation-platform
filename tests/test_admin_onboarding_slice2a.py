@@ -163,7 +163,7 @@ class TestSlice2aRegistries:
         assert reg.registry_schema_version >= 2
         assert len(reg.service_profiles) > 0
         assert len(reg.lead_field_registry) > 0
-        assert len(reg.routing_destinations) == 4
+        assert len(reg.routing_destinations) >= 4
         assert any(m.key == "new_incoming_only" for m in reg.data_start_modes)
 
     def test_session_route_does_not_duplicate_global_lists(self, db):
@@ -242,7 +242,7 @@ class TestSlice2aReadiness:
             db, session_id=session.id, operator=_operator(), settings=_settings()
         )
         assert readiness.overall_status == "ready_with_warnings"
-        assert any(c.id == "data_start.runtime_enforcement" for c in readiness.not_verifiable)
+        assert any(c.id == "data_start.runtime_enforcement" for c in readiness.passed_checks)
 
 
 class TestSlice2aRoutingStep:

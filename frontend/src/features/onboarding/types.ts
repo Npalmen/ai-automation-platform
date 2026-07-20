@@ -35,6 +35,7 @@ export type OnboardingSession = {
   activated_at: string | null
   company_name: string | null
   slug: string | null
+  industries: string[]
   capabilities: string[]
   integrations: string[]
   preset_key: string | null
@@ -53,6 +54,12 @@ export type ReadinessCheckItem = {
   message: string
   source_class: string
   step_key?: string | null
+  status?: string | null
+  title_sv?: string | null
+  explanation_sv?: string | null
+  blocking?: boolean | null
+  action_link?: string | null
+  checked_at?: string | null
 }
 
 export type ReadinessResult = {
@@ -64,6 +71,12 @@ export type ReadinessResult = {
   not_applicable: ReadinessCheckItem[]
   not_verifiable: ReadinessCheckItem[]
   last_checked_at: string
+  groups?: Array<{
+    group_key: string
+    group_label_sv: string
+    checks: ReadinessCheckItem[]
+  }>
+  stale?: boolean
 }
 
 export type StepDetail = {
@@ -119,6 +132,13 @@ export type RegistryAutomationPreset = {
   limitation?: string | null
 }
 
+export type RegistryIndustry = {
+  key: string
+  label: string
+  description: string
+  suggested_service_keys: string[]
+}
+
 export type OnboardingRegistriesResponse = {
   registry_schema_version: number
   registry_revision: string
@@ -146,6 +166,7 @@ export type OnboardingRegistriesResponse = {
   }>
   service_type_lead_type_map_version: number
   external_routing_targets?: RegistryExternalRoutingTarget[]
+  industries?: RegistryIndustry[]
 }
 
 export type RegistryServiceProfile = {
@@ -158,6 +179,9 @@ export type RegistryServiceProfile = {
   supported_in_current_slice: boolean
   required_fields_summary: string[]
   optional_fields_summary: string[]
+  capability_dependencies?: string[]
+  industry_keys?: string[]
+  module_keys?: string[]
 }
 
 export type Slice2aStepResponse = {
@@ -172,7 +196,10 @@ export type Slice2aStepResponse = {
 export type ServiceProfilePatchPayload = {
   version: number
   selected_profiles: string[]
-  lead_requirements: Record<string, Record<string, "required" | "optional" | "inherit">>
+  lead_requirements: Record<
+    string,
+    Record<string, "required" | "optional" | "inherit" | "skip">
+  >
 }
 
 export type RoutingPatchPayload = {
@@ -252,6 +279,7 @@ export type IdentityPatchPayload = {
   version: number
   company_name?: string
   slug?: string
+  industries?: string[]
   org_number?: string
   contact_email?: string
   primary_contact?: string
@@ -361,13 +389,13 @@ export type ConnectIntegrationPayload = {
 }
 
 export const WIZARD_STEPS = [
-  { key: "identity", label: "Identitet" },
-  { key: "modules", label: "Moduler" },
-  { key: "automation", label: "Automation" },
-  { key: "service_profile", label: "Serviceprofil" },
-  { key: "routing", label: "Routing" },
-  { key: "integrations", label: "Integrationer" },
-  { key: "data_start", label: "Startläge" },
-  { key: "readiness", label: "Readiness" },
-  { key: "review", label: "Aktivera" },
+  { key: "identity", label: "Företag", icon: "building" },
+  { key: "modules", label: "Moduler", icon: "modules" },
+  { key: "service_profile", label: "Tjänster", icon: "services" },
+  { key: "automation", label: "Automation", icon: "automation" },
+  { key: "routing", label: "Routing", icon: "routing" },
+  { key: "integrations", label: "Integrationer", icon: "integrations" },
+  { key: "data_start", label: "Datastart", icon: "data" },
+  { key: "readiness", label: "Readiness", icon: "readiness" },
+  { key: "review", label: "Aktivering", icon: "activation" },
 ] as const

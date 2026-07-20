@@ -28,6 +28,8 @@ class TestEnsureRuntimeSchemaHappyPath:
 
     def test_executes_alter_for_each_required_column(self):
         from app.repositories.postgres.schema_migrations import (
+            _INTEGRATION_OAUTH_STATE_MIGRATION_STATEMENTS,
+            _ONBOARDING_2_MIGRATION_STATEMENTS,
             _ONBOARDING_MIGRATION_STATEMENTS,
             _OPERATOR_ALERTS_MIGRATION_STATEMENTS,
             _REQUIRED_COLUMNS,
@@ -42,7 +44,9 @@ class TestEnsureRuntimeSchemaHappyPath:
             + len(_REQUIRED_TABLES)
             + len(_ONBOARDING_MIGRATION_STATEMENTS)
             + len(_SLICE2B_MIGRATION_STATEMENTS)
+            + len(_INTEGRATION_OAUTH_STATE_MIGRATION_STATEMENTS)
             + len(_OPERATOR_ALERTS_MIGRATION_STATEMENTS)
+            + len(_ONBOARDING_2_MIGRATION_STATEMENTS)
         )
         assert conn.execute.call_count == expected
 

@@ -74,6 +74,8 @@ class RegistryServiceProfileOut(BaseModel):
     availability: Availability
     supported_in_current_slice: bool
     capability_dependencies: list[str] = Field(default_factory=list)
+    industry_keys: list[str] = Field(default_factory=list)
+    module_keys: list[str] = Field(default_factory=list)
 
 
 class RegistryLeadFieldOut(BaseModel):
@@ -95,6 +97,13 @@ class RegistryDataStartModeOut(BaseModel):
     recommended: bool = False
 
 
+class RegistryIndustryOut(BaseModel):
+    key: str
+    label: str
+    description: str
+    suggested_service_keys: list[str] = Field(default_factory=list)
+
+
 class OnboardingRegistriesResponse(BaseModel):
     registry_schema_version: int
     registry_revision: str
@@ -108,6 +117,7 @@ class OnboardingRegistriesResponse(BaseModel):
     routing_destinations: list[RegistryRoutingDestinationOut] = Field(default_factory=list)
     data_start_modes: list[RegistryDataStartModeOut] = Field(default_factory=list)
     external_routing_targets: list[RegistryExternalRoutingTargetOut] = Field(default_factory=list)
+    industries: list[RegistryIndustryOut] = Field(default_factory=list)
 
 
 class ActivationConsequenceOut(BaseModel):

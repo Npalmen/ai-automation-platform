@@ -294,8 +294,8 @@ def _build_session_response(
     for step_key in (
         "identity",
         "modules",
-        "automation",
         "service_profile",
+        "automation",
         "routing",
         "integrations",
         "data_start",
@@ -378,6 +378,7 @@ def _build_session_response(
         activated_at=session.activated_at,
         company_name=identity_payload.get("company_name") or tenant.name,
         slug=identity_payload.get("slug") or tenant.slug,
+        industries=list(identity_payload.get("industries") or []),
         capabilities=capabilities,
         integrations=integrations,
         preset_key=str(preset_key) if preset_key else None,
@@ -557,6 +558,7 @@ def patch_identity(
         "phone",
         "timezone",
         "language",
+        "industries",
     ):
         if field in payload and payload[field] is not None:
             current[field] = payload[field]
@@ -570,6 +572,14 @@ def patch_identity(
             raise OnboardingConflictError("Slug is already in use.", code="slug_conflict")
         current["slug"] = new_slug
         tenant.slug = new_slug
+
+    if payload.get("industries") is not None:
+        from app.admin.onboarding.industry_registry import validate_industry_keys
+
+        invalid = validate_industry_keys(list(payload.get("industries") or []))
+        if invalid:
+            raise OnboardingValidationError(f"Unknown industries: {', '.join(invalid)}")
+        current["industries"] = list(payload.get("industries") or [])
 
     if not current.get("company_name"):
         raise OnboardingValidationError("company_name is required.")
@@ -600,7 +610,11 @@ def patch_identity(
         tenant_id=session.tenant_id,
         action="onboarding.identity_updated",
         status="succeeded",
-        details=_operator_audit_details(operator, session_id=session_id),
+        details=_operator_audit_details(
+            operator,
+            session_id=session_id,
+            extra={"industries": current.get("industries")},
+        ),
     )
     try:
         db.commit()
@@ -640,6 +654,24 @@ def patch_modules(
             f"Unknown runtime dependencies: {', '.join(unknown_runtime)}"
         )
 
+    from app.admin.onboarding.orphan_services import detect_orphan_service_profiles
+
+    sp_draft = OnboardingRepository.get_draft(db, session_id, "service_profile")
+    sp_payload = (sp_draft.payload if sp_draft else {}) or {}
+    identity_draft = OnboardingRepository.get_draft(db, session_id, "identity")
+    identity_payload = (identity_draft.payload if identity_draft else {}) or {}
+    orphans = detect_orphan_service_profiles(
+        selected_profiles=sp_payload.get("selected_profiles") or [],
+        capability_keys=capabilities,
+        industry_keys=identity_payload.get("industries") or [],
+    )
+    if orphans:
+        raise OnboardingValidationError(
+            "Moduländring lämnar inkompatibla tjänster valda: "
+            + ", ".join(f"{o['label_sv']} ({o['reason']})" for o in orphans)
+            + ". Ta bort tjänsterna i Tjänster-steget först.",
+        )
+
     modules_payload = {
         "capabilities": capabilities,
         "integrations": integrations,
@@ -660,7 +692,7 @@ def patch_modules(
         verification_level="declared",
         operator_id=operator["id"],
     )
-    session.current_step = "automation"
+    session.current_step = "service_profile"
     _sync_readonly_step_states(
         db,
         session_id=session_id,
@@ -728,7 +760,7 @@ def patch_automation(
         verification_level="declared",
         operator_id=operator["id"],
     )
-    session.current_step = "service_profile"
+    session.current_step = "routing"
     _sync_readonly_step_states(
         db,
         session_id=session_id,
@@ -796,6 +828,8 @@ def run_readiness(
     session.readiness_check_version += 1
     session.updated_at = _utcnow()
     session.last_updated_by_operator_id = operator["id"]
+    tenant.readiness_config_version = int(tenant.config_version or 1)
+    tenant.readiness_checked_at = _utcnow()
 
     result = compute_readiness(
         db,
@@ -961,12 +995,19 @@ def activate_onboarding_session(
     tenant.name = identity_payload.get("company_name") or tenant.name
     tenant.slug = slug
     tenant.status = "active"
+    tenant.lifecycle_status = "active"
+    tenant.lifecycle_updated_at = activation_now
+    tenant.lifecycle_updated_by = operator["id"]
     tenant.enabled_job_types = job_types
     tenant.allowed_integrations = integration_keys
     tenant.auto_actions = snapshot.get("auto_actions") or {}
     tenant.updated_at = activation_now
 
     merged_settings = copy.deepcopy(tenant.settings or _safe_defaults_settings())
+    company = merged_settings.setdefault("company", {})
+    for key in ("industries", "org_number", "primary_contact", "contact_email", "phone", "timezone", "language"):
+        if identity_payload.get(key) is not None:
+            company[key] = identity_payload[key]
     automation_flags = snapshot.get("automation_flags") or {}
     merged_settings["automation"] = {
         **(merged_settings.get("automation") or {}),
@@ -1061,6 +1102,29 @@ def activate_onboarding_session(
                 "plan_hash": plan_hash,
             },
         ),
+    )
+    from uuid import uuid4
+
+    from app.admin.tenant_lifecycle.service import bump_config_version, save_activation_snapshot
+
+    bump_config_version(tenant, operator_id=operator["id"])
+    tenant.readiness_config_version = int(tenant.config_version or 1)
+    tenant.readiness_checked_at = activation_now
+    save_activation_snapshot(
+        db,
+        tenant_id=session.tenant_id,
+        snapshot_id=str(uuid4()),
+        config_version=int(tenant.config_version or 1),
+        plan_hash=plan_hash,
+        readiness_check_version=readiness_check_version,
+        snapshot_json={
+            "identity": identity_payload,
+            "modules": modules_payload,
+            "automation": automation_payload,
+            "plan_hash": plan_hash,
+        },
+        operator_id=operator["id"],
+        activated_at=activation_now,
     )
     try:
         db.commit()

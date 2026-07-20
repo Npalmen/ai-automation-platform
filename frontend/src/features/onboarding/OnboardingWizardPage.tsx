@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 
 import { CriticalActionDialog } from "@/components/operator/CriticalActionDialog"
 import { ErrorState } from "@/components/operator/ErrorState"
@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/operator/StatusBadge"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/features/auth/AuthProvider"
 
+import { ReadinessActionLink } from "./readinessActionLink"
 import { IntegrationsStepPanel } from "./IntegrationsStepPanel"
 import {
   formatOnboardingError,
@@ -36,6 +37,10 @@ import {
 } from "./queries"
 import { WIZARD_STEPS, type EffectiveRouteRow, type ReadinessResult } from "./types"
 import {
+  groupServiceProfiles,
+  recommendedProfileKeys,
+} from "./serviceStep.utils"
+import {
   hasUnsavedRoutingDraft,
   mergeRoutingPreviewRows,
   routingSourceLabel,
@@ -57,7 +62,7 @@ function oauthReturnNotice(): string | null {
   return null
 }
 
-type LeadFieldMode = "required" | "optional" | "inherit"
+type LeadFieldMode = "required" | "optional" | "inherit" | "skip"
 
 function stepVariant(status: string): "healthy" | "warning" | "failed" | "paused" | "unknown" {
   if (status === "completed" || status === "not_applicable") return "healthy"
@@ -68,6 +73,7 @@ function stepVariant(status: string): "healthy" | "warning" | "failed" | "paused
 
 export function OnboardingWizardPage() {
   const { tenantId } = useParams<{ tenantId: string }>()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { auth } = useAuth()
   const registriesQuery = useOnboardingRegistriesQuery()
@@ -81,6 +87,7 @@ export function OnboardingWizardPage() {
   const [activeStep, setActiveStep] = useState("identity")
   const [companyName, setCompanyName] = useState("")
   const [slug, setSlug] = useState("")
+  const [industries, setIndustries] = useState<string[]>([])
   const [capabilities, setCapabilities] = useState<string[]>([])
   const [integrations, setIntegrations] = useState<string[]>([])
   const [presetKey, setPresetKey] = useState("observe_only")
@@ -124,6 +131,7 @@ export function OnboardingWizardPage() {
     if (!session) return
     setCompanyName(session.company_name ?? "")
     setSlug(session.slug ?? "")
+    setIndustries(session.industries ?? [])
     setCapabilities(session.capabilities ?? [])
     setIntegrations(session.integrations ?? [])
     if (session.preset_key) setPresetKey(session.preset_key)
@@ -132,8 +140,13 @@ export function OnboardingWizardPage() {
 
   useEffect(() => {
     if (!session) return
+    const stepParam = searchParams.get("step")
+    if (stepParam && WIZARD_STEPS.some((step) => step.key === stepParam)) {
+      setActiveStep(stepParam)
+      return
+    }
     setActiveStep(session.current_step || "identity")
-  }, [session?.id])
+  }, [session?.id, searchParams])
 
   useEffect(() => {
     if (!serviceProfileQuery.data) return
@@ -180,6 +193,39 @@ export function OnboardingWizardPage() {
     }
     return Array.from(byKey.values())
   }, [registries])
+
+  const serviceGroups = useMemo(() => {
+    if (!registries) {
+      return { recommended: { title: "", items: [] }, selected: { title: "", items: [] }, all: { title: "", items: [] } }
+    }
+    const recommended = recommendedProfileKeys(
+      capabilities,
+      industries,
+      registries.industries ?? [],
+    )
+    return groupServiceProfiles(registries.service_profiles, {
+      selected: selectedProfiles,
+      recommended,
+      industries,
+      capabilities,
+    })
+  }, [registries, selectedProfiles, industries, capabilities])
+
+  const effectiveServiceFields = useMemo(() => {
+    const profiles = (
+      serviceProfileQuery.data?.effective as
+        | { profiles?: Array<{ service_type: string; fields?: Array<Record<string, string>> }> }
+        | undefined
+    )?.profiles
+    const map: Record<string, Record<string, Record<string, string>>> = {}
+    for (const profile of profiles ?? []) {
+      map[profile.service_type] = {}
+      for (const field of profile.fields ?? []) {
+        map[profile.service_type][field.field_key as string] = field
+      }
+    }
+    return map
+  }, [serviceProfileQuery.data])
 
   const modulesInvalid =
     (session?.legacy_capability_keys.length ?? 0) > 0 ||
@@ -239,6 +285,7 @@ export function OnboardingWizardPage() {
       version: session!.version,
       company_name: companyName.trim(),
       slug: slug.trim(),
+      industries,
     })
     setActiveStep("modules")
   }
@@ -249,7 +296,7 @@ export function OnboardingWizardPage() {
       capabilities,
       integrations,
     })
-    setActiveStep("automation")
+    setActiveStep("service_profile")
   }
 
   async function saveAutomation() {
@@ -259,7 +306,7 @@ export function OnboardingWizardPage() {
       preset_key: presetKey,
       preset_version: preset?.version ?? presetVersion,
     })
-    setActiveStep("service_profile")
+    setActiveStep("routing")
   }
 
   async function saveServiceProfile() {
@@ -268,7 +315,7 @@ export function OnboardingWizardPage() {
       selected_profiles: selectedProfiles,
       lead_requirements: leadRequirements,
     })
-    setActiveStep("routing")
+    setActiveStep("automation")
   }
 
   async function saveRouting() {
@@ -379,6 +426,24 @@ export function OnboardingWizardPage() {
     Boolean(activationPlan?.plan_hash) &&
     !planQuery.isLoading
 
+  const dataStartEffective = (
+    dataStartQuery.data?.effective as
+      | {
+          runtime_enforcement?: string
+          enforcement?: string
+          mode?: string
+          valid?: boolean
+        }
+      | undefined
+  )
+  const dataStartModeLabel =
+    registries?.data_start_modes.find((mode) => mode.key === dataStartMode)?.label ??
+    dataStartMode
+  const intakeEnforced = dataStartEffective?.runtime_enforcement === "enforced"
+  const activationCutoff =
+    (dataStartQuery.data?.draft as { activation_cutoff_at?: string } | undefined)
+      ?.activation_cutoff_at ?? null
+
   return (
     <div className="flex min-w-0 flex-col gap-6">
       <PageHeader
@@ -387,7 +452,10 @@ export function OnboardingWizardPage() {
       />
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
-        <nav className="min-w-0 space-y-1 rounded-lg border border-border bg-surface p-3">
+        <nav className="min-w-0 space-y-1 rounded-lg border border-border bg-surface p-3" aria-label="Onboarding-steg">
+          <p className="mb-2 text-caption text-text-secondary">
+            Grön = klart · Gul = pågår · Röd = blockerat
+          </p>
           {WIZARD_STEPS.map((step, index) => (
             <button
               key={step.key}
@@ -435,6 +503,39 @@ export function OnboardingWizardPage() {
                   disabled={!canWrite}
                 />
               </label>
+              {(registries.industries?.length ?? 0) > 0 ? (
+                <fieldset className="space-y-2">
+                  <legend className="text-label">Branscher</legend>
+                  <p className="text-body-small text-text-secondary">
+                    Välj en eller flera branscher. Påverkar rekommenderade tjänster.
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {registries.industries?.map((industry) => (
+                      <label key={industry.key} className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={industries.includes(industry.key)}
+                          disabled={!canWrite}
+                          onChange={(event) => {
+                            setIndustries((current) =>
+                              event.target.checked
+                                ? [...current, industry.key]
+                                : current.filter((key) => key !== industry.key),
+                            )
+                          }}
+                        />
+                        <span className="text-body text-text-primary">
+                          {industry.label}
+                          <span className="block text-body-small text-text-secondary">
+                            {industry.description}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              ) : null}
             </div>
           ) : null}
 
@@ -515,40 +616,65 @@ export function OnboardingWizardPage() {
 
           {activeStep === "service_profile" ? (
             <div className="space-y-4">
-              <h2 className="text-section-title text-text-primary">Serviceprofil</h2>
+              <h2 className="text-section-title text-text-primary">Tjänster</h2>
               {serviceProfileQuery.isLoading ? (
-                <LoadingState label="Laddar serviceprofil…" rows={3} />
+                <LoadingState label="Laddar tjänster…" rows={3} />
               ) : (
                 <>
                   <p className="text-body-small text-text-secondary">
-                    Välj profiler och justera lead-fältkrav per profil.
+                    Välj tjänster och justera fältkrav per tjänst. Endast avvikelser från
+                    plattformsstandard sparas.
                   </p>
-                  <div className="space-y-2">
-                    {registries.service_profiles
-                      .filter((p) => p.supported_in_current_slice)
-                      .map((profile) => (
-                        <label key={profile.key} className="flex items-start gap-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedProfiles.includes(profile.key)}
-                            disabled={!canWrite}
-                            onChange={(event) => {
-                              setSelectedProfiles((current) =>
-                                event.target.checked
-                                  ? [...current, profile.key]
-                                  : current.filter((item) => item !== profile.key),
-                              )
-                            }}
-                          />
-                          <span className="text-body text-text-primary">
-                            {profile.label}
-                            <span className="block text-body-small text-text-secondary">
-                              {profile.description}
-                            </span>
-                          </span>
-                        </label>
-                      ))}
-                  </div>
+                  {(["recommended", "selected", "all"] as const).map((groupKey) => {
+                    const group = serviceGroups[groupKey]
+                    if (!group.items.length) return null
+                    return (
+                      <div key={groupKey} className="space-y-2">
+                        <h3 className="text-label text-text-primary">{group.title}</h3>
+                        {group.items.map((profile) => {
+                          const incompatible = Boolean(
+                            (profile as { _incompatible?: boolean })._incompatible,
+                          )
+                          return (
+                            <label
+                              key={profile.key}
+                              className={`flex items-start gap-3 rounded-md border px-3 py-2 ${
+                                incompatible
+                                  ? "border-status-warning bg-surface-subtle"
+                                  : "border-border"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="mt-1"
+                                checked={selectedProfiles.includes(profile.key)}
+                                disabled={!canWrite}
+                                onChange={(event) => {
+                                  setSelectedProfiles((current) =>
+                                    event.target.checked
+                                      ? [...current, profile.key]
+                                      : current.filter((item) => item !== profile.key),
+                                  )
+                                }}
+                              />
+                              <span className="text-body text-text-primary">
+                                {profile.label}
+                                {incompatible ? (
+                                  <StatusBadge
+                                    variant="warning"
+                                    label="Inkompatibel med valda moduler/branscher"
+                                  />
+                                ) : null}
+                                <span className="block text-body-small text-text-secondary">
+                                  {profile.description}
+                                </span>
+                              </span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
                   {selectedProfiles.map((profileKey) => {
                     const profile = registries.service_profiles.find((p) => p.key === profileKey)
                     if (!profile) return null
@@ -569,11 +695,13 @@ export function OnboardingWizardPage() {
                                 ?.label ?? fieldKey
                             const mode =
                               leadRequirements[profileKey]?.[fieldKey] ?? "inherit"
-                            const platformDefault = profile.required_fields_summary.includes(
-                              fieldKey,
-                            )
-                              ? "obligatoriskt"
-                              : "valfritt"
+                            const effectiveMeta =
+                              effectiveServiceFields[profileKey]?.[fieldKey] ?? {}
+                            const effectiveLabel =
+                              effectiveMeta.effective_label_sv ??
+                              (profile.required_fields_summary.includes(fieldKey)
+                                ? "Obligatorisk"
+                                : "Valfri")
                             return (
                               <div
                                 key={`${profileKey}-${fieldKey}`}
@@ -597,10 +725,17 @@ export function OnboardingWizardPage() {
                                     }))
                                   }}
                                 >
-                                  <option value="inherit">Ärv plattformsdefault</option>
-                                  <option value="required">Obligatoriskt</option>
-                                  <option value="optional">Valfritt</option>
+                                  <option value="inherit">Automatiskt</option>
+                                  <option value="required">Obligatorisk</option>
+                                  <option value="optional">Valfri</option>
+                                  <option value="skip">Fråga inte</option>
                                 </select>
+                                <span
+                                  className="text-caption text-text-secondary"
+                                  title="Automatiskt följer plattformsstandard för tjänsten"
+                                >
+                                  Effektivt: {effectiveLabel}
+                                </span>
                                 {mode !== "inherit" && canWrite ? (
                                   <Button
                                     type="button"
@@ -608,7 +743,7 @@ export function OnboardingWizardPage() {
                                     className="shrink-0"
                                     onClick={() => resetLeadFieldToInherit(profileKey, fieldKey)}
                                   >
-                                    Återställ till standard ({platformDefault})
+                                    Återställ
                                   </Button>
                                 ) : null}
                               </div>
@@ -790,10 +925,35 @@ export function OnboardingWizardPage() {
                 <LoadingState label="Laddar datastart…" rows={2} />
               ) : (
                 <>
-                  <p className="text-body-small text-text-secondary">
-                    Cutoff sparas som metadata vid aktivering. Plattformen blockerar inte
-                    tekniskt historiska mejl i denna slice (runtime enforcement: not_verifiable).
-                  </p>
+                  <div className="rounded-md border border-border bg-surface-subtle p-3 text-body-small text-text-secondary">
+                    <p>
+                      <span className="font-medium text-text-primary">Tekniskt genomdriven:</span>{" "}
+                      {intakeEnforced ? "Ja (internalDate vid Gmail-sync)" : "Nej — readiness blockerar"}
+                    </p>
+                    <p>
+                      <span className="font-medium text-text-primary">Startläge:</span>{" "}
+                      {dataStartModeLabel}
+                    </p>
+                    <p>
+                      <span className="font-medium text-text-primary">Enforcement:</span>{" "}
+                      {dataStartEffective?.enforcement ?? "—"}
+                    </p>
+                    <p>
+                      <span className="font-medium text-text-primary">Cutoff-tid:</span>{" "}
+                      {activationCutoff
+                        ? new Date(activationCutoff).toLocaleString("sv-SE")
+                        : "Sätts vid aktivering (UTC)"}
+                    </p>
+                    {intakeEnforced ? (
+                      <p className="mt-2 text-text-primary">
+                        Meddelanden före cutoff blockeras vid runtime via Gmail internalDate (UTC).
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-status-warning">
+                        Runtime enforcement är inte aktiv — åtgärda datastart innan aktivering.
+                      </p>
+                    )}
+                  </div>
                   <div className="space-y-2">
                     {registries.data_start_modes
                       .filter((mode) => mode.supported_in_current_slice)
@@ -839,34 +999,93 @@ export function OnboardingWizardPage() {
                 {readinessMutation.isPending ? "Kör…" : "Kör readiness"}
               </Button>
               {readiness ? (
-                <div className="space-y-3">
-                  <StatusBadge
-                    variant={
-                      readiness.overall_status === "ready"
-                        ? "healthy"
-                        : readiness.overall_status === "ready_with_warnings"
-                          ? "warning"
-                          : "failed"
-                    }
-                    label={readiness.overall_status}
-                  />
-                  {readiness.blocking_checks.map((check) => (
-                    <p key={check.id} className="text-body-small text-status-danger">
-                      {check.message}
-                    </p>
-                  ))}
-                  {readiness.warnings.map((warning) => (
-                    <label key={warning.id} className="flex items-start gap-2">
-                      <input
-                        type="checkbox"
-                        checked={acknowledgedWarnings.includes(warning.id)}
-                        onChange={() => toggleWarning(warning.id)}
-                      />
-                      <span className="text-body-small text-text-secondary">
-                        {warning.message}
-                      </span>
-                    </label>
-                  ))}
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge
+                      variant={
+                        readiness.overall_status === "ready"
+                          ? "healthy"
+                          : readiness.overall_status === "ready_with_warnings"
+                            ? "warning"
+                            : "failed"
+                      }
+                      label={readiness.overall_status}
+                    />
+                    {readiness.stale ? (
+                      <StatusBadge variant="warning" label="Föråldrad — kör readiness igen" />
+                    ) : null}
+                    <span className="text-body-small text-text-secondary">
+                      Kontrollerad: {new Date(readiness.last_checked_at).toLocaleString("sv-SE")}
+                    </span>
+                  </div>
+                  {readiness.groups?.length ? (
+                    readiness.groups.map((group) => (
+                      <div key={group.group_key} className="space-y-2 rounded-md border border-border p-3">
+                        <h3 className="text-label text-text-primary">{group.group_label_sv}</h3>
+                        {group.checks.map((check) => (
+                          <div key={check.id} className="space-y-1">
+                            <p
+                              className={`text-body-small ${
+                                check.blocking || check.status === "fail"
+                                  ? "text-status-danger"
+                                  : check.status === "warning"
+                                    ? "text-status-warning"
+                                    : "text-text-secondary"
+                              }`}
+                            >
+                              {check.message}
+                            </p>
+                            {check.action_link ? (
+                              <ReadinessActionLink
+                                template={check.action_link}
+                                tenantId={session.tenant_id}
+                                stepLabel={group.group_label_sv}
+                              />
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                      {readiness.blocking_checks.map((check) => (
+                        <div key={check.id} className="space-y-1">
+                          <p className="text-body-small text-status-danger">{check.message}</p>
+                          <ReadinessActionLink
+                            template={check.action_link}
+                            tenantId={session.tenant_id}
+                            stepLabel={check.step_key ?? undefined}
+                          />
+                        </div>
+                      ))}
+                      {readiness.warnings.map((warning) => (
+                        <label key={warning.id} className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={acknowledgedWarnings.includes(warning.id)}
+                            onChange={() => toggleWarning(warning.id)}
+                          />
+                          <span className="text-body-small text-text-secondary">
+                            {warning.message}
+                          </span>
+                        </label>
+                      ))}
+                    </>
+                  )}
+                  {readiness.groups?.length
+                    ? readiness.warnings.map((warning) => (
+                        <label key={warning.id} className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={acknowledgedWarnings.includes(warning.id)}
+                            onChange={() => toggleWarning(warning.id)}
+                          />
+                          <span className="text-body-small text-text-secondary">
+                            {warning.message}
+                          </span>
+                        </label>
+                      ))
+                    : null}
                 </div>
               ) : null}
             </div>

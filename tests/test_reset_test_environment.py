@@ -42,6 +42,9 @@ from app.tools.test_environment.reserved_tenants import (
 )
 
 
+from tests.onboarding_db_tables import onboarding_sqlite_tables
+
+
 def _utc(dt: str) -> datetime:
     return datetime.fromisoformat(dt)
 
@@ -49,8 +52,7 @@ def _utc(dt: str) -> datetime:
 @pytest.fixture()
 def reset_db():
     engine = create_engine("sqlite:///:memory:")
-    tables = [
-        TenantConfigRecord.__table__,
+    tables = onboarding_sqlite_tables() + [
         JobRecord.__table__,
         ApprovalRequestRecord.__table__,
         IncidentRecord.__table__,
@@ -59,9 +61,6 @@ def reset_db():
         IncidentTimelineEventRecord.__table__,
         IntegrationEvent.__table__,
         ActionExecutionRecord.__table__,
-        AuditEventRecord.__table__,
-        OAuthCredentialRecord.__table__,
-        TenantApiKeyRecord.__table__,
     ]
     Base.metadata.create_all(bind=engine, tables=tables)
     Session = sessionmaker(bind=engine)

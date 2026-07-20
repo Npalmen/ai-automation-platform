@@ -18,11 +18,11 @@ type GmailOAuthStatus = {
 }
 
 const STATE_LABELS: Record<string, string> = {
-  not_connected: "Not connected",
-  connected: "Connected",
-  reconnect_required: "Reconnect required",
-  connecting: "Connecting",
-  error: "Error",
+  not_connected: "Ej ansluten",
+  connected: "Ansluten",
+  reconnect_required: "Återanslutning krävs",
+  connecting: "Ansluter",
+  error: "Fel",
 }
 
 function fetchGmailStatus(tenantId: string): Promise<GmailOAuthStatus> {

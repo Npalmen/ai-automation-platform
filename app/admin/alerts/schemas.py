@@ -15,7 +15,7 @@ AlertScopeType = Literal[
 AlertSourceClass = Literal["intern_db_detected", "intern_metadata_detected"]
 ReopenPolicy = Literal["reopen_existing", "create_new_after_grace", "never_reopen"]
 
-ACTIVE_ALERT_STATUSES = frozenset({"open", "acknowledged", "snoozed", "suppressed"})
+ACTIVE_ALERT_STATUSES = frozenset({"open", "acknowledged", "snoozed"})
 
 
 class AlertSafeDetails(BaseModel):
