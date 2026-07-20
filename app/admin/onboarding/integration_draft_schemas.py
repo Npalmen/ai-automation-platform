@@ -39,9 +39,18 @@ class MondayIntegrationConfig(BaseModel):
     requested: bool = False
 
 
+SelectionStatusDraft = Literal["not_selected", "selected_optional", "selected_required"]
+
+
+class IntegrationSelectionDraft(BaseModel):
+    selection_status: SelectionStatusDraft = "not_selected"
+    migration_review_required: bool = False
+
+
 class IntegrationsDraftPayload(BaseModel):
     schema_version: int = 1
     requested_integrations: list[str] = Field(default_factory=list)
+    selections: dict[str, IntegrationSelectionDraft] = Field(default_factory=dict)
     gmail: GmailIntegrationConfig = Field(default_factory=GmailIntegrationConfig)
     visma: VismaIntegrationConfig = Field(default_factory=VismaIntegrationConfig)
     google_sheets: GoogleSheetsIntegrationConfig = Field(default_factory=GoogleSheetsIntegrationConfig)
@@ -63,7 +72,8 @@ class ExternalRoutingDraftPayload(BaseModel):
 
 class IntegrationsPatchRequest(BaseModel):
     version: int
-    requested_integrations: list[str] = Field(default_factory=list)
+    requested_integrations: list[str] | None = None
+    selections: dict[str, IntegrationSelectionDraft] | None = None
     gmail: GmailIntegrationConfig | None = None
     visma: VismaIntegrationConfig | None = None
     google_sheets: GoogleSheetsIntegrationConfig | None = None

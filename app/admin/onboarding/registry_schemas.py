@@ -29,6 +29,12 @@ class RegistryIntegrationOut(BaseModel):
     verification_capability: str | None = None
     lifecycle_cap: str | None = None
     limitation_ids: list[str] = Field(default_factory=list)
+    canonical_integration_key: str | None = None
+    category: str | None = None
+    alternatives_group: str | None = None
+    alternatives_group_label_sv: str | None = None
+    support_status: str | None = None
+    selectable: bool | None = None
 
 
 class RegistryExternalRoutingTargetOut(BaseModel):

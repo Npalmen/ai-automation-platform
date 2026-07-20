@@ -216,8 +216,10 @@ def evaluate_integrations_step(
     session_id: str | None = None,
 ) -> dict[str, Any]:
     from app.admin.onboarding.integration_draft_schemas import IntegrationsDraftPayload
+    from app.admin.onboarding.integration_selection_draft import effective_selection_status
     from app.admin.onboarding.integration_verification import IntegrationVerificationStore
     from app.admin.onboarding.repository import OnboardingRepository
+    from app.integrations.keys import INTEGRATION_REGISTRY
 
     caps = _selected_capabilities(modules_draft)
     explicit_integrations = _selected_integrations(modules_draft)
@@ -244,7 +246,12 @@ def evaluate_integrations_step(
         external_routing = (er_record.payload if er_record else {}) or {}
 
     draft_requested = set(integrations_draft.requested_integrations if integrations_draft else [])
-    all_keys = sorted(set(explicit_integrations) | required | draft_requested)
+    selection_keys: set[str] = set()
+    if integrations_draft and integrations_draft.selections:
+        for canonical in integrations_draft.selections:
+            meta = INTEGRATION_REGISTRY.get(canonical, {})
+            selection_keys.add(str(meta.get("registry_key", canonical)))
+    all_keys = sorted(set(explicit_integrations) | required | draft_requested | selection_keys)
 
     if not all_keys:
         return {
@@ -265,7 +272,34 @@ def evaluate_integrations_step(
         if not integ or not integ.supported_in_current_slice:
             continue
 
-        is_required = key in required or key in draft_requested or key in explicit_integrations
+        module_required = key in required or key in explicit_integrations
+        selection_status, migration_review_required = (
+            effective_selection_status(
+                integrations_draft,
+                key,
+                required_by_module=module_required,
+            )
+            if integrations_draft
+            else ("selected_required" if module_required or key in draft_requested else "not_selected", False)
+        )
+
+        if selection_status == "not_selected":
+            items.append(
+                {
+                    "integration_key": key,
+                    "label": integ.label_sv,
+                    "required": False,
+                    "selection_status": selection_status,
+                    "migration_review_required": migration_review_required,
+                    "lifecycle_status": "not_applicable",
+                    "connected": False,
+                    "verified": False,
+                    "locally_verified": False,
+                }
+            )
+            continue
+
+        is_required = selection_status == "selected_required"
         legacy = _integration_status(db, tenant, integ, settings) if tenant else {}
 
         configured = False
@@ -373,12 +407,16 @@ def evaluate_integrations_step(
                 blocking.append(key)
             elif not settings.GOOGLE_MAIL_ACCESS_TOKEN:
                 warnings.append("gmail_platform_credential")
+        elif key == "gmail" and selection_status == "selected_optional" and not configured:
+            warnings.append("gmail_optional_unconfigured")
 
         items.append(
             {
                 "integration_key": key,
                 "label": integ.label_sv,
                 "required": is_required,
+                "selection_status": selection_status,
+                "migration_review_required": migration_review_required,
                 "lifecycle_status": lifecycle,
                 "connected": legacy.get("connected", False),
                 "verified": verified,

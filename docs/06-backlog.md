@@ -24,7 +24,7 @@
 ### Customer settings — integration selection (2026-07-21)
 
 - [x] **Slice A — selection resolver + health gating** — canonical keys (`app/integrations/keys.py`); `app/admin/integrations/selection_resolver.py`; platform vs tenant health split; gated triage, tenant directory, alerts; frontend customer detail filtering. No migration 015. Cherry-picked to `main` from `a99c33c` (feature branch `feature/kapitel-2d1-approval-trace` not merged). Tests: parity + health + tenant_directory + super_admin (144 passed).
-- [ ] **Slice B — explicit `settings.integrations.selections`** — migration 015; integration groups; onboarding selection UI; readiness semantics; sync to `allowed_integrations`.
+- [ ] **Slice B — explicit `settings.integrations.selections`** — migration **016** (structure SQL + separate backfill service); `enabled_external_writes`; selection materialize on activation; Niklas backfill gate tests; onboarding tri-state UI + registry metadata + selection-aware readiness. **In progress** on `feature/integration-selection-slice-b`: pilot deploy + post-deploy matrix remain.
 - [ ] **Slice C — transactional customer settings edits** — `CustomerSettingsPage`; multi-section commands; `readiness_domains_invalidated`.
 - [ ] **Slice D — slutgates + pilot deploy** — after B/C.
 

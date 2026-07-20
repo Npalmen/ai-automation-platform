@@ -314,8 +314,19 @@ export type CancelPayload = {
   reason: string
 }
 
+export type IntegrationSelectionStatus =
+  | "not_selected"
+  | "selected_optional"
+  | "selected_required"
+
+export type IntegrationSelectionDraft = {
+  selection_status: IntegrationSelectionStatus
+  migration_review_required?: boolean
+}
+
 export type IntegrationLifecycleItem = {
   integration_key: string
+  canonical_integration_key?: string | null
   label: string
   lifecycle_status: string
   connection_status?: string
@@ -324,6 +335,14 @@ export type IntegrationLifecycleItem = {
   configured: boolean
   required: boolean
   requested?: boolean
+  selection_status?: IntegrationSelectionStatus
+  migration_review_required?: boolean
+  category?: string | null
+  alternatives_group?: string | null
+  alternatives_group_label_sv?: string | null
+  support_status?: string | null
+  selectable?: boolean
+  supported_in_current_slice?: boolean
   verification_status?: string
   verified_at?: string | null
   freshness_max_hours?: number | null
@@ -352,7 +371,8 @@ export type IntegrationsStepResponse = {
 
 export type IntegrationsPatchPayload = {
   version: number
-  requested_integrations: string[]
+  requested_integrations?: string[]
+  selections?: Record<string, IntegrationSelectionDraft>
   gmail?: { requested: boolean; label_scope_slug: string }
   visma?: { requested: boolean }
   google_sheets?: { requested: boolean; spreadsheet_id: string; export_tabs: string[] }
