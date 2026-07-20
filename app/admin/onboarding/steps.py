@@ -45,11 +45,15 @@ def _selected_integrations(modules_draft: dict) -> list[str]:
 
 
 def _required_integrations_for_capabilities(capability_keys: list[str]) -> set[str]:
+    from app.admin.onboarding.integration_groups import registry_keys_for_group
+
     required: set[str] = set()
     for key in capability_keys:
         cap = PRODUCT_CAPABILITIES.get(key)
         if cap:
             required.update(cap.required_integrations)
+            for group in cap.required_integration_groups:
+                required.update(registry_keys_for_group(group))
     return required
 
 
@@ -216,6 +220,12 @@ def evaluate_integrations_step(
     session_id: str | None = None,
 ) -> dict[str, Any]:
     from app.admin.onboarding.integration_draft_schemas import IntegrationsDraftPayload
+    from app.admin.onboarding.integration_groups import (
+        evaluate_required_integration_groups,
+        registry_keys_for_group,
+        required_integration_groups_for_capabilities,
+        unsatisfied_required_groups,
+    )
     from app.admin.onboarding.integration_selection_draft import effective_selection_status
     from app.admin.onboarding.integration_verification import IntegrationVerificationStore
     from app.admin.onboarding.repository import OnboardingRepository
@@ -224,9 +234,12 @@ def evaluate_integrations_step(
     caps = _selected_capabilities(modules_draft)
     explicit_integrations = _selected_integrations(modules_draft)
     required = _required_integrations_for_capabilities(caps)
+    required_groups = required_integration_groups_for_capabilities(caps)
 
     integrations_draft: IntegrationsDraftPayload | None = None
     external_routing: dict = {}
+    service_profile_draft: dict = {}
+    routing_draft: dict = {}
     if session_id:
         integ_record = OnboardingRepository.get_draft(db, session_id, "integrations")
         try:
@@ -244,6 +257,10 @@ def evaluate_integrations_step(
             }
         er_record = OnboardingRepository.get_draft(db, session_id, "external_routing")
         external_routing = (er_record.payload if er_record else {}) or {}
+        sp_record = OnboardingRepository.get_draft(db, session_id, "service_profile")
+        service_profile_draft = (sp_record.payload if sp_record else {}) or {}
+        rt_record = OnboardingRepository.get_draft(db, session_id, "routing")
+        routing_draft = (rt_record.payload if rt_record else {}) or {}
 
     draft_requested = set(integrations_draft.requested_integrations if integrations_draft else [])
     selection_keys: set[str] = set()
@@ -251,9 +268,14 @@ def evaluate_integrations_step(
         for canonical in integrations_draft.selections:
             meta = INTEGRATION_REGISTRY.get(canonical, {})
             selection_keys.add(str(meta.get("registry_key", canonical)))
-    all_keys = sorted(set(explicit_integrations) | required | draft_requested | selection_keys)
+    group_keys: set[str] = set()
+    for group in required_groups:
+        group_keys.update(registry_keys_for_group(group))
+    all_keys = sorted(
+        set(explicit_integrations) | required | draft_requested | selection_keys | group_keys
+    )
 
-    if not all_keys:
+    if not all_keys and not required_groups:
         return {
             "step_status": "not_applicable",
             "verification_level": "not_applicable",
@@ -424,6 +446,18 @@ def evaluate_integrations_step(
             }
         )
 
+    group_evaluations = []
+    if integrations_draft and session_id and required_groups:
+        group_evaluations = evaluate_required_integration_groups(
+            capability_keys=caps,
+            integrations_draft=integrations_draft,
+            modules_draft=modules_draft,
+            service_profile_draft=service_profile_draft,
+            routing_draft=routing_draft,
+        )
+        for evaluation in unsatisfied_required_groups(group_evaluations):
+            blocking.append(f"group:{evaluation.group_key}")
+
     if blocking:
         return {
             "step_status": "blocked",
@@ -431,7 +465,20 @@ def evaluate_integrations_step(
             "blocks_activation": True,
             "read_only": False,
             "read_only_reason": None,
-            "details": {"integrations": items, "blocking": blocking, "warnings": warnings},
+            "details": {
+                "integrations": items,
+                "blocking": blocking,
+                "warnings": warnings,
+                "integration_groups": [
+                    {
+                        "group_key": ev.group_key,
+                        "satisfied": ev.satisfied,
+                        "implementation": ev.implementation,
+                        "reason": ev.reason,
+                    }
+                    for ev in group_evaluations
+                ],
+            },
         }
 
     if warnings and all(i.get("lifecycle_status") == "configured_not_running" for i in items if i["required"]):
@@ -441,7 +488,19 @@ def evaluate_integrations_step(
             "blocks_activation": False,
             "read_only": False,
             "read_only_reason": None,
-            "details": {"integrations": items, "warnings": warnings},
+            "details": {
+                "integrations": items,
+                "warnings": warnings,
+                "integration_groups": [
+                    {
+                        "group_key": ev.group_key,
+                        "satisfied": ev.satisfied,
+                        "implementation": ev.implementation,
+                        "reason": ev.reason,
+                    }
+                    for ev in group_evaluations
+                ],
+            },
         }
 
     return {
@@ -450,7 +509,18 @@ def evaluate_integrations_step(
         "blocks_activation": False,
         "read_only": False,
         "read_only_reason": None,
-        "details": {"integrations": items},
+        "details": {
+            "integrations": items,
+            "integration_groups": [
+                {
+                    "group_key": ev.group_key,
+                    "satisfied": ev.satisfied,
+                    "implementation": ev.implementation,
+                    "reason": ev.reason,
+                }
+                for ev in group_evaluations
+            ],
+        },
     }
 
 

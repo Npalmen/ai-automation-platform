@@ -10,7 +10,7 @@ from typing import Literal
 Availability = Literal["available", "read_only", "deferred"]
 
 # Bump when GET /admin/onboarding/registries response shape changes.
-REGISTRY_SCHEMA_VERSION: int = 3
+REGISTRY_SCHEMA_VERSION: int = 4
 
 
 @dataclass(frozen=True)
@@ -20,6 +20,8 @@ class ProductCapabilityDefinition:
     description_sv: str
     enabled_job_types: tuple[str, ...]
     required_integrations: tuple[str, ...] = ()
+    required_integration_groups: tuple[str, ...] = ()
+    recommended_integration_groups: tuple[str, ...] = ()
     required_runtime: tuple[str, ...] = ()
     availability: Availability = "available"
     supported_in_current_slice: bool = True
@@ -74,21 +76,21 @@ PRODUCT_CAPABILITIES: dict[str, ProductCapabilityDefinition] = {
         label_sv="Leadhantering",
         description_sv="Hantera inkommande leads via Monday-integration.",
         enabled_job_types=("lead",),
-        required_integrations=("monday",),
+        required_integration_groups=("work_management",),
     ),
     "customer_inquiries": ProductCapabilityDefinition(
         key="customer_inquiries",
         label_sv="Kundärenden",
         description_sv="Hantera kundärenden via Gmail-intag.",
         enabled_job_types=("customer_inquiry",),
-        required_integrations=("gmail",),
+        required_integration_groups=("email_system",),
     ),
     "invoice_handling": ProductCapabilityDefinition(
         key="invoice_handling",
         label_sv="Faktura-/ekonomihantering",
-        description_sv="Fakturaflöden med Visma-integration.",
+        description_sv="Fakturaflöden med ekonomidestination (Visma, Fortnox, Bokio eller manuell ekonomirouting).",
         enabled_job_types=("invoice",),
-        required_integrations=("visma",),
+        required_integration_groups=("finance_destination",),
     ),
     "quote_drafts": ProductCapabilityDefinition(
         key="quote_drafts",
@@ -320,6 +322,8 @@ def _canonical_business_payload() -> dict:
         k: {
             "enabled_job_types": list(v.enabled_job_types),
             "required_integrations": list(v.required_integrations),
+            "required_integration_groups": list(v.required_integration_groups),
+            "recommended_integration_groups": list(v.recommended_integration_groups),
             "required_runtime": list(v.required_runtime),
             "availability": v.availability,
         }
@@ -409,11 +413,29 @@ def validate_registry_integrity() -> None:
     if len(preset_pairs) != len(set(preset_pairs)):
         raise RegistryIntegrityError("Duplicate automation preset key/version pairs.")
 
+    known_groups = {
+        "email_system",
+        "finance_destination",
+        "work_management",
+        "spreadsheet_export",
+        "calendar_system",
+    }
+
     for cap in PRODUCT_CAPABILITIES.values():
         for dep in cap.required_integrations:
             if dep not in integ_keys:
                 raise RegistryIntegrityError(
                     f"Capability '{cap.key}' references unknown integration '{dep}'."
+                )
+        for group in cap.required_integration_groups:
+            if group not in known_groups:
+                raise RegistryIntegrityError(
+                    f"Capability '{cap.key}' references unknown integration group '{group}'."
+                )
+        for group in cap.recommended_integration_groups:
+            if group not in known_groups:
+                raise RegistryIntegrityError(
+                    f"Capability '{cap.key}' references unknown recommended group '{group}'."
                 )
         for dep in cap.required_runtime:
             if dep not in runtime_keys:

@@ -16,6 +16,8 @@ class RegistryCapabilityOut(BaseModel):
     availability: Availability
     supported_in_current_slice: bool
     dependencies: dict[str, list[str]] = Field(default_factory=dict)
+    required_integration_groups: list[str] = Field(default_factory=list)
+    recommended_integration_groups: list[str] = Field(default_factory=list)
     requires_api_key: bool = False
 
 

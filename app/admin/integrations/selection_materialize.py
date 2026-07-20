@@ -10,6 +10,7 @@ from app.admin.integrations.selection_models import (
     ensure_selections_envelope,
     selections_from_registry_draft,
 )
+from app.admin.onboarding.integration_groups import module_required_canonical_keys
 from app.admin.onboarding.registries import INTEGRATIONS, PRODUCT_CAPABILITIES
 from app.integrations.keys import (
     CANONICAL_INTEGRATION_KEYS,
@@ -22,16 +23,7 @@ def _utcnow_iso() -> str:
 
 
 def _module_required_keys(capability_keys: list[str]) -> set[str]:
-    required: set[str] = set()
-    for cap_key in capability_keys:
-        cap = PRODUCT_CAPABILITIES.get(cap_key)
-        if not cap:
-            continue
-        for registry_key in cap.required_integrations:
-            canonical = registry_key_to_canonical(registry_key)
-            if canonical:
-                required.add(canonical)
-    return required
+    return module_required_canonical_keys(capability_keys)
 
 
 def materialize_selections_config(

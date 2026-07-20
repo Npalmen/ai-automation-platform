@@ -518,6 +518,11 @@ def patch_integrations_step(
     if body.selections is not None:
         current = merge_selection_patch(current, body.selections)
 
+    if body.group_implementations is not None:
+        merged_groups = dict(current.group_implementations)
+        merged_groups.update(body.group_implementations)
+        current = current.model_copy(update={"group_implementations": merged_groups})
+
     gmail = body.gmail if body.gmail is not None else current.gmail
     visma = body.visma if body.visma is not None else current.visma
     sheets = body.google_sheets if body.google_sheets is not None else current.google_sheets
@@ -534,6 +539,7 @@ def patch_integrations_step(
     draft = IntegrationsDraftPayload(
         requested_integrations=requested,
         selections=current.selections,
+        group_implementations=current.group_implementations,
         gmail=gmail,
         visma=visma,
         google_sheets=sheets,
@@ -567,7 +573,9 @@ def patch_integrations_step(
     )
     audit_action = (
         INTEGRATION_REQUESTED
-        if body.requested_integrations is not None or body.selections is not None
+        if body.requested_integrations is not None
+        or body.selections is not None
+        or body.group_implementations is not None
         else INTEGRATION_CONFIGURATION_UPDATED
     )
     emit_onboarding_audit(

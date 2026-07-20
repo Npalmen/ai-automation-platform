@@ -47,10 +47,19 @@ class IntegrationSelectionDraft(BaseModel):
     migration_review_required: bool = False
 
 
+GroupImplementationType = Literal["manual_accounting_routing", "integration"]
+
+
+class GroupImplementationDraft(BaseModel):
+    type: GroupImplementationType
+    integration_key: str | None = None
+
+
 class IntegrationsDraftPayload(BaseModel):
     schema_version: int = 1
     requested_integrations: list[str] = Field(default_factory=list)
     selections: dict[str, IntegrationSelectionDraft] = Field(default_factory=dict)
+    group_implementations: dict[str, GroupImplementationDraft] = Field(default_factory=dict)
     gmail: GmailIntegrationConfig = Field(default_factory=GmailIntegrationConfig)
     visma: VismaIntegrationConfig = Field(default_factory=VismaIntegrationConfig)
     google_sheets: GoogleSheetsIntegrationConfig = Field(default_factory=GoogleSheetsIntegrationConfig)
@@ -74,6 +83,7 @@ class IntegrationsPatchRequest(BaseModel):
     version: int
     requested_integrations: list[str] | None = None
     selections: dict[str, IntegrationSelectionDraft] | None = None
+    group_implementations: dict[str, GroupImplementationDraft] | None = None
     gmail: GmailIntegrationConfig | None = None
     visma: VismaIntegrationConfig | None = None
     google_sheets: GoogleSheetsIntegrationConfig | None = None

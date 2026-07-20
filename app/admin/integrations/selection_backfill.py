@@ -19,6 +19,7 @@ from app.admin.integrations.selection_resolver import (
     _has_tenant_credential,
     _has_verified_config,
 )
+from app.admin.onboarding.integration_groups import module_required_canonical_keys
 from app.admin.onboarding.registries import INTEGRATIONS, PRODUCT_CAPABILITIES
 from app.integrations.keys import (
     CANONICAL_INTEGRATION_KEYS,
@@ -61,17 +62,12 @@ def _utcnow_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
-def _module_required_canonical_keys(capability_keys: list[str]) -> set[str]:
-    required: set[str] = set()
-    for cap_key in capability_keys:
-        cap = PRODUCT_CAPABILITIES.get(cap_key)
-        if not cap:
-            continue
-        for registry_key in cap.required_integrations:
-            canonical = registry_key_to_canonical(registry_key)
-            if canonical:
-                required.add(canonical)
-    return required
+def _module_required_canonical_keys(
+    capability_keys: list[str],
+    *,
+    allowed: set[str] | None = None,
+) -> set[str]:
+    return module_required_canonical_keys(capability_keys, allowed=allowed)
 
 
 def _explicit_onboarding_selection(
@@ -122,7 +118,7 @@ def classify_integration_for_backfill(
     tenant_id = getattr(record, "tenant_id", "")
     settings = getattr(record, "settings", None) or {}
     allowed = set(normalize_integration_key_list(getattr(record, "allowed_integrations", None)))
-    module_required = _module_required_canonical_keys(capability_keys or [])
+    module_required = _module_required_canonical_keys(capability_keys or [], allowed=allowed)
     has_cred = _has_tenant_credential(db, tenant_id, integration_key)
     has_verified = _has_verified_config(settings, integration_key)
     in_allowed = integration_key in allowed

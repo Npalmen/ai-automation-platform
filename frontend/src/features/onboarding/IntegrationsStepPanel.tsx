@@ -19,7 +19,7 @@ import { ErrorState } from "@/components/operator/ErrorState"
 import { LoadingState } from "@/components/operator/LoadingState"
 import { StatusBadge } from "@/components/operator/StatusBadge"
 import { Button } from "@/components/ui/button"
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 
 type Props = {
   sessionId: string
@@ -452,15 +452,12 @@ export function IntegrationsStepPanel({
   const [unlinkOpen, setUnlinkOpen] = useState(false)
   const [unlinkError, setUnlinkError] = useState<string | undefined>()
 
-  useEffect(() => {
-    if (!data?.draft) return
-    const draft = data.draft as {
-      gmail?: { label_scope_slug?: string }
-      google_sheets?: { spreadsheet_id?: string }
-    }
-    setGmailSlug(draft.gmail?.label_scope_slug ?? "")
-    setSpreadsheetId(draft.google_sheets?.spreadsheet_id ?? "")
-  }, [data])
+  const draftPayload = (data?.draft ?? {}) as {
+    gmail?: { label_scope_slug?: string }
+    google_sheets?: { spreadsheet_id?: string }
+  }
+  const gmailSlugValue = gmailSlug || draftPayload.gmail?.label_scope_slug || ""
+  const spreadsheetIdValue = spreadsheetId || draftPayload.google_sheets?.spreadsheet_id || ""
 
   const groupedIntegrations = useMemo(
     () => groupIntegrations(data?.integrations ?? []),
@@ -478,7 +475,7 @@ export function IntegrationsStepPanel({
     void patchMutation.mutateAsync({
       version,
       requested_integrations: ["gmail"],
-      gmail: { requested: true, label_scope_slug: gmailSlug },
+      gmail: { requested: true, label_scope_slug: gmailSlugValue },
       selections: {
         google_mail: { selection_status: "selected_optional", migration_review_required: false },
       },
@@ -491,7 +488,7 @@ export function IntegrationsStepPanel({
       requested_integrations: ["google_sheets"],
       google_sheets: {
         requested: true,
-        spreadsheet_id: spreadsheetId,
+        spreadsheet_id: spreadsheetIdValue,
         export_tabs: ["Leads"],
       },
       selections: {
@@ -539,13 +536,13 @@ export function IntegrationsStepPanel({
               canWrite={canWrite}
               version={version}
               redirectTarget={redirectTarget}
-              gmailSlug={gmailSlug}
+              gmailSlug={gmailSlugValue}
               setGmailSlug={setGmailSlug}
               boardId={boardId}
               setBoardId={setBoardId}
               boardName={boardName}
               setBoardName={setBoardName}
-              spreadsheetId={spreadsheetId}
+              spreadsheetId={spreadsheetIdValue}
               setSpreadsheetId={setSpreadsheetId}
               onSelectionChange={handleSelectionChange}
               onUnlinkVisma={() => {

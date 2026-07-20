@@ -64,8 +64,11 @@ def present_registries() -> OnboardingRegistriesResponse:
             supported_in_current_slice=cap.supported_in_current_slice,
             dependencies={
                 "integrations": list(cap.required_integrations),
+                "integration_groups": list(cap.required_integration_groups),
                 "runtime": list(cap.required_runtime),
             },
+            required_integration_groups=list(cap.required_integration_groups),
+            recommended_integration_groups=list(cap.recommended_integration_groups),
             requires_api_key=cap.requires_api_key,
         )
         for cap in sorted(PRODUCT_CAPABILITIES.values(), key=lambda c: c.key)
