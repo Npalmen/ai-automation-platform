@@ -37,6 +37,7 @@ from app.admin.operator_actions import (
 )
 from app.admin.support_console import _get_automation, _get_scheduler
 from app.analytics.usage import _tenant_usage_summary
+from app.admin.integrations.selection_resolver import derive_integration_selection
 from app.domain.integrations.models import IntegrationEvent
 from app.health.integration_health import get_integration_health
 from app.repositories.postgres.approval_models import ApprovalRequestRecord
@@ -149,7 +150,10 @@ def _gmail_summary_for_tenant(rows: list[dict[str, Any]]) -> str:
     gmail_rows = [
         r for r in rows
         if r.get("area") == "integration"
-        and "gmail" in (r.get("title") or "").lower()
+        and (
+            "gmail" in (r.get("title") or "").lower()
+            or "google mail" in (r.get("title") or "").lower()
+        )
     ]
     if not gmail_rows:
         return "healthy"
@@ -291,7 +295,7 @@ def _integrations_summary_for_tenant(
     visma_stats = event_stats.get("visma", {"total": 0, "failed": 0})
     sheets_stats = event_stats.get("google_sheets", {"total": 0, "failed": 0})
     return {
-        "gmail": gmail,
+        "google_mail": gmail,
         "visma": _tenant_event_integration_status(
             "visma" in oauth_providers,
             visma_stats["total"],
@@ -367,6 +371,16 @@ def _tenant_visma_sheets_detail(
 
 def _map_health_integration(system_name: str, sys_data: dict[str, Any]) -> dict[str, Any]:
     raw_status = sys_data.get("status", "not_configured")
+    if raw_status in ("not_applicable", "not_connected"):
+        return {
+            "status": "unknown",
+            "description": sys_data.get("description") or f"{system_name} är inte vald för denna kund.",
+            "recommended_action": None,
+            "data_source": "integration_health_check",
+            "last_success_at": None,
+            "last_error_at": None,
+            "hidden": True,
+        }
     return {
         "status": _map_health_system_status(raw_status),
         "description": (
@@ -377,7 +391,29 @@ def _map_health_integration(system_name: str, sys_data: dict[str, Any]) -> dict[
         "data_source": "integration_health_check",
         "last_success_at": sys_data.get("last_success_at"),
         "last_error_at": sys_data.get("last_error_at"),
+        "hidden": False,
     }
+
+
+def _health_integrations_for_tenant(
+    record: Any,
+    db: Session,
+    systems: dict[str, Any],
+) -> dict[str, dict[str, Any] | None]:
+    block: dict[str, dict[str, Any] | None] = {
+        "google_mail": None,
+        "monday": None,
+        "fortnox": None,
+    }
+    for key in block:
+        selection = derive_integration_selection(db, record, key)
+        if selection.selection_status == "not_selected":
+            continue
+        mapped = _map_health_integration(key, systems.get(key, {}))
+        if mapped.get("hidden"):
+            continue
+        block[key] = {k: v for k, v in mapped.items() if k != "hidden"}
+    return block
 
 
 def _count_jobs_last_30d(db: Session, tenant_id: str) -> int:
@@ -586,10 +622,11 @@ def get_tenant_detail(
         logger.exception("tenant_detail_integration_health_failed", extra={"tenant_id": tenant_id})
 
     systems = integrations_health.get("systems", {})
+    health_integrations = _health_integrations_for_tenant(record, db, systems)
     integrations_block = {
-        "gmail": _map_health_integration("gmail", systems.get("gmail", {})),
-        "monday": _map_health_integration("monday", systems.get("monday", {})),
-        "fortnox": _map_health_integration("fortnox", systems.get("fortnox", {})),
+        "google_mail": health_integrations["google_mail"],
+        "monday": health_integrations["monday"],
+        "fortnox": health_integrations["fortnox"],
         "visma": _tenant_visma_sheets_detail(db, tenant_id, "visma", "visma"),
         "google_sheets": _tenant_visma_sheets_detail(
             db, tenant_id, "google_sheets", "google_sheets"

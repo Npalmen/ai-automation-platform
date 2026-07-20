@@ -81,13 +81,13 @@ def _pilot_almost():
 
 def _health_healthy():
     return {"overall_status": "healthy", "systems": {
-        "gmail":  {"status": "healthy"},
+        "google_mail":  {"status": "healthy"},
         "monday": {"status": "healthy"},
     }}
 
 def _health_warning():
     return {"overall_status": "warning", "systems": {
-        "gmail":  {"status": "not_configured"},
+        "google_mail":  {"status": "not_configured"},
         "monday": {"status": "warning"},
     }}
 
@@ -203,9 +203,9 @@ class TestBuildTenantSummary:
         result = _run_build(health=_health_healthy())
         assert result["integrations"]["overall_status"] == "healthy"
 
-    def test_integration_gmail_status(self):
+    def test_integration_google_mail_status(self):
         result = _run_build(health=_health_healthy())
-        assert result["integrations"]["gmail"] == "healthy"
+        assert result["integrations"]["google_mail"] == "healthy"
 
     def test_integration_monday_status(self):
         result = _run_build(health=_health_warning())
@@ -402,7 +402,7 @@ class TestGetSuperAdminOverview:
         result = self._run(
             tenants=tenants,
             health={"overall_status": "error", "systems": {
-                "gmail": {"status": "error"}, "monday": {"status": "healthy"}
+                "google_mail": {"status": "error"}, "monday": {"status": "healthy"}
             }},
         )
         assert result["error"] == 1
@@ -419,7 +419,7 @@ class TestGetSuperAdminOverview:
         tenants = [_fake_tenant("t-1")]
         result = self._run(tenants=tenants)
         integ = result["items"][0]["integrations"]
-        for field in ("overall_status", "gmail", "monday"):
+        for field in ("overall_status", "google_mail", "monday"):
             assert field in integ
 
     def test_no_external_api_calls(self):

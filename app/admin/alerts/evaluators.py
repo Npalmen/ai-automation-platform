@@ -28,6 +28,11 @@ from app.admin.alerts.system_signal_status import (
 )
 from app.core.settings import Settings
 from app.domain.integrations.models import IntegrationEvent
+from app.admin.integrations.selection_resolver import (
+    derive_integration_selection,
+    resolve_alerts_for_unselected_integrations,
+    should_evaluate_tenant_health,
+)
 from app.health.integration_health import get_integration_health
 from app.repositories.postgres.audit_models import AuditEventRecord
 from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
@@ -208,13 +213,20 @@ def evaluate_integration_health_critical(
     db: Session, definition: AlertDefinition, settings: Settings
 ) -> list[AlertCandidate]:
     out: list[AlertCandidate] = []
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
     for tenant_id, tenant_name in iter_active_tenants(db):
         try:
+            resolve_alerts_for_unselected_integrations(db, tenant_id=tenant_id)
             health = get_integration_health(db, tenant_id, settings)
         except Exception:
             continue
+        record = TenantConfigRepository.get(db, tenant_id)
         for system, block in (health.get("systems") or {}).items():
             if block.get("status") != "error":
+                continue
+            selection = derive_integration_selection(db, record, system)
+            if not should_evaluate_tenant_health(selection):
                 continue
             dedup = f"tenant:{tenant_id}:integration:{system}:health_error"
             fp = fingerprint_payload({"system": system, "status": "error"})
