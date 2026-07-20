@@ -1,0 +1,65 @@
+schema_version: "2e.1"
+scenario_id: S23_incomplete_lead_clarification
+scenario_version: 1
+dataset_version: k2e-v1
+title: Ofullständig offertförfrågan
+description: Saknad adress ska ge relevanta följdfrågor, inte falsk offert.
+category: lead
+risk_level: low
+source_mode: fixture
+tags: [smoke, golden]
+input:
+  subject: Offert laddbox
+  message_text: Hej, jag vill ha offert på laddbox till villan.
+  sender:
+    name: Per Andersson
+    email: per@example.com
+tenant:
+  auto_actions: {}
+  email_signature_name: El & Ladd AB
+ai:
+  mode: fixture_ai
+  fixtures:
+    classification_v1:
+      detected_job_type: lead
+      confidence: 0.9
+      reasons: [keyword_match]
+    entity_extraction_v1:
+      entities:
+        customer_name: Per Andersson
+        email: per@example.com
+      confidence: 0.85
+    lead_scoring_v1:
+      lead_score: 55
+      priority: medium
+      routing: crm_update
+      reasons: []
+      confidence: 0.85
+    decisioning_v1:
+      decision: auto_route
+      target_queue: sales_queue
+      action_flags:
+        create_crm_lead: false
+        notify_human: false
+        request_missing_data: true
+      reasons: []
+      confidence: 0.85
+pipeline:
+  steps:
+    - run: pipeline
+expect:
+  classification:
+    job_type:
+      exact: lead
+  policy:
+    authorization:
+      one_of: [approval_required, hold_for_review]
+  outcomes:
+    forbidden:
+      reply_claims: [action_completed, fabricated_reference]
+      policy_authorizations: [execution_allowed]
+  rubrics:
+    reply_quality:
+      - id: no_false_completion
+  safety:
+    real_external_calls: 0

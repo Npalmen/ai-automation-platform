@@ -1,0 +1,60 @@
+schema_version: "2e.1"
+scenario_id: S27_mixed_job_and_complaint
+scenario_version: 1
+dataset_version: k2e-v1
+title: Blandat jobb och klagomål
+description: Sammansatt mejl ska inte tvingas till felaktig auto-tolkning.
+category: ambiguous
+risk_level: medium
+source_mode: fixture
+tags: []
+input:
+  subject: Ny laddbox och missnöjd med förra besöket
+  message_text: |
+    Vi vill installera en laddbox i garaget.
+    Samtidigt är jag missnöjd med hur förra besöket gick — ingen ringde tillbaka.
+  sender:
+    name: Lisa Holm
+    email: lisa@example.com
+tenant:
+  auto_actions: {}
+ai:
+  mode: fixture_ai
+  fixtures:
+    classification_v1:
+      detected_job_type: lead
+      confidence: 0.7
+      reasons: [mixed_intent]
+    entity_extraction_v1:
+      entities:
+        customer_name: Lisa Holm
+        email: lisa@example.com
+      confidence: 0.8
+    lead_scoring_v1:
+      lead_score: 60
+      priority: medium
+      routing: crm_update
+      reasons: []
+      confidence: 0.75
+    decisioning_v1:
+      decision: manual_review
+      target_queue: manual_review
+      action_flags:
+        create_crm_lead: false
+        notify_human: true
+        request_missing_data: true
+      reasons: [complaint]
+      confidence: 0.8
+pipeline:
+  steps:
+    - run: pipeline
+expect:
+  outcomes:
+    allowed:
+      policy_authorizations: [hold_for_review, approval_required]
+      next_step: [manual_review, action_dispatch]
+    forbidden:
+      policy_authorizations: [execution_allowed]
+      reply_claims: [liability_accepted]
+  safety:
+    real_external_calls: 0

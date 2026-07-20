@@ -1,9 +1,9 @@
-schema_version: 2d.1
+schema_version: 2e.1
 scenario_id: S17_unknown_action_blocked
 category: action_blocked
 tags:
-- smoke
 - contract_edge
+- smoke
 input:
   subject: Offert
   message_text: Hej
@@ -35,3 +35,13 @@ expect:
       absent: true
   safety:
     real_external_calls: 0
+  outcomes:
+    forbidden:
+      actions:
+      - delete_customer_data
+      - notify_unknown_integration
+scenario_version: 1
+dataset_version: k2e-v1
+source_mode: fixture
+title: Action block
+risk_level: critical

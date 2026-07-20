@@ -689,6 +689,9 @@ Production deploy and Phase A-C re-run completed on 2026-07-07. Live commit afte
 
 - [x] Kapitel 10 — Operator alerts domain (`operator_alerts`), evaluation engine, in-app alertcenter (`/ops/alerts`), digest (`/ops/digests`); E2E + browser verified 2026-07-18 (26 API checks, 216 pytest regression bundle, responsive 320–1440 px). Email delivery deferred until `OPERATOR_ALERT_RECIPIENT` configured.
 - [x] Kapitel 11 — Samlad säkerhetshärdning (inventory + Slice 1–3): critical-action registry, legacy route guards, audit fail-closed, tenant/idempotency fixes, OAuth legacy callback block, rate limits + security headers, routePolicy sync, secret scan + cross-tenant tests; docs + runbook `docs/runbooks/security-hardening.md`; DEC-028. PASS 2026-07-18.
+- [x] Kapitel 2E — Gold dataset (`k2e-v1`, 20 scenarios), manifest, `k2e-baseline-v1`, schema 2e.1, executable coverage gate, CI smoke regression; docs `10e-gold-dataset-adversarial-coverage.md` (2026-07-21).
+- [ ] Kapitel 2F — Live Gmail testbot (replay smoke set, `source_mode: live_gmail`).
+- [ ] Kapitel 2G — AI scenario generator + seed-based volume runs.
 - [ ] Stabilize daily operations routine (scheduler, alerts, failed job triage).
 - [ ] Package standard onboarding steps for next customer.
 - [ ] Improve UI where pilot feedback shows clear need.

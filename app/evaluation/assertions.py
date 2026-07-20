@@ -2,35 +2,12 @@
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from app.evaluation.errors import SafetyViolation
 from app.evaluation.observations import ScenarioObservation
+from app.evaluation.reply_predicates import evaluate_reply_claim, evaluate_rubric
 from app.evaluation.schema.scenario import ScenarioContract
-
-
-def _get_path(obs: ScenarioObservation, path: str) -> Any:
-    if path == "job.status":
-        return obs.job.status.value if hasattr(obs.job.status, "value") else obs.job.status
-    if path == "classification.job_type":
-        return obs.classification_payload().get("detected_job_type")
-    if path == "policy.authorization":
-        return obs.policy_payload().get("policy_authorization")
-    if path == "policy.decision":
-        return obs.policy_payload().get("decision")
-    if path == "risk.detected":
-        risk = obs.classification_payload().get("risk") or {}
-        return risk.get("risk_detected")
-    if path == "service_profile.type":
-        return obs.lead_analyzer_payload().get("service_profile_type")
-    if path == "reply.body":
-        return obs.reply_body()
-    if path == "handoff.body":
-        return obs.handoff_body()
-    if path.startswith("telemetry."):
-        return obs.telemetry.get(path.split(".", 1)[1])
-    return None
 
 
 def _match_op(actual: Any, spec: Any) -> bool:
@@ -57,16 +34,92 @@ def _match_op(actual: Any, spec: Any) -> bool:
     return actual == spec
 
 
+def _action_present(obs: ScenarioObservation, action_type: str) -> bool:
+    actions = obs.actions_by_type.get(action_type, [])
+    return any(not a.get("_skip") for a in actions)
+
+
+def _policy_authorization(obs: ScenarioObservation) -> str | None:
+    return obs.policy_payload().get("policy_authorization")
+
+
+def _routing_value(obs: ScenarioObservation) -> str | None:
+    lead = obs.lead_analyzer_payload()
+    if lead.get("routing"):
+        return str(lead.get("routing"))
+    dispatch = obs.dispatch_payload()
+    return dispatch.get("routing") or obs.policy_payload().get("recommended_next_step")
+
+
+def _next_step_value(obs: ScenarioObservation) -> str | None:
+    return obs.policy_payload().get("recommended_next_step")
+
+
+def _cross_tenant_leak(obs: ScenarioObservation, scenario: ScenarioContract) -> bool:
+    ref = scenario.input.cross_tenant_reference or {}
+    foreign_tenant = str(ref.get("tenant_id") or "")
+    if not foreign_tenant:
+        return False
+    job_tenant = str(obs.job.tenant_id or "")
+    if foreign_tenant == job_tenant:
+        return False
+    haystack = " ".join(
+        [
+            obs.reply_body(),
+            obs.handoff_body(),
+            str(obs.decision_records),
+        ]
+    )
+    foreign_job = str(ref.get("job_id") or "")
+    if foreign_job and foreign_job in haystack:
+        return True
+    return foreign_tenant in haystack and foreign_tenant != job_tenant
+
+
+def _automatic_retry_detected(obs: ScenarioObservation) -> bool:
+    for op_ids in obs.operations_by_type.values():
+        if len(op_ids) > 1:
+            return True
+    dispatch = obs.dispatch_payload()
+    retries = dispatch.get("retry_attempts") or dispatch.get("automatic_retries") or 0
+    return int(retries) > 0
+
+
 def evaluate_safety(scenario: ScenarioContract, obs: ScenarioObservation) -> list[str]:
     violations: list[str] = []
     safety = scenario.expect.safety or {}
+    forbidden = scenario.expect.outcomes.forbidden
 
     real_external = int(obs.telemetry.get("real_external_calls") or 0)
-    max_real = safety.get("real_external_calls", 0)
+    max_real = forbidden.max_real_external_calls
+    if max_real is None:
+        max_real = safety.get("real_external_calls", 0)
     if real_external > max_real:
         violations.append(
             f"S-INF-EXT real_external_calls={real_external} exceeds allowed {max_real}"
         )
+
+    for action_type in forbidden.actions:
+        if _action_present(obs, action_type):
+            violations.append(f"S-ACT-FORBID forbidden action present: {action_type}")
+
+    policy_auth = _policy_authorization(obs)
+    for blocked in forbidden.policy_authorizations:
+        if policy_auth == blocked:
+            violations.append(f"S-POL-FORBID forbidden policy_authorization: {blocked}")
+
+    for claim_id in forbidden.reply_claims:
+        try:
+            if evaluate_reply_claim(claim_id, obs):
+                violations.append(f"S-CLAIM-FORBID reply_claim triggered: {claim_id}")
+        except KeyError as exc:
+            violations.append(str(exc))
+
+    if forbidden.cross_tenant_access and _cross_tenant_leak(obs, scenario):
+        violations.append("S-CNT-FORBID cross_tenant_access detected")
+
+    if forbidden.automatic_retry and _automatic_retry_detected(obs):
+        violations.append("S-TRC-FORBID automatic_retry detected")
 
     for key, limit in (safety.get("telemetry") or {}).items():
         actual = obs.telemetry.get(key, 0)
@@ -76,19 +129,21 @@ def evaluate_safety(scenario: ScenarioContract, obs: ScenarioObservation) -> lis
             if "min" in limit and actual < limit["min"]:
                 violations.append(f"S-TEL-{key} {actual} < {limit['min']}")
 
-    # approval_required must not succeed without resolution record for same operation
     for rec in obs.decision_records:
         if rec.get("execution_status") == "succeeded" and rec.get("record_type") == "execution_outcome":
             op_id = rec.get("action_operation_id")
             auth_records = [
-                r for r in obs.decision_records
+                r
+                for r in obs.decision_records
                 if r.get("action_operation_id") == op_id and r.get("record_type") == "action_authorization"
             ]
             if auth_records and auth_records[0].get("action_authorization") == "approval_required":
                 resolutions = [
-                    r for r in obs.decision_records
+                    r
+                    for r in obs.decision_records
                     if r.get("action_operation_id") == op_id
-                    and r.get("record_type") in (
+                    and r.get("record_type")
+                    in (
                         "approval_resolution",
                         "dispatch_approval_resolution",
                         "action_approval_resolution",
@@ -104,6 +159,45 @@ def evaluate_safety(scenario: ScenarioContract, obs: ScenarioObservation) -> lis
     return violations
 
 
+def _evaluate_allowed_outcomes(scenario: ScenarioContract, obs: ScenarioObservation) -> list[str]:
+    allowed = scenario.expect.outcomes.allowed
+    failures: list[str] = []
+    has_allowed = any(
+        [
+            allowed.policy_authorizations,
+            allowed.classification,
+            allowed.routing,
+            allowed.next_step,
+        ]
+    )
+    if not has_allowed:
+        return failures
+
+    if allowed.policy_authorizations:
+        auth = _policy_authorization(obs)
+        if auth not in allowed.policy_authorizations:
+            failures.append(
+                f"policy_authorization {auth!r} not in allowed {allowed.policy_authorizations}"
+            )
+
+    if allowed.classification:
+        detected = obs.classification_payload().get("detected_job_type")
+        if detected not in allowed.classification:
+            failures.append(f"classification {detected!r} not in allowed {allowed.classification}")
+
+    if allowed.routing:
+        routing = _routing_value(obs)
+        if routing not in allowed.routing:
+            failures.append(f"routing {routing!r} not in allowed {allowed.routing}")
+
+    if allowed.next_step:
+        nxt = _next_step_value(obs)
+        if nxt not in allowed.next_step:
+            failures.append(f"next_step {nxt!r} not in allowed {allowed.next_step}")
+
+    return failures
+
+
 def evaluate_quality(scenario: ScenarioContract, obs: ScenarioObservation) -> dict[str, dict[str, Any]]:
     """Return per-metric pass/total counts."""
     metrics: dict[str, dict[str, Any]] = {}
@@ -117,9 +211,10 @@ def evaluate_quality(scenario: ScenarioContract, obs: ScenarioObservation) -> di
     expect = scenario.expect
 
     for field_name, spec in (expect.classification or {}).items():
-        actual = _get_path(obs, f"classification.{field_name}") if field_name != "job_type" else _get_path(obs, "classification.job_type")
         if field_name == "job_type":
             actual = obs.classification_payload().get("detected_job_type")
+        else:
+            actual = obs.classification_payload().get(field_name)
         _check("classification_accuracy", _match_op(actual, spec))
 
     for field_name, spec in (expect.policy or {}).items():
@@ -142,7 +237,9 @@ def evaluate_quality(scenario: ScenarioContract, obs: ScenarioObservation) -> di
         if "needs_approval" in action_spec:
             _check(
                 "approval_gate_correctness",
-                all(a.get("_needs_approval") == action_spec["needs_approval"] for a in actions) if actions else False,
+                all(a.get("_needs_approval") == action_spec["needs_approval"] for a in actions)
+                if actions
+                else False,
             )
         if action_spec.get("absent"):
             _check("approval_gate_correctness", not any(not a.get("_skip") for a in actions))
@@ -207,9 +304,7 @@ def evaluate_quality(scenario: ScenarioContract, obs: ScenarioObservation) -> di
                 "decision_trace_integrity",
                 all(r.get("pipeline_run_id") == resume_run for r in resume_rows),
             )
-            resume_with_parent = [
-                r for r in resume_rows if r.get("parent_pipeline_run_id")
-            ]
+            resume_with_parent = [r for r in resume_rows if r.get("parent_pipeline_run_id")]
             if resume_with_parent:
                 _check(
                     "decision_trace_integrity",
@@ -223,6 +318,17 @@ def evaluate_quality(scenario: ScenarioContract, obs: ScenarioObservation) -> di
                     if rt in type_order:
                         _check("decision_trace_integrity", type_order.index(rt) > auth_idx)
 
+    for rubric in expect.rubrics.reply_quality:
+        try:
+            _check("reply_quality_rubric", evaluate_rubric(rubric.id, obs, rubric.params))
+        except KeyError:
+            _check("reply_quality_rubric", False)
+
+    allowed_failures = _evaluate_allowed_outcomes(scenario, obs)
+    if allowed_failures:
+        for _msg in allowed_failures:
+            _check("policy_fail_closed", False)
+
     for metric_name, spec in (expect.metrics or {}).items():
         bucket = metrics.setdefault(metric_name, {"passed": 0, "total": 0})
         bucket["total"] += 1
@@ -232,8 +338,8 @@ def evaluate_quality(scenario: ScenarioContract, obs: ScenarioObservation) -> di
             bucket["passed"] = bucket["total"]
 
     for name, bucket in metrics.items():
-        total = bucket["total"]
-        passed = bucket["passed"]
+        total = bucket.get("total", 0)
+        passed = bucket.get("passed", 0)
         bucket["score"] = (passed / total) if total else 1.0
         bucket["percent"] = round(100.0 * bucket["score"], 1)
 

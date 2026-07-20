@@ -1,4 +1,4 @@
-schema_version: 2d.1
+schema_version: 2e.1
 scenario_id: S15_full_auto_execution_trace
 category: auto_execute
 tags:
@@ -63,3 +63,8 @@ expect:
         min: 1
       execution_function_calls:
         min: 1
+scenario_version: 1
+dataset_version: k2e-v1
+source_mode: fixture
+title: Auto execution trace
+risk_level: medium

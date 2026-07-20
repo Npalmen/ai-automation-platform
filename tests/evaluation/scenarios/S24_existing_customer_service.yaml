@@ -1,0 +1,63 @@
+schema_version: "2e.1"
+scenario_id: S24_existing_customer_service
+scenario_version: 1
+dataset_version: k2e-v1
+title: Befintlig kund serviceärende
+description: VVS-felanmälan från befintlig kund ska routas till support.
+category: service
+risk_level: medium
+source_mode: fixture
+tags: [smoke]
+input:
+  subject: Varmvatten fungerar inte
+  message_text: Hej, vi är befintliga kunder och varmvattnet slutat fungera i badrummet.
+  sender:
+    name: Maria Ek
+    email: maria@example.com
+tenant:
+  auto_actions: {}
+ai:
+  mode: fixture_ai
+  fixtures:
+    classification_v1:
+      detected_job_type: customer_inquiry
+      confidence: 0.9
+      reasons: [service]
+    entity_extraction_v1:
+      entities:
+        customer_name: Maria Ek
+        email: maria@example.com
+      confidence: 0.85
+    customer_inquiry_analysis_v1:
+      inquiry_type: support
+      priority: high
+      routing: support_queue
+      reasons: []
+      confidence: 0.85
+    decisioning_v1:
+      decision: auto_route
+      target_queue: support_queue
+      action_flags:
+        create_crm_lead: false
+        notify_human: false
+        request_missing_data: true
+      reasons: []
+      confidence: 0.85
+pipeline:
+  steps:
+    - run: pipeline
+expect:
+  classification:
+    job_type:
+      exact: customer_inquiry
+  rubrics:
+    reply_quality:
+      - id: relevance_to_input
+        params:
+          keywords: [varmvatten, service, fel]
+      - id: professional_tone
+  outcomes:
+    forbidden:
+      reply_claims: [fabricated_reference]
+  safety:
+    real_external_calls: 0

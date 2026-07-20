@@ -1,0 +1,42 @@
+schema_version: "2e.1"
+scenario_id: S21_pending_blocks_retry
+scenario_version: 1
+dataset_version: k2e-v1
+title: Pending intent blockerar retry
+description: Oupplöst execution intent får inte trigga automatisk retry.
+category: decision_trace
+risk_level: high
+source_mode: fixture
+tags: [smoke, contract_edge]
+input:
+  subject: Retry test
+  message_text: Test
+  sender:
+    name: Test
+    email: test@example.com
+tenant:
+  auto_actions:
+    lead: full_auto
+ai:
+  mode: fixture_ai
+  fixtures: {}
+pipeline:
+  pre_seed:
+    - processor: policy_processor
+      result:
+        payload:
+          decision: auto_execute
+          policy_authorization: execution_allowed
+          detected_job_type: lead
+          recommended_next_step: action_dispatch
+  steps:
+    - run: seed_pending_intent
+    - run: retry_dispatch
+      expect_blocked: true
+expect:
+  outcomes:
+    forbidden:
+      automatic_retry: true
+      max_real_external_calls: 0
+  safety:
+    real_external_calls: 0

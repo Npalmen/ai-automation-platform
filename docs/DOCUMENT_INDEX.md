@@ -27,6 +27,7 @@
 | `docs/10b-decision-contract-resolution.md` | Kapitel 2B decision contract & action authorization (DEC-033) |
 | `docs/10c-decision-trace-foundation.md` | Kapitel 2C decision trace foundation (DEC-034) |
 | `docs/10d-evaluation-harness.md` | Kapitel 2D deterministic evaluation harness (DEC-035) |
+| `docs/10e-gold-dataset-adversarial-coverage.md` | Kapitel 2E gold dataset, adversarial coverage & testbot contracts |
 
 ---
 

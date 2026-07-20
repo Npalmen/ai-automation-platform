@@ -22,7 +22,6 @@ from app.evaluation.errors import (
     EXIT_FAIL_QUALITY,
     EXIT_FAIL_SAFETY,
     EXIT_PASS,
-    BaselineRegression,
     FixtureAIError,
     HarnessError,
     QualityFailure,
@@ -33,6 +32,19 @@ from app.evaluation.fixture_ai import (
     reset_active_prompt_name,
     set_active_prompt_name,
 )
+from app.evaluation.observations import collect_observation
+from app.evaluation.reporting import (
+    HarnessRunResult,
+    ScenarioResult,
+    ScenarioRuntimeObservation,
+    normalize_metrics_for_baseline,
+)
+from app.evaluation.schema.scenario import ScenarioContract
+from app.evaluation.scoring import diagnostic_weighted_score, gate_metrics
+from app.evaluation.telemetry import reset_telemetry
+from app.repositories.postgres.job_repository import JobRepository
+from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+from app.workflows.pipeline_runner import run_pipeline
 
 _AI_STEP_MODULES = (
     "app.workflows.processors.ai_processor_utils",
@@ -43,14 +55,6 @@ _AI_STEP_MODULES = (
     "app.workflows.processors.decisioning_processor",
     "app.workflows.processors.invoice_processor",
 )
-from app.evaluation.observations import collect_observation
-from app.evaluation.reporting import HarnessRunResult, ScenarioResult
-from app.evaluation.schema.scenario import ScenarioContract
-from app.evaluation.scoring import diagnostic_weighted_score, gate_metrics
-from app.evaluation.telemetry import reset_telemetry
-from app.repositories.postgres.job_repository import JobRepository
-from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
-from app.workflows.pipeline_runner import run_pipeline
 
 
 @dataclass
@@ -69,11 +73,15 @@ class EvalHarnessRunner:
         metrics: dict[str, Any] = {}
         diagnostic_score: float | None = None
         regression: dict[str, Any] = {"is_regression": False}
+        runtime = ScenarioRuntimeObservation(run_id=self.run_id, llm_mode="deterministic_fixture")
 
         try:
             self._validate_scenario_contract(scenario)
             job = self._execute(db, scenario, tenant_id)
             obs = collect_observation(db, job)
+            runtime.real_external_calls = int(obs.telemetry.get("real_external_calls") or 0)
+            runtime.fake_adapter_calls = int(obs.telemetry.get("fake_adapter_calls") or 0)
+            runtime.execution_function_calls = int(obs.telemetry.get("execution_function_calls") or 0)
             try:
                 evaluate_safety(scenario, obs)
             except SafetyViolation as exc:
@@ -91,7 +99,7 @@ class EvalHarnessRunner:
                 else:
                     diagnostic_score = diagnostic_weighted_score(metrics)
 
-            regression = self._compare_baseline(scenario.scenario_id, status, metrics)
+            regression = self._compare_baseline(scenario.scenario_id, status, normalize_metrics_for_baseline(metrics))
             if regression.get("is_regression") and self.fail_on_regression:
                 exit_code = EXIT_BASELINE_REGRESSION
                 status = "baseline_regression"
@@ -112,13 +120,19 @@ class EvalHarnessRunner:
             safety_passed=exit_code not in (EXIT_FAIL_SAFETY,),
             safety_violations=violations,
             quality_metrics=metrics,
+            normalized_metrics=normalize_metrics_for_baseline(metrics),
             diagnostic_score=diagnostic_score,
             duration_ms=duration_ms,
             exit_code=exit_code,
             regression=regression,
+            runtime=runtime,
         )
 
     def _validate_scenario_contract(self, scenario: ScenarioContract) -> None:
+        if scenario.source_mode != "fixture":
+            raise HarnessError(
+                f"2E runner is fixture-only; got source_mode={scenario.source_mode!r}"
+            )
         if scenario.pipeline.pre_seed and "contract_edge" not in scenario.tags and "legacy" not in scenario.tags:
             raise HarnessError(
                 "pre_seed requires contract_edge or legacy tag on scenario"
@@ -136,9 +150,66 @@ class EvalHarnessRunner:
             if scenario.pipeline.pre_seed:
                 job.processor_history = list(scenario.pipeline.pre_seed)
             for step in scenario.pipeline.steps:
-                job = self._run_step(db, scenario, job, step.run, step.approval_index)
+                job = self._run_step(db, scenario, job, step)
             fixture_client.finalize()
             return job
+
+    def _run_step(self, db: Session, scenario: ScenarioContract, job: Job, step) -> Job:
+        run = step.run
+        approval_index = step.approval_index
+        expect_blocked = step.expect_blocked
+        try:
+            if run == "pipeline":
+                return run_pipeline(job, db)
+            if run == "dispatch":
+                from app.workflows.pipeline_run_context import PipelineRunSource, create_trace_session
+                from app.workflows.processors.action_dispatch_processor import process_action_dispatch_job
+
+                trace = create_trace_session(job, source=PipelineRunSource.INTAKE, db=db)
+                return process_action_dispatch_job(job, db=db, trace=trace)
+            if run == "retry_dispatch":
+                from app.workflows.pipeline_run_context import PipelineRunSource, create_trace_session
+                from app.workflows.processors.action_dispatch_processor import process_action_dispatch_job
+
+                trace = create_trace_session(job, source=PipelineRunSource.INTAKE, db=db)
+                return process_action_dispatch_job(job, db=db, trace=trace)
+            if run == "seed_pending_intent":
+                return self._seed_pending_intent(db, job)
+            if run == "approve_action":
+                return self._approve_action(db, job, approval_index)
+            if run == "resume_dispatch":
+                from app.workflows.orchestrator import WorkflowOrchestrator
+
+                return WorkflowOrchestrator(db).resume_after_approval(job)
+            raise HarnessError(f"Unknown pipeline step '{run}'")
+        except Exception as exc:
+            from app.workflows.decision_trace_errors import ReconciliationRequired
+
+            if expect_blocked and isinstance(exc, ReconciliationRequired):
+                return job
+            raise
+
+    def _seed_pending_intent(self, db: Session, job: Job) -> Job:
+        from app.workflows.decision_record_service import record_execution_intent
+        from app.workflows.pipeline_run_context import PipelineRunSource, create_trace_session
+
+        trace = create_trace_session(job, source=PipelineRunSource.INTAKE, db=db)
+        op_id = str(uuid.uuid4())
+        action = {
+            "type": "send_customer_auto_reply",
+            "to": "test@example.com",
+            "_action_operation_id": op_id,
+        }
+        record_execution_intent(
+            db,
+            trace,
+            job,
+            action,
+            operation_id=op_id,
+            fingerprint=None,
+            key_version=None,
+        )
+        return JobRepository.get_job_by_id(db, job.tenant_id, job.job_id) or job
 
     def _patches(self, fixture_client: FixtureAIClient):
         from contextlib import contextmanager
@@ -153,6 +224,7 @@ class EvalHarnessRunner:
 
                 def _wrap_execute_action(*args, **kwargs):
                     from app.evaluation.telemetry import get_telemetry
+
                     get_telemetry().record_execution_call()
                     return original_execute(*args, **kwargs)
 
@@ -269,6 +341,8 @@ class EvalHarnessRunner:
         }
         if scenario.input.actions:
             input_data["actions"] = scenario.input.actions
+        if scenario.input.cross_tenant_reference:
+            input_data["cross_tenant_reference"] = scenario.input.cross_tenant_reference
         job = Job(
             job_id=str(uuid.uuid4()),
             tenant_id=tenant_id,
@@ -276,22 +350,6 @@ class EvalHarnessRunner:
             input_data=input_data,
         )
         return JobRepository.create_job(db, job)
-
-    def _run_step(self, db: Session, scenario: ScenarioContract, job: Job, step: str, approval_index: int) -> Job:
-        if step == "pipeline":
-            return run_pipeline(job, db)
-        if step == "dispatch":
-            from app.workflows.pipeline_run_context import PipelineRunSource, create_trace_session
-            from app.workflows.processors.action_dispatch_processor import process_action_dispatch_job
-
-            trace = create_trace_session(job, source=PipelineRunSource.INTAKE, db=db)
-            return process_action_dispatch_job(job, db=db, trace=trace)
-        if step == "approve_action":
-            return self._approve_action(db, job, approval_index)
-        if step == "resume_dispatch":
-            from app.workflows.orchestrator import WorkflowOrchestrator
-            return WorkflowOrchestrator(db).resume_after_approval(job)
-        raise HarnessError(f"Unknown pipeline step '{step}'")
 
     def _approve_action(self, db: Session, job: Job, approval_index: int) -> Job:
         from app.repositories.postgres.approval_repository import ApprovalRequestRepository
@@ -306,18 +364,29 @@ class EvalHarnessRunner:
         refreshed = JobRepository.get_job_by_id(db, job.tenant_id, job.job_id)
         return refreshed or job
 
-    def _compare_baseline(self, scenario_id: str, status: str, metrics: dict) -> dict[str, Any]:
+    def _compare_baseline(self, scenario_id: str, status: str, normalized_metrics: dict) -> dict[str, Any]:
         if not self.baseline:
             return {"is_regression": False}
-        prev = (self.baseline.get("scenario_status") or {}).get(scenario_id)
-        if prev is None:
+        prev_status = (self.baseline.get("scenario_status") or {}).get(scenario_id)
+        if prev_status is None:
             return {"is_regression": False, "baseline_status": None}
-        is_regression = prev == "pass" and status != "pass"
+        is_regression = prev_status == "pass" and status != "pass"
         out: dict[str, Any] = {
             "is_regression": is_regression,
-            "baseline_status": prev,
+            "baseline_status": prev_status,
             "current_status": status,
         }
+        prev_metrics = (self.baseline.get("scenario_metric_scores") or {}).get(scenario_id) or {}
+        if not prev_metrics:
+            prev_metrics = (self.baseline.get("metric_scores") or {}).get(scenario_id) or {}
+        if prev_metrics and normalized_metrics:
+            for key, prev_score in prev_metrics.items():
+                current = normalized_metrics.get(key)
+                if current is not None and current < prev_score:
+                    out["is_regression"] = True
+                    out.setdefault("metric_regressions", []).append(
+                        f"{key}: {current} < {prev_score}"
+                    )
         return out
 
     def aggregate(self, results: list[ScenarioResult]) -> HarnessRunResult:

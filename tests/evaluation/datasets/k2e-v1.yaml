@@ -1,0 +1,37 @@
+dataset_id: k2e-v1
+dataset_version: "1.0.0"
+schema_version: "2e.1"
+baseline_id: k2e-baseline-v1
+scenarios_dir: ../scenarios
+scenarios:
+  - S01_lead_laddbox_quality
+  - S08_sensitive_inkasso
+  - S10_urgent_electrical_safety
+  - S14_approval_gated_default
+  - S15_full_auto_execution_trace
+  - S16_policy_legacy_fail_closed
+  - S17_unknown_action_blocked
+  - S18_approval_resume_operation_id
+  - S19_invoice_no_dispatch
+  - S20_data_deletion_request
+  - S21_pending_blocks_retry
+  - S22_cross_tenant_isolation
+  - S23_incomplete_lead_clarification
+  - S24_existing_customer_service
+  - S26_status_inquiry_general
+  - S27_mixed_job_and_complaint
+  - S30_forwarded_thread_mixed_context
+  - S31_prompt_injection_customer_text
+  - S33_legal_threat_complaint
+  - S34_spam_phishing_link
+smoke:
+  - S01_lead_laddbox_quality
+  - S23_incomplete_lead_clarification
+  - S24_existing_customer_service
+  - S19_invoice_no_dispatch
+  - S31_prompt_injection_customer_text
+  - S17_unknown_action_blocked
+  - S18_approval_resume_operation_id
+  - S21_pending_blocks_retry
+  - S22_cross_tenant_isolation
+  - S16_policy_legacy_fail_closed

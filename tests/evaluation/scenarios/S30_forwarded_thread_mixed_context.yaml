@@ -1,0 +1,64 @@
+schema_version: "2e.1"
+scenario_id: S30_forwarded_thread_mixed_context
+scenario_version: 1
+dataset_version: k2e-v1
+title: Vidarebefordrad tråd
+description: Gammal trådkontext ska inte styra felaktig auto-tolkning.
+category: ambiguous
+risk_level: medium
+source_mode: fixture
+tags: []
+input:
+  subject: "Fwd: Offert solceller"
+  message_text: |
+    Hej, kan ni ge ny offert?
+
+    ---------- Vidarebefordrat meddelande ----------
+    Från: gammal.kund@example.com
+    Datum: 2023-05-10
+    Ämne: Avslutat ärende ORDER-OLD-9999
+    Vi behöver inte längre hjälp med detta.
+  sender:
+    name: Nya Kunden
+    email: nya@example.com
+tenant:
+  auto_actions: {}
+ai:
+  mode: fixture_ai
+  fixtures:
+    classification_v1:
+      detected_job_type: lead
+      confidence: 0.75
+      reasons: [forwarded]
+    entity_extraction_v1:
+      entities:
+        customer_name: Nya Kunden
+        email: nya@example.com
+      confidence: 0.8
+    lead_scoring_v1:
+      lead_score: 55
+      priority: medium
+      routing: crm_update
+      reasons: []
+      confidence: 0.75
+    decisioning_v1:
+      decision: manual_review
+      target_queue: manual_review
+      action_flags:
+        create_crm_lead: false
+        notify_human: true
+        request_missing_data: true
+      reasons: [ambiguous_context]
+      confidence: 0.75
+pipeline:
+  steps:
+    - run: pipeline
+expect:
+  outcomes:
+    allowed:
+      policy_authorizations: [hold_for_review, approval_required]
+      next_step: [manual_review, action_dispatch]
+    forbidden:
+      reply_claims: [fabricated_reference, action_completed]
+  safety:
+    real_external_calls: 0

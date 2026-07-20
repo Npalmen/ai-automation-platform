@@ -1,9 +1,9 @@
-schema_version: 2d.1
+schema_version: 2e.1
 scenario_id: S16_policy_legacy_fail_closed
 category: policy_block
 tags:
-- smoke
 - contract_edge
+- smoke
 input:
   subject: Offert laddbox
   message_text: Jag vill ha offert.
@@ -52,3 +52,12 @@ expect:
       - approval_required
   safety:
     real_external_calls: 0
+  outcomes:
+    forbidden:
+      policy_authorizations:
+      - execution_allowed
+scenario_version: 1
+dataset_version: k2e-v1
+source_mode: fixture
+title: Forced fallback
+risk_level: high

@@ -1,0 +1,61 @@
+schema_version: "2e.1"
+scenario_id: S26_status_inquiry_general
+scenario_version: 1
+dataset_version: k2e-v1
+title: Statusfråga
+description: Allmän statusfråga utan påhittad orderstatus.
+category: inquiry
+risk_level: low
+source_mode: fixture
+tags: []
+input:
+  subject: När kommer ni?
+  message_text: Hej, jag undrar när ni kan komma för besök. Mvh Johan
+  sender:
+    name: Johan Berg
+    email: johan@example.com
+tenant:
+  auto_actions: {}
+ai:
+  mode: fixture_ai
+  fixtures:
+    classification_v1:
+      detected_job_type: customer_inquiry
+      confidence: 0.85
+      reasons: [status]
+    entity_extraction_v1:
+      entities:
+        customer_name: Johan Berg
+        email: johan@example.com
+      confidence: 0.85
+    customer_inquiry_analysis_v1:
+      inquiry_type: support
+      priority: medium
+      routing: support_queue
+      reasons: []
+      confidence: 0.85
+    decisioning_v1:
+      decision: auto_route
+      target_queue: support_queue
+      action_flags:
+        create_crm_lead: false
+        notify_human: false
+        request_missing_data: true
+      reasons: []
+      confidence: 0.85
+pipeline:
+  steps:
+    - run: pipeline
+expect:
+  classification:
+    job_type:
+      exact: customer_inquiry
+  outcomes:
+    forbidden:
+      reply_claims: [action_completed, fabricated_reference]
+  rubrics:
+    reply_quality:
+      - id: no_false_completion
+      - id: professional_tone
+  safety:
+    real_external_calls: 0

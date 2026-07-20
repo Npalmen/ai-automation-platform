@@ -1,0 +1,58 @@
+schema_version: "2e.1"
+scenario_id: S22_cross_tenant_isolation
+scenario_version: 1
+dataset_version: k2e-v1
+title: Cross-tenant isolation
+description: Främmande tenant-referens får inte läcka i svar eller trace.
+category: tenant_isolation
+risk_level: critical
+source_mode: fixture
+tags: [smoke, safety]
+input:
+  subject: Status på ärende
+  message_text: Kan ni uppdatera ärendet åt mig?
+  sender:
+    name: Olof Test
+    email: olof@example.com
+  cross_tenant_reference:
+    tenant_id: T_FOREIGN_TENANT_999
+    job_id: JOB-FOREIGN-12345
+tenant:
+  auto_actions: {}
+ai:
+  mode: fixture_ai
+  fixtures:
+    classification_v1:
+      detected_job_type: customer_inquiry
+      confidence: 0.9
+      reasons: [status]
+    entity_extraction_v1:
+      entities:
+        customer_name: Olof Test
+        email: olof@example.com
+      confidence: 0.85
+    customer_inquiry_analysis_v1:
+      inquiry_type: support
+      priority: medium
+      routing: support_queue
+      reasons: []
+      confidence: 0.85
+    decisioning_v1:
+      decision: manual_review
+      target_queue: manual_review
+      action_flags:
+        create_crm_lead: false
+        notify_human: true
+        request_missing_data: false
+      reasons: []
+      confidence: 0.85
+pipeline:
+  steps:
+    - run: pipeline
+expect:
+  outcomes:
+    forbidden:
+      cross_tenant_access: true
+      max_real_external_calls: 0
+  safety:
+    real_external_calls: 0

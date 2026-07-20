@@ -1,7 +1,10 @@
-schema_version: "2d.1"
+schema_version: 2e.1
 scenario_id: S18_approval_resume_operation_id
 category: decision_trace
-tags: [smoke, contract_edge, trace]
+tags:
+- contract_edge
+- smoke
+- trace
 source: committed
 input:
   subject: Offert laddbox
@@ -19,56 +22,58 @@ ai:
   fixtures: {}
 pipeline:
   pre_seed:
-    - processor: classification_processor
-      result:
-        payload:
-          detected_job_type: lead
-          confidence: 0.9
-          reasons: [keyword]
-    - processor: entity_extraction_processor
-      result:
-        payload:
-          entities:
-            customer_name: Anna Svensson
-            email: anna@example.com
-          confidence: 0.85
-    - processor: lead_analyzer_processor
-      result:
-        payload:
-          service_profile_type: ev_charger_installation
-          generated_question_message: Kan du berätta mer om placering och huvudsäkring?
-          profile_missing_fields: [address]
-    - processor: lead_processor
-      result:
-        payload:
-          lead_score: 70
-          priority: medium
-          routing: crm_update
-          confidence: 0.85
-    - processor: decisioning_processor
-      result:
-        payload:
-          decision: auto_route
-          decisioning_recommendation: auto_route
-          confidence: 0.85
-    - processor: policy_processor
-      result:
-        payload:
-          decision: auto_execute
-          policy_authorization: execution_allowed
-          detected_job_type: lead
-          recommended_next_step: action_dispatch
+  - processor: classification_processor
+    result:
+      payload:
+        detected_job_type: lead
+        confidence: 0.9
+        reasons:
+        - keyword
+  - processor: entity_extraction_processor
+    result:
+      payload:
+        entities:
+          customer_name: Anna Svensson
+          email: anna@example.com
+        confidence: 0.85
+  - processor: lead_analyzer_processor
+    result:
+      payload:
+        service_profile_type: ev_charger_installation
+        generated_question_message: Kan du berätta mer om placering och huvudsäkring?
+        profile_missing_fields:
+        - address
+  - processor: lead_processor
+    result:
+      payload:
+        lead_score: 70
+        priority: medium
+        routing: crm_update
+        confidence: 0.85
+  - processor: decisioning_processor
+    result:
+      payload:
+        decision: auto_route
+        decisioning_recommendation: auto_route
+        confidence: 0.85
+  - processor: policy_processor
+    result:
+      payload:
+        decision: auto_execute
+        policy_authorization: execution_allowed
+        detected_job_type: lead
+        recommended_next_step: action_dispatch
   steps:
-    - run: dispatch
-    - run: approve_action
-      approval_index: 0
+  - run: dispatch
+  - run: approve_action
+    approval_index: 0
 expect:
   decision_trace:
     required_types:
-      - action_authorization
-      - action_approval_resolution
-      - execution_intent
-      - execution_outcome
+    - action_authorization
+    - action_approval_resolution
+    - execution_intent
+    - execution_outcome
     operation_id_stable: true
     two_pipeline_runs: true
   safety:
@@ -78,3 +83,8 @@ expect:
         min: 1
       execution_function_calls:
         min: 1
+scenario_version: 1
+dataset_version: k2e-v1
+source_mode: fixture
+title: Approval resume trace
+risk_level: medium
