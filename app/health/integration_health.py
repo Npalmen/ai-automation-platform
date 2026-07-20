@@ -5,8 +5,9 @@ Computes per-system health signals from existing platform state.
 All checks are deterministic and read-only — no external API calls.
 No secrets are included in the response.
 
-Systems checked: gmail, monday, fortnox
-Overall status: healthy | warning | error
+Tenant health uses canonical integration keys (google_mail, monday, fortnox).
+Platform capabilities are reported separately and never become tenant warnings
+when an integration is not selected for the tenant.
 
 Signal sources (internal only):
   - env/settings config presence
@@ -21,6 +22,16 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.admin.integrations.selection_resolver import (
+    IntegrationSelectionView,
+    derive_integration_selection,
+    should_evaluate_tenant_health,
+)
+from app.integrations.keys import (
+    TENANT_HEALTH_INTEGRATION_KEYS,
+    display_name_sv,
+    normalize_integration_key,
+)
 from app.repositories.postgres.audit_models import AuditEventRecord
 from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
 
@@ -117,7 +128,44 @@ def _check(key: str, status: str, description: str) -> dict:
     """Build a check dict with both 'description' (new) and 'message' (compat) fields."""
     return {"key": key, "check": key, "status": status, "description": description, "message": description}
 
-def _check_gmail(settings: dict, app_settings: Any, db: Session, tenant_id: str) -> dict:
+
+def _not_applicable_block(
+    integration_key: str,
+    selection: IntegrationSelectionView,
+) -> dict[str, Any]:
+    label = display_name_sv(integration_key)
+    return {
+        "status": "not_applicable",
+        "selection_status": selection.selection_status,
+        "configured": False,
+        "last_success_at": None,
+        "last_error_at": None,
+        "last_error_message": None,
+        "checks": [],
+        "recommended_action": "",
+        "description": f"{label} är inte vald för denna kund.",
+    }
+
+
+def _not_connected_block(
+    integration_key: str,
+    selection: IntegrationSelectionView,
+) -> dict[str, Any]:
+    label = display_name_sv(integration_key)
+    return {
+        "status": "not_connected",
+        "selection_status": selection.selection_status,
+        "configured": False,
+        "last_success_at": None,
+        "last_error_at": None,
+        "last_error_message": None,
+        "checks": [],
+        "recommended_action": "",
+        "description": f"{label} är vald men inte ansluten.",
+    }
+
+
+def _check_google_mail(settings: dict, app_settings: Any, db: Session, tenant_id: str) -> dict:
     from app.repositories.postgres.oauth_credential_repository import OAuthCredentialRepository
 
     checks = []
@@ -154,7 +202,6 @@ def _check_gmail(settings: dict, app_settings: Any, db: Session, tenant_id: str)
             checks.append(_check("token_valid", "fail",
                                  "OAuth-token har löpt ut — koppling måste förnyas."))
 
-        # Check 3: scanner ran successfully
         scan = settings.get("workflow_scan") or {}
         summary = scan.get("summary") or {}
         gmail_scan = summary.get("gmail") or {}
@@ -166,7 +213,6 @@ def _check_gmail(settings: dict, app_settings: Any, db: Session, tenant_id: str)
             else "Gmail-skanning ej genomförd — kör en skanning för att bekräfta flödet.",
         ))
 
-        # Check 4: inbox sync activity
         sync_record = _latest_audit_by_action(db, tenant_id, "gmail_inbox_sync")
         if sync_record:
             if sync_record.status == "success":
@@ -178,7 +224,6 @@ def _check_gmail(settings: dict, app_settings: Any, db: Session, tenant_id: str)
                 checks.append(_check("inbox_sync", "warning",
                                      "Senaste inkorgssynkronisering misslyckades."))
 
-    # Derive system status
     failed_checks = [c for c in checks if c["status"] == "fail"]
     warn_checks   = [c for c in checks if c["status"] == "warning"]
 
@@ -188,7 +233,6 @@ def _check_gmail(settings: dict, app_settings: Any, db: Session, tenant_id: str)
     elif token_expired:
         status = "error"
         action = "OAuth-token har löpt ut. Koppla om Gmail-integrationen via Google Cloud Console."
-        token_expired_flag = True
     elif failed_checks:
         status = "error"
         action = "Kontrollera Gmail-konfigurationen — en eller flera kontroller misslyckades."
@@ -213,6 +257,10 @@ def _check_gmail(settings: dict, app_settings: Any, db: Session, tenant_id: str)
     return result
 
 
+# Backward-compatible alias for tests importing _check_gmail.
+_check_gmail = _check_google_mail
+
+
 def _check_monday(settings: dict, app_settings: Any, db: Session, tenant_id: str) -> dict:
     checks = []
     configured = bool(getattr(app_settings, "MONDAY_API_KEY", ""))
@@ -220,7 +268,6 @@ def _check_monday(settings: dict, app_settings: Any, db: Session, tenant_id: str
     last_error_at = None
     last_error_message = None
 
-    # Check 1: config present
     checks.append(_check(
         "config_present",
         "pass" if configured else "fail",
@@ -229,7 +276,6 @@ def _check_monday(settings: dict, app_settings: Any, db: Session, tenant_id: str
     ))
 
     if configured:
-        # Check 2: scanner ran
         scan = settings.get("workflow_scan") or {}
         summary = scan.get("summary") or {}
         monday_scan = summary.get("monday") or {}
@@ -241,7 +287,6 @@ def _check_monday(settings: dict, app_settings: Any, db: Session, tenant_id: str
             else "Monday-skanning ej genomförd — kör en skanning.",
         ))
 
-        # Check 3: successful dispatch event
         dispatch = _latest_dispatch_event(db, tenant_id, "monday")
         if dispatch:
             if dispatch.status == "success":
@@ -254,7 +299,6 @@ def _check_monday(settings: dict, app_settings: Any, db: Session, tenant_id: str
                 checks.append(_check("dispatch_success", "warning",
                                      "Senaste ärendedispatch till Monday misslyckades."))
 
-    # Derive system status
     failed_checks = [c for c in checks if c["status"] == "fail"]
     warn_checks   = [c for c in checks if c["status"] == "warning"]
 
@@ -282,7 +326,23 @@ def _check_monday(settings: dict, app_settings: Any, db: Session, tenant_id: str
     }
 
 
-def _check_fortnox(settings: dict, app_settings: Any, db: Session, tenant_id: str) -> dict:
+def _check_fortnox_platform(app_settings: Any) -> dict[str, Any]:
+    access_token = (getattr(app_settings, "FORTNOX_ACCESS_TOKEN", "") or "").strip()
+    client_secret = (getattr(app_settings, "FORTNOX_CLIENT_SECRET", "") or "").strip()
+    configured = bool(access_token and client_secret)
+    return {
+        "integration_key": "fortnox",
+        "status": "configured" if configured else "not_configured",
+        "configured": configured,
+        "description": (
+            "Fortnox-plattformskonfiguration finns."
+            if configured
+            else "Fortnox-plattformskonfiguration saknas."
+        ),
+    }
+
+
+def _check_fortnox_tenant(settings: dict, app_settings: Any, db: Session, tenant_id: str) -> dict:
     checks = []
     access_token  = (getattr(app_settings, "FORTNOX_ACCESS_TOKEN",  "") or "").strip()
     client_secret = (getattr(app_settings, "FORTNOX_CLIENT_SECRET", "") or "").strip()
@@ -292,7 +352,6 @@ def _check_fortnox(settings: dict, app_settings: Any, db: Session, tenant_id: st
     last_error_message = None
     token_expired = False
 
-    # Check 1: both credentials present
     checks.append(_check(
         "config_present",
         "pass" if configured else "fail",
@@ -301,13 +360,11 @@ def _check_fortnox(settings: dict, app_settings: Any, db: Session, tenant_id: st
     ))
 
     if configured:
-        # Check 2: token expiry
         token_expired = _has_token_expiry_error(db, tenant_id, "fortnox")
         if token_expired:
             checks.append(_check("token_valid", "fail",
                                  "Fortnox-token har löpt ut — access token måste förnyas."))
 
-        # Check 3: scanner ran
         scan = settings.get("workflow_scan") or {}
         summary = scan.get("summary") or {}
         fortnox_scan = summary.get("fortnox") or {}
@@ -319,7 +376,6 @@ def _check_fortnox(settings: dict, app_settings: Any, db: Session, tenant_id: st
             else "Fortnox-skanning ej genomförd — kör en skanning.",
         ))
 
-        # Check 4: successful Fortnox integration event (export/preview)
         from app.domain.integrations.models import IntegrationEvent
         fortnox_event = (
             db.query(IntegrationEvent)
@@ -341,7 +397,6 @@ def _check_fortnox(settings: dict, app_settings: Any, db: Session, tenant_id: st
                 checks.append(_check("export_success", "warning",
                                      "Senaste Fortnox-export misslyckades."))
 
-    # Derive system status
     failed_checks = [c for c in checks if c["status"] == "fail"]
     warn_checks   = [c for c in checks if c["status"] == "warning"]
 
@@ -375,12 +430,48 @@ def _check_fortnox(settings: dict, app_settings: Any, db: Session, tenant_id: st
     return result
 
 
+# Backward-compatible alias for tests importing _check_fortnox.
+_check_fortnox = _check_fortnox_tenant
+
+_TENANT_CHECKERS = {
+    "google_mail": _check_google_mail,
+    "monday": _check_monday,
+    "fortnox": _check_fortnox_tenant,
+}
+
+
+def _apply_selection_to_health(
+    integration_key: str,
+    selection: IntegrationSelectionView,
+    raw_health: dict[str, Any],
+) -> dict[str, Any]:
+    if selection.selection_status == "not_selected":
+        return _not_applicable_block(integration_key, selection)
+
+    result = dict(raw_health)
+    result["selection_status"] = selection.selection_status
+
+    if (
+        selection.selection_status == "selected_optional"
+        and raw_health.get("status") == "not_configured"
+    ):
+        return _not_connected_block(integration_key, selection)
+
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Overall aggregation
 # ---------------------------------------------------------------------------
 
 def _overall_status(systems: dict) -> str:
-    statuses = [v["status"] for v in systems.values()]
+    statuses = [
+        v["status"]
+        for v in systems.values()
+        if v.get("status") not in ("not_applicable", "not_connected")
+    ]
+    if not statuses:
+        return "healthy"
     if "error" in statuses:
         return "error"
     if "warning" in statuses or "not_configured" in statuses:
@@ -397,21 +488,21 @@ def _build_runbook_signals(systems: dict[str, dict], recent_errors: list[dict]) 
     """
     signals: list[dict] = []
 
-    gmail = systems.get("gmail") or {}
+    google_mail = systems.get("google_mail") or {}
     monday = systems.get("monday") or {}
 
-    if gmail.get("status") in {"error", "not_configured"}:
+    if google_mail.get("status") in {"error", "not_configured"}:
         signals.append({
             "severity": "critical",
-            "area": "gmail",
+            "area": "google_mail",
             "title": "Gmail integration is unavailable",
             "action": "Configure OAuth env vars and rerun setup verification.",
             "runbook_ref": "docs/12-production-guide.md#gmail-integration",
         })
-    elif gmail.get("status") == "warning":
+    elif google_mail.get("status") == "warning":
         signals.append({
             "severity": "warning",
-            "area": "gmail",
+            "area": "google_mail",
             "title": "Gmail integration needs validation",
             "action": "Run inbox sync and workflow scan to confirm mail flow.",
             "runbook_ref": "docs/12-production-guide.md#pre-launch-checklist",
@@ -464,6 +555,25 @@ def _build_runbook_signals(systems: dict[str, dict], recent_errors: list[dict]) 
     return signals
 
 
+def get_platform_integration_capabilities(
+    app_settings: Any,
+) -> dict[str, dict[str, Any]]:
+    """Platform-level integration capability — never tenant-specific warnings."""
+    return {
+        "google_mail": {
+            "integration_key": "google_mail",
+            "status": "configured" if getattr(app_settings, "GOOGLE_MAIL_ACCESS_TOKEN", "") else "not_configured",
+            "configured": bool(getattr(app_settings, "GOOGLE_MAIL_ACCESS_TOKEN", "")),
+        },
+        "monday": {
+            "integration_key": "monday",
+            "status": "configured" if getattr(app_settings, "MONDAY_API_KEY", "") else "not_configured",
+            "configured": bool(getattr(app_settings, "MONDAY_API_KEY", "")),
+        },
+        "fortnox": _check_fortnox_platform(app_settings),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -475,24 +585,36 @@ def get_integration_health(
     app_settings: Any,
 ) -> dict[str, Any]:
     """
-    Compute integration health for all supported systems.
+    Compute integration health for tenant-selected systems.
 
     All checks are read-only and deterministic. No external API calls.
     No secret values appear in the response.
     """
     settings = TenantConfigRepository.get_settings(db, tenant_id)
+    record = TenantConfigRepository.get(db, tenant_id)
 
-    systems = {
-        "gmail":   _check_gmail(settings, app_settings, db, tenant_id),
-        "monday":  _check_monday(settings, app_settings, db, tenant_id),
-        "fortnox": _check_fortnox(settings, app_settings, db, tenant_id),
-    }
+    systems: dict[str, dict[str, Any]] = {}
+    for integration_key in TENANT_HEALTH_INTEGRATION_KEYS:
+        selection = derive_integration_selection(db, record, integration_key)
+        if not should_evaluate_tenant_health(selection):
+            systems[integration_key] = _not_applicable_block(integration_key, selection)
+            continue
+        checker = _TENANT_CHECKERS[integration_key]
+        raw = checker(settings, app_settings, db, tenant_id)
+        systems[integration_key] = _apply_selection_to_health(integration_key, selection, raw)
+
     recent_errors = _recent_errors(db, tenant_id)
 
     return {
         "tenant_id":      tenant_id,
         "overall_status": _overall_status(systems),
         "systems":        systems,
+        "platform_capabilities": get_platform_integration_capabilities(app_settings),
         "recent_errors":  recent_errors,
         "runbook_signals": _build_runbook_signals(systems, recent_errors),
     }
+
+
+def normalize_health_system_key(raw: str) -> str | None:
+    """Normalize external/system keys to canonical integration keys."""
+    return normalize_integration_key(raw)

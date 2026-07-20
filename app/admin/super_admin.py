@@ -121,12 +121,12 @@ def _build_tenant_summary(
         health = get_integration_health(db, tenant_id, app_settings=app_settings)
         integration_overall = health.get("overall_status", "warning")
         systems = health.get("systems", {})
-        gmail_status   = (systems.get("gmail")   or {}).get("status", "not_configured")
+        google_mail_status = (systems.get("google_mail") or {}).get("status", "not_configured")
         monday_status  = (systems.get("monday")  or {}).get("status", "not_configured")
         fortnox_status = (systems.get("fortnox") or {}).get("status", "not_configured")
     except Exception:
         integration_overall = "warning"
-        gmail_status = monday_status = fortnox_status = "not_configured"
+        google_mail_status = monday_status = fortnox_status = "not_configured"
 
     try:
         report = get_dispatch_report(db, tenant_id, range_="30d")
@@ -169,7 +169,7 @@ def _build_tenant_summary(
         },
         "integrations": {
             "overall_status": integration_overall,
-            "gmail":          gmail_status,
+            "google_mail":    google_mail_status,
             "monday":         monday_status,
             "fortnox":        fortnox_status,
         },

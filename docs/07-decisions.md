@@ -568,3 +568,20 @@ Reference: `docs/10c-decision-trace-foundation.md`
 | 7 | **No live LLM in 2D** | Extension point only; no `--with-llm` |
 
 Reference: `docs/10d-evaluation-harness.md`
+
+---
+
+## DEC-036 — Tenant integration health gated by selection (Slice A, 2026-07-21)
+
+**Status:** Active — Customer settings / integration selection
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **Canonical key `google_mail`** | Legacy `gmail` accepted only at ingest/alias boundary (`app/integrations/keys.py`) |
+| 2 | **Platform vs tenant health are separate layers** | Global/platform capability (e.g. Fortnox env) must not surface as tenant warning when integration is not selected |
+| 3 | **`not_selected` → `not_applicable`** | No tenant health warning, triage row, prioritized action, or open alert for that integration |
+| 4 | **`selected_optional` + unconfigured → neutral `not_connected`** | Not a warning state |
+| 5 | **Slice A resolver fallback only** | Derive selection from credentials + `allowed_integrations`; no migration 015 until Slice B |
+| 6 | **Resolve stale alerts with reason** | `integration_not_selected_after_selection_model_migration`; do not SQL-delete without audit |
+
+Reference: `app/admin/integrations/selection_resolver.py`, `app/health/integration_health.py`

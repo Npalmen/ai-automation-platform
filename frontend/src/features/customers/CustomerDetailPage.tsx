@@ -85,11 +85,16 @@ export function CustomerDetailPage() {
   const { tenant, health, integrations, jobs, approvals, manual_review, recent_errors, usage, audit, onboarding_config, lifecycle, available_actions } =
     data
 
-  const healthCheckIntegrations = [
-    ["gmail", integrations.gmail],
-    ["monday", integrations.monday],
-    ["fortnox", integrations.fortnox],
-  ] as const
+  const healthCheckIntegrations: Array<[string, TenantIntegrationStatus]> = []
+  if (integrations.google_mail) {
+    healthCheckIntegrations.push(["google_mail", integrations.google_mail])
+  }
+  if (integrations.monday) {
+    healthCheckIntegrations.push(["monday", integrations.monday])
+  }
+  if (integrations.fortnox) {
+    healthCheckIntegrations.push(["fortnox", integrations.fortnox])
+  }
 
   const eventIntegrations = [
     ["visma", integrations.visma],

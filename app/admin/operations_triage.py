@@ -21,6 +21,10 @@ from sqlalchemy.orm import Session
 from app.admin.support_console import _get_automation
 from app.admin.alerts.signal_sources import collect_stale_approval_signals
 from app.domain.integrations.models import IntegrationEvent
+from app.admin.integrations.selection_resolver import (
+    derive_integration_selection,
+    should_raise_tenant_warning,
+)
 from app.health.integration_health import get_integration_health
 from app.repositories.postgres.audit_models import AuditEventRecord
 from app.repositories.postgres.job_models import JobRecord
@@ -323,25 +327,35 @@ def _integration_signals(
     tenant_id: str,
     tenant_name: str,
     app_settings: Any,
+    *,
+    record: Any | None = None,
 ) -> list[dict]:
     rows: list[dict] = []
     try:
+        from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+        tenant_record = record or TenantConfigRepository.get(db, tenant_id)
         health = get_integration_health(db, tenant_id, app_settings=app_settings)
         systems = health.get("systems", {})
         for system_name, sys_data in systems.items():
             status = sys_data.get("status", "not_configured")
+            if status in ("not_applicable", "not_connected"):
+                continue
+            selection = derive_integration_selection(db, tenant_record, system_name)
+            if not should_raise_tenant_warning(selection, health_status=status):
+                continue
             runbook = (
-                "oauth_integration" if system_name == "gmail" else "integration_general"
+                "oauth_integration" if system_name == "google_mail" else "integration_general"
             )
             source_id = f"integration_health:{tenant_id}:{system_name}"
             if status in ("error", "not_configured"):
-                severity = "critical" if status == "error" else "high"
+                severity = "critical" if status == "error" else "medium"
                 rows.append(_row(
                     tenant_id=tenant_id,
                     tenant_name=tenant_name,
                     severity=severity,
                     area="integration",
-                    title=f"{system_name.capitalize()} integration is {status.replace('_', ' ')}",
+                    title=f"{system_name.replace('_', ' ').title()} integration is {status.replace('_', ' ')}",
                     detail=sys_data.get("recommended_action", "Check integration configuration."),
                     recommended_action=sys_data.get("recommended_action", ""),
                     runbook_ref=runbook,
@@ -356,7 +370,7 @@ def _integration_signals(
                     tenant_name=tenant_name,
                     severity="medium",
                     area="integration",
-                    title=f"{system_name.capitalize()} integration needs validation",
+                    title=f"{system_name.replace('_', ' ').title()} integration needs validation",
                     detail=sys_data.get("recommended_action", "Run workflow scan to confirm connection."),
                     recommended_action=sys_data.get("recommended_action", ""),
                     runbook_ref=runbook,
@@ -628,7 +642,7 @@ def _build_tenant_triage(
 ) -> list[dict]:
     """Collect all triage rows for a single tenant. Errors are silently skipped."""
     rows: list[dict] = []
-    rows.extend(_integration_signals(db, tenant_id, tenant_name, app_settings))
+    rows.extend(_integration_signals(db, tenant_id, tenant_name, app_settings, record=record))
     rows.extend(_failed_pipeline_signals(db, tenant_id, tenant_name))
     rows.extend(_stale_approval_signals(db, tenant_id, tenant_name))
     rows.extend(_failed_integration_event_signals(db, tenant_id, tenant_name))

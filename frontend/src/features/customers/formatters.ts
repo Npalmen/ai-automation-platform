@@ -20,6 +20,7 @@ export function tenantStatusLabel(status: string): string {
 
 export function integrationSummaryLabel(key: string): string {
   const labels: Record<string, string> = {
+    google_mail: "Gmail",
     gmail: "Gmail",
     visma: "Visma",
     google_sheets: "Google Sheets",
