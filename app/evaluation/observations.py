@@ -58,6 +58,8 @@ def collect_observation(db: Session, job) -> ScenarioObservation:
             "execution_status": r.execution_status,
             "policy_authorization": r.policy_authorization,
             "policy_decision": r.policy_decision,
+            "pipeline_run_id": r.pipeline_run_id,
+            "parent_pipeline_run_id": r.parent_pipeline_run_id,
             "metadata": r.metadata_json or {},
             "event_sequence": r.event_sequence,
         }

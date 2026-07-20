@@ -84,19 +84,23 @@ def execute_external_write_with_trace(
             "action_operation_id": operation_id,
         }
     if state in _UNRESOLVED_STATUSES:
-        raise ReconciliationRequired(
-            f"action_operation_id {operation_id} blocks automatic adapter retry (state={state})"
-        )
+        if state == ExecutionStatus.PENDING.value and action.get("_execute_after_intent_commit"):
+            pass
+        else:
+            raise ReconciliationRequired(
+                f"action_operation_id {operation_id} blocks automatic adapter retry (state={state})"
+            )
 
-    record_execution_intent(
-        db,
-        trace,
-        job,
-        action,
-        operation_id=operation_id,
-        fingerprint=fingerprint,
-        key_version=key_version,
-    )
+    if state != ExecutionStatus.PENDING.value:
+        record_execution_intent(
+            db,
+            trace,
+            job,
+            action,
+            operation_id=operation_id,
+            fingerprint=fingerprint,
+            key_version=key_version,
+        )
 
     try:
         result = adapter_fn()

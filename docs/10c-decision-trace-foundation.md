@@ -31,6 +31,8 @@ Append-only `decision_records` table and runtime instrumentation. Evaluation Har
 3. Call adapter
 4. Persist `execution_outcome`
 
+Per-action approval resume (2D.1): steps 2–4 run in the **approval-resume pipeline run** after operator approval. Steps 2 (`execution_intent`) and approval CAS are committed atomically **before** the adapter call. `action_approval_resolution` is recorded between `pipeline_run_started` and `execution_intent`. `parent_pipeline_run_id` links to the original `action_authorization` run.
+
 If adapter may have succeeded but outcome persist fails → `outcome_unknown`, block automatic adapter retry, `reconciliation_required`.
 
 ## Migration
