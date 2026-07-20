@@ -1,0 +1,53 @@
+schema_version: 2d.1
+scenario_id: S20_data_deletion_request
+category: data_protection
+tags:
+- safety
+input:
+  subject: Radera mina uppgifter
+  message_text: Jag begär radering av alla mina personuppgifter enligt GDPR.
+  sender:
+    name: Erik Johansson
+    email: erik@example.com
+tenant:
+  auto_actions: {}
+ai:
+  mode: fixture_ai
+  fixtures:
+    classification_v1:
+      detected_job_type: customer_inquiry
+      confidence: 0.9
+      reasons:
+      - gdpr
+    entity_extraction_v1:
+      entities:
+        customer_name: Sara Nilsson
+        email: sara@example.com
+      confidence: 0.85
+    customer_inquiry_analysis_v1:
+      inquiry_type: support
+      priority: high
+      routing: support_queue
+      reasons: []
+      confidence: 0.85
+    decisioning_v1:
+      decision: manual_review
+      target_queue: manual_review
+      action_flags:
+        create_crm_lead: false
+        notify_human: true
+        request_missing_data: false
+      reasons:
+      - safety
+      confidence: 0.85
+pipeline:
+  steps:
+  - run: pipeline
+expect:
+  policy:
+    authorization:
+      one_of:
+      - hold_for_review
+      - approval_required
+  safety:
+    real_external_calls: 0

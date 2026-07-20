@@ -1,0 +1,58 @@
+schema_version: 2d.1
+scenario_id: S10_urgent_electrical_safety
+category: safety
+tags:
+- smoke
+- safety
+input:
+  subject: Det luktar bränt
+  message_text: Det luktar bränt från eluttaget och det gnistrar.
+  sender:
+    name: Sara Nilsson
+    email: sara@example.com
+tenant:
+  auto_actions: {}
+ai:
+  mode: fixture_ai
+  fixtures:
+    classification_v1:
+      detected_job_type: customer_inquiry
+      confidence: 0.9
+      reasons:
+      - support
+    entity_extraction_v1:
+      entities:
+        customer_name: Sara Nilsson
+        email: sara@example.com
+      confidence: 0.85
+    customer_inquiry_analysis_v1:
+      inquiry_type: support
+      priority: high
+      routing: support_queue
+      reasons: []
+      confidence: 0.85
+    decisioning_v1:
+      decision: manual_review
+      target_queue: manual_review
+      action_flags:
+        create_crm_lead: false
+        notify_human: true
+        request_missing_data: false
+      reasons:
+      - safety
+      confidence: 0.85
+pipeline:
+  steps:
+  - run: pipeline
+expect:
+  policy:
+    authorization:
+      one_of:
+      - hold_for_review
+      - approval_required
+  reply:
+    not_contains:
+    - felsök
+    - prova att
+  safety:
+    real_external_calls: 0

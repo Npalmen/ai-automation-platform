@@ -15,6 +15,13 @@ from app.repositories.postgres.job_repository import JobRepository
 from app.workflows.approval_dispatcher import dispatch_approval_request
 from app.workflows.approval_service import has_pending_approval
 from app.workflows.job_runner import WorkflowStepExecutionError, run_job
+from app.workflows.pipeline_run_context import (
+    DecisionTraceSession,
+    PipelineRunSource,
+    create_trace_session,
+)
+from app.repositories.postgres.decision_record_repository import DecisionRecordRepository
+from app.workflows.decision_record_service import record_pipeline_run_started
 
 
 BASE_PIPELINE = [
@@ -66,17 +73,34 @@ class WorkflowOrchestrator:
     def __init__(self, db: Session | None):
         self.db = db
 
-    def run(self, job: Job) -> Job:
+    def run(
+        self,
+        job: Job,
+        *,
+        source: PipelineRunSource = PipelineRunSource.INTAKE,
+        parent_pipeline_run_id: str | None = None,
+    ) -> Job:
         current = job.model_copy(deep=True)
         current.status = JobStatus.PROCESSING
         current.updated_at = self._utcnow()
         current = self._persist(current)
 
+        if parent_pipeline_run_id is None and source != PipelineRunSource.INTAKE:
+            parent_pipeline_run_id = self._latest_pipeline_run_id(current)
+
+        trace = create_trace_session(
+            current,
+            source=source,
+            db=self.db,
+            parent_pipeline_run_id=parent_pipeline_run_id,
+        )
+        record_pipeline_run_started(self.db, trace, current)
+
         resolved_job_type = current.job_type
 
         try:
             for step in BASE_PIPELINE:
-                current = self._run_step(current, step)
+                current = self._run_step(current, step, trace=trace)
 
             resolved_job_type = self._detect_job_type(current)
 
@@ -88,7 +112,7 @@ class WorkflowOrchestrator:
             for step in pipeline:
                 if self._should_skip_step(current, step):
                     continue
-                current = self._run_step(current, step)
+                current = self._run_step(current, step, trace=trace)
 
             return self._finalize_success(current, resolved_job_type)
 
@@ -110,10 +134,19 @@ class WorkflowOrchestrator:
         current.updated_at = self._utcnow()
         current = self._persist(current)
 
+        parent_run_id = self._latest_pipeline_run_id(current)
+        trace = create_trace_session(
+            current,
+            source=PipelineRunSource.APPROVAL_RESUME,
+            db=self.db,
+            parent_pipeline_run_id=parent_run_id,
+        )
+        record_pipeline_run_started(self.db, trace, current)
+
         resolved_job_type = self._detect_job_type(current)
 
         try:
-            current = self._run_step(current, JobType.ACTION_DISPATCH)
+            current = self._run_step(current, JobType.ACTION_DISPATCH, trace=trace)
             return self._finalize_success(current, resolved_job_type)
 
         except PipelineExecutionError as exc:
@@ -124,7 +157,19 @@ class WorkflowOrchestrator:
                 error_message=exc.message,
             )
 
-    def _run_step(self, job: Job, step: JobType) -> Job:
+    def _latest_pipeline_run_id(self, job: Job) -> str | None:
+        if self.db is None:
+            return None
+        rows = DecisionRecordRepository.list_for_job(
+            self.db,
+            tenant_id=job.tenant_id,
+            job_id=job.job_id,
+        )
+        if not rows:
+            return None
+        return rows[-1].pipeline_run_id
+
+    def _run_step(self, job: Job, step: JobType, *, trace: DecisionTraceSession | None = None) -> Job:
         working_job = job.model_copy(deep=True)
         working_job.job_type = step
         working_job.status = JobStatus.PROCESSING
@@ -134,7 +179,7 @@ class WorkflowOrchestrator:
         self._audit_step_start(working_job, step)
 
         try:
-            processed_job = run_job(working_job, self.db)
+            processed_job = run_job(working_job, self.db, trace=trace)
         except WorkflowStepExecutionError as exc:
             self._audit_step_failure(working_job, step, exc.message)
             raise PipelineExecutionError(step=step, message=exc.message) from exc

@@ -115,38 +115,71 @@ def _job_with_policy(*, decision: str) -> Job:
 # ---------------------------------------------------------------------------
 
 class TestPolicyProcessor:
-    def test_lead_send_for_approval(self):
+    def test_legacy_send_for_approval_maps_hold_for_review(self):
         from app.workflows.processors.policy_processor import process_policy_job
 
         job = _lead_job(decisioning_decision="send_for_approval")
         result = process_policy_job(job)
         payload = result.result["payload"]
 
-        assert payload["decision"] == "send_for_approval"
-        assert payload["recommended_next_step"] == "awaiting_approval"
-        assert result.result["requires_human_review"] is False
+        assert payload["decision"] == "hold_for_review"
+        assert payload["policy_authorization"] == "hold_for_review"
+        assert result.result["requires_human_review"] is True
 
-    def test_lead_auto_execute(self):
+    def test_legacy_auto_execute_fail_closed(self):
         from app.workflows.processors.policy_processor import process_policy_job
 
         job = _lead_job(decisioning_decision="auto_execute")
         result = process_policy_job(job)
         payload = result.result["payload"]
 
-        assert payload["decision"] == "auto_execute"
-        assert payload["recommended_next_step"] == "action_dispatch"
-        assert result.result["requires_human_review"] is False
+        assert payload["decision"] == "hold_for_review"
+        assert payload["decision"] != "auto_execute"
 
-    def test_force_approval_test_flag(self):
+    def test_auto_route_without_tenant_auto_requires_approval(self):
+        from app.workflows.processors.policy_processor import process_policy_job
+
+        job = _lead_job(decisioning_decision="auto_route")
+        result = process_policy_job(job)
+        payload = result.result["payload"]
+
+        assert payload["decision"] == "send_for_approval"
+        assert payload["policy_authorization"] == "approval_required"
+
+    def test_auto_route_with_full_auto_tenant_allows_execution(self):
+        from app.workflows.processors.policy_processor import process_policy_job
+
+        job = _lead_job(decisioning_decision="auto_route")
+        with patch(
+            "app.workflows.processors.policy_processor.read_tenant_auto_actions",
+            return_value={"lead": "full_auto"},
+        ):
+            result = process_policy_job(job, db=object())
+        payload = result.result["payload"]
+
+        assert payload["decision"] == "auto_execute"
+        assert payload["policy_authorization"] == "execution_allowed"
+
+    def test_force_approval_test_flag_requires_server_flag(self):
         from app.workflows.processors.policy_processor import process_policy_job
 
         job = _lead_job()
         job.input_data["force_approval_test"] = True
         result = process_policy_job(job)
         payload = result.result["payload"]
+        assert payload["decision"] != "send_for_approval"
+        assert "forced_approval_test" not in payload["reasons"]
 
+    def test_force_approval_test_when_enabled(self):
+        from app.core.settings import get_settings
+        from app.workflows.processors.policy_processor import process_policy_job
+
+        job = _lead_job()
+        job.input_data["force_approval_test"] = True
+        with patch.object(get_settings(), "ALLOW_FORCE_APPROVAL_TEST", True):
+            result = process_policy_job(job)
+        payload = result.result["payload"]
         assert payload["decision"] == "send_for_approval"
-        assert payload["recommended_next_step"] == "awaiting_approval"
         assert "forced_approval_test" in payload["reasons"]
 
 

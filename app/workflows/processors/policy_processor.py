@@ -2,12 +2,28 @@ from __future__ import annotations
 
 from typing import Any
 
+from sqlalchemy.orm import Session
+
+from app.core.settings import get_settings
 from app.domain.workflows.models import Job
+from app.workflows.decision_contract import (
+    PolicyAuthorization,
+    is_force_approval_test_allowed,
+    normalize_decision_recommendation,
+    project_approval_route,
+    project_policy_decision,
+    project_recommended_next_step,
+    resolve_policy_authorization,
+)
 from app.workflows.intelligence_safety import assess_content_risk
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
     get_latest_processor_payload,
 )
+from app.workflows.tenant_automation import read_tenant_auto_actions
+
+from app.workflows.decision_record import DecisionRecordType
+from app.workflows.decision_record_service import record_processor_decision
 
 PROCESSOR_NAME = "policy_processor"
 
@@ -40,7 +56,7 @@ def _dedupe(items: list[str]) -> list[str]:
     return result
 
 
-def process_policy_job(job: Job) -> Job:
+def process_policy_job(job: Job, db: Session | None = None, trace=None) -> Job:
     input_data = job.input_data or {}
     latest_payload = (job.result or {}).get("payload") or {}
 
@@ -79,19 +95,17 @@ def process_policy_job(job: Job) -> Job:
     inquiry_routing = inquiry_payload.get("routing")
     inquiry_target_queue = inquiry_payload.get("target_queue")
 
-    decisioning_decision = decisioning_payload.get("decision")
+    decisioning_raw = decisioning_payload.get("decision")
     decisioning_target_queue = decisioning_payload.get("target_queue")
     decisioning_actions = decisioning_payload.get("actions") or []
+    used_fallback = bool(decisioning_payload.get("used_fallback"))
 
     reasons: list[str] = []
     missing_critical: list[str] = []
     duplicate_suspected = False
     validation_status: str | None = None
     target_queue: str | None = None
-    approval_route: str | None = None
-    decision = "assist"
-    requires_human_review = False
-    recommended_next_step = "continue_automation"
+
     risk = assess_content_risk(input_data)
     if risk["risk_detected"]:
         reasons.extend(risk["reasons"])
@@ -99,32 +113,34 @@ def process_policy_job(job: Job) -> Job:
     if extraction_issues:
         reasons.extend(extraction_issues)
 
-    if input_data.get("force_approval_test") is True:
-        result = {
-            "status": "completed",
-            "summary": "Policy bedömd.",
-            "requires_human_review": False,
-            "payload": {
-                "processor_name": PROCESSOR_NAME,
-                "decision": "send_for_approval",
-                "reasons": ["forced_approval_test"],
-                "detected_job_type": detected_job_type,
-                "classification_confidence": classification_confidence,
-                "extraction_confidence": extraction_confidence,
-                "lead_confidence": lead_confidence,
-                "inquiry_confidence": inquiry_confidence,
-                "invoice_confidence": invoice_confidence,
-                "decisioning_confidence": decisioning_confidence,
-                "target_queue": None,
-                "validation_status": "approval_test_mode",
-                "missing_critical": [],
-                "duplicate_suspected": False,
-                "approval_route": "approval_required",
-                "recommended_next_step": "awaiting_approval",
-            },
-        }
-        return append_processor_result(job, PROCESSOR_NAME, result)
+    recommendation = normalize_decision_recommendation(
+        decisioning_raw,
+        used_fallback=used_fallback,
+    )
 
+    low_confidence = False
+    if detected_job_type == "lead":
+        low_confidence = bool(
+            lead_payload.get("low_confidence", False)
+            or decisioning_payload.get("low_confidence", False)
+        )
+        target_queue = decisioning_target_queue or lead_target_queue
+    elif detected_job_type == "customer_inquiry":
+        low_confidence = bool(
+            inquiry_payload.get("low_confidence", False)
+            or decisioning_payload.get("low_confidence", False)
+        )
+        target_queue = decisioning_target_queue or inquiry_target_queue
+
+    if low_confidence:
+        reasons.append(f"{detected_job_type}_low_confidence")
+
+    if detected_job_type == "lead" and extraction_issues:
+        reasons.append("lead_missing_identity")
+    if detected_job_type == "customer_inquiry" and extraction_issues:
+        reasons.append("inquiry_missing_identity")
+
+    invoice_has_issues = False
     if detected_job_type == "invoice":
         missing_critical.extend(invoice_missing_critical)
         duplicate_suspected = invoice_duplicate_suspected
@@ -146,115 +162,52 @@ def process_policy_job(job: Job) -> Job:
         if duplicate_suspected:
             reasons.append("duplicate_suspected")
 
-        if reasons or missing_critical or duplicate_suspected:
-            decision = "hold_for_review"
-            requires_human_review = True
-            approval_route = "manual_review"
-            recommended_next_step = "manual_review"
-            target_queue = None
-        else:
-            decision = "send_for_approval"
-            requires_human_review = False
-            approval_route = "approval_required"
-            recommended_next_step = "awaiting_approval"
-            target_queue = None
+        invoice_has_issues = bool(reasons or missing_critical or duplicate_suspected)
 
-    elif detected_job_type == "lead":
-        target_queue = decisioning_target_queue or lead_target_queue
-        approval_route = decisioning_payload.get("approval_route")
+    settings = get_settings()
+    force_allowed = is_force_approval_test_allowed(
+        input_data,
+        allow_flag=settings.ALLOW_FORCE_APPROVAL_TEST,
+    )
 
-        low_confidence = bool(
-            lead_payload.get("low_confidence", False)
-            or decisioning_payload.get("low_confidence", False)
-        )
+    auth_result = resolve_policy_authorization(
+        detected_job_type=detected_job_type,
+        recommendation=recommendation,
+        recommendation_raw=str(decisioning_raw) if decisioning_raw is not None else None,
+        auto_actions=read_tenant_auto_actions(job, db),
+        low_confidence=low_confidence,
+        used_fallback=used_fallback,
+        risk_detected=bool(risk["risk_detected"]),
+        force_approval_test=force_allowed,
+        invoice_has_issues=invoice_has_issues,
+    )
 
-        if low_confidence:
-            reasons.append("lead_low_confidence")
+    reasons.extend(auth_result.reasons)
+    authorization = auth_result.authorization
 
-        if extraction_issues:
-            reasons.append("lead_missing_identity")
+    decision = project_policy_decision(authorization)
+    approval_route = project_approval_route(authorization)
+    recommended_next_step = project_recommended_next_step(authorization)
+    requires_human_review = authorization in (
+        PolicyAuthorization.HOLD_FOR_REVIEW,
+        PolicyAuthorization.NO_ACTION,
+    )
 
-        if decisioning_decision == "send_for_approval":
-            decision = "send_for_approval"
-            requires_human_review = False
-            approval_route = approval_route or "approval_required"
-            recommended_next_step = "awaiting_approval"
-        elif decisioning_decision == "auto_execute":
-            decision = "auto_execute"
-            requires_human_review = False
-            approval_route = None
-            recommended_next_step = "action_dispatch"
-        elif low_confidence:
-            decision = "hold_for_review"
-            requires_human_review = True
-            approval_route = "manual_review"
-            recommended_next_step = "manual_review"
-            target_queue = target_queue or "manual_review"
-        else:
-            decision = "auto_execute"
-            requires_human_review = False
-            approval_route = None
-            recommended_next_step = (
-                decisioning_payload.get("recommended_next_step")
-                or lead_routing
-                or "action_dispatch"
-            )
-
-    elif detected_job_type == "customer_inquiry":
-        target_queue = decisioning_target_queue or inquiry_target_queue
-        approval_route = decisioning_payload.get("approval_route")
-
-        low_confidence = bool(
-            inquiry_payload.get("low_confidence", False)
-            or decisioning_payload.get("low_confidence", False)
-        )
-
-        if low_confidence:
-            reasons.append("inquiry_low_confidence")
-
-        if extraction_issues:
-            reasons.append("inquiry_missing_identity")
-
-        if decisioning_decision == "send_for_approval":
-            decision = "send_for_approval"
-            requires_human_review = False
-            approval_route = approval_route or "approval_required"
-            recommended_next_step = "awaiting_approval"
-        elif decisioning_decision == "auto_execute":
-            decision = "auto_execute"
-            requires_human_review = False
-            approval_route = None
-            recommended_next_step = "action_dispatch"
-        elif low_confidence:
-            decision = "hold_for_review"
-            requires_human_review = True
-            approval_route = "manual_review"
-            recommended_next_step = "manual_review"
-            target_queue = target_queue or "manual_review"
-        else:
-            decision = "auto_execute"
-            requires_human_review = False
-            approval_route = None
-            recommended_next_step = (
-                decisioning_payload.get("recommended_next_step")
-                or inquiry_routing
-                or "action_dispatch"
-            )
-
-    else:
-        decision = "hold_for_review"
-        requires_human_review = True
-        approval_route = "manual_review"
-        recommended_next_step = "manual_review"
+    if requires_human_review and not target_queue:
         target_queue = "manual_review"
-        reasons.append("unknown_job_type")
 
-    if risk["risk_detected"]:
-        decision = "hold_for_review"
-        requires_human_review = True
-        approval_route = "manual_review"
-        recommended_next_step = "manual_review"
-        target_queue = "manual_review"
+    if detected_job_type == "lead" and authorization == PolicyAuthorization.EXECUTION_ALLOWED:
+        recommended_next_step = (
+            decisioning_payload.get("recommended_next_step")
+            or lead_routing
+            or recommended_next_step
+        )
+    if detected_job_type == "customer_inquiry" and authorization == PolicyAuthorization.EXECUTION_ALLOWED:
+        recommended_next_step = (
+            decisioning_payload.get("recommended_next_step")
+            or inquiry_routing
+            or recommended_next_step
+        )
 
     reasons = _dedupe(reasons)
     missing_critical = _dedupe(missing_critical)
@@ -266,6 +219,11 @@ def process_policy_job(job: Job) -> Job:
         "payload": {
             "processor_name": PROCESSOR_NAME,
             "decision": decision,
+            "policy_authorization": authorization.value,
+            "decisioning_recommendation": (
+                auth_result.recommendation.value if auth_result.recommendation else None
+            ),
+            "decisioning_recommendation_raw": auth_result.recommendation_raw,
             "reasons": reasons,
             "detected_job_type": detected_job_type,
             "classification_confidence": classification_confidence,
@@ -289,4 +247,13 @@ def process_policy_job(job: Job) -> Job:
         },
     }
 
-    return append_processor_result(job, PROCESSOR_NAME, result)
+    job = append_processor_result(job, PROCESSOR_NAME, result)
+    record_processor_decision(
+        db,
+        trace,
+        job,
+        record_type=DecisionRecordType.POLICY_AUTHORIZATION,
+        processor_name=PROCESSOR_NAME,
+        payload=result["payload"],
+    )
+    return job

@@ -1,0 +1,65 @@
+schema_version: 2d.1
+scenario_id: S15_full_auto_execution_trace
+category: auto_execute
+tags:
+- smoke
+- trace
+input:
+  subject: Offert laddbox
+  message_text: Jag vill ha offert på laddbox.
+  sender:
+    name: Anna Svensson
+    email: anna@example.com
+tenant:
+  auto_actions:
+    lead: full_auto
+  allowed_integrations:
+  - google_mail
+  - monday
+ai:
+  mode: fixture_ai
+  fixtures:
+    classification_v1:
+      detected_job_type: lead
+      confidence: 0.9
+      reasons:
+      - keyword_match
+    entity_extraction_v1:
+      entities:
+        customer_name: Anna Lindqvist
+        email: anna@example.com
+      confidence: 0.85
+    lead_scoring_v1:
+      lead_score: 70
+      priority: medium
+      routing: crm_update
+      reasons: []
+      confidence: 0.85
+    decisioning_v1:
+      decision: auto_route
+      target_queue: sales_queue
+      action_flags:
+        create_crm_lead: false
+        notify_human: false
+        request_missing_data: true
+      reasons: []
+      confidence: 0.85
+pipeline:
+  steps:
+  - run: pipeline
+expect:
+  policy:
+    authorization:
+      exact: execution_allowed
+  decision_trace:
+    required_types:
+    - pipeline_run_started
+    - classification
+    - policy_authorization
+  safety:
+    real_external_calls: 0
+    telemetry:
+      fake_adapter_calls:
+        min: 1
+      execution_function_calls:
+        min: 1

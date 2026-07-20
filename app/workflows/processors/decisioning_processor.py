@@ -43,10 +43,10 @@ def _build_source_context(job: Job) -> dict:
     }
 
 
-def process_decisioning_job(job: Job) -> Job:
+def process_decisioning_job(job: Job, trace=None) -> Job:
     context = _build_source_context(job)
 
-    return run_ai_step(
+    job = run_ai_step(
         job=job,
         processor_name=PROCESSOR_NAME,
         prompt_name = "decisioning_v1",
@@ -71,7 +71,24 @@ def process_decisioning_job(job: Job) -> Job:
             },
             "reasons": ["decisioning_failed"],
             "confidence": 0.0,
+            "low_confidence": True,
+            "used_fallback": True,
             "error": error_message,
             "recommended_next_step": "manual_review",
         },
     )
+    if trace is not None and trace.db is not None:
+        from app.workflows.decision_record import DecisionRecordType
+        from app.workflows.decision_record_service import record_processor_decision
+        from app.workflows.processors.ai_processor_utils import get_latest_processor_payload
+
+        payload = get_latest_processor_payload(job, PROCESSOR_NAME)
+        record_processor_decision(
+            trace.db,
+            trace,
+            job,
+            record_type=DecisionRecordType.DECISIONING_RECOMMENDATION,
+            processor_name=PROCESSOR_NAME,
+            payload=payload,
+        )
+    return job

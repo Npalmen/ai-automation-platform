@@ -78,6 +78,9 @@ class Settings(BaseSettings):
 
     VISMA_API_URL: str = "https://eaccountingapi.vismaonline.com/v2"
     VISMA_ACCESS_TOKEN: str = ""
+
+    # When False (default), force_approval_test in job input_data is ignored (fail-closed).
+    ALLOW_FORCE_APPROVAL_TEST: bool = False
     VISMA_CLIENT_ID: str = ""
     VISMA_CLIENT_SECRET: str = ""
     VISMA_REDIRECT_URI: str = ""
@@ -125,12 +128,42 @@ class Settings(BaseSettings):
     # Operator alert email (Kapitel 10) — platform allowlist only; empty = in-app only.
     OPERATOR_ALERT_RECIPIENT: str = ""
 
+    # Kapitel 2C — decision trace
+    APP_CODE_VERSION: str = "dev-local"
+    DECISION_RECORD_HMAC_KEY: str = ""
+    DECISION_RECORD_ENFORCE_WRITES: str = "true"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
     )
 
+    @field_validator("DECISION_RECORD_ENFORCE_WRITES", mode="before")
+    @classmethod
+    def _normalize_enforce_writes(cls, value: object) -> str:
+        if value is None:
+            return "true"
+        return str(value).strip().lower() or "true"
+
+
+def resolve_decision_record_enforce_writes(settings: Settings | None = None) -> bool:
+    """Invalid values fail-closed to True."""
+    settings = settings or get_settings()
+    raw = str(settings.DECISION_RECORD_ENFORCE_WRITES or "true").strip().lower()
+    if raw in ("false", "0", "no", "off"):
+        return False
+    return True
+
+
+def validate_decision_record_settings(settings: Settings) -> None:
+    if settings.ENV == "production" and not resolve_decision_record_enforce_writes(settings):
+        raise ValueError(
+            "DECISION_RECORD_ENFORCE_WRITES=false is forbidden when ENV=production"
+        )
+
 
 @lru_cache
 def get_settings() -> "Settings":
-    return Settings()
+    settings = Settings()
+    validate_decision_record_settings(settings)
+    return settings

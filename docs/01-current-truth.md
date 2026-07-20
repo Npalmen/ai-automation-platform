@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-20 (Stabilization reconciliation — canonical tag `krowolf-pilot-baseline-20260720-final`; clean Niklas baseline; soak Dag 1 ready.)
+2026-07-20 (Onboarding 2.0 pilot deploy + sign-off — RC `rc-f077aa5dda23`; tenant whitelist restored to `T_NIKLAS_DEMO_001` only; Gmail soak not resumed.)
 
 ## Verification method
 
@@ -711,6 +711,20 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 | Manual responsive browser verification | `Verified (Fas B 2026-07-17)` | Integrations wizard localhost:5173; Visma authorization_required, Gmail classification, routing reset/preview; overflow pass 320×568–1440×900 + 200%; 0 credential fields. |
 | Not built (slice 2B) | `Documented` | External OAuth revoke; Fortnox wizard; Gmail live intake verification (ops runbook only). |
 
+### Onboarding 2.0 — pilot deploy & sign-off (2026-07-20)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| **Canonical commit** | `Verified — PASS` | `f077aa5dda23d692499210bbc621240a6b8977f2` on `origin/main`; server worktree aligned. |
+| **RC image** | `Verified — PASS` | `krowolf-app:rc-f077aa5dda23`; digest `sha256:8f05924d6138a8728726915a48b853f75a8a4edd5b41a0d0a4eb94d3ddaa6932`; annotated tag `rc-f077aa5dda23`. |
+| **Migrations 012–014** | `Verified — PASS` | Lifecycle columns, `integration_invitations`, `tenant_activation_snapshots`; idempotent on app restart. |
+| **Tenant whitelist** | `Verified — PASS` | Post-cleanup: exactly `T_NIKLAS_DEMO_001` (`lifecycle_status=active`, `config_version=3`). Removed test tenants `T_5E4E4A_48B840`, `T_5E529D_D12F78`, `T_5E7400_4F081E` via `TenantDeletionService` (super_admin). |
+| **super_admin live** | `Verified — PASS` | `SUPER_ADMIN_OPERATOR_IDS=operator-admin`; dry-run row counts; `confirm_tenant_id` + reason enforced; Niklas blocked (`not_test_tenant`); audit `tenant.deleted` per removal. |
+| **read_only live** | `Verified — PASS` | Temporary `ADMIN_ROLE=read_only` with super_admin list cleared; PATCH/archive/delete/invitation/lifecycle → 403; registries read 200. Role restored to `admin` after smoke. |
+| **Runtime gates** | `Verified — PASS` | `/health=200`; scheduler `paused`; jobs=0; approvals=0; tenant alerts=0; `credential_source=tenant_oauth`; Gmail test-read PASS; no live scan; `external_side_effects=0`. |
+| **Gmail soak** | `Not resumed` | Whitelist + baseline green (`ready_for_soak_day_1=true`); operator must explicitly resume soak — see `docs/niklas-gmail-soak-log.md`. |
+| **Architecture** | `Documented` | `docs/onboarding-2.0-architecture.md`; migrations `012`–`014`. |
+
 ### Kapitel 8 — System-, backup- och deploystatus (2026-07-17)
 
 | Item | Status | Notes |
@@ -1229,6 +1243,9 @@ Notes: Jobs 9 and 10 are the 2 Phase F/G synthetic evidence jobs. Jobs 1–8 are
 | Invoice/economy handling | `Verified — IMPROVED` | Invoice-like items remain approval/manual-review gated; inkasso/betalningskrav now force manual review instead of approval-free automation |
 | Do-not-touch risk logic | `Verified — ADDED` | Shared deterministic risk detector covers legal threats, reklamation, contract disputes, inkasso/betalningskrav, safety/work-environment risk, sensitive personal data, data deletion, financial changes, and mass-send intent |
 | Policy routing | `Verified — IMPROVED` | Risk signals set `decision=hold_for_review`, `needs_human=true`, `approval_required=true`, `route_to=manual_review`, and `next_best_action=manual_review` |
+| Decision contract (2B) | `Verified — ADDED 2026-07-20` | `policy_authorization` internal truth; legacy `auto_execute`/`send_for_approval` in decisioning fail-closed; dispatch-boundary action authorization; per-action approvals; `tests/test_decision_contract.py`, `test_action_authorization.py`, `test_action_dispatch_authorization_boundary.py` |
+| Decision trace (2C) | `Verified — ADDED 2026-07-20` | Append-only `decision_records`; `action_operation_id`; two-phase external write; `DECISION_RECORD_ENFORCE_WRITES`; `tests/test_decision_trace_2c.py` |
+| Evaluation harness (2D) | `Verified — ADDED 2026-07-20` | `app/evaluation/`; 10 YAML scenarios + S18; smoke via `tests/evaluation/`; CLI `scripts/run_eval_harness.py`; DEC-035 |
 | Customer reply drafts | `Verified — IMPROVED` | Sensitive lead/customer-inquiry auto replies are approval-gated, non-binding acknowledgements that hand off to a responsible human; low-risk inquiries still route to Monday/internal handoff |
 | Live verification | `Partially run` | 2026-07-07 controlled Phase A-C only: local gates, production root/docs checks, and negative admin-auth checks. No production DB access, Gmail OAuth, Monday/Fortnox/Visma credentials, scheduler, tenant setup, approval E2E, or smoke check. |
 

@@ -509,3 +509,62 @@ Operation exit codes are independent of metadata write success. API reads files 
 | 10 | **Connected account after invite** | Store/display `connected_account_email`; never tokens in UI |
 
 Reference: `docs/onboarding-2.0-architecture.md`
+
+---
+
+## DEC-033 — Decision contract & action authorization (2026-07-20)
+
+**Status:** Active — Kapitel 2B
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **AI recommendation ≠ authorization** | `decisioning_recommendation` (`auto_route`, `manual_review`, `hold`) is normalized separately from `policy_authorization` |
+| 2 | **Legacy tokens fail-closed** | `auto_execute` / `send_for_approval` in decisioning payload → `manual_review`; never grant `execution_allowed` alone |
+| 3 | **Risk first** | `resolve_policy_authorization()` checks content risk before any lower-priority branch; no early return may bypass it |
+| 4 | **`force_approval_test` server-gated** | Honored only when `ALLOW_FORCE_APPROVAL_TEST=True`; stripped from job input otherwise |
+| 5 | **Dispatch boundary authorization** | All actions (builder, injected, replay, resume) pass `_apply_dispatch_authorization()` |
+| 6 | **Central action registry** | Unknown actions blocked; external writes classified in `ACTION_REGISTRY` |
+| 7 | **Per-action approval** | Each external write may get its own approval; resume is idempotent and scoped to `delivery_payload` |
+| 8 | **Central automation mode** | `tenant_automation.py` is the single normalizer for `auto_actions` |
+| 9 | **Backward-compatible projection** | `policy_authorization` is internal truth; legacy `decision` string is a projection for orchestrator/consumers |
+
+Reference: `docs/10b-decision-contract-resolution.md`
+
+---
+
+## DEC-034 — Append-only decision trace (2026-07-20)
+
+**Status:** Active — Kapitel 2C
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **Append-only `decision_records`** | No updates/deletes except tenant lifecycle purge |
+| 2 | **`event_sequence` DB-generated** | No application `MAX()+1` |
+| 3 | **`action_operation_id`** | Stable UUID per logical operation; independent of HMAC and `pipeline_run_id` |
+| 4 | **`action_fingerprint` diagnostic** | Optional HMAC with `fingerprint_key_version`; NULL without key |
+| 5 | **Explicit `PipelineRunContext`** | Parameter propagation; no thread-local |
+| 6 | **External write two-phase** | Auth → intent → adapter → outcome; unresolved blocks auto retry |
+| 7 | **`processor_history` reset unchanged** | Full trace in `decision_records` only |
+| 8 | **Metadata allowlist** | Max 2048 bytes; no raw payloads/tokens |
+| 9 | **`DECISION_RECORD_ENFORCE_WRITES` default-on** | Forbidden off in production; startup verifies migration 015 |
+| 10 | **Migration before code** | Documented deploy order |
+
+Reference: `docs/10c-decision-trace-foundation.md`
+
+---
+
+## DEC-035 — Deterministic evaluation harness (2026-07-20)
+
+**Status:** Active — Kapitel 2D
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **YAML scenarios are normative** | Baseline stores status/metrics only, not behavior |
+| 2 | **`fixture_ai` default** | Schema-valid fixtures; `forced_fallback` only when explicit |
+| 3 | **Real `execute_action` + fake adapter** | No adapter bypass; `real_external_calls` must be 0 |
+| 4 | **Safety veto before quality** | Per-metric gates; weighted score diagnostic only |
+| 5 | **Baseline exit code 21** | Separate from safety/quality failures |
+| 6 | **No production logic in harness** | Missing hooks reported as gaps, not hidden |
+| 7 | **No live LLM in 2D** | Extension point only; no `--with-llm` |
+
+Reference: `docs/10d-evaluation-harness.md`

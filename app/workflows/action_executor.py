@@ -317,7 +317,13 @@ def _integration_allowed_for_action(
     return is_integration_enabled_for_tenant(tenant_id, integration_type, db=db)
 
 
-def execute_action(action: dict[str, Any], db: "Session | None" = None) -> dict[str, Any]:
+def execute_action(
+    action: dict[str, Any],
+    db: "Session | None" = None,
+    *,
+    job=None,
+    trace=None,
+) -> dict[str, Any]:
     if not isinstance(action, dict):
         raise ValueError("Each action must be an object.")
 
@@ -356,21 +362,38 @@ def execute_action(action: dict[str, Any], db: "Session | None" = None) -> dict[
             integration=integration,
         )
 
-    if action_type in ("send_email", "send_customer_auto_reply", "send_internal_handoff"):
-        result = _build_email_result(action)
-        result["type"] = action_type
-        return result
+    def _run_adapter() -> dict[str, Any]:
+        if action_type in ("send_email", "send_customer_auto_reply", "send_internal_handoff"):
+            result = _build_email_result(action)
+            result["type"] = action_type
+            return result
 
-    if action_type == "notify_slack":
-        return _build_slack_result(action)
+        if action_type == "notify_slack":
+            return _build_slack_result(action)
 
-    if action_type == "notify_teams":
-        return _build_notify_teams_result(action)
+        if action_type == "notify_teams":
+            return _build_notify_teams_result(action)
 
-    if action_type == "create_internal_task":
-        return _build_internal_task_result(action)
+        if action_type == "create_internal_task":
+            return _build_internal_task_result(action)
 
-    if action_type == "create_monday_item":
-        return _build_monday_item_result(action)
+        if action_type == "create_monday_item":
+            return _build_monday_item_result(action)
 
-    raise ValueError(f"Unhandled action type '{action_type}'.")
+        raise ValueError(f"Unhandled action type '{action_type}'.")
+
+    if job is not None:
+        from app.workflows.action_authorization import ActionEffect, classify_action
+        from app.workflows.external_write_trace import execute_external_write_with_trace
+
+        spec = classify_action(action_type)
+        if spec is not None and spec.effect == ActionEffect.EXTERNAL_WRITE:
+            return execute_external_write_with_trace(
+                db=db,
+                trace=trace,
+                job=job,
+                action=action,
+                adapter_fn=_run_adapter,
+            )
+
+    return _run_adapter()

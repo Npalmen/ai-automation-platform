@@ -168,14 +168,17 @@ async def on_startup():
     except RegistryIntegrityError as exc:
         raise RuntimeError(f"Onboarding registry integrity check failed: {exc}") from exc
 
+    import app.repositories.postgres.decision_record_models  # noqa: F401
     from app.repositories.postgres.schema_migrations import (
         ensure_runtime_schema,
         provision_tenant_defaults,
     )
+    from app.workflows.decision_trace_readiness import verify_decision_trace_readiness
 
     Base.metadata.create_all(bind=engine)
     ensure_runtime_schema(engine)
     provision_tenant_defaults(engine)
+    verify_decision_trace_readiness(engine, get_settings())
     print("Startup complete")
 
     # Warn if OAuth refresh credential set is incomplete — prevents silent invalid_grant failures.
@@ -642,7 +645,7 @@ def _synthetic_history(job_type_value: str) -> list[dict]:
                 "requires_human_review": False,
                 "payload": {
                     "processor_name": "decisioning_processor",
-                    "decision": "auto_execute",
+                    "decision": "auto_route",
                     "target_queue": "crm_update",
                     "action_flags": {"create_crm_lead": True, "notify_human": False, "request_missing_data": False},
                     "reasons": ["verification_synthetic"],
@@ -687,7 +690,7 @@ def _synthetic_history(job_type_value: str) -> list[dict]:
                 "requires_human_review": False,
                 "payload": {
                     "processor_name": "decisioning_processor",
-                    "decision": "auto_execute",
+                    "decision": "auto_route",
                     "target_queue": "billing_queue",
                     "action_flags": {"create_crm_lead": False, "notify_human": False, "request_missing_data": False},
                     "reasons": ["verification_synthetic"],
@@ -940,6 +943,13 @@ def create_job(
             detail=f"Tenant mismatch. Header tenant '{tenant_id}' does not match payload tenant '{request.tenant_id}'.",
         )
 
+    from app.core.settings import get_settings
+    from app.workflows.decision_contract import is_force_approval_test_allowed
+
+    input_data = dict(request.input_data or {})
+    if not is_force_approval_test_allowed(input_data, allow_flag=get_settings().ALLOW_FORCE_APPROVAL_TEST):
+        input_data.pop("force_approval_test", None)
+
     if not is_job_type_enabled_for_tenant(request.job_type, tenant_id, db=db):
         raise HTTPException(
             status_code=403,
@@ -949,7 +959,7 @@ def create_job(
     job = Job(
         tenant_id=request.tenant_id,
         job_type=request.job_type,
-        input_data=request.input_data,
+        input_data=input_data,
     )
 
     saved_job = JobRepository.create_job(db, job)
@@ -1099,14 +1109,53 @@ def _resolve_email_approval(
     now = datetime.now(timezone.utc)
     new_state = "approved" if approved else "rejected"
 
+    if approval.state in ("approved", "rejected"):
+        return {
+            "approval_id": approval.approval_id,
+            "status": approval.state,
+            "job_id": approval.job_id,
+            "send_result": None,
+            "send_error": None,
+            "idempotent": True,
+        }
+
     send_result = None
     send_error = None
 
     if approved:
-        delivery = approval.delivery_payload or {}
+        delivery = dict(approval.delivery_payload or {})
+        request_payload = approval.request_payload or {}
+        operation_id = request_payload.get("action_operation_id")
+        if operation_id:
+            delivery["_action_operation_id"] = operation_id
+        fingerprint = request_payload.get("action_fingerprint")
+        if fingerprint:
+            delivery["_action_fingerprint"] = fingerprint
         if delivery:
             try:
-                send_result = execute_action(delivery, db=db)
+                from app.domain.workflows.enums import JobType
+                from app.domain.workflows.models import Job
+
+                try:
+                    job_type = JobType(approval.job_type or "customer_inquiry")
+                except ValueError:
+                    job_type = JobType.CUSTOMER_INQUIRY
+                job = Job(
+                    job_id=approval.job_id,
+                    tenant_id=approval.tenant_id,
+                    job_type=job_type,
+                    input_data={},
+                )
+                if db is not None:
+                    try:
+                        from app.repositories.postgres.job_repository import JobRepository
+
+                        loaded = JobRepository.get_job_by_id(db, approval.tenant_id, approval.job_id)
+                        if loaded is not None and isinstance(loaded.job_id, str):
+                            job = loaded
+                    except (TypeError, ValueError, AttributeError):
+                        pass
+                send_result = execute_action(delivery, db=db, job=job, trace=None)
             except Exception as exc:
                 send_error = str(exc)
                 # Do not raise — record the failure but complete the approval
@@ -1183,8 +1232,8 @@ def approve_request(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
 
-    # Email approvals: execute the stored email payload then mark approved
-    if approval.next_on_approve == "email_send":
+    # Email and per-action approvals: execute stored delivery payload
+    if approval.next_on_approve in ("email_send", "action_execute"):
         return _resolve_email_approval(db, approval, approved=True,
                                        actor=request.actor, note=request.note)
 
@@ -1254,7 +1303,7 @@ def reject_request(
             raise HTTPException(status_code=400, detail=str(exc))
 
     # Email approvals: just mark rejected, no send
-    if approval.next_on_approve == "email_send":
+    if approval.next_on_approve in ("email_send", "action_execute"):
         return _resolve_email_approval(db, approval, approved=False,
                                        actor=request.actor, note=request.note)
 

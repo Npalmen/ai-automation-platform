@@ -24,6 +24,7 @@ from app.domain.workflows.enums import JobType
 from app.domain.workflows.statuses import JobStatus
 from app.workflows.processors.action_dispatch_processor import (
     _email_needs_approval,
+    _apply_dispatch_authorization,
     _build_email_approval_action,
     _build_lead_default_actions,
     _build_inquiry_default_actions,
@@ -53,6 +54,41 @@ def _make_job(job_type=JobType.LEAD, tenant_id="TENANT_TEST") -> Job:
 
 def _settings_with_auto_actions(value) -> dict:
     return {"auto_actions": {"lead": value, "customer_inquiry": value}}
+
+
+def _attach_policy(job: Job, *, decision: str = "auto_execute") -> Job:
+    detected = job.job_type.value if hasattr(job.job_type, "value") else str(job.job_type)
+    history = list(job.processor_history or [])
+    history.append(
+        {
+            "processor": "policy_processor",
+            "result": {"payload": {"decision": decision, "detected_job_type": detected}},
+        }
+    )
+    job.processor_history = history
+    return job
+
+
+def _authorized_lead_actions(job: Job, settings: dict) -> list[dict]:
+    job = _attach_policy(job)
+    settings = {
+        **settings,
+        "internal_notification_email": settings.get("internal_notification_email", "ops@example.com"),
+        "followups_enabled": settings.get("followups_enabled", True),
+    }
+    built = _build_lead_default_actions(job, settings)
+    return _apply_dispatch_authorization(job, built, settings)
+
+
+def _authorized_inquiry_actions(job: Job, settings: dict) -> list[dict]:
+    job = _attach_policy(job)
+    settings = {
+        **settings,
+        "internal_notification_email": settings.get("internal_notification_email", "support@example.com"),
+        "followups_enabled": settings.get("followups_enabled", True),
+    }
+    built = _build_inquiry_default_actions(job, settings)
+    return _apply_dispatch_authorization(job, built, settings)
 
 
 # ---------------------------------------------------------------------------
@@ -119,50 +155,48 @@ class TestLeadActionsEmailGate:
     def test_auto_false_wraps_email_actions_as_needs_approval(self):
         job = self._lead_job()
         settings = _settings_with_auto_actions(False)
-        actions = _build_lead_default_actions(job, settings)
+        actions = _authorized_lead_actions(job, settings)
         email_actions = [a for a in actions if a.get("type") in _EMAIL_ACTION_TYPES and not a.get("_skip")]
-        assert all(a.get("_needs_approval") for a in email_actions), \
-            "All non-skipped email actions should be marked _needs_approval"
+        assert all(a.get("_needs_approval") for a in email_actions)
 
-    def test_auto_false_monday_not_wrapped(self):
+    def test_auto_false_monday_wrapped_at_dispatch_boundary(self):
         job = self._lead_job()
         settings = _settings_with_auto_actions(False)
-        actions = _build_lead_default_actions(job, settings)
+        actions = _authorized_lead_actions(job, settings)
         monday_actions = [a for a in actions if a.get("type") == "create_monday_item"]
-        assert monday_actions, "Monday action must still be present"
-        assert not any(a.get("_needs_approval") for a in monday_actions)
+        assert monday_actions
+        assert all(a.get("_needs_approval") for a in monday_actions)
 
     def test_auto_true_no_approval_flag(self):
         job = self._lead_job()
         settings = _settings_with_auto_actions(True)
-        actions = _build_lead_default_actions(job, settings)
-        assert not any(a.get("_needs_approval") for a in actions), \
-            "No action should have _needs_approval when auto=True"
+        actions = _authorized_lead_actions(job, settings)
+        assert not any(a.get("_needs_approval") for a in actions)
 
-    def test_auto_missing_no_approval_flag(self):
+    def test_auto_missing_requires_approval_at_boundary(self):
         job = self._lead_job()
-        actions = _build_lead_default_actions(job, {})
-        # missing auto_actions → default requires approval
-        email_actions = [a for a in actions if a.get("type") in _EMAIL_ACTION_TYPES and not a.get("_skip")]
-        assert all(a.get("_needs_approval") for a in email_actions)
+        settings = {"internal_notification_email": "ops@example.com", "followups_enabled": True}
+        actions = _authorized_lead_actions(job, settings)
+        external = [a for a in actions if a.get("type") in (*_EMAIL_ACTION_TYPES, "create_monday_item") and not a.get("_skip")]
+        assert all(a.get("_needs_approval") for a in external)
 
     def test_manual_string_wraps_email_actions(self):
         job = self._lead_job()
         settings = _settings_with_auto_actions("manual")
-        actions = _build_lead_default_actions(job, settings)
+        actions = _authorized_lead_actions(job, settings)
         email_actions = [a for a in actions if a.get("type") in _EMAIL_ACTION_TYPES and not a.get("_skip")]
         assert all(a.get("_needs_approval") for a in email_actions)
 
     def test_full_auto_string_does_not_wrap(self):
         job = self._lead_job()
         settings = _settings_with_auto_actions("full_auto")
-        actions = _build_lead_default_actions(job, settings)
+        actions = _authorized_lead_actions(job, settings)
         assert not any(a.get("_needs_approval") for a in actions)
 
     def test_semi_wraps_email_actions(self):
         job = self._lead_job()
         settings = _settings_with_auto_actions("semi")
-        actions = _build_lead_default_actions(job, settings)
+        actions = _authorized_lead_actions(job, settings)
         email_actions = [a for a in actions if a.get("type") in _EMAIL_ACTION_TYPES and not a.get("_skip")]
         assert all(a.get("_needs_approval") for a in email_actions)
 
@@ -171,7 +205,7 @@ class TestLeadActionsEmailGate:
         job = _make_job(JobType.LEAD)
         job.input_data["sender_email"] = ""  # force skip
         settings = _settings_with_auto_actions(False)
-        actions = _build_lead_default_actions(job, settings)
+        actions = _authorized_lead_actions(job, settings)
         skipped = [a for a in actions if a.get("_skip")]
         assert not any(a.get("_needs_approval") for a in skipped)
 
@@ -187,28 +221,28 @@ class TestInquiryActionsEmailGate:
     def test_auto_false_wraps_email_actions(self):
         job = self._inquiry_job()
         settings = {"auto_actions": {"customer_inquiry": False}}
-        actions = _build_inquiry_default_actions(job, settings)
+        actions = _authorized_inquiry_actions(job, settings)
         email_actions = [a for a in actions if a.get("type") in _EMAIL_ACTION_TYPES and not a.get("_skip")]
         assert all(a.get("_needs_approval") for a in email_actions)
 
-    def test_auto_false_monday_not_wrapped(self):
+    def test_auto_false_monday_wrapped_at_dispatch_boundary(self):
         job = self._inquiry_job()
         settings = {"auto_actions": {"customer_inquiry": False}}
-        actions = _build_inquiry_default_actions(job, settings)
+        actions = _authorized_inquiry_actions(job, settings)
         monday_actions = [a for a in actions if a.get("type") == "create_monday_item"]
         assert monday_actions
-        assert not any(a.get("_needs_approval") for a in monday_actions)
+        assert all(a.get("_needs_approval") for a in monday_actions)
 
     def test_auto_true_no_approval_flag(self):
         job = self._inquiry_job()
         settings = {"auto_actions": {"customer_inquiry": True}}
-        actions = _build_inquiry_default_actions(job, settings)
+        actions = _authorized_inquiry_actions(job, settings)
         assert not any(a.get("_needs_approval") for a in actions)
 
     def test_semi_wraps_email_actions(self):
         job = self._inquiry_job()
         settings = {"auto_actions": {"customer_inquiry": "semi"}}
-        actions = _build_inquiry_default_actions(job, settings)
+        actions = _authorized_inquiry_actions(job, settings)
         email_actions = [a for a in actions if a.get("type") in _EMAIL_ACTION_TYPES and not a.get("_skip")]
         assert all(a.get("_needs_approval") for a in email_actions)
 
@@ -231,16 +265,17 @@ class TestProcessActionDispatchEmailApproval:
         return db, mock_record
 
     def test_email_actions_not_executed_when_auto_false(self):
-        job = _make_job(JobType.LEAD)
+        job = _attach_policy(_make_job(JobType.LEAD))
         db = MagicMock()
 
         with (
             patch("app.workflows.processors.action_dispatch_processor._read_automation_settings",
                   return_value={"followups_enabled": True, "leads_enabled": True,
                                 "support_enabled": True, "support_email": "",
+                                "internal_notification_email": "ops@example.com",
                                 "auto_actions": {"lead": False}}),
             patch("app.workflows.processors.action_dispatch_processor.execute_action") as mock_exec,
-            patch("app.workflows.processors.action_dispatch_processor._create_email_approval_record",
+            patch("app.workflows.processors.action_dispatch_processor._create_action_approval_record",
                   return_value={"approval_id": "eml_test", "status": "pending_approval"}),
         ):
             result_job = process_action_dispatch_job(job, db)
@@ -251,8 +286,9 @@ class TestProcessActionDispatchEmailApproval:
             assert action_arg.get("type") not in _EMAIL_ACTION_TYPES, \
                 "execute_action must not be called for email types when approval required"
 
-    def test_monday_executed_when_auto_false(self):
+    def test_monday_pending_when_auto_false(self):
         job = _make_job(JobType.LEAD)
+        _attach_policy(job)
         db = MagicMock()
 
         executed_types = []
@@ -265,27 +301,29 @@ class TestProcessActionDispatchEmailApproval:
             patch("app.workflows.processors.action_dispatch_processor._read_automation_settings",
                   return_value={"followups_enabled": True, "leads_enabled": True,
                                 "support_enabled": True, "support_email": "",
+                                "internal_notification_email": "ops@example.com",
                                 "auto_actions": {"lead": False}}),
             patch("app.workflows.processors.action_dispatch_processor.execute_action", side_effect=fake_execute),
-            patch("app.workflows.processors.action_dispatch_processor._create_email_approval_record",
-                  return_value={"approval_id": "eml_test", "status": "pending_approval"}),
+            patch("app.workflows.processors.action_dispatch_processor._create_action_approval_record",
+                  return_value={"approval_id": "act_test", "status": "pending_approval"}),
         ):
             process_action_dispatch_job(job, db)
 
-        assert "create_monday_item" in executed_types, "Monday must execute even when email approvals required"
+        assert "create_monday_item" not in executed_types
 
     def test_pending_approvals_in_result_payload(self):
-        job = _make_job(JobType.LEAD)
+        job = _attach_policy(_make_job(JobType.LEAD))
         db = MagicMock()
 
         with (
             patch("app.workflows.processors.action_dispatch_processor._read_automation_settings",
                   return_value={"followups_enabled": True, "leads_enabled": True,
                                 "support_enabled": True, "support_email": "",
+                                "internal_notification_email": "ops@example.com",
                                 "auto_actions": {"lead": False}}),
             patch("app.workflows.processors.action_dispatch_processor.execute_action",
                   return_value={"type": "create_monday_item", "status": "completed"}),
-            patch("app.workflows.processors.action_dispatch_processor._create_email_approval_record",
+            patch("app.workflows.processors.action_dispatch_processor._create_action_approval_record",
                   return_value={"approval_id": "eml_abc", "status": "pending_approval"}),
         ):
             result_job = process_action_dispatch_job(job, db)
@@ -301,7 +339,7 @@ class TestProcessActionDispatchEmailApproval:
         assert payload["lead_sla"]["enabled"] is True
 
     def test_no_approval_when_auto_true(self):
-        job = _make_job(JobType.LEAD)
+        job = _attach_policy(_make_job(JobType.LEAD))
         db = MagicMock()
 
         created_approvals = []
@@ -310,10 +348,11 @@ class TestProcessActionDispatchEmailApproval:
             patch("app.workflows.processors.action_dispatch_processor._read_automation_settings",
                   return_value={"followups_enabled": True, "leads_enabled": True,
                                 "support_enabled": True, "support_email": "",
+                                "internal_notification_email": "ops@example.com",
                                 "auto_actions": {"lead": True}}),
             patch("app.workflows.processors.action_dispatch_processor.execute_action",
                   return_value={"type": "send_customer_auto_reply", "status": "completed"}),
-            patch("app.workflows.processors.action_dispatch_processor._create_email_approval_record",
+            patch("app.workflows.processors.action_dispatch_processor._create_action_approval_record",
                   side_effect=lambda *a, **kw: created_approvals.append(True) or {}),
         ):
             process_action_dispatch_job(job, db)
@@ -469,6 +508,19 @@ class TestResolveEmailApproval:
 
         mock_exec.assert_not_called()
         assert result["status"] == "approved"
+
+    def test_double_approve_is_idempotent(self):
+        """Second approve on already-resolved approval must not re-execute action."""
+        from app.main import _resolve_email_approval
+        db = MagicMock()
+        approval = self._make_approval_record(state="approved")
+
+        with patch(_EXEC) as mock_exec:
+            result = _resolve_email_approval(db, approval, approved=True)
+
+        mock_exec.assert_not_called()
+        assert result["status"] == "approved"
+        assert result.get("idempotent") is True
 
 
 # ---------------------------------------------------------------------------

@@ -19,6 +19,7 @@ import pytest
 from app.domain.workflows.enums import JobType
 from app.domain.workflows.models import Job
 from app.workflows.processors.action_dispatch_processor import (
+    _apply_dispatch_authorization,
     _build_inquiry_default_actions,
     _build_lead_default_actions,
     _read_automation_settings,
@@ -80,6 +81,19 @@ def _settings_with_branding(
         "email_signature_name": email_signature_name,
         "internal_notification_email": internal_notification_email,
     }
+
+
+def _authorized_lead_actions(job: Job, settings: dict) -> list[dict]:
+    history = list(job.processor_history or [])
+    history.append(
+        {
+            "processor": "policy_processor",
+            "result": {"payload": {"decision": "auto_execute", "detected_job_type": "lead"}},
+        }
+    )
+    job.processor_history = history
+    built = _build_lead_default_actions(job, settings)
+    return _apply_dispatch_authorization(job, built, settings, db=None, trace=None)
 
 
 # ---------------------------------------------------------------------------
@@ -339,22 +353,23 @@ class TestApprovalGateWithBranding:
             internal_notification_email="info@elitgruppen.se",
             auto_actions={"lead": False},
         )
-        actions = _build_lead_default_actions(_lead_job(tenant_id="T_ELITGRUPPEN"), settings)
+        actions = _authorized_lead_actions(_lead_job(tenant_id="T_ELITGRUPPEN"), settings)
         for a in actions:
             if a.get("type") in ("send_customer_auto_reply", "send_internal_handoff"):
                 assert a.get("_needs_approval"), f"Expected _needs_approval on {a.get('type')}"
                 body = a.get("body") or ""
                 assert "Elit Gruppen" in body or a.get("type") == "send_internal_handoff"
 
-    def test_monday_not_gated_with_branding(self):
+    def test_monday_gated_at_dispatch_boundary_with_branding(self):
+        """Branding does not bypass dispatch authorization for external writes."""
         settings = _settings_with_branding(
             email_signature_name="Elit Gruppen",
             auto_actions={"lead": False},
         )
-        actions = _build_lead_default_actions(_lead_job(tenant_id="T_ELITGRUPPEN"), settings)
+        actions = _authorized_lead_actions(_lead_job(tenant_id="T_ELITGRUPPEN"), settings)
         monday = next((a for a in actions if a.get("type") == "create_monday_item"), None)
         assert monday is not None
-        assert not monday.get("_needs_approval")
+        assert monday.get("_needs_approval")
         assert not monday.get("_skip")
 
 

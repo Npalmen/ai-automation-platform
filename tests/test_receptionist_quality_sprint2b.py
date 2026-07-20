@@ -43,9 +43,9 @@ from app.service_profiles import detect_service_context, select_profile
 from app.service_profiles.facts import FactState, detect_fact_state
 from app.service_profiles.name_extraction import resolve_customer_name
 from app.workflows.processors.action_dispatch_processor import (
+    _apply_dispatch_authorization,
     _build_inquiry_default_actions,
     _build_lead_default_actions,
-    _email_needs_approval,
 )
 from app.workflows.processors.lead_analyzer_processor import process_lead_analyzer_job
 from app.workflows.processors.support_analyzer_processor import process_support_analyzer_job
@@ -61,6 +61,24 @@ def _settings() -> dict:
         "internal_notification_email": "intern@krowolf.se",
         "auto_actions": {},
     }
+
+
+def _authorized_actions(job: Job, settings: dict, *, build_actions) -> list[dict]:
+    detected = job.job_type.value if hasattr(job.job_type, "value") else str(job.job_type)
+    job.processor_history = list(job.processor_history or [])
+    job.processor_history.append(
+        {
+            "processor": "policy_processor",
+            "result": {
+                "payload": {
+                    "decision": "auto_execute",
+                    "detected_job_type": detected,
+                }
+            },
+        }
+    )
+    built = build_actions(job, settings)
+    return _apply_dispatch_authorization(job, built, settings)
 
 
 def _lead_job(subject: str, body: str, sender_name: str = "Niklas Palm") -> Job:
@@ -471,27 +489,17 @@ class TestSprint1SafetyRegression:
 
     def test_lead_auto_reply_uses_approval_gate(self):
         job = _lead_job("Test laddbox", "Jag vill installera laddbox hemma.")
-        actions = _build_lead_default_actions(job, _settings())
-        auto_replies = [a for a in actions if a.get("type") == "send_customer_auto_reply"]
-        for a in auto_replies:
-            assert (
-                a.get("_needs_approval")
-                or a.get("_approval_required")
-                or _email_needs_approval(a)
-                or True  # fail-closed
-            )
+        actions = _authorized_actions(job, _settings(), build_actions=_build_lead_default_actions)
+        auto_replies = [a for a in actions if a.get("type") == "send_customer_auto_reply" and not a.get("_skip")]
+        assert auto_replies
+        assert all(a.get("_needs_approval") for a in auto_replies)
 
     def test_inquiry_auto_reply_uses_approval_gate(self):
         job = _inquiry_job("Test läcka", "Det läcker lite under diskbänken.")
-        actions = _build_inquiry_default_actions(job, _settings())
-        auto_replies = [a for a in actions if a.get("type") == "send_customer_auto_reply"]
-        for a in auto_replies:
-            assert (
-                a.get("_needs_approval")
-                or a.get("_approval_required")
-                or _email_needs_approval(a)
-                or True  # fail-closed
-            )
+        actions = _authorized_actions(job, _settings(), build_actions=_build_inquiry_default_actions)
+        auto_replies = [a for a in actions if a.get("type") == "send_customer_auto_reply" and not a.get("_skip")]
+        assert auto_replies
+        assert all(a.get("_needs_approval") for a in auto_replies)
 
     def test_bad_phrases_absent_in_lead_reply(self):
         job = _lead_job("Laddbox hemma", "Jag vill installera en laddbox hemma på villan.")

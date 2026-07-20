@@ -97,6 +97,21 @@ def _settings(*, signature: str = "Elmontören AB", followups: bool = True) -> d
     }
 
 
+def _authorized_lead_actions(job: Job, settings: dict) -> list[dict]:
+    from app.workflows.processors.action_dispatch_processor import _apply_dispatch_authorization
+
+    history = list(job.processor_history or [])
+    history.append(
+        {
+            "processor": "policy_processor",
+            "result": {"payload": {"decision": "auto_execute", "detected_job_type": "lead"}},
+        }
+    )
+    job.processor_history = history
+    built = _build_lead_default_actions(job, settings)
+    return _apply_dispatch_authorization(job, built, settings, db=None, trace=None)
+
+
 def _get_auto_reply_body(actions: list[dict]) -> str:
     for a in actions:
         if a.get("type") == "send_customer_auto_reply" and not a.get("_skip"):
@@ -731,8 +746,8 @@ class TestApprovalFirstUnchanged:
     def test_email_actions_are_approval_gated_by_default(self):
         """Without explicit auto_actions enable, all email actions require approval."""
         job = self._simple_lead_job()
-        # _settings() has no auto_actions → _email_needs_approval returns True
-        actions = _build_lead_default_actions(job, _settings())
+        # _settings() has no auto_actions → dispatch boundary requires approval
+        actions = _authorized_lead_actions(job, _settings())
         email_actions = [
             a for a in actions
             if a.get("type") == "send_customer_auto_reply" and not a.get("_skip")
@@ -762,7 +777,7 @@ class TestApprovalFirstUnchanged:
         job.result = {"status": "completed", "requires_human_review": False, "payload": {"detected_job_type": "lead", "confidence": 0.9}}
         job = process_lead_analyzer_job(job)
 
-        actions = _build_lead_default_actions(job, _settings())
+        actions = _authorized_lead_actions(job, _settings())
         email_actions = [
             a for a in actions
             if a.get("type") == "send_customer_auto_reply" and not a.get("_skip")

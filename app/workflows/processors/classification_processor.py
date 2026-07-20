@@ -132,7 +132,7 @@ def _build_source_context(job: Job) -> dict:
     }
 
 
-def process_classification_job(job: Job) -> Job:
+def process_classification_job(job: Job, trace=None) -> Job:
     context = _build_source_context(job)
 
     input_data = job.input_data or {}
@@ -154,7 +154,7 @@ def process_classification_job(job: Job) -> Job:
             "risk": risk,
         }
 
-    return run_ai_step(
+    job = run_ai_step(
         job=job,
         processor_name=PROCESSOR_NAME,
         prompt_name="classification_v1",
@@ -169,3 +169,18 @@ def process_classification_job(job: Job) -> Job:
         },
         fallback_payload_builder=_deterministic_fallback,
     )
+    if trace is not None and trace.db is not None:
+        from app.workflows.decision_record import DecisionRecordType
+        from app.workflows.decision_record_service import record_processor_decision
+        from app.workflows.processors.ai_processor_utils import get_latest_processor_payload
+
+        payload = get_latest_processor_payload(job, PROCESSOR_NAME)
+        record_processor_decision(
+            trace.db,
+            trace,
+            job,
+            record_type=DecisionRecordType.CLASSIFICATION,
+            processor_name=PROCESSOR_NAME,
+            payload=payload,
+        )
+    return job

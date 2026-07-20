@@ -40,6 +40,9 @@ from app.domain.workflows.models import Job
 from app.workflows.approval_dispatcher import dispatch_approval_request
 from app.workflows.dispatchers.engine import ControlledDispatchEngine
 from app.workflows.pipeline_runner import run_pipeline
+from app.workflows.pipeline_run_context import PipelineRunSource, create_trace_session
+from app.repositories.postgres.decision_record_repository import DecisionRecordRepository
+from app.workflows.decision_record_service import record_operator_recovery
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +85,13 @@ def _utcnow() -> datetime:
 
 def _load_job(db: Session, tenant_id: str, job_id: str) -> Job | None:
     return JobRepository.get_job_by_id(db, tenant_id, job_id)
+
+
+def _latest_pipeline_run_id(db: Session, tenant_id: str, job_id: str) -> str | None:
+    rows = DecisionRecordRepository.list_for_job(db, tenant_id=tenant_id, job_id=job_id)
+    if not rows:
+        return None
+    return rows[-1].pipeline_run_id
 
 
 class RecoveryAuditError(Exception):
@@ -144,6 +154,21 @@ def retry_job(db: Session, tenant_id: str, job_id: str, actor: str = "admin") ->
         "previous_status": str(job.status),
     })
 
+    parent_run_id = _latest_pipeline_run_id(db, tenant_id, job_id)
+    recovery_trace = create_trace_session(
+        job,
+        source=PipelineRunSource.RETRY,
+        db=db,
+        parent_pipeline_run_id=parent_run_id,
+    )
+    record_operator_recovery(
+        db,
+        recovery_trace,
+        job,
+        operator_action=action_name,
+        operator_actor=actor,
+    )
+
     # Clear failure state so the pipeline runs fresh; preserve input_data and audit trail.
     job.status = JobStatus.PENDING
     job.result = None
@@ -151,7 +176,12 @@ def retry_job(db: Session, tenant_id: str, job_id: str, actor: str = "admin") ->
     job.updated_at = _utcnow()
 
     try:
-        updated_job = run_pipeline(job, db)
+        updated_job = run_pipeline(
+            job,
+            db,
+            run_source=PipelineRunSource.RETRY,
+            parent_pipeline_run_id=parent_run_id,
+        )
     except Exception as exc:
         logger.exception("retry_job pipeline error for job %s", job_id)
         _audit(db, tenant_id, action_name, "failed", {"job_id": job_id, "error": "pipeline_error"})
@@ -251,6 +281,21 @@ def reclassify(db: Session, tenant_id: str, job_id: str, actor: str = "admin") -
         "note": "Overwriting prior classification state",
     })
 
+    parent_run_id = _latest_pipeline_run_id(db, tenant_id, job_id)
+    recovery_trace = create_trace_session(
+        job,
+        source=PipelineRunSource.RECLASSIFY,
+        db=db,
+        parent_pipeline_run_id=parent_run_id,
+    )
+    record_operator_recovery(
+        db,
+        recovery_trace,
+        job,
+        operator_action=action_name,
+        operator_actor=actor,
+    )
+
     # Strip all derived state — rerun from intake/classification
     job.status = JobStatus.PENDING
     job.result = None
@@ -258,7 +303,12 @@ def reclassify(db: Session, tenant_id: str, job_id: str, actor: str = "admin") -
     job.updated_at = _utcnow()
 
     try:
-        updated_job = run_pipeline(job, db)
+        updated_job = run_pipeline(
+            job,
+            db,
+            run_source=PipelineRunSource.RECLASSIFY,
+            parent_pipeline_run_id=parent_run_id,
+        )
     except Exception:
         logger.exception("reclassify pipeline error for job %s", job_id)
         _audit(db, tenant_id, action_name, "failed", {"job_id": job_id, "error": "pipeline_error"})

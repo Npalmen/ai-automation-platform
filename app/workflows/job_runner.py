@@ -13,7 +13,7 @@ class WorkflowStepExecutionError(Exception):
         super().__init__(message)
 
 
-def run_job(job: Job, db=None) -> Job:
+def run_job(job: Job, db=None, *, trace=None) -> Job:
     processor = PROCESSOR_REGISTRY.get(job.job_type)
     if processor is None:
         raise ValueError(f"No processor registered for job type '{job.job_type.value}'")
@@ -23,10 +23,12 @@ def run_job(job: Job, db=None) -> Job:
 
     try:
         signature = inspect.signature(processor)
+        kwargs: dict = {}
         if "db" in signature.parameters:
-            processed_job = processor(job, db=db)
-        else:
-            processed_job = processor(job)
+            kwargs["db"] = db
+        if "trace" in signature.parameters:
+            kwargs["trace"] = trace
+        processed_job = processor(job, **kwargs) if kwargs else processor(job)
     except WorkflowStepExecutionError:
         raise
     except Exception as exc:

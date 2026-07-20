@@ -11,6 +11,8 @@ from app.domain.workflows.models import Job
 from app.repositories.postgres.action_execution_repository import ActionExecutionRepository
 from app.service_profiles.name_extraction import resolve_customer_name
 from app.workflows.action_executor import execute_action
+from app.workflows.action_authorization import apply_action_authorization, classify_action, ActionEffect
+from app.workflows.decision_record_service import record_action_authorization
 from app.workflows.intelligence_safety import assess_content_risk
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
@@ -21,6 +23,8 @@ from app.workflows.processors.ai_processor_utils import (
     get_latest_processor_payload,
     normalize_sender,
 )
+
+from app.workflows.tenant_automation import requires_action_approval, resolve_automation_mode
 
 PROCESSOR_NAME = "action_dispatch_processor"
 
@@ -50,6 +54,57 @@ _PROFILE_OPENERS: dict[str, str] = {
 }
 
 _ORG_PREFIX_WORDS = frozenset({"brf", "ab", "hb", "kb", "ab.", "ltd", "inc", "as", "oy"})
+
+
+def _apply_dispatch_authorization(
+    job: Job,
+    actions: list[dict[str, Any]],
+    automation_settings: dict[str, Any],
+    *,
+    db: Session | None = None,
+    trace=None,
+) -> list[dict[str, Any]]:
+    """Final dispatch boundary — applies to builder, injected, and replayed actions."""
+    policy_payload = get_latest_processor_payload(job, "policy_processor")
+    policy_decision = policy_payload.get("decision")
+    input_data = job.input_data or {}
+    risk = assess_content_risk(input_data)
+    job_type = (
+        policy_payload.get("detected_job_type")
+        or (job.job_type.value if hasattr(job.job_type, "value") else str(job.job_type))
+    )
+    auto_actions = automation_settings.get("auto_actions") or {}
+
+    authorized: list[dict[str, Any]] = []
+    for action in actions:
+        annotated = apply_action_authorization(
+            action,
+            job_type=job_type,
+            auto_actions=auto_actions,
+            risk_detected=bool(risk["risk_detected"]),
+            policy_decision=policy_decision,
+            pre_authorized=bool(action.get("_pre_authorized")),
+        )
+        if (
+            db is not None
+            and trace is not None
+            and not annotated.get("_skip")
+        ):
+            spec = classify_action(annotated.get("type"))
+            if spec is not None and spec.effect == ActionEffect.EXTERNAL_WRITE:
+                if annotated.get("_needs_approval"):
+                    auth_value = "approval_required"
+                else:
+                    auth_value = str(annotated.get("_authorization") or "execution_allowed")
+                record_action_authorization(
+                    db,
+                    trace,
+                    job,
+                    annotated,
+                    authorization=auth_value,
+                )
+        authorized.append(annotated)
+    return authorized
 
 
 def _is_no_reply_email(value: str) -> bool:
@@ -489,14 +544,6 @@ def _build_lead_default_actions(
     if not completeness["is_complete"] and sender_email and completeness["follow_up_questions"]:
         actions.append(_build_follow_up_email(sender_email, completeness["follow_up_questions"]))
 
-    # Gate outbound customer emails on auto_actions approval policy
-    if risk["risk_detected"] or _email_needs_approval("lead", settings):
-        actions = [
-            _build_email_approval_action(a) if a.get("type") in _EMAIL_ACTION_TYPES and not a.get("_skip")
-            else a
-            for a in actions
-        ]
-
     return actions
 
 
@@ -723,14 +770,6 @@ def _build_inquiry_default_actions(
 
     if not completeness["is_complete"] and sender_email and completeness["follow_up_questions"]:
         actions.append(_build_follow_up_email(sender_email, completeness["follow_up_questions"]))
-
-    # Gate outbound customer emails on auto_actions approval policy
-    if risk["risk_detected"] or _email_needs_approval("customer_inquiry", settings):
-        actions = [
-            _build_email_approval_action(a) if a.get("type") in _EMAIL_ACTION_TYPES and not a.get("_skip")
-            else a
-            for a in actions
-        ]
 
     return actions
 
@@ -985,18 +1024,16 @@ def _read_automation_settings(job: Job, db: Session | None) -> dict[str, Any]:
 
 
 def _email_auto_execute_allowed(job_type: str, automation_settings: dict[str, Any]) -> bool:
-    """Return True only when auto_actions explicitly permits immediate email send."""
-    auto_actions = automation_settings.get("auto_actions") or {}
-    value = auto_actions.get(job_type)
-    return value is True or value == "auto" or value == "full_auto"
+    """Return True only when auto_actions explicitly permits immediate external execution."""
+    mode = resolve_automation_mode(
+        automation_settings.get("auto_actions") or {},
+        job_type,
+    )
+    return not requires_action_approval(mode)
 
 
 def _email_needs_approval(job_type: str, automation_settings: dict[str, Any]) -> bool:
-    """Return True when outbound emails for this job type require manual approval.
-
-    Fail-closed: None, False, 'manual', and 'semi' all require approval.
-    Only explicit True, 'auto', or 'full_auto' may bypass approval.
-    """
+    """Return True when outbound emails for this job type require manual approval."""
     return not _email_auto_execute_allowed(job_type, automation_settings)
 
 
@@ -1078,44 +1115,37 @@ def _compute_lead_sla_payload(
     }
 
 
-def _create_email_approval_record(
+def _create_action_approval_record(
     db: Session,
     job: Job,
     action: dict[str, Any],
     index: int,
 ) -> dict[str, Any]:
-    """Persist a pending email approval and return a summary dict."""
+    """Persist a pending per-action approval; delivery executes exactly one action."""
     import uuid
     from app.repositories.postgres.approval_repository import ApprovalRequestRepository
 
-    approval_id = f"eml_{uuid.uuid4().hex[:20]}"
     action_type = action.get("type", "send_email")
-    recipient = action.get("to") or ""
-    subject = action.get("subject") or ""
+    prefix = "eml_" if action_type in _EMAIL_ACTION_TYPES else "act_"
+    approval_id = f"{prefix}{uuid.uuid4().hex[:20]}"
+    recipient = action.get("to") or action.get("item_name") or action.get("channel") or ""
+    subject = action.get("subject") or action.get("item_name") or action_type
 
     approval_payload = {
         "approval_id": approval_id,
         "state": "pending",
         "channel": "dashboard",
-        "title": f"E-post: {subject[:60]}",
-        "summary": f"Väntande e-post till {recipient} ({action_type})",
-        "next_on_approve": "email_send",
-        "next_on_reject": "email_reject",
+        "title": f"Action: {action_type}",
+        "summary": f"Väntande åtgärd {action_type} ({recipient})",
+        "next_on_approve": "action_execute",
+        "next_on_reject": "action_reject",
         "requested_by": "system",
+        "action_type": action_type,
+        "action_operation_id": action.get("_action_operation_id"),
+        "action_fingerprint": action.get("_action_fingerprint"),
     }
-    # Store the full email payload so approve can execute it
-    delivery = {
-        "type": action_type,
-        "to": recipient,
-        "subject": subject,
-        "body": action.get("body") or "",
-    }
-    if action.get("thread_id"):
-        delivery["thread_id"] = action.get("thread_id")
-    if action.get("in_reply_to"):
-        delivery["in_reply_to"] = action.get("in_reply_to")
-    if action.get("references"):
-        delivery["references"] = action.get("references")
+
+    delivery = {k: v for k, v in action.items() if not str(k).startswith("_")}
 
     ApprovalRequestRepository.upsert_from_payload(
         db=db,
@@ -1132,13 +1162,24 @@ def _create_email_approval_record(
         "to": recipient,
         "subject": subject,
         "status": "pending_approval",
-        "approval_kind": "ai_reply_draft" if _is_customer_email_action(action) else "email_action",
+        "approval_kind": "ai_reply_draft" if _is_customer_email_action(action) else "action_execute",
     }
 
 
-def process_action_dispatch_job(job: Job, db: Session | None = None) -> Job:
+def _create_email_approval_record(
+    db: Session,
+    job: Job,
+    action: dict[str, Any],
+    index: int,
+) -> dict[str, Any]:
+    """Backward-compatible wrapper."""
+    return _create_action_approval_record(db, job, action, index)
+
+
+def process_action_dispatch_job(job: Job, db: Session | None = None, trace=None) -> Job:
     automation_settings = _read_automation_settings(job, db)
     actions = _resolve_actions(job, automation_settings)
+    actions = _apply_dispatch_authorization(job, actions, automation_settings, db=db, trace=trace)
     executed_actions: list[dict[str, Any]] = []
     failed_actions: list[dict[str, Any]] = []
     skipped_actions: list[dict[str, Any]] = []
@@ -1148,7 +1189,7 @@ def process_action_dispatch_job(job: Job, db: Session | None = None) -> Job:
         # Approval-pending sentinel — create approval record, do not execute
         if action.get("_needs_approval"):
             if db is not None:
-                approval_summary = _create_email_approval_record(db, job, action, index)
+                approval_summary = _create_action_approval_record(db, job, action, index)
                 pending_approvals.append(approval_summary)
             else:
                 pending_approvals.append({
@@ -1189,7 +1230,7 @@ def process_action_dispatch_job(job: Job, db: Session | None = None) -> Job:
             continue
 
         try:
-            executed = execute_action(action, db=db)
+            executed = execute_action(action, db=db, job=job, trace=trace)
             executed_actions.append(executed)
             _persist_successful_action(
                 db=db,

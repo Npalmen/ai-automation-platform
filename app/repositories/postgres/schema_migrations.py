@@ -317,6 +317,52 @@ _ONBOARDING_2_MIGRATION_STATEMENTS: list[str] = [
     "UPDATE tenant_configs SET lifecycle_status = 'active' WHERE status = 'active' AND lifecycle_status = 'onboarding'",
 ]
 
+_DECISION_RECORD_MIGRATION_STATEMENTS: list[str] = [
+    """
+    CREATE TABLE IF NOT EXISTS decision_records (
+        decision_id              VARCHAR(36)  PRIMARY KEY,
+        tenant_id                VARCHAR      NOT NULL,
+        job_id                   VARCHAR      NOT NULL,
+        event_sequence           BIGINT       GENERATED ALWAYS AS IDENTITY,
+        pipeline_run_id          VARCHAR(36)  NOT NULL,
+        parent_pipeline_run_id   VARCHAR(36),
+        stage_sequence           SMALLINT     NOT NULL,
+        record_type              VARCHAR(48)  NOT NULL,
+        source                   VARCHAR(32)  NOT NULL,
+        processor_name           VARCHAR(64),
+        recommendation           VARCHAR(32),
+        policy_authorization     VARCHAR(32),
+        policy_decision          VARCHAR(32),
+        action_type              VARCHAR(64),
+        action_operation_id      VARCHAR(36),
+        action_fingerprint       VARCHAR(128),
+        fingerprint_key_version  SMALLINT,
+        action_authorization     VARCHAR(32),
+        execution_phase          VARCHAR(16),
+        execution_status         VARCHAR(32),
+        confidence               DOUBLE PRECISION,
+        reason_codes             JSON         NOT NULL DEFAULT '[]',
+        tenant_config_version    INTEGER,
+        code_version             VARCHAR(64)  NOT NULL,
+        service_profile_type     VARCHAR(64),
+        prompt_name              VARCHAR(64),
+        prompt_version           VARCHAR(32),
+        prompt_hash              VARCHAR(64),
+        model_provider           VARCHAR(32),
+        model_name               VARCHAR(64),
+        idempotency_key          VARCHAR(160) NOT NULL,
+        supersedes_decision_id   VARCHAR(36),
+        job_status_at_record     VARCHAR(32)  NOT NULL,
+        metadata                 JSON         NOT NULL DEFAULT '{}',
+        created_at               TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_decision_records_idempotency ON decision_records (tenant_id, idempotency_key)",
+    "CREATE INDEX IF NOT EXISTS ix_decision_records_tenant_job_event ON decision_records (tenant_id, job_id, event_sequence)",
+    "CREATE INDEX IF NOT EXISTS ix_decision_records_pipeline_run ON decision_records (tenant_id, pipeline_run_id, stage_sequence)",
+    "CREATE INDEX IF NOT EXISTS ix_decision_records_action_operation ON decision_records (tenant_id, action_operation_id) WHERE action_operation_id IS NOT NULL",
+]
+
 
 # Tenant branding/settings defaults provisioned at startup.
 # Each entry: (tenant_id, settings_key, default_value_dict)
@@ -412,14 +458,19 @@ def ensure_runtime_schema(engine: Engine) -> None:
                 conn.execute(text(ddl))
                 log.debug("Onboarding 2.0 migration OK")
 
+            for ddl in _DECISION_RECORD_MIGRATION_STATEMENTS:
+                conn.execute(text(ddl))
+                log.debug("Decision record migration OK")
+
         log.info(
-            "Runtime schema safeguard complete (%d column(s), %d table/index statement(s), %d onboarding statement(s), %d slice2b statement(s), %d operator alerts statement(s), %d onboarding 2.0 statement(s) checked)",
+            "Runtime schema safeguard complete (%d column(s), %d table/index statement(s), %d onboarding statement(s), %d slice2b statement(s), %d operator alerts statement(s), %d onboarding 2.0 statement(s), %d decision record statement(s) checked)",
             len(_REQUIRED_COLUMNS),
             len(_REQUIRED_TABLES),
             len(_ONBOARDING_MIGRATION_STATEMENTS),
             len(_SLICE2B_MIGRATION_STATEMENTS),
             len(_OPERATOR_ALERTS_MIGRATION_STATEMENTS),
             len(_ONBOARDING_2_MIGRATION_STATEMENTS),
+            len(_DECISION_RECORD_MIGRATION_STATEMENTS),
         )
     except Exception as exc:
         log.error(

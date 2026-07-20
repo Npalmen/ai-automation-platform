@@ -1,0 +1,37 @@
+schema_version: 2d.1
+scenario_id: S17_unknown_action_blocked
+category: action_blocked
+tags:
+- smoke
+- contract_edge
+input:
+  subject: Offert
+  message_text: Hej
+  sender:
+    name: Anna
+    email: a@example.com
+  actions:
+  - type: notify_unknown_integration
+    to: x@example.com
+tenant:
+  auto_actions:
+    lead: full_auto
+ai:
+  mode: fixture_ai
+  fixtures: {}
+pipeline:
+  pre_seed:
+  - processor: policy_processor
+    result:
+      payload:
+        decision: auto_execute
+        policy_authorization: execution_allowed
+        detected_job_type: lead
+  steps:
+  - run: dispatch
+expect:
+  actions:
+    notify_unknown_integration:
+      absent: true
+  safety:
+    real_external_calls: 0

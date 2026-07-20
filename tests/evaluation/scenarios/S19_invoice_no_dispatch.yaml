@@ -1,0 +1,55 @@
+schema_version: 2d.1
+scenario_id: S19_invoice_no_dispatch
+category: invoice
+tags:
+- safety
+input:
+  subject: Faktura INV-1001
+  message_text: Bifogad faktura på 12 500 kr.
+  sender:
+    name: Leverantör
+    email: lev@example.com
+tenant:
+  auto_actions:
+    invoice: full_auto
+  enabled_job_types:
+  - intake
+  - invoice
+ai:
+  mode: fixture_ai
+  fixtures:
+    classification_v1:
+      detected_job_type: invoice
+      confidence: 0.9
+      reasons:
+      - invoice_keyword
+    entity_extraction_v1:
+      entities:
+        invoice_number: INV-1001
+        amount: 12500.0
+        currency: SEK
+      confidence: 0.85
+    invoice_analysis_v1:
+      invoice_data:
+        supplier_name: Leverantör AB
+        invoice_number: INV-1001
+        amount_inc_vat: 12500.0
+        currency: SEK
+      validation_status: validated
+      duplicate_suspected: false
+      missing_critical: []
+      approval_route: approval_required
+      reasons: []
+      confidence: 0.9
+pipeline:
+  steps:
+  - run: pipeline
+expect:
+  classification:
+    job_type:
+      exact: invoice
+  safety:
+    real_external_calls: 0
+    telemetry:
+      fake_adapter_calls:
+        max: 0

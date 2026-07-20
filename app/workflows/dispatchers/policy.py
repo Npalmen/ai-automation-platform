@@ -24,22 +24,12 @@ from __future__ import annotations
 
 from typing import Any
 
-# Normalized modes
-MANUAL            = "manual"
-APPROVAL_REQUIRED = "approval_required"
-FULL_AUTO         = "full_auto"
-
-_VALID_MODES = {MANUAL, APPROVAL_REQUIRED, FULL_AUTO}
-
-
-def _normalize(raw) -> str:
-    """Map a raw auto_actions value to a normalized dispatch mode."""
-    if raw is True or raw == "auto":
-        return FULL_AUTO
-    if raw == "semi":
-        return APPROVAL_REQUIRED
-    # False, None, "manual", missing, or anything else → safest default
-    return MANUAL
+from app.workflows.tenant_automation import (
+    APPROVAL_REQUIRED,
+    FULL_AUTO,
+    MANUAL,
+    normalize_automation_mode,
+)
 
 
 def resolve_dispatch_policy(tenant_config: dict, job_type: str) -> dict:
@@ -53,7 +43,7 @@ def resolve_dispatch_policy(tenant_config: dict, job_type: str) -> dict:
     """
     auto_actions: dict = tenant_config.get("auto_actions") or {}
     raw = auto_actions.get(job_type)
-    mode = _normalize(raw)
+    mode = normalize_automation_mode(raw)
 
     requires_approval = mode == APPROVAL_REQUIRED
     can_dispatch_now  = mode != APPROVAL_REQUIRED

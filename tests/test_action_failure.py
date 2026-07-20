@@ -72,6 +72,30 @@ def _job_with_action_dispatch_failure(failed_count: int = 1) -> Job:
     return job
 
 
+def _dispatch_ready_job(actions: list[dict]) -> Job:
+    job = _base_job()
+    job.input_data = {"actions": actions}
+    job.processor_history = [
+        {
+            "processor": "policy_processor",
+            "result": {
+                "payload": {
+                    "decision": "auto_execute",
+                    "detected_job_type": "lead",
+                }
+            },
+        }
+    ]
+    return job
+
+
+_DISPATCH_SETTINGS = {
+    "auto_actions": {"lead": "full_auto"},
+    "followups_enabled": True,
+    "internal_notification_email": "ops@example.com",
+}
+
+
 # ---------------------------------------------------------------------------
 # action_dispatch_processor: result shape on failure
 # ---------------------------------------------------------------------------
@@ -80,10 +104,9 @@ class TestActionDispatchProcessorFailure:
 
     def test_result_status_is_failed_when_action_raises(self):
         """When execute_action raises, result status must be 'failed', not 'completed'."""
-        job = _base_job()
-        job.input_data = {
-            "actions": [{"type": "send_email", "to": "bad@bad.com"}],
-        }
+        job = _dispatch_ready_job(
+            [{"type": "send_email", "to": "bad@bad.com", "tenant_id": "TENANT_1001"}]
+        )
 
         with patch(
             "app.workflows.processors.action_dispatch_processor.execute_action",
@@ -92,6 +115,9 @@ class TestActionDispatchProcessorFailure:
             "app.workflows.processors.action_dispatch_processor.ActionExecutionRepository"
         ), patch(
             "app.workflows.processors.action_dispatch_processor.create_audit_event"
+        ), patch(
+            "app.workflows.processors.action_dispatch_processor._read_automation_settings",
+            return_value=_DISPATCH_SETTINGS,
         ):
             from app.workflows.processors.action_dispatch_processor import (
                 process_action_dispatch_job,
@@ -106,10 +132,9 @@ class TestActionDispatchProcessorFailure:
 
     def test_failed_count_and_error_in_payload(self):
         """failed_count and error string must be persisted in payload."""
-        job = _base_job()
-        job.input_data = {
-            "actions": [{"type": "send_email", "to": "bad@bad.com"}],
-        }
+        job = _dispatch_ready_job(
+            [{"type": "send_email", "to": "bad@bad.com", "tenant_id": "TENANT_1001"}]
+        )
 
         with patch(
             "app.workflows.processors.action_dispatch_processor.execute_action",
@@ -118,6 +143,9 @@ class TestActionDispatchProcessorFailure:
             "app.workflows.processors.action_dispatch_processor.ActionExecutionRepository"
         ), patch(
             "app.workflows.processors.action_dispatch_processor.create_audit_event"
+        ), patch(
+            "app.workflows.processors.action_dispatch_processor._read_automation_settings",
+            return_value=_DISPATCH_SETTINGS,
         ):
             from app.workflows.processors.action_dispatch_processor import (
                 process_action_dispatch_job,
@@ -136,10 +164,9 @@ class TestActionDispatchProcessorFailure:
 
     def test_audit_event_emitted_on_failure_when_db_provided(self):
         """An audit event must be created when actions fail and db is not None."""
-        job = _base_job()
-        job.input_data = {
-            "actions": [{"type": "send_email", "to": "bad@bad.com"}],
-        }
+        job = _dispatch_ready_job(
+            [{"type": "send_email", "to": "bad@bad.com", "tenant_id": "TENANT_1001"}]
+        )
         mock_db = MagicMock()
 
         with patch(
@@ -149,7 +176,10 @@ class TestActionDispatchProcessorFailure:
             "app.workflows.processors.action_dispatch_processor.ActionExecutionRepository"
         ), patch(
             "app.workflows.processors.action_dispatch_processor.create_audit_event"
-        ) as mock_audit:
+        ) as mock_audit, patch(
+            "app.workflows.processors.action_dispatch_processor._read_automation_settings",
+            return_value=_DISPATCH_SETTINGS,
+        ):
             from app.workflows.processors.action_dispatch_processor import (
                 process_action_dispatch_job,
             )

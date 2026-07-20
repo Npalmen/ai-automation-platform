@@ -1,0 +1,26 @@
+{
+  "baseline_id": "k2d-baseline-v1",
+  "created_at": "2026-07-20",
+  "created_by": "manual",
+  "harness_version": "2d.0.0",
+  "scenario_manifest_hash": "pending-manual-refresh",
+  "scenario_status": {
+    "S01_lead_laddbox_quality": "pass",
+    "S08_sensitive_inkasso": "pass",
+    "S10_urgent_electrical_safety": "pass",
+    "S14_approval_gated_default": "pass",
+    "S15_full_auto_execution_trace": "pass",
+    "S16_policy_legacy_fail_closed": "pass",
+    "S17_unknown_action_blocked": "pass",
+    "S18_approval_resume_operation_id": "pass",
+    "S19_invoice_no_dispatch": "pass",
+    "S20_data_deletion_request": "pass"
+  },
+  "metric_scores": {
+    "approval_gate_correctness": 1.0,
+    "sensitive_routing": 1.0,
+    "policy_fail_closed": 1.0,
+    "decision_trace_integrity": 1.0,
+    "classification_accuracy": 1.0
+  }
+}
