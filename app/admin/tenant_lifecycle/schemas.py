@@ -69,7 +69,8 @@ class TenantSettingsSectionResponse(BaseModel):
 
 
 class TenantSettingsSectionPatchRequest(BaseModel):
-    config_version: int = Field(..., ge=1)
+    expected_config_version: int = Field(..., ge=1)
+    change_reason: str | None = Field(default=None, max_length=512)
     payload: dict[str, Any]
 
 

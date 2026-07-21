@@ -265,44 +265,29 @@ def resume_operations(
 
 
 ALLOWED_SETTINGS_SECTIONS = frozenset(
-    {"identity", "modules", "services", "routing", "intake", "integrations"}
+    {"identity", "modules", "services", "routing", "intake", "integrations", "automation"}
 )
 
 
-def get_settings_section(db: Session, tenant_id: str, section: str) -> dict[str, Any]:
-    if section not in ALLOWED_SETTINGS_SECTIONS:
+def get_settings_section(
+    db: Session,
+    tenant_id: str,
+    section: str,
+    *,
+    operator: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    from app.admin.customer_settings.domains import SETTINGS_DOMAINS
+    from app.admin.customer_settings.service import get_domain_settings
+
+    if section not in SETTINGS_DOMAINS:
         raise HTTPException(status_code=404, detail="Unknown settings section.")
-    record = _get_tenant_or_404(db, tenant_id)
-    settings = record.settings or {}
-    if section == "identity":
-        payload = (settings.get("company") or {}) | {
-            "name": record.name,
-            "slug": record.slug,
-        }
-    elif section == "modules":
-        payload = {
-            "enabled_job_types": record.enabled_job_types or [],
-            "allowed_integrations": record.allowed_integrations or [],
-            "capabilities": settings.get("capabilities") or {},
-        }
-    elif section == "services":
-        payload = settings.get("memory") or {}
-    elif section == "routing":
-        payload = settings.get("routing") or {}
-    elif section == "intake":
-        payload = settings.get("intake") or {}
-    elif section == "integrations":
-        payload = {
-            "integrations": settings.get("integrations") or {},
-            "google_sheets": settings.get("google_sheets") or {},
-        }
-    else:
-        payload = {}
+    op = operator or {"id": "system", "display_name": "System", "role": "admin"}
+    result = get_domain_settings(db, tenant_id, section, op)  # type: ignore[arg-type]
     return {
-        "tenant_id": tenant_id,
-        "section": section,
-        "config_version": int(record.config_version or 1),
-        "payload": payload,
+        "tenant_id": result["tenant_id"],
+        "section": result["domain"],
+        "config_version": result["config_version"],
+        "payload": result["payload"],
     }
 
 
@@ -314,56 +299,30 @@ def patch_settings_section(
     operator_id: str,
     config_version: int,
     payload: dict[str, Any],
+    operator_role: str = "admin",
+    change_reason: str | None = None,
 ) -> dict[str, Any]:
-    if section not in ALLOWED_SETTINGS_SECTIONS:
+    from app.admin.customer_settings.domains import SETTINGS_DOMAINS
+    from app.admin.customer_settings.service import patch_domain_settings
+
+    if section not in SETTINGS_DOMAINS:
         raise HTTPException(status_code=404, detail="Unknown settings section.")
-    record = _get_tenant_or_404(db, tenant_id)
-    _assert_version(record, config_version)
-    settings = copy.deepcopy(record.settings or {})
-    if section == "identity":
-        company = settings.setdefault("company", {})
-        for key in ("industries", "org_number", "primary_contact", "contact_email", "phone", "timezone", "language"):
-            if key in payload:
-                company[key] = payload[key]
-        if payload.get("name"):
-            record.name = str(payload["name"])
-        if payload.get("slug"):
-            record.slug = str(payload["slug"])
-    elif section == "modules":
-        if "enabled_job_types" in payload:
-            record.enabled_job_types = list(payload["enabled_job_types"] or [])
-        if "allowed_integrations" in payload:
-            record.allowed_integrations = list(payload["allowed_integrations"] or [])
-        if "capabilities" in payload:
-            settings["capabilities"] = payload["capabilities"]
-    elif section == "services":
-        settings["memory"] = {**(settings.get("memory") or {}), **payload}
-    elif section == "routing":
-        settings["routing"] = {**(settings.get("routing") or {}), **payload}
-    elif section == "intake":
-        settings["intake"] = {**(settings.get("intake") or {}), **payload}
-    elif section == "integrations":
-        if "integrations" in payload:
-            settings["integrations"] = payload["integrations"]
-        if "google_sheets" in payload:
-            settings["google_sheets"] = payload["google_sheets"]
-    record.settings = settings
-    flag_modified(record, "settings")
-    bump_config_version(record, operator_id=operator_id)
-    db.add(
-        AuditEventRecord(
-            event_id=str(uuid4()),
-            tenant_id=tenant_id,
-            category="tenant_settings",
-            action=f"tenant.settings.{section}_updated",
-            status="succeeded",
-            details={"operator_id": operator_id, "section": section},
-            created_at=_utcnow(),
-        )
+    operator = {"id": operator_id, "display_name": operator_id, "role": operator_role}
+    result = patch_domain_settings(
+        db,
+        tenant_id=tenant_id,
+        domain=section,
+        expected_config_version=config_version,
+        payload=payload,
+        operator=operator,  # type: ignore[arg-type]
+        change_reason=change_reason,
     )
-    db.commit()
-    db.refresh(record)
-    return get_settings_section(db, tenant_id, section)
+    return {
+        "tenant_id": result["tenant_id"],
+        "section": result["domain"],
+        "config_version": result["config_version"],
+        "payload": result["domain_payload"],
+    }
 
 
 def list_activation_history(db: Session, tenant_id: str) -> dict[str, Any]:
