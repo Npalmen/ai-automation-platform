@@ -57,7 +57,8 @@ jobs:
           EVAL_HARNESS_PG_ALLOWED: yes
           EVAL_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_platform_eval
         run: |
-          EXPECTED_PG_EVAL=$(python -m pytest --collect-only -q -m pg_eval | awk '/tests collected/ { print $1; exit }')
+          COLLECT_LINE=$(python -m pytest --collect-only -q -m pg_eval 2>/dev/null | awk '/ collected/ { print; exit }')
+          EXPECTED_PG_EVAL=$(echo "${COLLECT_LINE}" | awk '{ split($1, parts, "/"); print parts[1] }')
           python -m pytest -m pg_eval -q --tb=short --junitxml=pg_eval.junit.xml
           python scripts/ci/verify_pytest_junit.py pg_eval.junit.xml --expected "${EXPECTED_PG_EVAL}"
 
