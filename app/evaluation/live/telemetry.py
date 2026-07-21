@@ -10,32 +10,23 @@ from sqlalchemy.orm import Session
 from app.evaluation.live.constants import EVENT_OUTCOME_SUCCEEDED
 from app.evaluation.live.context import get_current_live_eval_snapshot
 from app.evaluation.live.schemas import TrustedLiveEvalSnapshot
+from app.evaluation.live.redaction import redact_sensitive
 from app.repositories.postgres.live_eval_models import LiveEvalExternalEventRow
 from app.repositories.postgres.live_eval_repository import LiveEvalExternalEventRepository
 
-_REDACT_KEYS = frozenset(
-    {
-        "access_token",
-        "refresh_token",
-        "api_key",
-        "authorization",
-        "message_text",
-        "body",
-        "prompt",
-        "raw_prompt",
-    }
-)
+_REDACT_MAX_STRING_LEN = 256
 
 
 def _redact_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
     if not metadata:
         return {}
+    redacted = redact_sensitive(metadata)
+    if not isinstance(redacted, dict):
+        return {}
     out: dict[str, Any] = {}
-    for key, value in metadata.items():
-        if key.lower() in _REDACT_KEYS:
-            continue
-        if isinstance(value, str) and len(value) > 256:
-            out[key] = value[:256] + "…"
+    for key, value in redacted.items():
+        if isinstance(value, str) and len(value) > _REDACT_MAX_STRING_LEN:
+            out[key] = value[:_REDACT_MAX_STRING_LEN] + "…"
         else:
             out[key] = value
     return out

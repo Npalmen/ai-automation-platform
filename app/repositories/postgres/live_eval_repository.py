@@ -31,13 +31,13 @@ class LiveEvalRunNotFoundError(Exception):
 class LiveEvalRunRepository:
     @staticmethod
     def register_run(db: Session, row: LiveEvalRunRow) -> LiveEvalRunRow:
-        db.add(row)
         try:
-            db.flush()
+            with db.begin_nested():
+                db.add(row)
+                db.flush()
         except IntegrityError as exc:
-            db.rollback()
             raise LiveEvalRunConflictError(
-                f"evaluation_run_id already exists: {row.evaluation_run_id}"
+                "evaluation_run_id already exists"
             ) from exc
         return row
 
@@ -196,12 +196,12 @@ class LiveEvalExternalEventRepository:
     @staticmethod
     def record_event(db: Session, event: LiveEvalExternalEventRow) -> bool:
         """Insert idempotently. Returns True if inserted, False if duplicate event_key."""
-        db.add(event)
         try:
-            db.flush()
+            with db.begin_nested():
+                db.add(event)
+                db.flush()
             return True
         except IntegrityError:
-            db.rollback()
             return False
 
     @staticmethod

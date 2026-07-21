@@ -64,6 +64,7 @@ class TrustedLiveEvalSnapshot(BaseModel):
     fixture_bundle_id: str | None = None
     expected_sender: str
     expected_recipient: str
+    config_hash: str
     trusted: bool = True
 
 

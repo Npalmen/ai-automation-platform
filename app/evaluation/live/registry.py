@@ -207,6 +207,7 @@ def trusted_snapshot_from_row(row: LiveEvalRunRow) -> TrustedLiveEvalSnapshot:
         fixture_bundle_id=row.fixture_bundle_id,
         expected_sender=row.expected_sender,
         expected_recipient=row.expected_recipient,
+        config_hash=row.config_hash,
         trusted=True,
     )
 

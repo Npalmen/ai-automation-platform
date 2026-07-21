@@ -11,6 +11,7 @@ import pytest
 
 from app.evaluation.live.context import live_eval_context
 from app.evaluation.live.journal import append_transition, load_transitions, write_report_atomic
+from app.evaluation.live.redaction import redact_sensitive
 from app.evaluation.live.schemas import LiveEvalReport, TrustedLiveEvalSnapshot
 from app.evaluation.live.telemetry import record_live_eval_external_event
 from app.repositories.postgres.live_eval_models import LiveEvalRunRow
@@ -27,6 +28,7 @@ def _snapshot():
         fixture_bundle_id="k2f_bundle_s01",
         expected_sender="sender@eval.test",
         expected_recipient="recipient@eval.test",
+        config_hash="abc123",
         trusted=True,
     )
 
@@ -99,6 +101,46 @@ def test_journal_append_and_atomic_report(tmp_path, live_eval_env, monkeypatch):
     if os.name != "nt":
         assert oct(run_dir.stat().st_mode & 0o777) == oct(0o750)
         assert oct(report_path.stat().st_mode & 0o777) == oct(0o640)
+
+    get_settings.cache_clear()
+    get_live_eval_config.cache_clear()
+
+
+def test_redact_sensitive_nested_keys():
+    payload = {
+        "metadata": {
+            "body": "secret email body",
+            "nested": {"access_token": "tok", "safe": "ok"},
+        },
+        "items": [{"prompt": "hidden"}, {"label": "visible"}],
+    }
+    redacted = redact_sensitive(payload)
+    assert "body" not in redacted["metadata"]
+    assert "access_token" not in redacted["metadata"]["nested"]
+    assert redacted["metadata"]["nested"]["safe"] == "ok"
+    assert redacted["items"][0] == {}
+    assert redacted["items"][1]["label"] == "visible"
+
+
+def test_journal_redacts_nested_sensitive_fields(tmp_path, live_eval_env, monkeypatch):
+    monkeypatch.setenv("STORAGE_PATH", str(tmp_path))
+    from app.core.settings import get_settings
+    from app.evaluation.live.config import get_live_eval_config
+
+    get_settings.cache_clear()
+    get_live_eval_config.cache_clear()
+
+    run_id = "run-redact"
+    append_transition(
+        run_id,
+        {
+            "state": "registered",
+            "details": {"email_body": "full text", "count": 1},
+        },
+    )
+    transitions = load_transitions(run_id)
+    assert transitions[0]["details"]["count"] == 1
+    assert "email_body" not in transitions[0]["details"]
 
     get_settings.cache_clear()
     get_live_eval_config.cache_clear()

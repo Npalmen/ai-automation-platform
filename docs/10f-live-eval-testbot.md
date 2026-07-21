@@ -33,6 +33,10 @@ Migration `018_live_eval_external_events.sql` adds persistent telemetry with com
 
 Mail must not determine `ai_mode`, fixture bundle, tenant, or write policy.
 
+`POST /jobs` strips any client-supplied `input_data.live_eval` before persistence. Only Gmail trusted intake + atomic root claim may attach `trusted=true` snapshots.
+
+Registry binding (`validate_trusted_live_eval_context`) is required before fixture AI, live LLM routing, or write-policy dispatch: `job.tenant_id`, `config_hash`, `ai_mode`, fixture bundle, scenario/attempt, active status, and `expires_at` must match the authoritative `live_eval_runs` row.
+
 ### Admin API
 
 - `POST /admin/live-eval/runs` — register run (`X-Admin-API-Key`)
@@ -91,6 +95,12 @@ ENV=test DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_platform 
 ```
 
 The `integration_db` fixture verifies schema provisioning only; it does not run migrations.
+
+CI gates (release-gate `live-eval-postgres` job):
+
+1. `tests/evaluation/live -m integration_db` — exactly 5 tests (atomic root claim)
+2. `test_postgres_migration_016_table_when_database_available` — 1 test
+3. `tests/evaluation/live/test_telemetry_idempotency_pg.py -m integration_db` — 2 tests (session-safe telemetry)
 
 ### Journal
 

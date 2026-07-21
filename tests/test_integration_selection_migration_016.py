@@ -240,10 +240,10 @@ def test_postgres_migration_016_table_when_database_available():
     pytest.importorskip("psycopg2")
     from sqlalchemy import create_engine as create_pg_engine
 
-    from app.repositories.postgres.schema_migrations import ensure_runtime_schema
+    from app.repositories.postgres.migration_runner import verify_ci_postgres_schema_provisioned
 
     engine = create_pg_engine(database_url)
-    ensure_runtime_schema(engine)
+    verify_ci_postgres_schema_provisioned(engine)
     with engine.connect() as conn:
         result = conn.execute(
             text(

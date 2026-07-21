@@ -115,6 +115,29 @@ jobs:
           python -m pytest tests/evaluation/live -m integration_db -q --tb=short --junitxml=live_eval_integration_db.junit.xml
           python scripts/ci/verify_pytest_junit.py live_eval_integration_db.junit.xml --expected 5
 
+      - name: Run migration 016 PostgreSQL integration test
+        env:
+          ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_platform
+        run: |
+          python -m pytest tests/test_integration_selection_migration_016.py::test_postgres_migration_016_table_when_database_available \
+            -q --tb=short --junitxml=migration_016_integration_db.junit.xml
+          python scripts/ci/verify_pytest_junit.py migration_016_integration_db.junit.xml --expected 1
+
+      - name: Run live-eval repository PG contract tests
+        env:
+          ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_platform
+        run: |
+          COLLECT_LINE=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live/test_telemetry_idempotency_pg.py 2>/dev/null | awk '/ collected/ { print; exit }')
+          EXPECTED=$(echo "${COLLECT_LINE}" | awk '{ split($1, parts, "/"); print parts[1] }')
+          if [ "${EXPECTED}" != "2" ]; then
+            echo "telemetry idempotency gate requires exactly 2 selected tests, got ${EXPECTED}" >&2
+            exit 1
+          fi
+          python -m pytest tests/evaluation/live/test_telemetry_idempotency_pg.py -m integration_db -q --tb=short --junitxml=live_eval_telemetry_idempotency_pg.junit.xml
+          python scripts/ci/verify_pytest_junit.py live_eval_telemetry_idempotency_pg.junit.xml --expected 2
+
   frontend:
     runs-on: ubuntu-latest
 

@@ -947,6 +947,7 @@ def create_job(
     from app.workflows.decision_contract import is_force_approval_test_allowed
 
     input_data = dict(request.input_data or {})
+    input_data.pop("live_eval", None)
     if not is_force_approval_test_allowed(input_data, allow_flag=get_settings().ALLOW_FORCE_APPROVAL_TEST):
         input_data.pop("force_approval_test", None)
 

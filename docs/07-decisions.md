@@ -608,3 +608,13 @@ Reference: `app/admin/integrations/selection_resolver.py`, `app/health/integrati
 | 12 | **Credentials preserved on deselection** | Switching to manual routing may change Visma **selection** via explicit `visma_disposition` only; OAuth rows are not deleted |
 
 Reference: `app/admin/integrations/selection_backfill.py`, `selection_sync.py`, `integration_groups.py`, `docs/onboarding-2.0-operator-flow.md`
+
+---
+
+## DEC-2F1-TRUST — Live-eval trust anchor at API boundary
+
+**Status:** Locked (2F.1 merge hardening)  
+**Decision:** `POST /jobs` must strip `input_data.live_eval` before persistence. Trusted live-eval snapshots may only originate from server-side Gmail intake + atomic root claim. Registry-backed validation (`config_hash`, tenant, active/expiry) is required before fixture AI, live LLM, or write-policy dispatch.  
+**Reason:** Prevent tenant API keys from forging eval privileges in test/staging.  
+**Consequence:** Clients cannot self-register trusted eval context via job creation.  
+**Reference:** `app/evaluation/live/authorization.py`, `app/main.py` (`create_job`)

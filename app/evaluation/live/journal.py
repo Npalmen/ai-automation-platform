@@ -10,21 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from app.evaluation.live.config import get_live_eval_config
+from app.evaluation.live.redaction import redact_sensitive
 from app.evaluation.live.schemas import LiveEvalReport
-
-_FORBIDDEN_KEYS = frozenset(
-    {"access_token", "refresh_token", "api_key", "message_text", "body", "prompt"}
-)
-
-
-def _redact(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {k: _redact(v) for k, v in value.items() if k not in _FORBIDDEN_KEYS}
-    if isinstance(value, list):
-        return [_redact(v) for v in value]
-    if isinstance(value, str) and len(value) > 512:
-        return value[:512] + "…"
-    return value
 
 
 def run_directory(evaluation_run_id: str) -> Path:
@@ -42,7 +29,7 @@ def ensure_run_directory(evaluation_run_id: str) -> Path:
 def append_transition(evaluation_run_id: str, transition: dict[str, Any]) -> None:
     directory = ensure_run_directory(evaluation_run_id)
     transitions_path = directory / "transitions.jsonl"
-    payload = _redact(
+    payload = redact_sensitive(
         {
             **transition,
             "recorded_at": datetime.now(timezone.utc).isoformat(),
@@ -59,7 +46,7 @@ def append_transition(evaluation_run_id: str, transition: dict[str, Any]) -> Non
 def write_report_atomic(evaluation_run_id: str, report: LiveEvalReport) -> Path:
     directory = ensure_run_directory(evaluation_run_id)
     target = directory / "report.json"
-    payload = _redact(report.model_dump(mode="json"))
+    payload = redact_sensitive(report.model_dump(mode="json"))
     fd, tmp_name = tempfile.mkstemp(dir=directory, prefix=".report.", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:

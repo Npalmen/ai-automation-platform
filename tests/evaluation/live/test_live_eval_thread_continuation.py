@@ -23,6 +23,7 @@ def _trusted_snapshot_dict(run_id: str = "run-001-aaaa") -> dict:
         "fixture_bundle_id": "k2f_bundle_s01",
         "expected_sender": "sender@eval.test",
         "expected_recipient": "recipient@eval.test",
+        "config_hash": "hash",
         "trusted": True,
     }
 

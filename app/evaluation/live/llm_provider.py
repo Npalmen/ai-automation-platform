@@ -23,7 +23,8 @@ from app.evaluation.fixture_ai import (
     reset_active_prompt_name,
     set_active_prompt_name,
 )
-from app.evaluation.live.context import get_current_live_eval_snapshot
+from app.evaluation.live.authorization import validate_trusted_live_eval_context
+from app.evaluation.live.context import get_current_live_eval_snapshot, get_pipeline_db
 from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.live.fixture_bundle import load_bundle_fixtures
 from app.evaluation.live.safety import require_live_eval_enabled, require_tenant_allowed
@@ -71,6 +72,20 @@ def resolve_llm_client(*, job, db: Session | None = None):
     snapshot = get_current_live_eval_snapshot()
     if snapshot is None:
         raise LiveEvalSafetyError("live_eval job missing in-process trusted snapshot")
+
+    if db is None:
+        db = get_pipeline_db()
+    if db is None:
+        raise LiveEvalSafetyError("live_eval requires database session for registry validation")
+
+    snapshot = validate_trusted_live_eval_context(
+        db,
+        job=job,
+        snapshot=snapshot,
+        require_active=True,
+    )
+    if snapshot is None:
+        return get_llm_client()
 
     config = require_live_eval_enabled()
     require_tenant_allowed(snapshot.tenant_id, config)

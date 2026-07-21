@@ -26,6 +26,7 @@ def _snapshot() -> TrustedLiveEvalSnapshot:
         fixture_bundle_id="k2f_bundle_s01",
         expected_sender="sender@eval.test",
         expected_recipient="recipient@eval.test",
+        config_hash="abc123",
         trusted=True,
     )
 

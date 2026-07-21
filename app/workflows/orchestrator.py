@@ -23,6 +23,7 @@ from app.workflows.pipeline_run_context import (
 from app.repositories.postgres.decision_record_repository import DecisionRecordRepository
 from app.workflows.decision_record_service import record_pipeline_run_started
 from app.evaluation.live.context import live_eval_context, snapshot_from_job_input
+from app.evaluation.live.authorization import validate_trusted_live_eval_context
 
 
 BASE_PIPELINE = [
@@ -82,7 +83,14 @@ class WorkflowOrchestrator:
         parent_pipeline_run_id: str | None = None,
     ) -> Job:
         snapshot = snapshot_from_job_input(job.input_data)
-        with live_eval_context(snapshot):
+        if snapshot is not None:
+            snapshot = validate_trusted_live_eval_context(
+                self.db,
+                job=job,
+                snapshot=snapshot,
+                require_active=True,
+            )
+        with live_eval_context(snapshot, db=self.db):
             current = job.model_copy(deep=True)
             current.status = JobStatus.PROCESSING
             current.updated_at = self._utcnow()
@@ -133,7 +141,14 @@ class WorkflowOrchestrator:
         This must NOT rerun intake/classification/policy or create a new approval.
         """
         snapshot = snapshot_from_job_input(job.input_data)
-        with live_eval_context(snapshot):
+        if snapshot is not None:
+            snapshot = validate_trusted_live_eval_context(
+                self.db,
+                job=job,
+                snapshot=snapshot,
+                require_active=True,
+            )
+        with live_eval_context(snapshot, db=self.db):
             current = job.model_copy(deep=True)
             current.status = JobStatus.PROCESSING
             current.updated_at = self._utcnow()
