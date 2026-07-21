@@ -14,6 +14,8 @@
 
 2026-07-21 (Slice B partial — superseded by Commit 4+5 reconciliation on same branch.)
 
+2026-07-21 (Slice C gates — branch `feature/customer-settings-slice-c` @ Commit 4: integration gate tests 17 service + 2 HTTP; customer settings bundle **86 passed**; Slice B parity bundle **110 passed**; frontend gates PASS (29 customer-settings + 21 onboarding contract tests); eval harness smoke **6/8** (S15/S18 baseline failures); full pytest **3814 passed / 18 failed** — failures match pre-Slice-C baseline categories: Monday live adapter, eval harness safety tel, onboarding wizard tenant-auth, admin alerts isolation.)
+
 2026-07-21 (Slice C frontend — branch `feature/customer-settings-slice-c` @ Commit 3: `CustomerSettingsPage` at `/ops/customers/:tenantId/settings`; aggregate GET + per-domain PATCH/preview; permissions from backend; optimistic concurrency with ConflictDialog; risk-domain ConsequencePreview; readiness blocker navigation via `action_domain`; 29 frontend contract tests pass.)
 
 2026-07-21 (Slice C backend — branch `feature/customer-settings-slice-c` @ Commit 2C: frontend-neutral readiness blockers (`code`, `domain`, `message`, `action_domain`, `affected_capabilities`); `_readiness` internal meta protected; 15 HTTP contract tests pass with isolated test `ADMIN_API_KEY`; automation PATCH/preview verified via HTTP.)

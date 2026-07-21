@@ -137,6 +137,41 @@ Covers:
 
 ---
 
+## Slice C — customer settings gates (2026-07-21)
+
+```bash
+# Customer settings (service + HTTP)
+python -m pytest tests/test_customer_settings_integration_gates.py \
+  tests/test_customer_settings_backend.py \
+  tests/test_customer_settings_contract_hardening.py -q
+
+# Integration selection / backfill audit (SQLite)
+python -m pytest tests/test_integration_selection_migration_016.py -q -m "not integration_db"
+
+# Slice B parity bundle
+python -m pytest tests/test_integration_selection_slice_b.py \
+  tests/test_integration_group_requirements.py \
+  tests/test_onboarding_smoke_gates.py -q
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm run lint && npm run typecheck && npm run test:contracts
+npm run test:customer-settings && npm run test:onboarding && npm run build
+```
+
+Live API smoke (operator environment):
+
+```bash
+python scripts/customer_settings_gate_smoke.py --admin-api-key "$ADMIN_API_KEY"
+```
+
+**Verified 2026-07-21 (Slice C Commit 4):** customer settings **86 passed**; Slice B parity bundle **110 passed**; frontend **29 + 21** contract tests PASS; full pytest **3814 passed / 18 failed** (baseline: Monday live, eval S15/S18, onboarding tenant-auth — not introduced by Slice C).
+
+---
+
 ## Release gate command
 
 ```bash
