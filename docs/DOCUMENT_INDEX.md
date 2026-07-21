@@ -1,7 +1,7 @@
 # Document Index (Canonical)
 
 > **Governing hierarchy:** `docs/00-master-plan.md` → this index → listed canonical docs → deprecated/archive docs.
-> Last updated: **2026-07-20** (Stabilization reconciliation — tag `krowolf-pilot-baseline-20260720-final`).
+> Last updated: **2026-07-21** (Kapitel 2E merged to `main` @ `3baae50`).
 
 ---
 
@@ -28,7 +28,7 @@
 | `docs/10b-decision-contract-resolution.md` | Kapitel 2B decision contract & action authorization (DEC-033) |
 | `docs/10c-decision-trace-foundation.md` | Kapitel 2C decision trace foundation (DEC-034) |
 | `docs/10d-evaluation-harness.md` | Kapitel 2D deterministic evaluation harness (DEC-035) |
-| `docs/10e-gold-dataset-adversarial-coverage.md` | Kapitel 2E gold dataset, adversarial coverage & testbot contracts |
+| `docs/10e-gold-dataset-adversarial-coverage.md` | Kapitel 2E gold dataset & adversarial coverage — **merged** (`3baae50`); future Live Gmail/LLM contracts in 2F/2G |
 
 ---
 

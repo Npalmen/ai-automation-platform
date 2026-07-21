@@ -1,17 +1,28 @@
 # Kapitel 2E — Gold Dataset, Adversarial Coverage & Testbot Contracts
 
-**Status:** Verified on branch `feature/kapitel-2e-gold-dataset`  
-**Bascommit:** `48d8a0a` (origin/main)  
+**Status:** Completed — merged to `main`  
+**Merged commit:** `3baae50e1b82fb37c2d02b13dffbe482b1b24a12` (PR #2, 2026-07-21)  
 **Dataset:** `k2e-v1` — 20 curated fixture scenarios  
 **Manifest:** `tests/evaluation/datasets/k2e-v1.yaml`  
 **Baseline:** `tests/evaluation/baselines/k2e-baseline-v1.json`  
 **Harness:** `2e.0.0` / schema `2e.1`
 
-## Stash (pre-branch WIP)
+## Merge verification (@ `3baae50`)
 
-Slice B + pilot scripts stashed before branch — **not applied** during 2E:
+| Check | Result |
+|-------|--------|
+| Smoke set | 10/10 PASS |
+| Full dataset | 20/20 PASS |
+| Coverage gate | PASS |
+| Baseline regression | PASS |
+| `real_external_calls` | 0 |
+| `pg_eval` | 7/7 PASS, 0 skips |
+| Full backend suite | 3768 PASS, 0 failures |
+| Frontend (CI) | PASS |
+| Docker (CI) | PASS |
+| Post-merge Release Gate | [run 29860392395](https://github.com/Npalmen/ai-automation-platform/actions/runs/29860392395) — success |
 
-`stash@{0}: pre-2e-branch-wip-slice-b-and-pilots`
+**Scope note:** Kapitel 2E is a **deterministic, fixture-based** evaluation foundation. It does **not** include Live Gmail, Live LLM, AI-generated fuzzing, or high-volume mail runs — those are scoped to **2F** and **2G** respectively.
 
 ## Authoritative manifest
 
@@ -152,11 +163,13 @@ Reproducibility key (documented, generator in 2G):
 
 `hash(dataset_version, template_id, seed, generator_model, generator_prompt_version)`
 
-## Known limitations
+## Known limitations (post-merge)
 
+- **Fixture-based evaluation only** — no Live Gmail or Live LLM in 2E
 - Reply quality is deterministic predicate-based (no live LLM judge in 2E)
-- Prompt-injection detection relies on policy/fixture path; live-model variance tested in 2F
-- `pg_eval` requires local PostgreSQL `ai_platform_eval` (not in default CI smoke step)
+- Prompt-injection detection relies on policy/fixture path; live-model variance deferred to **2F**
+- **No AI-generated fuzzing or high-volume mail runs** — deferred to **2G**
+- Local `pg_eval` still requires `ai_platform_eval` @ localhost; CI provisions this in `release-gate.yml` on push to `main`
 
 ## GO / NO-GO Kapitel 2F
 
