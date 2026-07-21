@@ -8,6 +8,8 @@
 
 ## Last verified date
 
+2026-07-22 (Slice C — merged to `main` @ `a725471`; pilot RC `krowolf-app:rc-a72547176d8c`; tenant `T_NIKLAS_DEMO_001`; Customer Settings API gates PASS on pilot; backfill dry-run `tenant_data_changed=false`; scheduler `paused`; credentials unchanged; external side effects 0; Gmail soak not resumed.)
+
 2026-07-21 (Slice A integration selection — canonical on `main` commit `7c511ee`; pilot RC `krowolf-app:rc-7c511eeb0719`; tenant `T_NIKLAS_DEMO_001`; Gmail soak not resumed.)
 
 2026-07-21 (Slice B — branch `feature/integration-selection-slice-b` @ Commit 4 `11a261a`: selections SoT, integration groups, `manual_accounting_routing` UI, `visma_disposition` required, frontend lint PASS. Commit 5 adds conflict/credential gates + docs. Pilot deploy/merge pending.)

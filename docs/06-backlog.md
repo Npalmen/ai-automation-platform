@@ -25,8 +25,8 @@
 
 - [x] **Slice A — selection resolver + health gating** — canonical keys (`app/integrations/keys.py`); `app/admin/integrations/selection_resolver.py`; platform vs tenant health split; gated triage, tenant directory, alerts; frontend customer detail filtering. No migration 015. Cherry-picked to `main` from `a99c33c` (feature branch `feature/kapitel-2d1-approval-trace` not merged). Tests: parity + health + tenant_directory + super_admin (144 passed).
 - [x] **Slice B — explicit `settings.integrations.selections`** — migration **016** (structure SQL + `integration_selection_backfill_runs`); backfill service `run_integration_selection_backfill.py`; `enabled_external_writes` fail-closed; onboarding tri-state UI; `finance_destination` panel + `manual_accounting_routing` + mandatory `visma_disposition`; integration groups; Niklas + conflict/credential gate tests. **Local gates green on branch** — merge/deploy pending browser smoke + postgres dry-run in operator environment.
-- [x] **Slice C — transactional customer settings edits** — backend commits 1–2C + frontend Commit 3 + **Commit 4 gates** (`test_customer_settings_integration_gates.py`, smoke scripts, DEC-038). Merge/deploy pending operator browser matrix on pilot.
-- [ ] **Slice D — slutgates + pilot deploy** — after B/C.
+- [x] **Slice C — transactional customer settings edits** — merged `main` @ `a725471`; pilot deploy `krowolf-app:rc-a72547176d8c`; Customer Settings API gates PASS; backfill dry-run audit PASS; DEC-038.
+- [ ] **Slice D — slutgates + pilot deploy** — after B/C (Slice C deploy complete; remaining Slice D scope TBD).
 
 ---
 
