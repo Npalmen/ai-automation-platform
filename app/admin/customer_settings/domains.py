@@ -37,6 +37,7 @@ FORBIDDEN_PATCH_KEYS: frozenset[str] = frozenset(
         "enabled_job_types",
         "enabled_external_writes",
         "auto_actions",
+        "effective_policy_snapshot",
         "config_version",
         "readiness_config_version",
         "readiness_checked_at",
@@ -47,6 +48,7 @@ FORBIDDEN_PATCH_KEYS: frozenset[str] = frozenset(
         "scheduler",
         "lifecycle_status",
         "status",
+        "_readiness",
     }
 )
 

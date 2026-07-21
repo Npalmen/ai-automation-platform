@@ -21,7 +21,9 @@ from app.admin.customer_settings.domains import (
 )
 from app.admin.customer_settings.preview import build_domain_preview
 from app.admin.customer_settings.presenters import _domain_payload, build_aggregate_view
+from app.admin.customer_settings.automation_projection import AutomationProjectionError
 from app.admin.customer_settings.readiness_invalidation import readiness_domains_for_patch
+from app.admin.customer_settings.readiness import mark_readiness_stale_domains
 from app.admin.customer_settings.validation import (
     DomainValidationError,
     apply_runtime_projections,
@@ -160,22 +162,22 @@ def patch_domain_settings(
             validation=validation,
             projected_settings=projected_settings,
         )
-        if consequences["blocking"] or validation.blocking:
-            raise DomainValidationError(
-                "; ".join(consequences["blocking"] + validation.blocking)
-            )
+        not_ready_blockers = consequences.get("blocking", []) + validation.blocking
 
         if domain == "identity" and "name" in validation.normalized_payload:
             record.name = validation.normalized_payload["name"]
 
-        record.settings = projected_settings
+        record.settings = mark_readiness_stale_domains(
+            projected_settings,
+            readiness_domains_for_patch(domain),
+        )
         flag_modified(record, "settings")
 
         runtime_projection = compute_runtime_projection_changes(
             db,
             domain=domain,
             record=record,
-            settings=projected_settings,
+            settings=record.settings or {},
             normalized_payload=validation.normalized_payload,
         )
         runtime_changed = apply_runtime_projections(
@@ -219,6 +221,9 @@ def patch_domain_settings(
     except DomainValidationError as exc:
         db.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except AutomationProjectionError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except PermissionError as exc:
         db.rollback()
         raise HTTPException(status_code=403, detail=str(exc)) from exc
@@ -234,5 +239,7 @@ def patch_domain_settings(
         "readiness_invalidated": readiness_invalidated,
         "runtime_projections_changed": runtime_changed,
         "warnings": consequences.get("warnings", []) + validation.warnings,
+        "blockers": not_ready_blockers,
+        "not_ready": bool(not_ready_blockers),
         "domain_payload": _domain_payload(record, domain),
     }

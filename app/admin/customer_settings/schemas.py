@@ -29,6 +29,8 @@ class CustomerSettingsPatchResponse(BaseModel):
     readiness_invalidated: list[str]
     runtime_projections_changed: list[str]
     warnings: list[str] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+    not_ready: bool = False
     domain_payload: dict[str, Any]
 
 
@@ -51,6 +53,18 @@ class CustomerSettingsPreviewResponse(BaseModel):
     finance_destination: dict[str, Any] | None = None
 
 
+class CustomerSettingsReadinessResponse(BaseModel):
+    overall_status: str
+    is_stale: bool
+    stale_domains: list[str] = Field(default_factory=list)
+    blockers: list[dict[str, Any]] = Field(default_factory=list)
+    warnings: list[dict[str, Any]] = Field(default_factory=list)
+    blocking_domain: str | None = None
+    action_target: str | None = None
+    integration_group_status: dict[str, Any] = Field(default_factory=dict)
+    affected_capabilities: list[str] = Field(default_factory=list)
+
+
 class CustomerSettingsAggregateResponse(BaseModel):
     tenant_id: str
     tenant_status: str
@@ -63,5 +77,6 @@ class CustomerSettingsAggregateResponse(BaseModel):
     routing_summary: dict[str, Any]
     automation_policy_summary: dict[str, Any]
     readiness_summary: dict[str, Any]
+    effective_readiness: CustomerSettingsReadinessResponse
     permissions: dict[str, dict[str, bool]]
     last_updated: dict[str, Any]

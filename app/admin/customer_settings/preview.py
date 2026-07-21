@@ -10,11 +10,13 @@ from sqlalchemy.orm import Session
 
 from app.admin.customer_settings.domains import assert_domain_permission
 from app.admin.customer_settings.readiness_invalidation import readiness_domains_for_patch
+from app.admin.customer_settings.automation_projection import compute_automation_runtime_projection
 from app.admin.customer_settings.validation import (
     DomainValidationError,
     compute_consequences,
     compute_runtime_projection_changes,
     materialize_domain_config,
+    modules_draft_from_tenant,
     validate_domain_config,
 )
 from app.core.admin_session import OperatorIdentity
@@ -72,6 +74,12 @@ def build_domain_preview(
         settings=projected_settings,
         normalized_payload=validation.normalized_payload,
     )
+    automation_projection = None
+    if domain == "automation":
+        automation_projection = compute_automation_runtime_projection(
+            projected_settings,
+            capability_keys=list(modules_draft_from_tenant(record).get("capabilities") or []),
+        )
     return {
         "tenant_id": record.tenant_id,
         "domain": domain,
@@ -81,6 +89,7 @@ def build_domain_preview(
         "blocking": consequences["blocking"] + validation.blocking,
         "readiness_domains_affected": readiness_domains_for_patch(domain),
         "runtime_gates": consequences["runtime_gates"],
+        "automation_projection": automation_projection,
         "credential_preservation": validation.credential_preservation,
         "normalized_payload": validation.normalized_payload,
         "preview_fingerprint": preview_fingerprint(

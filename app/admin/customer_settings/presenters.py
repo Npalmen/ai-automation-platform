@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.admin.customer_settings.domains import domain_permissions
+from app.admin.customer_settings.readiness import compute_customer_settings_readiness
 from app.admin.customer_settings.readiness_invalidation import readiness_summary_for_tenant
 from app.admin.customer_settings.validation import (
     integrations_draft_from_tenant,
@@ -191,6 +192,7 @@ def build_aggregate_view(
         "routing_summary": routing_summary(record),
         "automation_policy_summary": automation_policy_summary(record),
         "readiness_summary": readiness_summary_for_tenant(record),
+        "effective_readiness": compute_customer_settings_readiness(db, record),
         "permissions": domain_permissions(operator),
         "last_updated": {
             "at": record.updated_at.isoformat() if record.updated_at else None,

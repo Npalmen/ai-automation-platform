@@ -46,21 +46,23 @@ from app.admin.onboarding.integration_groups import (
     reject_coming_later_group_implementation,
 )
 from app.admin.onboarding.integration_selection_draft import effective_selection_status
-from app.admin.onboarding.registries import PRODUCT_CAPABILITIES, resolve_modules_to_tenant_config
+from app.admin.customer_settings.automation_projection import (
+    AUTOMATION_CANONICAL_KEYS,
+    AutomationProjectionError,
+    FORBIDDEN_AUTOMATION_RUNTIME_KEYS,
+    compute_automation_runtime_projection,
+)
+from app.admin.onboarding.registries import (
+    PRODUCT_CAPABILITIES,
+    resolve_modules_to_tenant_config,
+    resolve_preset,
+)
 from app.admin.onboarding.runtime_evaluation import validate_runtime_dependencies
 from app.admin.onboarding.slice2a_registry import lead_field_registry, profiles_for_onboarding
 from app.integrations.keys import INTEGRATION_REGISTRY, normalize_integration_key
 from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 
-AUTOMATION_ALLOWED_KEYS = frozenset(
-    {
-        "preset_key",
-        "preset_version",
-        "effective_policy_snapshot",
-        "approval_first",
-        "demo_mode",
-    }
-)
+AUTOMATION_ALLOWED_KEYS = AUTOMATION_CANONICAL_KEYS
 
 
 @dataclass
@@ -273,10 +275,15 @@ def compute_runtime_projection_changes(
         changes.allowed_integrations = gates.allowed_integrations
         changes.enabled_external_writes = gates.enabled_external_writes
         changes.gate_details = gates.changes
-    if domain == "automation" and normalized_payload:
-        snapshot = normalized_payload.get("effective_policy_snapshot")
-        if isinstance(snapshot, dict) and "auto_actions" in snapshot:
-            changes.auto_actions = snapshot.get("auto_actions")
+    if domain == "automation":
+        try:
+            projection = compute_automation_runtime_projection(
+                settings,
+                capability_keys=_capability_keys_from_tenant(record),
+            )
+        except AutomationProjectionError as exc:
+            raise DomainValidationError(str(exc)) from exc
+        changes.auto_actions = projection.get("auto_actions")
     return changes
 
 
@@ -321,17 +328,16 @@ def compute_consequences(
     warnings = list(validation.warnings)
     blocking = list(validation.blocking)
 
-    if domain in {"modules", "integrations", "routing"}:
-        group_evals = evaluate_required_integration_groups(
-            capability_keys=list(modules.get("capabilities") or []),
-            integrations_draft=integrations_draft,
-            modules_draft=modules,
-            service_profile_draft=memory.get("service_profile"),
-            routing_draft=routing,
-        )
-        for ev in group_evals:
-            if not ev.satisfied:
-                blocking.append(f"integration_group.{ev.group_key}.{ev.reason}")
+    group_evals = evaluate_required_integration_groups(
+        capability_keys=list(modules.get("capabilities") or []),
+        integrations_draft=integrations_draft,
+        modules_draft=modules,
+        service_profile_draft=memory.get("service_profile"),
+        routing_draft=routing,
+    )
+    for ev in group_evals:
+        if not ev.satisfied:
+            blocking.append(f"integration_group.{ev.group_key}.{ev.reason}")
 
     finance_status = build_finance_destination_status(
         draft=integrations_draft,
@@ -340,8 +346,13 @@ def compute_consequences(
         routing_draft=routing,
         tenant_id=record.tenant_id,
     )
-    if finance_status.get("active_implementation") == "manual_accounting_routing":
-        if not finance_status.get("accounting_routing_valid"):
+    if "invoice_handling" in (modules.get("capabilities") or []):
+        if finance_status.get("active_implementation") == "none":
+            blocking.append("finance_destination.not_configured")
+        elif (
+            finance_status.get("active_implementation") == "manual_accounting_routing"
+            and not finance_status.get("accounting_routing_valid")
+        ):
             blocking.append("finance_destination.manual_accounting_routing_missing_routing")
 
     runtime = compute_runtime_projection_changes(
@@ -421,21 +432,11 @@ def _validate_routing(payload: dict[str, Any], record: TenantConfigRecord) -> Do
         RoutingDraftPayload.model_validate(routing_payload),
         selected_profiles=list((sp_payload.get("selected_profiles") or [])),
     )
-    blocking: list[str] = []
     warnings: list[str] = []
     if errors:
         raise DomainValidationError("; ".join(errors))
-    modules = modules_draft_from_tenant(record)
-    if "invoice_handling" in (modules.get("capabilities") or []):
-        if not has_valid_accounting_routing(
-            modules_draft=modules,
-            service_profile_draft=sp_payload,
-            routing_draft=routing_payload if isinstance(routing_payload, dict) else {},
-        ):
-            blocking.append("finance_destination.manual_accounting_routing_missing_routing")
     return DomainValidationResult(
         normalized_payload={"routing": routing_payload if isinstance(routing_payload, dict) else {}},
-        blocking=blocking,
         warnings=warnings,
     )
 
@@ -511,28 +512,6 @@ def _validate_integrations(
     modules = modules_draft_from_tenant(record)
     projected_draft = draft
 
-    if payload.get("selections"):
-        required_keys = module_required_canonical_keys(modules.get("capabilities") or [])
-        for raw_key, sel_payload in payload["selections"].items():
-            canonical = normalize_integration_key(raw_key)
-            if canonical is None:
-                continue
-            new_status = str((sel_payload or {}).get("selection_status", "not_selected"))
-            if new_status != "selected_required":
-                continue
-            if canonical not in required_keys:
-                continue
-            from app.admin.integrations.selection_resolver import (
-                _has_tenant_credential,
-                _has_verified_config,
-            )
-
-            if not (
-                _has_tenant_credential(db, record.tenant_id, canonical)
-                and _has_verified_config(record.settings or {}, canonical)
-            ):
-                blocking.append(f"integrations.{canonical}.required_not_verified")
-
     return DomainValidationResult(
         normalized_payload=normalized or payload,
         warnings=warnings,
@@ -542,10 +521,23 @@ def _validate_integrations(
 
 
 def _validate_automation(payload: dict[str, Any], record: TenantConfigRecord) -> DomainValidationResult:
+    forbidden_runtime = [k for k in payload if k in FORBIDDEN_AUTOMATION_RUNTIME_KEYS]
+    if forbidden_runtime:
+        raise DomainValidationError(
+            f"Forbidden runtime fields in automation payload: {', '.join(sorted(forbidden_runtime))}"
+        )
     unknown = [k for k in payload if k not in AUTOMATION_ALLOWED_KEYS]
     if unknown:
         raise DomainValidationError(f"Unsupported automation fields: {', '.join(sorted(unknown))}")
-    return DomainValidationResult(normalized_payload=dict(payload))
+    normalized = dict(payload)
+    preset_key = normalized.get("preset_key")
+    if preset_key is not None:
+        preset_version = int(normalized.get("preset_version") or 1)
+        if resolve_preset(str(preset_key), preset_version) is None:
+            raise DomainValidationError(
+                f"Unknown automation preset: {preset_key} v{preset_version}"
+            )
+    return DomainValidationResult(normalized_payload=normalized)
 
 
 def _validate_intake(payload: dict[str, Any], record: TenantConfigRecord) -> DomainValidationResult:
