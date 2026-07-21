@@ -420,6 +420,7 @@ _LIVE_EVAL_RUNS_MIGRATION_STATEMENTS: list[str] = [
     """,
     "CREATE INDEX IF NOT EXISTS ix_live_eval_runs_tenant_status ON live_eval_runs (tenant_id, status)",
     "CREATE INDEX IF NOT EXISTS ix_live_eval_runs_expires_at ON live_eval_runs (expires_at)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_live_eval_runs_tenant_run ON live_eval_runs (tenant_id, evaluation_run_id)",
 ]
 
 _LIVE_EVAL_RUNS_019_MIGRATION_STATEMENTS: list[str] = [

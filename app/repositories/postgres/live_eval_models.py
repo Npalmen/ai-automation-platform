@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKeyConstraint, Integer, String, func
+from sqlalchemy import JSON, Column, DateTime, ForeignKeyConstraint, Integer, String, UniqueConstraint, func
 
 from app.repositories.postgres.database import Base
 
 
 class LiveEvalRunRow(Base):
     __tablename__ = "live_eval_runs"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "evaluation_run_id",
+            name="uq_live_eval_runs_tenant_run",
+        ),
+    )
 
     evaluation_run_id = Column(String(36), primary_key=True)
     tenant_id = Column(String(64), nullable=False, index=True)
