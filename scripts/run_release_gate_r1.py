@@ -12,6 +12,8 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
+from app.evaluation.live.constants import PYTEST_MARKER_EXPR
+
 
 @dataclass(frozen=True)
 class GatePhase:
@@ -63,7 +65,7 @@ def _run_phase(phase: GatePhase, *, verbose: bool) -> int:
     for test_file in phase.tests:
         print(f"  - {test_file}")
 
-    cmd = [sys.executable, "-m", "pytest", "-m", "not monday_live", *phase.tests]
+    cmd = [sys.executable, "-m", "pytest", "-m", PYTEST_MARKER_EXPR, *phase.tests]
     if verbose:
         print(f"Running command: {' '.join(cmd)}")
 

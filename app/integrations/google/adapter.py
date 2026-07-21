@@ -77,6 +77,16 @@ class GoogleMailAdapter(BaseIntegrationAdapter):
                 "messages": messages,
             }
 
+        if action == "list_labels":
+            labels = self.client.list_labels()
+            return {
+                "status": "success",
+                "integration": "google_mail",
+                "provider": "google_mail",
+                "action": action,
+                "labels": labels,
+            }
+
         if action == "get_message":
             message_id = payload.get("message_id")
             if not message_id:
