@@ -314,8 +314,19 @@ export type CancelPayload = {
   reason: string
 }
 
+export type IntegrationSelectionStatus =
+  | "not_selected"
+  | "selected_optional"
+  | "selected_required"
+
+export type IntegrationSelectionDraft = {
+  selection_status: IntegrationSelectionStatus
+  migration_review_required?: boolean
+}
+
 export type IntegrationLifecycleItem = {
   integration_key: string
+  canonical_integration_key?: string | null
   label: string
   lifecycle_status: string
   connection_status?: string
@@ -324,6 +335,14 @@ export type IntegrationLifecycleItem = {
   configured: boolean
   required: boolean
   requested?: boolean
+  selection_status?: IntegrationSelectionStatus
+  migration_review_required?: boolean
+  category?: string | null
+  alternatives_group?: string | null
+  alternatives_group_label_sv?: string | null
+  support_status?: string | null
+  selectable?: boolean
+  supported_in_current_slice?: boolean
   verification_status?: string
   verified_at?: string | null
   freshness_max_hours?: number | null
@@ -339,6 +358,19 @@ export type IntegrationLifecycleItem = {
   } | null
 }
 
+export type VismaDisposition = "not_selected" | "selected_optional"
+
+export type FinanceDestinationStatus = {
+  group_key: string
+  active_implementation: "visma" | "manual_accounting_routing" | "none"
+  accounting_routes: Array<{ service_type: string; effective: string; source: string }>
+  accounting_routing_valid: boolean
+  satisfied: boolean
+  reason: string
+  routing_step_link: string
+  blocks_activation: boolean
+}
+
 export type IntegrationsStepResponse = {
   step_key: string
   step_status: StepStatus
@@ -348,11 +380,17 @@ export type IntegrationsStepResponse = {
   draft: Record<string, unknown>
   integrations: IntegrationLifecycleItem[]
   details: Record<string, unknown>
+  finance_destination?: FinanceDestinationStatus
 }
 
 export type IntegrationsPatchPayload = {
   version: number
-  requested_integrations: string[]
+  requested_integrations?: string[]
+  selections?: Record<string, IntegrationSelectionDraft>
+  finance_destination?: {
+    choice: "visma" | "manual_accounting_routing" | "none"
+    visma_disposition?: VismaDisposition
+  }
   gmail?: { requested: boolean; label_scope_slug: string }
   visma?: { requested: boolean }
   google_sheets?: { requested: boolean; spreadsheet_id: string; export_tabs: string[] }

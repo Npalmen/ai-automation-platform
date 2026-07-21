@@ -53,6 +53,8 @@ from app.admin.onboarding.steps import (
     tenant_has_api_key,
 )
 from app.admin.onboarding.effective_config import materialize_slice2a_config, materialize_slice2b_config
+from app.admin.integrations.selection_materialize import materialize_selections_config
+from app.admin.integrations.selection_sync import sync_allowed_integrations_from_selections
 from app.admin.onboarding.tenant_id import generate_tenant_id, normalize_slug, slug_exists
 from app.core.admin_session import OperatorIdentity
 from app.core.settings import Settings
@@ -1034,8 +1036,21 @@ def activate_onboarding_session(
         integration_state_revision=int(session.integration_state_revision or 0),
         tenant_slug=slug,
     )
+    merged_settings = materialize_selections_config(
+        merged_settings,
+        modules_payload=modules_payload,
+        integrations_payload=integrations_draft.payload if integrations_draft else None,
+        operator_id=operator["id"],
+    )
     tenant.settings = merged_settings
     flag_modified(tenant, "settings")
+    sync_allowed_integrations_from_selections(
+        db,
+        tenant,
+        dry_run=False,
+        fail_closed=True,
+        allow_expand_on_activation=True,
+    )
 
     now = activation_now
     session.status = "active"

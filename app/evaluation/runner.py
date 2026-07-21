@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session
 from app.domain.workflows.enums import JobType
 from app.domain.workflows.models import Job
 from app.evaluation.adapter_fakes import (
-    EVAL_INTEGRATION_CONNECTION_CONFIG,
     eval_get_integration_adapter,
     eval_get_integration_connection_config,
 )

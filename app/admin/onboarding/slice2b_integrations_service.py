@@ -26,6 +26,18 @@ from app.admin.onboarding.integration_fingerprint import (
     fingerprint_visma,
 )
 from app.admin.onboarding.integration_verification import IntegrationVerificationStore
+from app.admin.onboarding.integration_groups import (
+    apply_finance_destination_patch,
+    build_finance_destination_status,
+    reject_coming_later_group_implementation,
+)
+from app.admin.onboarding.integration_selection_draft import (
+    apply_selections_to_legacy_draft,
+    effective_selection_status,
+    merge_selection_patch,
+    onboarding_display_registry_keys,
+    registry_meta_for_key,
+)
 from app.admin.onboarding.models import OPEN_SESSION_STATUSES
 from app.admin.onboarding.audit_events import (
     INTEGRATION_CONFIGURATION_UPDATED,
@@ -172,12 +184,63 @@ def _compute_lifecycle(
     external_routing: dict,
     required: bool,
 ) -> dict[str, Any]:
+    meta = registry_meta_for_key(integration_key)
+    selection_status, migration_review_required = effective_selection_status(
+        draft,
+        integration_key,
+        required_by_module=required,
+    )
     integ = INTEGRATIONS.get(integration_key)
     if integ is None:
+        from app.integrations.keys import display_name_sv
+
         return {
             "integration_key": integration_key,
+            "canonical_integration_key": meta.get("canonical_integration_key"),
+            "label": display_name_sv(str(meta.get("canonical_integration_key") or integration_key)),
             "lifecycle_status": "not_supported",
             "required": required,
+            "selection_status": selection_status,
+            "migration_review_required": migration_review_required,
+            "category": meta.get("category"),
+            "alternatives_group": meta.get("alternatives_group"),
+            "alternatives_group_label_sv": meta.get("alternatives_group_label_sv"),
+            "support_status": meta.get("support_status"),
+            "selectable": meta.get("selectable"),
+            "supported_in_current_slice": False,
+        }
+
+    if selection_status == "not_selected":
+        return {
+            "integration_key": integration_key,
+            "canonical_integration_key": meta.get("canonical_integration_key"),
+            "label": integ.label_sv,
+            "required": False,
+            "requested": False,
+            "lifecycle_status": "not_applicable",
+            "connection_status": "not_requested",
+            "connected": False,
+            "configured": False,
+            "verified": False,
+            "verification_status": "pending",
+            "verified_at": None,
+            "freshness_max_hours": integ.freshness_max_hours,
+            "verification_error_code": None,
+            "source_class": "declared",
+            "platform_credential": False,
+            "ownership": "not_verifiable",
+            "config_fingerprint": None,
+            "limitation_ids": list(integ.limitation_ids),
+            "lifecycle_cap": integ.lifecycle_cap,
+            "gmail_classification": None,
+            "selection_status": selection_status,
+            "migration_review_required": migration_review_required,
+            "category": meta.get("category"),
+            "alternatives_group": meta.get("alternatives_group"),
+            "alternatives_group_label_sv": meta.get("alternatives_group_label_sv"),
+            "support_status": meta.get("support_status"),
+            "selectable": meta.get("selectable"),
+            "supported_in_current_slice": integ.supported_in_current_slice,
         }
 
     verification = IntegrationVerificationStore.get(db, session_id, integration_key)
@@ -199,9 +262,10 @@ def _compute_lifecycle(
     source_class = "declared"
     ownership = "not_verifiable"
     platform_credential = False
+    requested = selection_status in ("selected_optional", "selected_required")
 
     if integration_key == "gmail":
-        requested = draft.gmail.requested or required
+        requested = selection_status in ("selected_optional", "selected_required")
         row = _google_mail_oauth_row(db, tenant.tenant_id)
         configured = requested and _gmail_label_valid(draft.gmail.label_scope_slug)
         platform_credential = row is not None or bool(settings.GOOGLE_MAIL_ACCESS_TOKEN)
@@ -226,7 +290,7 @@ def _compute_lifecycle(
         else:
             lifecycle = "not_applicable"
     elif integration_key == "visma":
-        requested = draft.visma.requested or required
+        requested = selection_status in ("selected_optional", "selected_required")
         row = _visma_oauth_row(db, tenant.tenant_id)
         connected = row is not None
         configured = requested
@@ -244,7 +308,7 @@ def _compute_lifecycle(
         else:
             lifecycle = "not_applicable"
     elif integration_key == "google_sheets":
-        requested = draft.google_sheets.requested or required
+        requested = selection_status in ("selected_optional", "selected_required")
         configured = requested and bool(draft.google_sheets.spreadsheet_id.strip())
         connected = configured
         if verified:
@@ -257,7 +321,7 @@ def _compute_lifecycle(
         else:
             lifecycle = "not_applicable"
     elif integration_key == "monday":
-        requested = draft.monday.requested or required
+        requested = selection_status in ("selected_optional", "selected_required")
         board_id, _ = _monday_board_from_routing(external_routing)
         configured = requested and bool(board_id)
         connected = bool(settings.MONDAY_API_KEY)
@@ -273,6 +337,8 @@ def _compute_lifecycle(
             lifecycle = "selected"
         else:
             lifecycle = "not_applicable"
+    else:
+        lifecycle = "selected" if requested else "not_applicable"
 
     freshness_hours = integ.freshness_max_hours if integ else None
     verified_at = verification.verified_at.isoformat() if verification and verification.verified_at else None
@@ -291,9 +357,10 @@ def _compute_lifecycle(
 
     return {
         "integration_key": integration_key,
+        "canonical_integration_key": meta.get("canonical_integration_key"),
         "label": integ.label_sv,
-        "required": required,
-        "requested": integration_key in (draft.requested_integrations or []),
+        "required": required or selection_status == "selected_required",
+        "requested": requested,
         "lifecycle_status": lifecycle,
         "connection_status": connection_status,
         "connected": connected,
@@ -310,6 +377,14 @@ def _compute_lifecycle(
         "limitation_ids": list(integ.limitation_ids),
         "lifecycle_cap": integ.lifecycle_cap,
         "gmail_classification": gmail_details,
+        "selection_status": selection_status,
+        "migration_review_required": migration_review_required,
+        "category": meta.get("category"),
+        "alternatives_group": meta.get("alternatives_group"),
+        "alternatives_group_label_sv": meta.get("alternatives_group_label_sv"),
+        "support_status": meta.get("support_status"),
+        "selectable": meta.get("selectable"),
+        "supported_in_current_slice": integ.supported_in_current_slice,
     }
 
 
@@ -407,8 +482,11 @@ def get_integrations_step(
             external_routing=external_routing,
             required=key in required_keys,
         )
-        for key in sorted(set(required_keys) | {i.key for i in INTEGRATIONS.values() if i.supported_in_current_slice})
-        if key in INTEGRATIONS and INTEGRATIONS[key].supported_in_current_slice
+        for key in sorted(
+            set(required_keys)
+            | set(onboarding_display_registry_keys())
+            | {i.key for i in INTEGRATIONS.values() if i.supported_in_current_slice}
+        )
     ]
 
     evaluation = evaluate_integrations_step(
@@ -417,6 +495,15 @@ def get_integrations_step(
         tenant=tenant,
         settings=settings,
         session_id=session_id,
+    )
+    sp_record = OnboardingRepository.get_draft(db, session_id, "service_profile")
+    rt_record = OnboardingRepository.get_draft(db, session_id, "routing")
+    finance_status = build_finance_destination_status(
+        draft=draft,
+        modules_draft=modules_payload,
+        service_profile_draft=(sp_record.payload if sp_record else {}) or {},
+        routing_draft=(rt_record.payload if rt_record else {}) or {},
+        tenant_id=session.tenant_id,
     )
     return {
         "step_key": "integrations",
@@ -427,6 +514,7 @@ def get_integrations_step(
         "draft": draft.model_dump(),
         "integrations": items,
         "details": evaluation.get("details") or {},
+        "finance_destination": finance_status,
     }
 
 
@@ -445,22 +533,49 @@ def patch_integrations_step(
     modules_payload = (modules.payload if modules else {}) or {}
     current = _load_integrations_draft(db, session_id)
 
+    if body.selections is not None:
+        current = merge_selection_patch(current, body.selections)
+
+    if body.group_implementations is not None:
+        for _, impl in body.group_implementations.items():
+            reject_coming_later_group_implementation(impl.integration_key)
+        merged_groups = dict(current.group_implementations)
+        merged_groups.update(body.group_implementations)
+        current = current.model_copy(update={"group_implementations": merged_groups})
+
+    if body.finance_destination is not None:
+        try:
+            current = apply_finance_destination_patch(
+                current,
+                choice=body.finance_destination.choice,
+                visma_disposition=body.finance_destination.visma_disposition,
+            )
+        except ValueError as exc:
+            raise OnboardingValidationError(str(exc)) from exc
+
     gmail = body.gmail if body.gmail is not None else current.gmail
     visma = body.visma if body.visma is not None else current.visma
     sheets = body.google_sheets if body.google_sheets is not None else current.google_sheets
     monday = body.monday if body.monday is not None else current.monday
-    requested = body.requested_integrations if body.requested_integrations is not None else current.requested_integrations
+    requested = (
+        body.requested_integrations
+        if body.requested_integrations is not None
+        else current.requested_integrations
+    )
 
-    if gmail.requested and not _gmail_label_valid(gmail.label_scope_slug):
+    if body.gmail is not None and gmail.requested and not _gmail_label_valid(gmail.label_scope_slug):
         raise OnboardingValidationError("Gmail label_scope_slug is invalid.")
 
     draft = IntegrationsDraftPayload(
         requested_integrations=requested,
+        selections=current.selections,
+        group_implementations=current.group_implementations,
         gmail=gmail,
         visma=visma,
         google_sheets=sheets,
         monday=monday,
     )
+    draft = apply_selections_to_legacy_draft(draft)
 
     if sheets.spreadsheet_id.strip():
         ResourceBindingService.bind(
@@ -489,6 +604,9 @@ def patch_integrations_step(
     audit_action = (
         INTEGRATION_REQUESTED
         if body.requested_integrations is not None
+        or body.selections is not None
+        or body.group_implementations is not None
+        or body.finance_destination is not None
         else INTEGRATION_CONFIGURATION_UPDATED
     )
     emit_onboarding_audit(

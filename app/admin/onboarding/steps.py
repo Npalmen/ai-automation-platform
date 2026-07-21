@@ -50,6 +50,8 @@ def _required_integrations_for_capabilities(capability_keys: list[str]) -> set[s
         cap = PRODUCT_CAPABILITIES.get(key)
         if cap:
             required.update(cap.required_integrations)
+            # Integration groups (finance_destination, etc.) are satisfied and
+            # blocked at group level — never as per-provider required flags.
     return required
 
 
@@ -216,15 +218,26 @@ def evaluate_integrations_step(
     session_id: str | None = None,
 ) -> dict[str, Any]:
     from app.admin.onboarding.integration_draft_schemas import IntegrationsDraftPayload
+    from app.admin.onboarding.integration_groups import (
+        evaluate_required_integration_groups,
+        registry_keys_for_group,
+        required_integration_groups_for_capabilities,
+        unsatisfied_required_groups,
+    )
+    from app.admin.onboarding.integration_selection_draft import effective_selection_status
     from app.admin.onboarding.integration_verification import IntegrationVerificationStore
     from app.admin.onboarding.repository import OnboardingRepository
+    from app.integrations.keys import INTEGRATION_REGISTRY
 
     caps = _selected_capabilities(modules_draft)
     explicit_integrations = _selected_integrations(modules_draft)
     required = _required_integrations_for_capabilities(caps)
+    required_groups = required_integration_groups_for_capabilities(caps)
 
     integrations_draft: IntegrationsDraftPayload | None = None
     external_routing: dict = {}
+    service_profile_draft: dict = {}
+    routing_draft: dict = {}
     if session_id:
         integ_record = OnboardingRepository.get_draft(db, session_id, "integrations")
         try:
@@ -242,11 +255,25 @@ def evaluate_integrations_step(
             }
         er_record = OnboardingRepository.get_draft(db, session_id, "external_routing")
         external_routing = (er_record.payload if er_record else {}) or {}
+        sp_record = OnboardingRepository.get_draft(db, session_id, "service_profile")
+        service_profile_draft = (sp_record.payload if sp_record else {}) or {}
+        rt_record = OnboardingRepository.get_draft(db, session_id, "routing")
+        routing_draft = (rt_record.payload if rt_record else {}) or {}
 
     draft_requested = set(integrations_draft.requested_integrations if integrations_draft else [])
-    all_keys = sorted(set(explicit_integrations) | required | draft_requested)
+    selection_keys: set[str] = set()
+    if integrations_draft and integrations_draft.selections:
+        for canonical in integrations_draft.selections:
+            meta = INTEGRATION_REGISTRY.get(canonical, {})
+            selection_keys.add(str(meta.get("registry_key", canonical)))
+    group_keys: set[str] = set()
+    for group in required_groups:
+        group_keys.update(registry_keys_for_group(group))
+    all_keys = sorted(
+        set(explicit_integrations) | required | draft_requested | selection_keys | group_keys
+    )
 
-    if not all_keys:
+    if not all_keys and not required_groups:
         return {
             "step_status": "not_applicable",
             "verification_level": "not_applicable",
@@ -265,7 +292,34 @@ def evaluate_integrations_step(
         if not integ or not integ.supported_in_current_slice:
             continue
 
-        is_required = key in required or key in draft_requested or key in explicit_integrations
+        module_required = key in required or key in explicit_integrations
+        selection_status, migration_review_required = (
+            effective_selection_status(
+                integrations_draft,
+                key,
+                required_by_module=module_required,
+            )
+            if integrations_draft
+            else ("selected_required" if module_required or key in draft_requested else "not_selected", False)
+        )
+
+        if selection_status == "not_selected":
+            items.append(
+                {
+                    "integration_key": key,
+                    "label": integ.label_sv,
+                    "required": False,
+                    "selection_status": selection_status,
+                    "migration_review_required": migration_review_required,
+                    "lifecycle_status": "not_applicable",
+                    "connected": False,
+                    "verified": False,
+                    "locally_verified": False,
+                }
+            )
+            continue
+
+        is_required = selection_status == "selected_required"
         legacy = _integration_status(db, tenant, integ, settings) if tenant else {}
 
         configured = False
@@ -373,18 +427,34 @@ def evaluate_integrations_step(
                 blocking.append(key)
             elif not settings.GOOGLE_MAIL_ACCESS_TOKEN:
                 warnings.append("gmail_platform_credential")
+        elif key == "gmail" and selection_status == "selected_optional" and not configured:
+            warnings.append("gmail_optional_unconfigured")
 
         items.append(
             {
                 "integration_key": key,
                 "label": integ.label_sv,
                 "required": is_required,
+                "selection_status": selection_status,
+                "migration_review_required": migration_review_required,
                 "lifecycle_status": lifecycle,
                 "connected": legacy.get("connected", False),
                 "verified": verified,
                 "locally_verified": verified,
             }
         )
+
+    group_evaluations = []
+    if integrations_draft and session_id and required_groups:
+        group_evaluations = evaluate_required_integration_groups(
+            capability_keys=caps,
+            integrations_draft=integrations_draft,
+            modules_draft=modules_draft,
+            service_profile_draft=service_profile_draft,
+            routing_draft=routing_draft,
+        )
+        for evaluation in unsatisfied_required_groups(group_evaluations):
+            blocking.append(f"group:{evaluation.group_key}")
 
     if blocking:
         return {
@@ -393,7 +463,20 @@ def evaluate_integrations_step(
             "blocks_activation": True,
             "read_only": False,
             "read_only_reason": None,
-            "details": {"integrations": items, "blocking": blocking, "warnings": warnings},
+            "details": {
+                "integrations": items,
+                "blocking": blocking,
+                "warnings": warnings,
+                "integration_groups": [
+                    {
+                        "group_key": ev.group_key,
+                        "satisfied": ev.satisfied,
+                        "implementation": ev.implementation,
+                        "reason": ev.reason,
+                    }
+                    for ev in group_evaluations
+                ],
+            },
         }
 
     if warnings and all(i.get("lifecycle_status") == "configured_not_running" for i in items if i["required"]):
@@ -403,7 +486,19 @@ def evaluate_integrations_step(
             "blocks_activation": False,
             "read_only": False,
             "read_only_reason": None,
-            "details": {"integrations": items, "warnings": warnings},
+            "details": {
+                "integrations": items,
+                "warnings": warnings,
+                "integration_groups": [
+                    {
+                        "group_key": ev.group_key,
+                        "satisfied": ev.satisfied,
+                        "implementation": ev.implementation,
+                        "reason": ev.reason,
+                    }
+                    for ev in group_evaluations
+                ],
+            },
         }
 
     return {
@@ -412,7 +507,18 @@ def evaluate_integrations_step(
         "blocks_activation": False,
         "read_only": False,
         "read_only_reason": None,
-        "details": {"integrations": items},
+        "details": {
+            "integrations": items,
+            "integration_groups": [
+                {
+                    "group_key": ev.group_key,
+                    "satisfied": ev.satisfied,
+                    "implementation": ev.implementation,
+                    "reason": ev.reason,
+                }
+                for ev in group_evaluations
+            ],
+        },
     }
 
 

@@ -1,4 +1,4 @@
-"""Derive tenant integration selection from persisted config (Slice A legacy fallback)."""
+"""Derive tenant integration selection from persisted config."""
 
 from __future__ import annotations
 
@@ -8,6 +8,10 @@ from typing import Any, Literal
 
 from sqlalchemy.orm import Session
 
+from app.admin.integrations.selection_models import (
+    IntegrationSelectionRecord,
+    parse_selections_map,
+)
 from app.integrations.keys import (
     CANONICAL_INTEGRATION_KEYS,
     normalize_integration_key,
@@ -18,7 +22,6 @@ SelectionStatus = Literal[
     "not_selected",
     "selected_optional",
     "selected_required",
-    "migration_review_required",
 ]
 
 TENANT_OAUTH_PROVIDERS: dict[str, str] = {
@@ -34,30 +37,26 @@ ALERT_SUPPRESSION_REASON = "integration_not_selected_after_selection_model_migra
 class IntegrationSelectionView:
     integration_key: str
     selection_status: SelectionStatus
-    requirement_source: Literal["manual", "module_recommendation", "module_requirement", "legacy_allowed"]
+    migration_review_required: bool
+    requirement_source: Literal[
+        "manual",
+        "module_recommendation",
+        "module_requirement",
+        "legacy_backfill",
+        "legacy_allowed",
+    ]
 
 
 def _tenant_settings(record: Any) -> dict[str, Any]:
     return getattr(record, "settings", None) or {}
 
 
-def _explicit_selection_status(settings: dict[str, Any], integration_key: str) -> SelectionStatus | None:
-    selections = (settings.get("integrations") or {}).get("selections") or {}
-    for raw_key, payload in selections.items():
-        canonical = normalize_integration_key(raw_key)
-        if canonical != integration_key:
-            continue
-        if not isinstance(payload, dict):
-            continue
-        status = str(payload.get("selection_status") or "").strip()
-        if status in (
-            "not_selected",
-            "selected_optional",
-            "selected_required",
-            "migration_review_required",
-        ):
-            return status  # type: ignore[return-value]
-    return None
+def _explicit_selection_record(
+    settings: dict[str, Any],
+    integration_key: str,
+) -> IntegrationSelectionRecord | None:
+    selections = parse_selections_map((settings.get("integrations") or {}).get("selections"))
+    return selections.get(integration_key)
 
 
 def _has_tenant_credential(db: Session, tenant_id: str, integration_key: str) -> bool:
@@ -67,7 +66,6 @@ def _has_tenant_credential(db: Session, tenant_id: str, integration_key: str) ->
 
         return OAuthCredentialRepository.get(db, tenant_id, provider) is not None
     if integration_key == "google_sheets":
-        settings = {}
         from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
 
         settings = TenantConfigRepository.get_settings(db, tenant_id)
@@ -98,25 +96,21 @@ def derive_integration_selection(
         raise ValueError(f"Unknown integration key: {integration_key}")
 
     settings = _tenant_settings(record)
-    explicit = _explicit_selection_status(settings, canonical)
+    explicit = _explicit_selection_record(settings, canonical)
     if explicit is not None:
-        source: Literal[
-            "manual", "module_recommendation", "module_requirement", "legacy_allowed"
-        ] = "manual"
-        payload = (settings.get("integrations") or {}).get("selections") or {}
-        for raw_key, item in payload.items():
-            if normalize_integration_key(raw_key) == canonical and isinstance(item, dict):
-                raw_source = str(item.get("requirement_source") or "").strip()
-                if raw_source in (
-                    "manual",
-                    "module_recommendation",
-                    "module_requirement",
-                ):
-                    source = raw_source  # type: ignore[assignment]
+        source = explicit.requirement_source
+        if source not in (
+            "manual",
+            "module_recommendation",
+            "module_requirement",
+            "legacy_backfill",
+        ):
+            source = "manual"
         return IntegrationSelectionView(
             integration_key=canonical,
-            selection_status=explicit,
-            requirement_source=source,
+            selection_status=explicit.selection_status,
+            migration_review_required=explicit.migration_review_required,
+            requirement_source=source,  # type: ignore[assignment]
         )
 
     tenant_id = getattr(record, "tenant_id", "")
@@ -128,34 +122,38 @@ def derive_integration_selection(
     if has_credential and has_verified and not in_allowed:
         return IntegrationSelectionView(
             integration_key=canonical,
-            selection_status="migration_review_required",
+            selection_status="selected_optional",
+            migration_review_required=True,
             requirement_source="legacy_allowed",
         )
     if has_credential or has_verified:
         return IntegrationSelectionView(
             integration_key=canonical,
             selection_status="selected_optional",
+            migration_review_required=False,
             requirement_source="legacy_allowed",
         )
     if in_allowed:
         return IntegrationSelectionView(
             integration_key=canonical,
             selection_status="selected_required",
+            migration_review_required=False,
             requirement_source="legacy_allowed",
         )
     return IntegrationSelectionView(
         integration_key=canonical,
         selection_status="not_selected",
+        migration_review_required=False,
         requirement_source="manual",
     )
 
 
 def should_evaluate_tenant_health(selection: IntegrationSelectionView) -> bool:
-    return selection.selection_status in (
-        "selected_optional",
-        "selected_required",
-        "migration_review_required",
-    )
+    if selection.selection_status == "not_selected":
+        return False
+    if selection.migration_review_required and selection.selection_status == "selected_optional":
+        return True
+    return selection.selection_status in ("selected_optional", "selected_required")
 
 
 def should_raise_tenant_warning(

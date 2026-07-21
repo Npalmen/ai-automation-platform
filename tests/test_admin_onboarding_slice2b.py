@@ -17,6 +17,7 @@ from app.admin.onboarding.errors import OnboardingConflictError
 from app.admin.onboarding.integration_draft_schemas import (
     ExternalRoutingPatchRequest,
     GmailIntegrationConfig,
+    IntegrationSelectionDraft,
     IntegrationsPatchRequest,
     MondayIntegrationConfig,
     VismaIntegrationConfig,
@@ -49,6 +50,7 @@ from app.admin.onboarding.slice2b_external_routing_service import (
 from app.admin.onboarding.slice2b_integrations_service import (
     connect_integration,
     get_integration_status,
+    get_integrations_step,
     patch_integrations_step,
     verify_integration,
 )
@@ -612,3 +614,56 @@ class TestSlice2bPlanHash:
             db, session_id=session.id, tenant=tenant, settings=_settings()
         )
         assert plan_before["plan_hash"] != plan_after["plan_hash"]
+
+
+class TestSlice2bIntegrationSelections:
+    def test_patch_selections_exposes_tri_state_and_hides_unselected_connection(self, db):
+        session = _session_with_lead_management(db)
+        patch_integrations_step(
+            db,
+            session_id=session.id,
+            operator=_operator(),
+            body=IntegrationsPatchRequest(
+                version=session.version,
+                selections={
+                    "google_mail": IntegrationSelectionDraft(selection_status="selected_required"),
+                    "visma": IntegrationSelectionDraft(selection_status="not_selected"),
+                },
+            ),
+            settings=_settings(),
+        )
+        step = get_integrations_step(db, session.id, settings=_settings())
+        gmail = next(i for i in step["integrations"] if i["integration_key"] == "gmail")
+        visma = next(i for i in step["integrations"] if i["integration_key"] == "visma")
+        assert gmail["selection_status"] == "selected_required"
+        assert visma["selection_status"] == "not_selected"
+        assert visma["lifecycle_status"] == "not_applicable"
+        assert gmail["category"] == "email"
+
+    def test_optional_gmail_selection_does_not_add_gmail_blocking(self, db):
+        from app.admin.onboarding.steps import evaluate_integrations_step
+
+        session = _session_with_lead_management(db)
+        patch_integrations_step(
+            db,
+            session_id=session.id,
+            operator=_operator(),
+            body=IntegrationsPatchRequest(
+                version=session.version,
+                selections={
+                    "google_mail": IntegrationSelectionDraft(selection_status="selected_optional"),
+                },
+            ),
+            settings=_settings(),
+        )
+        modules = OnboardingRepository.get_draft(db, session.id, "modules")
+        tenant = db.query(TenantConfigRecord).filter_by(tenant_id=session.tenant_id).first()
+        evaluation = evaluate_integrations_step(
+            db,
+            modules_draft=(modules.payload if modules else {}) or {},
+            tenant=tenant,
+            settings=_settings(),
+            session_id=session.id,
+        )
+        blocking = (evaluation.get("details") or {}).get("blocking") or []
+        assert "gmail" not in blocking

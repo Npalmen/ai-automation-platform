@@ -138,10 +138,10 @@ class TestMondayLeadAdapterDryRun:
 
 
 # ---------------------------------------------------------------------------
-# MondayLeadDispatchAdapter — live
+# MondayLeadDispatchAdapter — non-dry_run contract (mocked transport)
 # ---------------------------------------------------------------------------
 
-class TestMondayLeadAdapterLive:
+class TestMondayLeadAdapterNonDryRun:
     def _adapter(self):
         from app.workflows.dispatchers.monday_lead_adapter import MondayLeadDispatchAdapter
         return MondayLeadDispatchAdapter()
@@ -155,20 +155,27 @@ class TestMondayLeadAdapterLive:
     def test_missing_api_key_returns_failed(self):
         adapter = self._adapter()
         job = _make_job()
-        result = adapter.dispatch(job=job, routing_hint=_valid_hint(), settings=None, dry_run=False)
-        # get_settings returns empty key in test env
-        assert result.status in ("failed",)
+        result = adapter.dispatch(
+            job=job,
+            routing_hint=_valid_hint(),
+            settings=self._mock_settings(api_key=""),
+            dry_run=False,
+        )
+        assert result.status == "failed"
+        assert "MONDAY_API_KEY" in result.message
 
     def test_live_success_returns_success(self):
         adapter = self._adapter()
         job = _make_job(input_data={"subject": "Lead 1"})
         mock_resp = {"data": {"create_item": {"id": "9001", "name": "Lead 1", "state": "active", "board": {"id": "99", "name": "Leads"}}}}
 
-        with (
-            patch("app.workflows.dispatchers.monday_lead_adapter.get_settings", return_value=self._mock_settings()),
-            patch("app.integrations.monday.client.MondayClient.create_item", return_value=mock_resp),
-        ):
-            result = adapter.dispatch(job=job, routing_hint=_valid_hint(), settings=None, dry_run=False)
+        with patch("app.integrations.monday.client.MondayClient.create_item", return_value=mock_resp):
+            result = adapter.dispatch(
+                job=job,
+                routing_hint=_valid_hint(),
+                settings=self._mock_settings(),
+                dry_run=False,
+            )
 
         assert result.status == "success"
         assert result.external_id == "9001"
@@ -179,11 +186,13 @@ class TestMondayLeadAdapterLive:
         job = _make_job(input_data={"subject": "Lead"})
         mock_resp = {"data": {"create_item": {"id": "10", "name": "Lead", "state": "active", "board": {"id": "99", "name": "Leads"}}}}
 
-        with (
-            patch("app.workflows.dispatchers.monday_lead_adapter.get_settings", return_value=self._mock_settings()),
-            patch("app.integrations.monday.client.MondayClient.create_item", return_value=mock_resp),
-        ):
-            result = adapter.dispatch(job=job, routing_hint=_valid_hint(board_name="Leads"), settings=None, dry_run=False)
+        with patch("app.integrations.monday.client.MondayClient.create_item", return_value=mock_resp):
+            result = adapter.dispatch(
+                job=job,
+                routing_hint=_valid_hint(board_name="Leads"),
+                settings=self._mock_settings(),
+                dry_run=False,
+            )
 
         assert "Leads" in result.message
 
@@ -191,11 +200,16 @@ class TestMondayLeadAdapterLive:
         adapter = self._adapter()
         job = _make_job()
 
-        with (
-            patch("app.workflows.dispatchers.monday_lead_adapter.get_settings", return_value=self._mock_settings()),
-            patch("app.integrations.monday.client.MondayClient.create_item", side_effect=RuntimeError("API error")),
+        with patch(
+            "app.integrations.monday.client.MondayClient.create_item",
+            side_effect=RuntimeError("API error"),
         ):
-            result = adapter.dispatch(job=job, routing_hint=_valid_hint(), settings=None, dry_run=False)
+            result = adapter.dispatch(
+                job=job,
+                routing_hint=_valid_hint(),
+                settings=self._mock_settings(),
+                dry_run=False,
+            )
 
         assert result.status == "failed"
         assert "API error" in result.message
@@ -210,11 +224,13 @@ class TestMondayLeadAdapterLive:
             captured["board_id"] = board_id
             return mock_resp
 
-        with (
-            patch("app.workflows.dispatchers.monday_lead_adapter.get_settings", return_value=self._mock_settings()),
-            patch("app.integrations.monday.client.MondayClient.create_item", side_effect=fake_create),
-        ):
-            adapter.dispatch(job=job, routing_hint=_valid_hint(board_id="77"), settings=None, dry_run=False)
+        with patch("app.integrations.monday.client.MondayClient.create_item", side_effect=fake_create):
+            adapter.dispatch(
+                job=job,
+                routing_hint=_valid_hint(board_id="77"),
+                settings=self._mock_settings(),
+                dry_run=False,
+            )
 
         assert captured["board_id"] == 77  # cast to int
 

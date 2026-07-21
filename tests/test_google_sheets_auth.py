@@ -14,10 +14,16 @@ class TestResolveGoogleSheetsAccessToken:
         assert token == "tenant_override_token"
 
     def test_refresh_used_when_no_tenant_override(self):
-        with patch(
-            "app.integrations.google.sheets_auth.refresh_access_token",
-            return_value="refreshed_token",
-        ) as mock_refresh:
+        with (
+            patch("app.integrations.google.sheets_auth.get_settings") as mock_settings,
+            patch(
+                "app.integrations.google.sheets_auth.refresh_access_token",
+                return_value="refreshed_token",
+            ) as mock_refresh,
+        ):
+            mock_settings.return_value.GOOGLE_OAUTH_REFRESH_TOKEN = "rt"
+            mock_settings.return_value.GOOGLE_OAUTH_CLIENT_ID = "cid"
+            mock_settings.return_value.GOOGLE_OAUTH_CLIENT_SECRET = "secret"
             token = resolve_google_sheets_access_token({})
 
         assert token == "refreshed_token"

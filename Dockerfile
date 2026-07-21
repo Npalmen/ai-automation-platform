@@ -27,7 +27,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY scripts ./scripts
-COPY storage ./storage
 COPY --from=frontend-build /frontend/dist ./frontend/dist
 
 RUN python scripts/write_build_metadata.py \
@@ -36,6 +35,9 @@ RUN python scripts/write_build_metadata.py \
     --release-id "$RELEASE_ID" \
     --output /app/build-metadata.json
 
+RUN chmod +x /app/scripts/docker_entrypoint.sh
+
 EXPOSE 8000
 
+ENTRYPOINT ["/app/scripts/docker_entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "172.16.0.0/12,10.0.0.0/8,127.0.0.1"]

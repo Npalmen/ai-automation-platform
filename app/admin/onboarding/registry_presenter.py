@@ -33,6 +33,7 @@ from app.admin.onboarding.slice2a_registry import (
 )
 from app.admin.onboarding.slice2b_registry import EXTERNAL_ROUTING_TARGETS
 from app.admin.onboarding.type_mapping import SERVICE_TYPE_LEAD_TYPE_MAP_VERSION
+from app.admin.onboarding.integration_selection_draft import registry_meta_for_key
 
 _RUNTIME_ACTIVATION_NOTES = {
     "scheduler": "Förblir paused vid aktivering i slice 1.",
@@ -63,26 +64,37 @@ def present_registries() -> OnboardingRegistriesResponse:
             supported_in_current_slice=cap.supported_in_current_slice,
             dependencies={
                 "integrations": list(cap.required_integrations),
+                "integration_groups": list(cap.required_integration_groups),
                 "runtime": list(cap.required_runtime),
             },
+            required_integration_groups=list(cap.required_integration_groups),
+            recommended_integration_groups=list(cap.recommended_integration_groups),
             requires_api_key=cap.requires_api_key,
         )
         for cap in sorted(PRODUCT_CAPABILITIES.values(), key=lambda c: c.key)
     ]
-    integrations = [
-        RegistryIntegrationOut(
-            key=integ.key,
-            label=integ.label_sv,
-            description=integ.description_sv,
-            availability=integ.availability,
-            supported_in_current_slice=integ.supported_in_current_slice,
-            dependencies={},
-            verification_capability=integ.verification_capability,
-            lifecycle_cap=integ.lifecycle_cap,
-            limitation_ids=list(integ.limitation_ids),
+    integrations = []
+    for integ in sorted(INTEGRATIONS.values(), key=lambda i: i.key):
+        meta = registry_meta_for_key(integ.key)
+        integrations.append(
+            RegistryIntegrationOut(
+                key=integ.key,
+                label=integ.label_sv,
+                description=integ.description_sv,
+                availability=integ.availability,
+                supported_in_current_slice=integ.supported_in_current_slice,
+                dependencies={},
+                verification_capability=integ.verification_capability,
+                lifecycle_cap=integ.lifecycle_cap,
+                limitation_ids=list(integ.limitation_ids),
+                canonical_integration_key=str(meta.get("canonical_integration_key") or "") or None,
+                category=str(meta.get("category") or "") or None,
+                alternatives_group=meta.get("alternatives_group"),  # type: ignore[arg-type]
+                alternatives_group_label_sv=meta.get("alternatives_group_label_sv"),  # type: ignore[arg-type]
+                support_status=str(meta.get("support_status") or "") or None,
+                selectable=bool(meta.get("selectable")),
+            )
         )
-        for integ in sorted(INTEGRATIONS.values(), key=lambda i: i.key)
-    ]
     external_routing_targets = [
         RegistryExternalRoutingTargetOut(
             key=t.key,
