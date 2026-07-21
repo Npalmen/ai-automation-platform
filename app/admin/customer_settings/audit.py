@@ -49,6 +49,10 @@ def redact_settings_summary(payload: dict[str, Any] | None) -> dict[str, Any]:
     return {key: redact_settings_value(key, value) for key, value in payload.items()}
 
 
+def filter_internal_audit_paths(paths: list[str]) -> list[str]:
+    return [path for path in paths if not path.startswith("_readiness")]
+
+
 def diff_field_paths(before: dict[str, Any], after: dict[str, Any], *, prefix: str = "") -> list[str]:
     paths: list[str] = []
     keys = sorted(set(before.keys()) | set(after.keys()))

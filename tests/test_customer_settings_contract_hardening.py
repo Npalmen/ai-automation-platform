@@ -1,4 +1,4 @@
-"""Customer settings contract hardening tests (Slice C Commit 2B)."""
+"""Customer settings contract hardening tests (Slice C Commit 2B+2C)."""
 
 from __future__ import annotations
 
@@ -12,15 +12,19 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.attributes import flag_modified
+from sqlalchemy.pool import StaticPool
 
 from app.admin.customer_settings.automation_projection import compute_automation_runtime_projection
-from app.admin.customer_settings.readiness import compute_customer_settings_readiness
+from app.admin.customer_settings.readiness import (
+    compute_customer_settings_readiness,
+    mark_readiness_stale_domains,
+)
 from app.admin.customer_settings.service import (
     get_customer_settings_view,
     patch_domain_settings,
     preview_domain_settings,
 )
-from app.admin.customer_settings.validation import validate_domain_config
+from app.api.dependencies import get_db
 from app.admin.tenant_lifecycle.models import TenantActivationSnapshotRecord
 from app.main import app
 from app.repositories.postgres.audit_models import AuditEventRecord
@@ -29,6 +33,8 @@ from app.repositories.postgres.oauth_credential_models import OAuthCredentialRec
 from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 from tests.onboarding_db_tables import onboarding_sqlite_tables
 from tests.test_customer_settings_backend import _active_tenant, _operator
+
+TEST_ADMIN_API_KEY = "test-customer-settings-http-key-isolated"
 
 
 def _commit_settings(db, tenant):
@@ -39,7 +45,11 @@ def _commit_settings(db, tenant):
 
 @pytest.fixture
 def db():
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     tables = onboarding_sqlite_tables()
     Base.metadata.create_all(bind=engine, tables=tables)
     Session = sessionmaker(bind=engine)
@@ -84,7 +94,7 @@ class TestAggregateReadiness:
         db.commit()
         readiness = compute_customer_settings_readiness(db, tenant)
         assert readiness["overall_status"] == "not_ready"
-        assert any("google_mail" in item["id"] for item in readiness["blockers"])
+        assert any("google_mail" in item["code"] for item in readiness["blockers"])
 
     def test_optional_disconnected_is_neutral(self, db, tenant):
         tenant.settings["integrations"]["selections"]["fortnox"]["selection_status"] = (
@@ -92,11 +102,11 @@ class TestAggregateReadiness:
         )
         db.commit()
         readiness = compute_customer_settings_readiness(db, tenant)
-        assert not any("fortnox" in item["id"] for item in readiness["blockers"])
+        assert not any("fortnox" in item["code"] for item in readiness["blockers"])
 
     def test_fortnox_not_selected_no_blocker(self, db, tenant):
         readiness = compute_customer_settings_readiness(db, tenant)
-        assert not any("fortnox" in item["id"] for item in readiness["blockers"])
+        assert not any("fortnox" in item["code"] for item in readiness["blockers"])
 
     def test_finance_destination_without_implementation_blocks(self, db, tenant):
         tenant.settings["integrations"]["selections"]["visma"]["selection_status"] = "not_selected"
@@ -105,7 +115,7 @@ class TestAggregateReadiness:
         _commit_settings(db, tenant)
         readiness = compute_customer_settings_readiness(db, tenant)
         assert any(
-            item["id"] == "finance_destination.not_configured" for item in readiness["blockers"]
+            item["code"] == "finance_destination.not_configured" for item in readiness["blockers"]
         )
 
     def test_manual_routing_without_valid_route_blocks(self, db, tenant):
@@ -117,7 +127,7 @@ class TestAggregateReadiness:
         _commit_settings(db, tenant)
         readiness = compute_customer_settings_readiness(db, tenant)
         assert any(
-            "manual_accounting_routing_missing_routing" in item["id"]
+            "manual_accounting_routing_missing_routing" in item["code"]
             for item in readiness["blockers"]
         )
 
@@ -148,6 +158,17 @@ class TestAggregateReadiness:
         readiness = view["effective_readiness"]
         assert readiness["is_stale"] is True
         assert "identity" in readiness["stale_domains"]
+        assert "action_target" not in readiness
+        assert "blocking_domain" not in readiness
+        blocker = readiness["blockers"][0]
+        assert {"code", "domain", "message", "action_domain", "affected_capabilities"} <= set(
+            blocker.keys()
+        )
+        assert not any(
+            str(value).startswith("/admin/tenants/")
+            for value in blocker.values()
+            if isinstance(value, str)
+        )
 
     def test_aggregate_get_is_read_only(self, db, tenant):
         version_before = tenant.config_version
@@ -376,25 +397,75 @@ class TestInvalidVsNotReady:
         assert exc.value.status_code == 422
 
 
+class TestReadinessReservedInternal:
+    def test_patch_readiness_meta_rejected(self, db, tenant):
+        with pytest.raises(HTTPException) as exc:
+            patch_domain_settings(
+                db,
+                tenant_id=tenant.tenant_id,
+                domain="identity",
+                expected_config_version=3,
+                payload={"_readiness": {"stale_domains": ["integrations"]}},
+                operator=_operator(),
+            )
+        assert exc.value.status_code == 422
+
+    def test_aggregate_does_not_expose_readiness_meta(self, db, tenant):
+        tenant.settings = mark_readiness_stale_domains(tenant.settings or {}, ["identity"])
+        _commit_settings(db, tenant)
+        view = get_customer_settings_view(db, tenant.tenant_id, _operator())
+        assert "_readiness" not in str(view["domains"])
+        assert "_readiness" in (tenant.settings or {})
+
+    def test_audit_ignores_readiness_meta_paths(self, db, tenant):
+        patch_domain_settings(
+            db,
+            tenant_id=tenant.tenant_id,
+            domain="identity",
+            expected_config_version=3,
+            payload={"timezone": "Europe/Berlin"},
+            operator=_operator(),
+        )
+        audit = (
+            db.query(AuditEventRecord)
+            .filter(AuditEventRecord.tenant_id == tenant.tenant_id)
+            .order_by(AuditEventRecord.created_at.desc())
+            .first()
+        )
+        assert audit is not None
+        assert "_readiness" not in str(audit.details.get("changed_paths", []))
+
+
 class TestCustomerSettingsHttpRoutes:
+    @pytest.fixture(autouse=True)
+    def http_env(self):
+        with patch.dict(
+            os.environ,
+            {"ADMIN_API_KEY": TEST_ADMIN_API_KEY, "ADMIN_ROLE": "admin"},
+            clear=False,
+        ):
+            from app.core.settings import get_settings
+
+            get_settings.cache_clear()
+            yield
+            get_settings.cache_clear()
+
     @pytest.fixture
     def client(self, db, tenant):
         def override_get_db():
             yield db
 
-        app.dependency_overrides[__import__("app.api.dependencies", fromlist=["get_db"]).get_db] = (
-            override_get_db
-        )
+        app.dependency_overrides[get_db] = override_get_db
         client = TestClient(app, raise_server_exceptions=False)
         yield client
         app.dependency_overrides.clear()
 
     @pytest.fixture
     def admin_headers(self):
-        key = os.environ.get("ADMIN_API_KEY", "").strip()
-        if not key:
-            pytest.skip("ADMIN_API_KEY not configured")
-        return {"X-Admin-API-Key": key, "Origin": "http://testserver"}
+        return {
+            "X-Admin-API-Key": TEST_ADMIN_API_KEY,
+            "Origin": "http://testserver",
+        }
 
     def test_aggregate_get_200(self, client, admin_headers, tenant):
         response = client.get(f"/admin/tenants/{tenant.tenant_id}/settings", headers=admin_headers)
@@ -576,3 +647,95 @@ class TestCustomerSettingsHttpRoutes:
         assert domain.status_code == 200
         assert "domains" in aggregate.json()
         assert domain.json()["section"] == "integrations"
+
+
+class TestCustomerSettingsHttpAutomation:
+    @pytest.fixture(autouse=True)
+    def http_env(self):
+        with patch.dict(
+            os.environ,
+            {"ADMIN_API_KEY": TEST_ADMIN_API_KEY, "ADMIN_ROLE": "admin"},
+            clear=False,
+        ):
+            from app.core.settings import get_settings
+
+            get_settings.cache_clear()
+            yield
+            get_settings.cache_clear()
+
+    @pytest.fixture
+    def client(self, db, tenant):
+        def override_get_db():
+            yield db
+
+        app.dependency_overrides[get_db] = override_get_db
+        client = TestClient(app, raise_server_exceptions=False)
+        yield client
+        app.dependency_overrides.clear()
+
+    @pytest.fixture
+    def admin_headers(self):
+        return {
+            "X-Admin-API-Key": TEST_ADMIN_API_KEY,
+            "Origin": "http://testserver",
+        }
+
+    def test_automation_patch_via_http(self, client, admin_headers, db, tenant):
+        version_before = tenant.config_version
+        scheduler_before = copy.deepcopy(tenant.settings["scheduler"])
+        writes_before = list(
+            tenant.settings["integrations"].get("enabled_external_writes") or []
+        )
+        audit_before = db.query(AuditEventRecord).count()
+
+        response = client.patch(
+            f"/admin/tenants/{tenant.tenant_id}/settings/automation",
+            headers=admin_headers,
+            json={
+                "expected_config_version": version_before,
+                "payload": {"preset_key": "approval_first", "preset_version": 1},
+            },
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["config_version"] == version_before + 1
+
+        db.refresh(tenant)
+        assert tenant.config_version == version_before + 1
+        assert tenant.auto_actions.get("invoice") == "semi"
+        assert tenant.settings["scheduler"] == scheduler_before
+        assert tenant.settings["integrations"].get("enabled_external_writes") == writes_before
+
+        audit = (
+            db.query(AuditEventRecord)
+            .filter(AuditEventRecord.tenant_id == tenant.tenant_id)
+            .order_by(AuditEventRecord.created_at.desc())
+            .first()
+        )
+        assert db.query(AuditEventRecord).count() == audit_before + 1
+        assert audit is not None
+        raw = str(audit.details)
+        assert "static-visma" not in raw
+        assert "_readiness" not in audit.details.get("changed_paths", [])
+
+    def test_automation_preview_via_http_is_read_only(self, client, admin_headers, db, tenant):
+        version_before = tenant.config_version
+        settings_before = copy.deepcopy(tenant.settings)
+        auto_actions_before = copy.deepcopy(tenant.auto_actions)
+        audit_before = db.query(AuditEventRecord).count()
+
+        response = client.post(
+            f"/admin/tenants/{tenant.tenant_id}/settings/automation/preview",
+            headers=admin_headers,
+            json={"payload": {"preset_key": "prepare_only", "preset_version": 1}},
+        )
+        assert response.status_code == 200
+        preview = response.json()
+        assert preview["config_version"] == version_before
+        assert preview["automation_projection"]["auto_actions"]["customer_inquiry"] == "semi"
+
+        db.refresh(tenant)
+        assert tenant.config_version == version_before
+        assert tenant.settings == settings_before
+        assert tenant.auto_actions == auto_actions_before
+        assert db.query(AuditEventRecord).count() == audit_before

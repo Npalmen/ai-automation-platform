@@ -31,7 +31,9 @@ LEGACY_SECTION_ALIASES: dict[str, str] = {
     "intake": "intake",
 }
 
-FORBIDDEN_PATCH_KEYS: frozenset[str] = frozenset(
+RESERVED_INTERNAL_SETTINGS_KEYS: frozenset[str] = frozenset({"_readiness"})
+
+FORBIDDEN_PATCH_KEYS: frozenset[str] = RESERVED_INTERNAL_SETTINGS_KEYS | frozenset(
     {
         "allowed_integrations",
         "enabled_job_types",
@@ -48,7 +50,6 @@ FORBIDDEN_PATCH_KEYS: frozenset[str] = frozenset(
         "scheduler",
         "lifecycle_status",
         "status",
-        "_readiness",
     }
 )
 

@@ -14,7 +14,7 @@
 
 2026-07-21 (Slice B partial — superseded by Commit 4+5 reconciliation on same branch.)
 
-2026-07-21 (Slice C backend — branch `feature/customer-settings-slice-c` @ Commit 2B: active customer settings aggregate GET exposes `effective_readiness` (integration groups + runtime rules, read-only); `compute_automation_runtime_projection` syncs `auto_actions` from canonical `settings.automation`; PATCH allows valid-but-not-ready configs; 80 focused tests passed locally.)
+2026-07-21 (Slice C backend — branch `feature/customer-settings-slice-c` @ Commit 2C: frontend-neutral readiness blockers (`code`, `domain`, `message`, `action_domain`, `affected_capabilities`); `_readiness` internal meta protected; 15 HTTP contract tests pass with isolated test `ADMIN_API_KEY`; automation PATCH/preview verified via HTTP.)
 
 ## Verification method
 

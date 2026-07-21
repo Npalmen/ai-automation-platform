@@ -14,6 +14,7 @@ from app.admin.customer_settings.audit import (
     build_settings_audit_event,
     diff_field_paths,
     domain_snapshot,
+    filter_internal_audit_paths,
 )
 from app.admin.customer_settings.domains import (
     assert_domain_permission,
@@ -192,7 +193,9 @@ def patch_domain_settings(
         record.updated_at = _utcnow()
 
         after_snapshot = domain_snapshot(record.settings or {}, domain)
-        changed_paths = diff_field_paths(before_snapshot, after_snapshot)
+        changed_paths = filter_internal_audit_paths(
+            diff_field_paths(before_snapshot, after_snapshot)
+        )
 
         db.add(
             build_settings_audit_event(

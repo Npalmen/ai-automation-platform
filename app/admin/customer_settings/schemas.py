@@ -51,16 +51,30 @@ class CustomerSettingsPreviewResponse(BaseModel):
     normalized_payload: dict[str, Any] = Field(default_factory=dict)
     preview_fingerprint: str
     finance_destination: dict[str, Any] | None = None
+    automation_projection: dict[str, Any] | None = None
+
+
+class CustomerSettingsReadinessBlocker(BaseModel):
+    code: str
+    domain: str
+    message: str
+    action_domain: str
+    affected_capabilities: list[str] = Field(default_factory=list)
+
+
+class CustomerSettingsReadinessWarning(BaseModel):
+    code: str
+    domain: str
+    message: str
+    action_domain: str
 
 
 class CustomerSettingsReadinessResponse(BaseModel):
     overall_status: str
     is_stale: bool
     stale_domains: list[str] = Field(default_factory=list)
-    blockers: list[dict[str, Any]] = Field(default_factory=list)
-    warnings: list[dict[str, Any]] = Field(default_factory=list)
-    blocking_domain: str | None = None
-    action_target: str | None = None
+    blockers: list[CustomerSettingsReadinessBlocker] = Field(default_factory=list)
+    warnings: list[CustomerSettingsReadinessWarning] = Field(default_factory=list)
     integration_group_status: dict[str, Any] = Field(default_factory=dict)
     affected_capabilities: list[str] = Field(default_factory=list)
 

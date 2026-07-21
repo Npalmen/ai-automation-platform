@@ -35,6 +35,19 @@ _SETTINGS_DOMAIN_BY_READINESS_DOMAIN = {
     for readiness_domain in readiness_domains
 }
 
+_READINESS_TO_ACTION_DOMAIN = {
+    "readiness": "identity",
+    "identity": "identity",
+    "modules": "modules",
+    "services": "services",
+    "integrations": "integrations",
+    "routing": "routing",
+    "automation": "automation",
+    "intake": "intake",
+    "finance_destination": "integrations",
+    "data_start": "intake",
+}
+
 
 def _readiness_meta(settings: dict[str, Any]) -> dict[str, Any]:
     meta = settings.get("_readiness")
@@ -65,31 +78,76 @@ def mark_readiness_stale_domains(settings: dict[str, Any], domains: list[str]) -
     return merged
 
 
+def _action_domain_for(*, domain: str, group_key: str | None = None) -> str:
+    if group_key == "finance_destination":
+        return "integrations"
+    return _READINESS_TO_ACTION_DOMAIN.get(domain, domain)
+
+
+def _capabilities_for_blocker(
+    capability_keys: list[str],
+    *,
+    domain: str,
+    code: str,
+    group_key: str | None = None,
+) -> list[str]:
+    affected: list[str] = []
+    for key in capability_keys:
+        cap = PRODUCT_CAPABILITIES.get(key)
+        if not cap:
+            continue
+        if code.startswith("readiness."):
+            affected.append(key)
+            continue
+        if domain in {"integrations", "finance_destination"} or group_key:
+            if cap.required_integration_groups or cap.required_integrations:
+                if group_key and group_key not in cap.required_integration_groups:
+                    continue
+                affected.append(key)
+        elif domain == "routing" and key == "invoice_handling":
+            affected.append(key)
+        elif domain == "automation":
+            affected.append(key)
+        elif domain == "modules":
+            affected.append(key)
+    return sorted(set(affected))
+
+
 def _blocker(
     *,
-    blocker_id: str,
+    code: str,
     message: str,
     domain: str,
+    capability_keys: list[str],
     group_key: str | None = None,
+    action_domain: str | None = None,
 ) -> dict[str, Any]:
+    resolved_action_domain = action_domain or _action_domain_for(domain=domain, group_key=group_key)
     return {
-        "id": blocker_id,
-        "message": message,
+        "code": code,
         "domain": domain,
-        "group_key": group_key,
+        "message": message,
+        "action_domain": resolved_action_domain,
+        "affected_capabilities": _capabilities_for_blocker(
+            capability_keys,
+            domain=domain,
+            code=code,
+            group_key=group_key,
+        ),
     }
 
 
 def _warning(
     *,
-    warning_id: str,
+    code: str,
     message: str,
     domain: str,
 ) -> dict[str, Any]:
     return {
-        "id": warning_id,
+        "code": code,
         "message": message,
         "domain": domain,
+        "action_domain": _action_domain_for(domain=domain),
     }
 
 
@@ -118,25 +176,11 @@ def _runtime_snapshot(settings: dict[str, Any], capability_keys: list[str]) -> d
     return snapshot
 
 
-def _affected_capabilities(capability_keys: list[str], blockers: list[dict[str, Any]]) -> list[str]:
-    if not blockers:
-        return []
-    blocker_domains = {item.get("domain") for item in blockers}
-    affected: list[str] = []
-    for key in capability_keys:
-        cap = PRODUCT_CAPABILITIES.get(key)
-        if not cap:
-            continue
-        if "modules" in blocker_domains or "integrations" in blocker_domains:
-            if cap.required_integration_groups or cap.required_integrations:
-                affected.append(key)
-                continue
-        if "routing" in blocker_domains and "invoice_handling" == key:
-            affected.append(key)
-            continue
-        if "automation" in blocker_domains:
-            affected.append(key)
-    return sorted(set(affected))
+def _aggregate_affected_capabilities(blockers: list[dict[str, Any]]) -> list[str]:
+    affected: set[str] = set()
+    for blocker in blockers:
+        affected.update(blocker.get("affected_capabilities") or [])
+    return sorted(affected)
 
 
 def compute_customer_settings_readiness(
@@ -161,11 +205,14 @@ def compute_customer_settings_readiness(
     warnings: list[dict[str, Any]] = []
 
     if is_stale:
+        stale_action_domain = stale_domains[0] if stale_domains else "identity"
         blockers.append(
             _blocker(
-                blocker_id="readiness.stale_config_version",
+                code="readiness.stale_config_version",
                 message="Readiness är inaktuell efter config-ändring.",
                 domain="readiness",
+                capability_keys=capability_keys,
+                action_domain=stale_action_domain,
             )
         )
 
@@ -202,9 +249,13 @@ def compute_customer_settings_readiness(
         domain = "routing" if evaluation.reason == "manual_accounting_routing_missing_routing" else "integrations"
         blockers.append(
             _blocker(
-                blocker_id=f"integration_group.{evaluation.group_key}.{evaluation.reason}",
-                message=f"Integrationsgrupp '{evaluation.group_key}' är inte uppfylld ({evaluation.reason}).",
+                code=f"integration_group.{evaluation.group_key}.{evaluation.reason}",
+                message=(
+                    f"Integrationsgrupp '{evaluation.group_key}' är inte uppfylld "
+                    f"({evaluation.reason})."
+                ),
                 domain=domain,
+                capability_keys=capability_keys,
                 group_key=evaluation.group_key,
             )
         )
@@ -212,9 +263,10 @@ def compute_customer_settings_readiness(
     if "invoice_handling" in capability_keys and finance_status.get("active_implementation") == "none":
         blockers.append(
             _blocker(
-                blocker_id="finance_destination.not_configured",
+                code="finance_destination.not_configured",
                 message="Ekonomidestination saknas.",
                 domain="integrations",
+                capability_keys=capability_keys,
                 group_key="finance_destination",
             )
         )
@@ -230,9 +282,10 @@ def compute_customer_settings_readiness(
         ):
             blockers.append(
                 _blocker(
-                    blocker_id=f"integrations.{canonical}.required_not_verified",
+                    code=f"integrations.{canonical}.required_not_verified",
                     message=f"Obligatorisk integration '{canonical}' är inte verifierad.",
                     domain="integrations",
+                    capability_keys=capability_keys,
                 )
             )
 
@@ -249,30 +302,23 @@ def compute_customer_settings_readiness(
         else None,
     )
     for item in runtime_bundle.get("readiness_blocking") or []:
+        step_domain = str(item.get("step_key") or "automation")
         blockers.append(
             _blocker(
-                blocker_id=str(item.get("id") or "runtime.blocked"),
+                code=str(item.get("id") or "runtime.blocked"),
                 message=str(item.get("message") or "Runtime blocker."),
-                domain=str(item.get("step_key") or "automation"),
+                domain=step_domain,
+                capability_keys=capability_keys,
             )
         )
     for item in runtime_bundle.get("readiness_warnings") or []:
         warnings.append(
             _warning(
-                warning_id=str(item.get("id") or "runtime.warning"),
+                code=str(item.get("id") or "runtime.warning"),
                 message=str(item.get("message") or "Runtime varning."),
                 domain=str(item.get("step_key") or "automation"),
             )
         )
-
-    blocking_domain = None
-    if blockers:
-        blocking_domain = str(blockers[0].get("domain") or "integrations")
-    action_target = (
-        f"/admin/tenants/{record.tenant_id}/settings/{blocking_domain}"
-        if blocking_domain and blocking_domain != "readiness"
-        else None
-    )
 
     if blockers:
         overall_status = "not_ready"
@@ -287,8 +333,6 @@ def compute_customer_settings_readiness(
         "stale_domains": stale_domains,
         "blockers": blockers,
         "warnings": warnings,
-        "blocking_domain": blocking_domain,
-        "action_target": action_target,
         "integration_group_status": group_status,
-        "affected_capabilities": _affected_capabilities(capability_keys, blockers),
+        "affected_capabilities": _aggregate_affected_capabilities(blockers),
     }
