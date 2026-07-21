@@ -50,7 +50,8 @@ class TestWriteOperationStatus:
         assert "password" not in json.dumps(payload).lower()
         if os.name != "nt":
             mode = stat.S_IMODE(output.stat().st_mode)
-            assert mode & 0o077 == 0
+            # Policy: 0640 (owner rw, group r, others none) per docs/runbooks/backup-and-restore.md
+            assert mode == 0o640
 
     def test_restore_success_with_verification_enums(self, tmp_path: Path):
         output = tmp_path / "restore_status.json"
