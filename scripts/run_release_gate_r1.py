@@ -63,7 +63,7 @@ def _run_phase(phase: GatePhase, *, verbose: bool) -> int:
     for test_file in phase.tests:
         print(f"  - {test_file}")
 
-    cmd = [sys.executable, "-m", "pytest", *phase.tests]
+    cmd = [sys.executable, "-m", "pytest", "-m", "not monday_live", *phase.tests]
     if verbose:
         print(f"Running command: {' '.join(cmd)}")
 

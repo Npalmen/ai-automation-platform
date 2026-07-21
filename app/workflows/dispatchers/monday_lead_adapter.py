@@ -112,7 +112,7 @@ class MondayLeadDispatchAdapter(BaseDispatchAdapter):
                 },
             )
 
-        cfg = get_settings()
+        cfg = settings if settings is not None else get_settings()
         api_key = getattr(cfg, "MONDAY_API_KEY", "") or ""
         api_url = getattr(cfg, "MONDAY_API_URL", "https://api.monday.com/v2") or "https://api.monday.com/v2"
 
