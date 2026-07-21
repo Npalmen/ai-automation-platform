@@ -127,7 +127,7 @@ def _live_eval_job(message_id: str, run_id: str) -> Job:
 
 
 def test_concurrent_different_messages_one_root_job(pg_engine):
-    run_id = f"run-pg-{uuid4()}"
+    run_id = str(uuid4())
     with pg_engine.begin() as conn:
         _insert_registered_run(conn, run_id)
 
@@ -190,7 +190,7 @@ def test_concurrent_different_messages_one_root_job(pg_engine):
 
 
 def test_same_message_id_claim_is_idempotent(pg_engine):
-    run_id = f"run-pg-{uuid4()}"
+    run_id = str(uuid4())
     message_id = f"msg-{uuid4()}"
     with pg_engine.begin() as conn:
         _insert_registered_run(conn, run_id)
@@ -238,7 +238,7 @@ def test_same_message_id_claim_is_idempotent(pg_engine):
 
 
 def test_rollback_on_claim_failure_after_job_flush(pg_engine):
-    run_id = f"run-pg-{uuid4()}"
+    run_id = str(uuid4())
     with pg_engine.begin() as conn:
         _insert_registered_run(conn, run_id)
 
@@ -277,7 +277,7 @@ def test_rollback_on_claim_failure_after_job_flush(pg_engine):
 
 
 def test_rollback_on_commit_failure_after_claim(pg_engine):
-    run_id = f"run-pg-{uuid4()}"
+    run_id = str(uuid4())
     message_id = f"msg-{uuid4()}"
     with pg_engine.begin() as conn:
         _insert_registered_run(conn, run_id)
@@ -313,7 +313,7 @@ def test_rollback_on_commit_failure_after_claim(pg_engine):
 
 
 def test_repository_concurrent_claim_only_one_wins(pg_engine):
-    run_id = f"run-pg-{uuid4()}"
+    run_id = str(uuid4())
     with pg_engine.begin() as conn:
         _insert_registered_run(conn, run_id)
 
