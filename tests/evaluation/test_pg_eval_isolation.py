@@ -275,7 +275,7 @@ def test_pg_migration_chain_from_empty_database():
     engine = _fresh_engine()
     try:
         apply_pre_migration_baseline(engine)
-        apply_versioned_sql_migrations(engine, ORDERED_MIGRATION_FILES)
+        apply_versioned_sql_migrations(engine, MIGRATIONS_THROUGH_015)
         _assert_decision_records_schema(engine)
         _assert_unique_idempotency_index(engine)
         _assert_action_operation_index(engine)

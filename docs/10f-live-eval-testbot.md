@@ -79,6 +79,19 @@ Excluded from release gate and ordinary suites:
 not monday_live and not live_gmail_eval and not live_llm_eval and not live_e2e_eval
 ```
 
+### PostgreSQL integration_db (CI + local)
+
+CI bootstraps schema once before `integration_db` tests:
+
+```bash
+ENV=test DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_platform \
+  python -m scripts.ci.bootstrap_postgres_schema
+ENV=test DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_platform \
+  python -m pytest tests/evaluation/live -m integration_db --junitxml=live_eval_integration_db.junit.xml
+```
+
+The `integration_db` fixture verifies schema provisioning only; it does not run migrations.
+
 ### Journal
 
 `storage/live_eval/runs/<id>/transitions.jsonl` (append-only) and `report.json` (atomic replace). Directory `0750`, files `0640`.

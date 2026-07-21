@@ -46,7 +46,7 @@ jobs:
         run: python -m scripts.run_eval_harness --smoke --fail-on-regression
 
       - name: Run release gate
-        run: python scripts/run_release_gate_r1.py --verbose
+        run: python -m scripts.run_release_gate_r1 --verbose
 
       - name: Provision PostgreSQL eval database
         run: python scripts/ci/provision_eval_pg_database.py
@@ -94,6 +94,12 @@ jobs:
 
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
+
+      - name: Bootstrap PostgreSQL schema
+        env:
+          ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_platform
+        run: python -m scripts.ci.bootstrap_postgres_schema
 
       - name: Run live-eval integration_db PostgreSQL tests
         env:

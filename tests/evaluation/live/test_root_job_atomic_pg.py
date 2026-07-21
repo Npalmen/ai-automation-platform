@@ -21,7 +21,7 @@ from app.repositories.postgres.live_eval_repository import (
     LiveEvalRunConflictError,
     LiveEvalRunRepository,
 )
-from app.repositories.postgres.schema_migrations import ensure_runtime_schema
+from app.repositories.postgres.migration_runner import verify_ci_postgres_schema_provisioned
 
 pytestmark = pytest.mark.integration_db
 
@@ -37,7 +37,7 @@ def _postgres_url() -> str:
 def pg_engine():
     pytest.importorskip("psycopg2")
     engine = create_engine(_postgres_url())
-    ensure_runtime_schema(engine)
+    verify_ci_postgres_schema_provisioned(engine)
     yield engine
     engine.dispose()
 
