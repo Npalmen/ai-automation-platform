@@ -137,7 +137,11 @@ jobs:
           docker run --rm ai-automation-platform:ci python -c "import json; d=json.load(open('/app/build-metadata.json')); assert d['schema_version']==1; assert d['commit_sha']; assert d['build_time']; assert d['release_id']"
 
       - name: Validate production compose config
-        run: docker compose -f docker-compose.prod.yml config
+        run: |
+          cat > .env.production <<'EOF'
+          POSTGRES_PASSWORD=ci-postgres-password
+          EOF
+          docker compose -f docker-compose.prod.yml config
 
       - name: Verify runtime storage bootstrap and health
         env:
