@@ -2,15 +2,6 @@ name: Live Eval Foundation (2F.1)
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - "app/evaluation/live/**"
-      - "migrations/017_live_eval_runs.sql"
-      - "migrations/018_live_eval_external_events.sql"
-      - "migrations/019_live_eval_runs_activated_at.sql"
-      - "scripts/run_live_eval.py"
-      - "tests/evaluation/live/**"
-      - ".github/workflows/live-eval.yml"
 
 jobs:
   foundation:
