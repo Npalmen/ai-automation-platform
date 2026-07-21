@@ -418,20 +418,20 @@ class TestOverviewEndpoint:
 
         key = "overview-admin-key"
         s = _settings(ADMIN_API_KEY=key)
-        client = TestClient(app, raise_server_exceptions=False)
-        with patch("app.core.admin_auth.get_settings", return_value=s):
-            with patch(
-                "app.admin.operations_overview.TenantConfigRepository.list_all",
-                return_value=[],
-            ):
+        with TestClient(app, raise_server_exceptions=False) as client:
+            with patch("app.core.admin_auth.get_settings", return_value=s):
                 with patch(
-                    "app.admin.operations_overview.collect_all_triage_rows",
+                    "app.admin.operations_overview.TenantConfigRepository.list_all",
                     return_value=[],
                 ):
-                    r = client.get(
-                        "/admin/operations/overview",
-                        headers={"X-Admin-API-Key": key},
-                    )
+                    with patch(
+                        "app.admin.operations_overview.collect_all_triage_rows",
+                        return_value=[],
+                    ):
+                        r = client.get(
+                            "/admin/operations/overview",
+                            headers={"X-Admin-API-Key": key},
+                        )
         assert r.status_code == 200
         body = r.json()
         OperationsOverviewResponse.model_validate(body)

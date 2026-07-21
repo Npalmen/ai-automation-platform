@@ -19,6 +19,16 @@ from app.admin.onboarding.draft_schemas import (
     RoutingPatchRequest,
     ServiceProfilePatchRequest,
 )
+from app.admin.onboarding.integration_draft_schemas import (
+    GmailIntegrationConfig,
+    IntegrationSelectionDraft,
+    IntegrationsPatchRequest,
+)
+from app.admin.onboarding.slice2b_integrations_service import (
+    patch_integrations_step,
+    verify_integration,
+)
+from app.admin.onboarding.steps import evaluate_integrations_step
 from app.admin.onboarding.effective_config import materialize_lead_config, materialize_slice2a_config
 from app.admin.onboarding.models import (
     OnboardingSessionRecord,
@@ -157,6 +167,33 @@ def _complete_slice2a(db, session_id: str, version: int):
     return OnboardingRepository.get_session(db, session_id)
 
 
+def _integrations_evaluation(db, session):
+    modules = OnboardingRepository.get_draft(db, session.id, "modules")
+    tenant = db.query(TenantConfigRecord).filter_by(tenant_id=session.tenant_id).first()
+    return evaluate_integrations_step(
+        db,
+        modules_draft=(modules.payload if modules else {}) or {},
+        tenant=tenant,
+        settings=_settings(),
+        session_id=session.id,
+    )
+
+
+def _patch_integration_selections(db, session, *, selections, settings=None, **kwargs):
+    patch_integrations_step(
+        db,
+        session_id=session.id,
+        operator=_operator(),
+        body=IntegrationsPatchRequest(
+            version=session.version,
+            selections=selections,
+            **kwargs,
+        ),
+        settings=settings or _settings(),
+    )
+    return OnboardingRepository.get_session(db, session.id)
+
+
 class TestSlice2aRegistries:
     def test_registries_include_slice2a_sections(self):
         reg = present_registries()
@@ -220,20 +257,158 @@ class TestSlice2aMaterialization:
 
 
 class TestSlice2aReadiness:
-    def test_lead_management_not_ready_without_integration(self, db):
+    def test_lead_management_ready_with_warnings_without_explicit_integration(self, db):
         session = _advance_to_automation(db, capabilities=["lead_management"])
         session = _complete_slice2a(db, session.id, session.version)
         readiness = run_readiness(
             db, session_id=session.id, operator=_operator(), settings=_settings()
         )
-        assert readiness.overall_status == "not_ready"
+        assert readiness.overall_status == "ready_with_warnings"
         passed_ids = {c.id for c in readiness.passed_checks}
+        warning_ids = {c.id for c in readiness.warnings}
         blocking_ids = {c.id for c in readiness.blocking_checks}
         assert "step.service_profile" in passed_ids
         assert "step.routing" in passed_ids
-        assert "step.integrations" in blocking_ids or any(
-            "integration" in c.id for c in readiness.blocking_checks
+        assert "step.integrations" in passed_ids
+        assert blocking_ids == set()
+        assert "warning.lifecycle.not_active" in warning_ids
+
+        evaluation = _integrations_evaluation(db, session)
+        assert evaluation["blocks_activation"] is False
+        items = (evaluation.get("details") or {}).get("integrations") or []
+        assert any(
+            item.get("integration_key") == "monday"
+            and item.get("selection_status") == "not_selected"
+            and item.get("lifecycle_status") == "not_applicable"
+            for item in items
         )
+
+    def test_selected_required_unconfigured_is_not_ready(self, db):
+        session = _advance_to_automation(db, capabilities=["lead_management"])
+        session = _complete_slice2a(db, session.id, session.version)
+        session = _patch_integration_selections(
+            db,
+            session,
+            selections={
+                "google_mail": IntegrationSelectionDraft(selection_status="selected_required"),
+            },
+        )
+        readiness = run_readiness(
+            db, session_id=session.id, operator=_operator(), settings=_settings()
+        )
+        blocking_ids = {c.id for c in readiness.blocking_checks}
+        assert readiness.overall_status == "not_ready"
+        assert "step.integrations" in blocking_ids
+
+        evaluation = _integrations_evaluation(db, session)
+        assert evaluation["blocks_activation"] is True
+        gmail = next(
+            item
+            for item in (evaluation.get("details") or {}).get("integrations") or []
+            if item.get("integration_key") == "gmail"
+        )
+        assert gmail["selection_status"] == "selected_required"
+        assert gmail["lifecycle_status"] == "selected"
+        assert gmail["connected"] is False
+
+    def test_selected_optional_unconnected_ready_with_warnings(self, db):
+        session = _advance_to_automation(db, capabilities=["lead_management"])
+        session = _complete_slice2a(db, session.id, session.version)
+        session = _patch_integration_selections(
+            db,
+            session,
+            selections={
+                "google_mail": IntegrationSelectionDraft(selection_status="selected_optional"),
+            },
+        )
+        readiness = run_readiness(
+            db, session_id=session.id, operator=_operator(), settings=_settings()
+        )
+        assert readiness.overall_status == "ready_with_warnings"
+        assert {c.id for c in readiness.blocking_checks} == set()
+
+        evaluation = _integrations_evaluation(db, session)
+        assert evaluation["blocks_activation"] is False
+        gmail = next(
+            item
+            for item in (evaluation.get("details") or {}).get("integrations") or []
+            if item.get("integration_key") == "gmail"
+        )
+        assert gmail["selection_status"] == "selected_optional"
+        assert gmail["connected"] is False
+
+    def test_not_selected_integration_is_not_applicable_and_non_blocking(self, db):
+        session = _advance_to_automation(db, capabilities=["lead_management"])
+        session = _complete_slice2a(db, session.id, session.version)
+        session = _patch_integration_selections(
+            db,
+            session,
+            selections={
+                "google_mail": IntegrationSelectionDraft(selection_status="not_selected"),
+                "visma": IntegrationSelectionDraft(selection_status="not_selected"),
+            },
+        )
+        readiness = run_readiness(
+            db, session_id=session.id, operator=_operator(), settings=_settings()
+        )
+        assert readiness.overall_status == "ready_with_warnings"
+        assert "step.integrations" in {c.id for c in readiness.passed_checks}
+        assert {c.id for c in readiness.blocking_checks} == set()
+
+        evaluation = _integrations_evaluation(db, session)
+        assert evaluation["blocks_activation"] is False
+        for key in ("gmail", "visma"):
+            item = next(
+                i
+                for i in (evaluation.get("details") or {}).get("integrations") or []
+                if i.get("integration_key") == key
+            )
+            assert item["selection_status"] == "not_selected"
+            assert item["lifecycle_status"] == "not_applicable"
+
+    def test_selected_required_connected_passes_integration_checks(self, db):
+        session = _advance_to_automation(db, capabilities=["lead_management"])
+        session = _complete_slice2a(db, session.id, session.version)
+        settings = _settings(GOOGLE_MAIL_ACCESS_TOKEN="mail-token")
+        session = _patch_integration_selections(
+            db,
+            session,
+            selections={
+                "google_mail": IntegrationSelectionDraft(selection_status="selected_required"),
+            },
+            requested_integrations=["gmail"],
+            gmail=GmailIntegrationConfig(requested=True, label_scope_slug="slice-2a-co"),
+            settings=settings,
+        )
+        verify_integration(
+            db,
+            session_id=session.id,
+            operator=_operator(),
+            integration_key="gmail",
+            settings=settings,
+        )
+        readiness = run_readiness(
+            db, session_id=session.id, operator=_operator(), settings=settings
+        )
+        passed_ids = {c.id for c in readiness.passed_checks}
+        blocking_ids = {c.id for c in readiness.blocking_checks}
+        assert readiness.overall_status == "ready_with_warnings"
+        assert blocking_ids == set()
+        assert "step.integrations" in passed_ids
+        assert "integration.gmail.platform_credential" in passed_ids
+        assert "integration.gmail.label_query" in passed_ids
+
+        evaluation = _integrations_evaluation(db, session)
+        assert evaluation["blocks_activation"] is False
+        gmail = next(
+            item
+            for item in (evaluation.get("details") or {}).get("integrations") or []
+            if item.get("integration_key") == "gmail"
+        )
+        assert gmail["selection_status"] == "selected_required"
+        assert gmail["lifecycle_status"] == "configured_not_running"
+        assert gmail["verified"] is True
+        assert gmail["locally_verified"] is True
 
     def test_followups_ready_with_warnings(self, db):
         session = _advance_to_automation(db, capabilities=["followups"])
