@@ -210,7 +210,7 @@ def _compute_lifecycle(
             "supported_in_current_slice": False,
         }
 
-    if selection_status == "not_selected" and not required:
+    if selection_status == "not_selected":
         return {
             "integration_key": integration_key,
             "canonical_integration_key": meta.get("canonical_integration_key"),
@@ -262,6 +262,7 @@ def _compute_lifecycle(
     source_class = "declared"
     ownership = "not_verifiable"
     platform_credential = False
+    requested = selection_status in ("selected_optional", "selected_required")
 
     if integration_key == "gmail":
         requested = selection_status in ("selected_optional", "selected_required")
@@ -336,6 +337,8 @@ def _compute_lifecycle(
             lifecycle = "selected"
         else:
             lifecycle = "not_applicable"
+    else:
+        lifecycle = "selected" if requested else "not_applicable"
 
     freshness_hours = integ.freshness_max_hours if integ else None
     verified_at = verification.verified_at.isoformat() if verification and verification.verified_at else None

@@ -45,15 +45,13 @@ def _selected_integrations(modules_draft: dict) -> list[str]:
 
 
 def _required_integrations_for_capabilities(capability_keys: list[str]) -> set[str]:
-    from app.admin.onboarding.integration_groups import registry_keys_for_group
-
     required: set[str] = set()
     for key in capability_keys:
         cap = PRODUCT_CAPABILITIES.get(key)
         if cap:
             required.update(cap.required_integrations)
-            for group in cap.required_integration_groups:
-                required.update(registry_keys_for_group(group))
+            # Integration groups (finance_destination, etc.) are satisfied and
+            # blocked at group level — never as per-provider required flags.
     return required
 
 
