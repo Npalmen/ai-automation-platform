@@ -6,15 +6,13 @@ import os
 from unittest.mock import patch
 
 import pytest
-from fastapi.testclient import TestClient
 
 from app.core.settings import get_settings
-from app.main import app
 
 
 @pytest.fixture
-def client():
-    return TestClient(app)
+def client(lifespan_client):
+    return lifespan_client
 
 
 @pytest.fixture

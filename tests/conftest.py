@@ -27,3 +27,14 @@ def _reset_rate_limits_between_tests():
     reset_rate_limits_for_tests()
     yield
     reset_rate_limits_for_tests()
+
+
+@pytest.fixture
+def lifespan_client():
+    """FastAPI TestClient that runs app startup/shutdown (schema provisioning)."""
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    with TestClient(app) as client:
+        yield client
