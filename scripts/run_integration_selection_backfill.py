@@ -17,37 +17,21 @@ def main() -> int:
     parser.add_argument("--verify", action="store_true", help="Compare selections vs allowed_integrations")
     args = parser.parse_args()
 
-    from app.admin.integrations.selection_backfill import (
-        backfill_tenant_selections,
-        run_backfill_all_tenants,
-        verify_selections_vs_allowed_integrations,
-    )
-    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+    from app.admin.integrations.selection_backfill import execute_backfill_run
 
     db = SessionLocal()
     try:
-        if args.tenant_id:
-            report = backfill_tenant_selections(db, args.tenant_id, dry_run=args.dry_run)
-            out = {
-                "tenant_id": report.tenant_id,
-                "updated": report.updated,
-                "skipped": report.skipped,
-                "decisions": [d.__dict__ for d in report.decisions],
-                "errors": report.errors,
-            }
-            if args.verify:
-                record = TenantConfigRepository.get(db, args.tenant_id)
-                out["verification"] = verify_selections_vs_allowed_integrations(record) if record else {}
-            if not args.dry_run:
-                db.commit()
-        else:
-            out = run_backfill_all_tenants(db, dry_run=args.dry_run)
-            if not args.dry_run:
-                db.commit()
+        out = execute_backfill_run(
+            db,
+            tenant_id=args.tenant_id,
+            dry_run=args.dry_run,
+            verify=args.verify,
+        )
+        db.commit()
         print(json.dumps(out, ensure_ascii=False, indent=2))
         return 0
     except Exception as exc:
-        db.rollback()
+        db.commit()
         print(json.dumps({"error": str(exc)}), file=sys.stderr)
         return 1
     finally:
