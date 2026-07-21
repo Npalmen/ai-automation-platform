@@ -5,6 +5,20 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.admin.customer_settings.schemas import (
+    CustomerSettingsAggregateResponse,
+    CustomerSettingsDomainPatchRequest,
+    CustomerSettingsDomainResponse,
+    CustomerSettingsPatchResponse,
+    CustomerSettingsPreviewRequest,
+    CustomerSettingsPreviewResponse,
+)
+from app.admin.customer_settings.service import (
+    get_customer_settings_view,
+    get_domain_settings,
+    patch_domain_settings,
+    preview_domain_settings,
+)
 from app.admin.tenant_lifecycle.deletion_service import TenantDeletionService
 from app.admin.tenant_lifecycle.schemas import (
     ActivationHistoryResponse,
@@ -156,6 +170,15 @@ def tenant_activation_history(
     return ActivationHistoryResponse(**list_activation_history(db, tenant_id))
 
 
+@router.get("/{tenant_id}/settings", response_model=CustomerSettingsAggregateResponse)
+def tenant_settings_aggregate(
+    tenant_id: str,
+    db: Session = Depends(get_db),
+    operator: OperatorIdentity = Depends(require_operator_role(_READ_ROLES)),
+):
+    return CustomerSettingsAggregateResponse(**get_customer_settings_view(db, tenant_id, operator))
+
+
 @router.get("/{tenant_id}/settings/{section}", response_model=TenantSettingsSectionResponse)
 def tenant_settings_get(
     tenant_id: str,
@@ -163,8 +186,9 @@ def tenant_settings_get(
     db: Session = Depends(get_db),
     operator: OperatorIdentity = Depends(require_operator_role(_READ_ROLES)),
 ):
-    _ = operator
-    return TenantSettingsSectionResponse(**get_settings_section(db, tenant_id, section))
+    return TenantSettingsSectionResponse(
+        **get_settings_section(db, tenant_id, section, operator=operator)
+    )
 
 
 @router.patch("/{tenant_id}/settings/{section}", response_model=TenantSettingsSectionResponse)
@@ -173,16 +197,53 @@ def tenant_settings_patch(
     section: str,
     body: TenantSettingsSectionPatchRequest,
     db: Session = Depends(get_db),
-    operator: OperatorIdentity = Depends(require_operator_role(_WRITE_ROLES)),
+    operator: OperatorIdentity = Depends(require_operator_role(_READ_ROLES)),
 ):
+    from app.admin.customer_settings.domains import assert_domain_permission
+
+    try:
+        assert_domain_permission(operator, section, "write")
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    expected = body.expected_config_version
     return TenantSettingsSectionResponse(
         **patch_settings_section(
             db,
             tenant_id=tenant_id,
             section=section,
             operator_id=operator["id"],
-            config_version=body.config_version,
+            config_version=expected,
             payload=body.payload,
+            operator_role=operator.get("role") or "admin",
+            change_reason=body.change_reason,
+        )
+    )
+
+
+@router.post(
+    "/{tenant_id}/settings/{section}/preview",
+    response_model=CustomerSettingsPreviewResponse,
+)
+def tenant_settings_preview(
+    tenant_id: str,
+    section: str,
+    body: CustomerSettingsPreviewRequest,
+    db: Session = Depends(get_db),
+    operator: OperatorIdentity = Depends(require_operator_role(_READ_ROLES)),
+):
+    from app.admin.customer_settings.domains import assert_domain_permission
+
+    try:
+        assert_domain_permission(operator, section, "preview")
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    return CustomerSettingsPreviewResponse(
+        **preview_domain_settings(
+            db,
+            tenant_id=tenant_id,
+            domain=section,
+            payload=body.payload,
+            operator=operator,
         )
     )
 

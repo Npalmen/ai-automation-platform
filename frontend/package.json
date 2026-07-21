@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "test:contracts": "node --test design/contracts.test.mjs",
     "test:onboarding": "node --test src/features/onboarding/registrySource.test.mjs src/features/onboarding/slice2aWizard.test.mjs src/features/onboarding/slice2bWizard.test.mjs src/features/onboarding/financeDestination.test.mjs src/features/onboarding/readinessActionLink.test.mjs src/features/auth/permissions.test.mjs",
+    "test:customer-settings": "node --test src/features/customerSettings/customerSettings.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

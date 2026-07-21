@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
+import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.admin.integrations.selection_models import (
@@ -28,6 +31,23 @@ from app.integrations.keys import (
     registry_key_to_canonical,
 )
 from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+BackfillRunStatus = Literal["completed", "failed"]
+
+_REDACT_KEY_FRAGMENTS = frozenset(
+    {
+        "token",
+        "secret",
+        "password",
+        "credential",
+        "api_key",
+        "authorization",
+        "refresh",
+        "access_token",
+        "refresh_token",
+        "client_secret",
+    }
+)
 
 BackfillReason = Literal[
     "explicit_onboarding",
@@ -60,6 +80,228 @@ class TenantBackfillReport:
 
 def _utcnow_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _resolve_canonical_commit() -> str | None:
+    for key in ("BUILD_COMMIT_SHA", "GIT_COMMIT", "COMMIT_SHA"):
+        value = os.environ.get(key, "").strip()
+        if value:
+            return value
+    return None
+
+
+def _redact_backfill_report(payload: Any, *, parent_key: str = "") -> Any:
+    if isinstance(payload, dict):
+        return {key: _redact_backfill_report(value, parent_key=key) for key, value in payload.items()}
+    if isinstance(payload, list):
+        return [_redact_backfill_report(item, parent_key=parent_key) for item in payload]
+    if isinstance(payload, str):
+        key_lower = parent_key.lower()
+        if any(fragment in key_lower for fragment in _REDACT_KEY_FRAGMENTS):
+            return "[REDACTED]"
+        if payload.startswith(("ya29.", "kw_", "1//")):
+            return "[REDACTED]"
+    return payload
+
+
+def record_backfill_run(
+    db: Session,
+    *,
+    run_id: str,
+    started_at: datetime,
+    completed_at: datetime,
+    dry_run: bool,
+    status: BackfillRunStatus,
+    tenants_seen: int,
+    tenants_updated: int,
+    tenants_skipped: int,
+    tenants_failed: int,
+    report: dict[str, Any],
+) -> None:
+    redacted = _redact_backfill_report(report)
+    db.execute(
+        text(
+            """
+            INSERT INTO integration_selection_backfill_runs (
+                id,
+                started_at,
+                completed_at,
+                dry_run,
+                status,
+                tenants_seen,
+                tenants_updated,
+                tenants_skipped,
+                report_json
+            ) VALUES (
+                :id,
+                :started_at,
+                :completed_at,
+                :dry_run,
+                :status,
+                :tenants_seen,
+                :tenants_updated,
+                :tenants_skipped,
+                :report_json
+            )
+            """
+        ),
+        {
+            "id": run_id,
+            "started_at": started_at,
+            "completed_at": completed_at,
+            "dry_run": dry_run,
+            "status": status,
+            "tenants_seen": tenants_seen,
+            "tenants_updated": tenants_updated,
+            "tenants_skipped": tenants_skipped,
+            "report_json": json.dumps(redacted, ensure_ascii=False),
+        },
+    )
+
+
+def _envelope_from_core_report(
+    core: dict[str, Any],
+    *,
+    started_at: datetime,
+    completed_at: datetime,
+    dry_run: bool,
+    verify_mode: bool,
+    status: BackfillRunStatus,
+    error_summary: str | None = None,
+) -> dict[str, Any]:
+    tenant_data_changed = bool(core.get("tenants_updated", 0)) and not dry_run
+    envelope: dict[str, Any] = {
+        **core,
+        "actor": MIGRATION_BACKFILL_ACTOR,
+        "verify_mode": verify_mode,
+        "tenant_data_changed": tenant_data_changed,
+        "canonical_commit": _resolve_canonical_commit(),
+        "started_at": started_at.isoformat(),
+        "completed_at": completed_at.isoformat(),
+        "status": status,
+        "tenants_failed": int(core.get("tenants_failed", 0)),
+    }
+    if error_summary:
+        envelope["error_summary"] = error_summary
+    return envelope
+
+
+def execute_backfill_run(
+    db: Session,
+    *,
+    tenant_id: str | None = None,
+    dry_run: bool = False,
+    verify: bool = False,
+) -> dict[str, Any]:
+    run_id = str(uuid.uuid4())
+    started = datetime.now(timezone.utc)
+    try:
+        if tenant_id:
+            core = _run_single_tenant_backfill(
+                db,
+                tenant_id,
+                dry_run=dry_run,
+                verify=verify,
+                run_id=run_id,
+                started_at=started,
+            )
+        else:
+            core = run_backfill_all_tenants(db, dry_run=dry_run, verify=verify, run_id=run_id, started_at=started)
+        completed = datetime.now(timezone.utc)
+        envelope = _envelope_from_core_report(
+            core,
+            started_at=started,
+            completed_at=completed,
+            dry_run=dry_run,
+            verify_mode=verify,
+            status="completed",
+        )
+        record_backfill_run(
+            db,
+            run_id=run_id,
+            started_at=started,
+            completed_at=completed,
+            dry_run=dry_run,
+            status="completed",
+            tenants_seen=int(envelope.get("tenants_seen", 0)),
+            tenants_updated=int(envelope.get("tenants_updated", 0)),
+            tenants_skipped=int(envelope.get("tenants_skipped", 0)),
+            tenants_failed=int(envelope.get("tenants_failed", 0)),
+            report=envelope,
+        )
+        db.flush()
+        return envelope
+    except Exception as exc:
+        completed = datetime.now(timezone.utc)
+        failed_core = {
+            "run_id": run_id,
+            "dry_run": dry_run,
+            "verify_mode": verify,
+            "tenants_seen": 0,
+            "tenants_updated": 0,
+            "tenants_skipped": 0,
+            "tenants_failed": 0,
+            "tenants": [],
+        }
+        envelope = _envelope_from_core_report(
+            failed_core,
+            started_at=started,
+            completed_at=completed,
+            dry_run=dry_run,
+            verify_mode=verify,
+            status="failed",
+            error_summary=f"{type(exc).__name__}: {exc}",
+        )
+        record_backfill_run(
+            db,
+            run_id=run_id,
+            started_at=started,
+            completed_at=completed,
+            dry_run=dry_run,
+            status="failed",
+            tenants_seen=0,
+            tenants_updated=0,
+            tenants_skipped=0,
+            tenants_failed=0,
+            report=envelope,
+        )
+        db.flush()
+        raise
+
+
+def _run_single_tenant_backfill(
+    db: Session,
+    tenant_id: str,
+    *,
+    dry_run: bool,
+    verify: bool,
+    run_id: str,
+    started_at: datetime,
+) -> dict[str, Any]:
+    report = backfill_tenant_selections(db, tenant_id, dry_run=dry_run)
+    tenant_payload = {
+        "tenant_id": report.tenant_id,
+        "updated": report.updated,
+        "skipped": report.skipped,
+        "decisions": [d.__dict__ for d in report.decisions],
+        "errors": report.errors,
+    }
+    core: dict[str, Any] = {
+        "run_id": run_id,
+        "dry_run": dry_run,
+        "started_at": started_at.isoformat(),
+        "tenants_seen": 1,
+        "tenants_updated": 1 if report.updated else 0,
+        "tenants_skipped": 1 if report.skipped and not report.errors else 0,
+        "tenants_failed": 1 if report.errors else 0,
+        "tenants": [tenant_payload],
+    }
+    if verify:
+        record = TenantConfigRepository.get(db, tenant_id)
+        core["verification"] = verify_selections_vs_allowed_integrations(record) if record else {}
+    if not dry_run and report.updated:
+        db.flush()
+    return core
 
 
 def _module_required_canonical_keys(
@@ -313,15 +555,19 @@ def run_backfill_all_tenants(
     db: Session,
     *,
     dry_run: bool = False,
+    verify: bool = False,
+    run_id: str | None = None,
+    started_at: datetime | None = None,
 ) -> dict[str, Any]:
     from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 
-    run_id = str(uuid.uuid4())
-    started = datetime.now(timezone.utc)
+    run_id = run_id or str(uuid.uuid4())
+    started = started_at or datetime.now(timezone.utc)
     tenant_reports: list[dict[str, Any]] = []
     tenants = db.query(TenantConfigRecord).all()
     updated = 0
     skipped = 0
+    failed = 0
 
     for record in tenants:
         caps = list(getattr(record, "enabled_job_types", None) or [])
@@ -331,7 +577,9 @@ def run_backfill_all_tenants(
             dry_run=dry_run,
             capability_keys=_capability_keys_from_job_types(caps),
         )
-        if report.skipped and not report.errors:
+        if report.errors:
+            failed += 1
+        elif report.skipped:
             skipped += 1
         elif report.updated:
             updated += 1
@@ -345,18 +593,24 @@ def run_backfill_all_tenants(
             }
         )
 
-    if not dry_run:
+    if not dry_run and updated:
         db.flush()
 
-    return {
+    core: dict[str, Any] = {
         "run_id": run_id,
         "dry_run": dry_run,
         "started_at": started.isoformat(),
         "tenants_seen": len(tenants),
         "tenants_updated": updated,
         "tenants_skipped": skipped,
+        "tenants_failed": failed,
         "tenants": tenant_reports,
     }
+    if verify:
+        core["verifications"] = [
+            verify_selections_vs_allowed_integrations(record) for record in tenants
+        ]
+    return core
 
 
 def _capability_keys_from_job_types(job_types: list[str]) -> list[str]:

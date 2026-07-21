@@ -10,6 +10,7 @@ import { DesignReferencePage } from "@/pages/DesignReferencePage"
 import { FoundationPage } from "@/pages/FoundationPage"
 import { NotFoundPage } from "@/pages/NotFoundPage"
 import { CustomerDetailPage } from "@/features/customers/CustomerDetailPage"
+import { CustomerSettingsPage } from "@/features/customerSettings/CustomerSettingsPage"
 import { CustomersListPage } from "@/features/customers/CustomersListPage"
 import { NewCustomerPage } from "@/features/onboarding/NewCustomerPage"
 import { OnboardingWizardPage } from "@/features/onboarding/OnboardingWizardPage"
@@ -81,6 +82,14 @@ export const router = createBrowserRouter(
                     </RequireRole>
                   ) },
                 { path: ":tenantId", element: <CustomerDetailPage /> },
+                {
+                  path: ":tenantId/settings",
+                  element: (
+                    <RequireRole allowedRoles={["read_only", "operations", "admin"]}>
+                      <CustomerSettingsPage />
+                    </RequireRole>
+                  ),
+                },
               ],
             },
             {

@@ -206,5 +206,47 @@
     "errorState": "Kunde inte ladda sammanfattningar.",
     "actionPlacement": "Länk tillbaka till larm.",
     "forbiddenPatterns": ["Parallell triage-severity.", "Email utan säker recipient."]
+  },
+  "customer-settings": {
+    "purpose": "Operatörsgränssnitt för aktiva kunders kundinställningar per domän.",
+    "route": "/ops/customers/:tenantId/settings",
+    "roles": ["read_only", "operations", "admin", "super_admin"],
+    "domains": [
+      "identity",
+      "modules",
+      "integrations",
+      "routing",
+      "automation",
+      "readiness"
+    ],
+    "primaryActions": [
+      "Spara domän",
+      "Förhandsgranska riskdomän",
+      "Återställ osparade ändringar",
+      "Navigera readiness-blockerare"
+    ],
+    "informationHierarchy": [
+      "Kundheader",
+      "Domänflikar",
+      "Domänformulär",
+      "Readiness-sammanfattning"
+    ],
+    "desktopLayout": "Sidonavigation + innehållspanel med sticky save bar.",
+    "tabletLayout": "Wrap-navigation ovanför innehåll.",
+    "mobileLayout": "Vertikal fliknavigation, kort/listor istället för tabeller, min-h-11 interaktiva ytor.",
+    "loadingState": "Skeleton för header och domäninnehåll.",
+    "emptyState": "Tom capability-lista eller saknad tenant.",
+    "errorState": "ErrorState med tillbaka-länk till kundlistan.",
+    "destructiveRiskConfirmations": [
+      "ConflictDialog vid versionskonflikt",
+      "ConsequencePreview före risk-save",
+      "Bekräftelse vid osparade ändringar och flikbyte"
+    ],
+    "forbiddenPatterns": [
+      "Råa enumvärden i UI",
+      "Automatisk overwrite vid 409",
+      "Preview för read_only",
+      "Skicka scheduler/auto_actions från klienten"
+    ]
   }
 }

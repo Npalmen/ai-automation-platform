@@ -1,7 +1,7 @@
 # Document Index (Canonical)
 
 > **Governing hierarchy:** `docs/00-master-plan.md` → this index → listed canonical docs → deprecated/archive docs.
-> Last updated: **2026-07-21** (Kapitel 2E merged to `main` @ `3baae50`).
+> Last updated: **2026-07-21** (Kapitel 2E merged to `main` @ `3baae50`; Slice C customer settings gates — DEC-038).
 
 ---
 

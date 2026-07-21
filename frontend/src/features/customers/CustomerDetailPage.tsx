@@ -110,6 +110,12 @@ export function CustomerDetailPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
+              to={`/customers/${tenant.tenant_id}/settings`}
+              className="rounded-md border border-border bg-surface px-3 py-2 text-label text-text-primary hover:bg-surface-subtle"
+            >
+              Inställningar
+            </Link>
+            <Link
               to={`/customers/${tenant.tenant_id}/onboarding`}
               className="rounded-md border border-border bg-surface px-3 py-2 text-label text-text-primary hover:bg-surface-subtle"
             >

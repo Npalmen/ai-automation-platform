@@ -599,6 +599,61 @@ curl -s "http://localhost:8000/customer/activity" \
 
 ---
 
+## Active customer settings (Slice C)
+
+Operator UI: `/ops/customers/:tenantId/settings` (`CustomerSettingsPage`).
+
+### API (session or admin key in scripts only)
+
+| Operation | Endpoint |
+|-----------|----------|
+| Aggregate | `GET /admin/tenants/{id}/settings` |
+| Domain read | `GET /admin/tenants/{id}/settings/{domain}` |
+| Preview | `POST /admin/tenants/{id}/settings/{domain}/preview` |
+| Patch | `PATCH /admin/tenants/{id}/settings/{domain}` with `expected_config_version` |
+
+Domains: `identity`, `modules`, `services`, `integrations`, `routing`, `automation`, `intake`.
+
+### Gate commands (Commit 4)
+
+```bash
+# Backend customer-settings bundle
+python -m pytest tests/test_customer_settings_integration_gates.py \
+  tests/test_customer_settings_backend.py \
+  tests/test_customer_settings_contract_hardening.py -q
+
+# Slice B parity + onboarding smoke
+python -m pytest tests/test_integration_selection_slice_b.py \
+  tests/test_integration_group_requirements.py \
+  tests/test_onboarding_smoke_gates.py -q
+
+# Backfill audit (SQLite; PostgreSQL optional via SLICE_B_TEST_DATABASE_URL)
+python -m pytest tests/test_integration_selection_migration_016.py -q -m "not integration_db"
+
+# API smoke (live stack required)
+python scripts/customer_settings_gate_smoke.py \
+  --backend-url http://127.0.0.1:8000 \
+  --frontend-url http://127.0.0.1:5173 \
+  --tenant-id T_NIKLAS_DEMO_001 \
+  --admin-api-key "$ADMIN_API_KEY"
+
+# Side-effect gate (before/after snapshots)
+python scripts/customer_settings_side_effect_gate.py \
+  --before storage/side_effect_before.json --admin-api-key "$ADMIN_API_KEY"
+```
+
+### Pilot verification checklist
+
+1. Open customer card → **Inställningar** link.
+2. Verify tabs: identity, modules, integrations, routing, automation, readiness.
+3. `read_only`: no save buttons; `operations`: routing write only; `admin`: full write per backend permissions.
+4. Risk domains show preview before save; stale version shows ConflictDialog (no silent overwrite).
+5. After smoke: scheduler still paused, credentials unchanged, no external writes, no Gmail scans.
+
+See DEC-038 (`docs/07-decisions.md`).
+
+---
+
 ## Security hardening (Kapitel 11)
 
 Detailed procedures: **`docs/runbooks/security-hardening.md`**

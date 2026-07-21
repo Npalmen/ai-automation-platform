@@ -36,6 +36,7 @@ See plan DEC-032: paused is operational (not lifecycle), super_admin via operato
 | `POST /admin/tenants/{id}/lifecycle/archive\|restore` | admin only |
 | `POST /admin/tenants/{id}/operations/pause\|resume` | Operational pause |
 | `GET/PATCH /admin/tenants/{id}/settings/{section}` | Post-activation settings |
+| `GET /admin/tenants/{id}/settings` | Aggregate customer settings (Slice C) |
 | `GET /admin/tenants/{id}/activation-history` | Immutable snapshots |
 | `POST/GET /admin/tenants/{id}/integrations/invitations` | Customer invites |
 | `GET/POST /integrations/invite/{token}/*` | Public invite flow |
