@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 
 import { CriticalActionDialog } from "@/components/operator/CriticalActionDialog"
@@ -127,8 +127,9 @@ export function OnboardingWizardPage() {
   const activateMutation = useActivateOnboardingMutation(sessionId ?? "")
   const cancelMutation = useCancelOnboardingMutation(sessionId ?? "")
 
-  useEffect(() => {
-    if (!session) return
+  const [identitySeedApplied, setIdentitySeedApplied] = useState<string | null>(null)
+  if (session && session.id !== identitySeedApplied) {
+    setIdentitySeedApplied(session.id)
     setCompanyName(session.company_name ?? "")
     setSlug(session.slug ?? "")
     setIndustries(session.industries ?? [])
@@ -136,40 +137,57 @@ export function OnboardingWizardPage() {
     setIntegrations(session.integrations ?? [])
     if (session.preset_key) setPresetKey(session.preset_key)
     if (session.preset_version) setPresetVersion(session.preset_version)
-  }, [session])
+  }
 
-  useEffect(() => {
-    if (!session) return
-    const stepParam = searchParams.get("step")
+  const stepParam = searchParams.get("step")
+  const stepSeed = session ? `${session.id}:${stepParam ?? ""}:${session.current_step ?? ""}` : null
+  const [stepSeedApplied, setStepSeedApplied] = useState<string | null>(null)
+  if (session && stepSeed && stepSeed !== stepSeedApplied) {
+    setStepSeedApplied(stepSeed)
     if (stepParam && WIZARD_STEPS.some((step) => step.key === stepParam)) {
       setActiveStep(stepParam)
-      return
+    } else {
+      setActiveStep(session.current_step || "identity")
     }
-    setActiveStep(session.current_step || "identity")
-  }, [session?.id, searchParams])
+  }
 
-  useEffect(() => {
-    if (!serviceProfileQuery.data) return
+  const serviceProfileSeed =
+    serviceProfileQuery.data && sessionId
+      ? `${sessionId}:${serviceProfileQuery.dataUpdatedAt}`
+      : null
+  const [serviceProfileSeedApplied, setServiceProfileSeedApplied] = useState<string | null>(null)
+  if (
+    serviceProfileQuery.data &&
+    serviceProfileSeed &&
+    serviceProfileSeed !== serviceProfileSeedApplied
+  ) {
+    setServiceProfileSeedApplied(serviceProfileSeed)
     const draft = serviceProfileQuery.data.draft as {
       selected_profiles?: string[]
       lead_requirements?: Record<string, Record<string, LeadFieldMode>>
     }
     setSelectedProfiles(draft.selected_profiles ?? [])
     setLeadRequirements(draft.lead_requirements ?? {})
-  }, [serviceProfileQuery.data])
+  }
 
-  useEffect(() => {
-    if (!routingQuery.data) return
+  const routingSeed =
+    routingQuery.data && sessionId ? `${sessionId}:${routingQuery.dataUpdatedAt}` : null
+  const [routingSeedApplied, setRoutingSeedApplied] = useState<string | null>(null)
+  if (routingQuery.data && routingSeed && routingSeed !== routingSeedApplied) {
+    setRoutingSeedApplied(routingSeed)
     const draft = routingQuery.data.draft as { route_overrides?: Record<string, string | null> }
     setRouteOverrides(draft.route_overrides ?? {})
     setRoutingPreviewRows(null)
-  }, [routingQuery.data])
+  }
 
-  useEffect(() => {
-    if (!dataStartQuery.data) return
+  const dataStartSeed =
+    dataStartQuery.data && sessionId ? `${sessionId}:${dataStartQuery.dataUpdatedAt}` : null
+  const [dataStartSeedApplied, setDataStartSeedApplied] = useState<string | null>(null)
+  if (dataStartQuery.data && dataStartSeed && dataStartSeed !== dataStartSeedApplied) {
+    setDataStartSeedApplied(dataStartSeed)
     const draft = dataStartQuery.data.draft as { mode?: "new_incoming_only" }
     if (draft.mode) setDataStartMode(draft.mode)
-  }, [dataStartQuery.data])
+  }
 
   const role = auth.status === "authenticated" ? auth.operator.role : null
 

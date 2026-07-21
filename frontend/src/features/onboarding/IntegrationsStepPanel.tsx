@@ -15,7 +15,7 @@ import { ErrorState } from "@/components/operator/ErrorState"
 import { LoadingState } from "@/components/operator/LoadingState"
 import { StatusBadge } from "@/components/operator/StatusBadge"
 import { Button } from "@/components/ui/button"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 type Props = {
   sessionId: string
@@ -79,7 +79,7 @@ export function IntegrationsStepPanel({
   canWrite,
   oauthNotice,
 }: Props) {
-  const { data, isLoading, isError, error } = useIntegrationsStepQuery(sessionId, true)
+  const { data, isLoading, isError, error, dataUpdatedAt } = useIntegrationsStepQuery(sessionId, true)
   const patchMutation = usePatchIntegrationsMutation(sessionId)
   const verifyMutation = useVerifyIntegrationMutation(sessionId)
   const connectMutation = useConnectIntegrationMutation(sessionId)
@@ -96,15 +96,19 @@ export function IntegrationsStepPanel({
   const [unlinkOpen, setUnlinkOpen] = useState(false)
   const [unlinkError, setUnlinkError] = useState<string | undefined>()
 
-  useEffect(() => {
-    if (!data?.draft) return
+  const integrationsDraftSeed = data?.draft ? `${sessionId}:${dataUpdatedAt}` : null
+  const [integrationsDraftSeedApplied, setIntegrationsDraftSeedApplied] = useState<string | null>(
+    null,
+  )
+  if (data?.draft && integrationsDraftSeed && integrationsDraftSeed !== integrationsDraftSeedApplied) {
+    setIntegrationsDraftSeedApplied(integrationsDraftSeed)
     const draft = data.draft as {
       gmail?: { label_scope_slug?: string }
       google_sheets?: { spreadsheet_id?: string }
     }
     setGmailSlug(draft.gmail?.label_scope_slug ?? "")
     setSpreadsheetId(draft.google_sheets?.spreadsheet_id ?? "")
-  }, [data])
+  }
 
   if (isLoading) return <LoadingState label="Laddar integrationer…" rows={3} />
   if (isError || !data) {
