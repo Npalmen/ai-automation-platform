@@ -42,6 +42,9 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
+      - name: Run evaluation harness smoke
+        run: python -m scripts.run_eval_harness --smoke --fail-on-regression
+
       - name: Run release gate
         run: python scripts/run_release_gate_r1.py --verbose
 
