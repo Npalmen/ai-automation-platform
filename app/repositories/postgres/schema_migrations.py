@@ -422,6 +422,10 @@ _LIVE_EVAL_RUNS_MIGRATION_STATEMENTS: list[str] = [
     "CREATE INDEX IF NOT EXISTS ix_live_eval_runs_expires_at ON live_eval_runs (expires_at)",
 ]
 
+_LIVE_EVAL_RUNS_019_MIGRATION_STATEMENTS: list[str] = [
+    "ALTER TABLE live_eval_runs ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ",
+]
+
 _LIVE_EVAL_EVENTS_MIGRATION_STATEMENTS: list[str] = [
     """
     CREATE TABLE IF NOT EXISTS live_eval_external_events (
@@ -545,6 +549,10 @@ def ensure_runtime_schema(engine: Engine) -> None:
                 conn.execute(text(ddl))
                 log.debug("Live eval runs migration OK")
 
+            for ddl in _LIVE_EVAL_RUNS_019_MIGRATION_STATEMENTS:
+                conn.execute(text(ddl))
+                log.debug("Live eval runs 019 migration OK")
+
             for ddl in _LIVE_EVAL_EVENTS_MIGRATION_STATEMENTS:
                 conn.execute(text(ddl))
                 log.debug("Live eval events migration OK")
@@ -560,6 +568,7 @@ def ensure_runtime_schema(engine: Engine) -> None:
             len(_DECISION_RECORD_MIGRATION_STATEMENTS),
             len(_INTEGRATION_SELECTION_MIGRATION_STATEMENTS),
             len(_LIVE_EVAL_RUNS_MIGRATION_STATEMENTS),
+            len(_LIVE_EVAL_RUNS_019_MIGRATION_STATEMENTS),
             len(_LIVE_EVAL_EVENTS_MIGRATION_STATEMENTS),
         )
     except Exception as exc:

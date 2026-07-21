@@ -16,6 +16,7 @@ def emit_live_eval_audit(
     action: str,
     status: str,
     details: dict[str, Any] | None = None,
+    commit: bool = True,
 ) -> None:
     safe_details = dict(details or {})
     for forbidden in ("access_token", "refresh_token", "api_key", "message_text", "body"):
@@ -27,4 +28,5 @@ def emit_live_eval_audit(
         action=action,
         status=status,
         details=safe_details,
+        commit=commit,
     )

@@ -16,7 +16,10 @@ from app.evaluation.live.safety import (
 )
 from app.integrations.enums import IntegrationType
 from app.integrations.factory import get_integration_adapter
+from app.integrations.policies import is_integration_enabled_for_tenant
 from app.integrations.service import get_integration_connection_config
+
+_READ_ONLY_GMAIL_ACTIONS = frozenset({"get_profile", "list_labels"})
 
 
 @dataclass
@@ -62,6 +65,11 @@ def run_gmail_readiness_checks(
         issues.append(str(exc))
         return ReadinessReport(ready=False, issues=issues, checks=checks)
 
+    if not is_integration_enabled_for_tenant(
+        tenant_id, IntegrationType.GOOGLE_MAIL, db=db
+    ):
+        issues.append("Gmail integration is not enabled for tenant")
+
     label_name = config.intake_label
     intake_query = f"label:{label_name} is:unread"
     checks["intake_query"] = intake_query
@@ -72,17 +80,26 @@ def run_gmail_readiness_checks(
             integration_type=IntegrationType.GOOGLE_MAIL,
             db=db,
         )
-        account_email = str(connection_config.get("user_id") or "").strip().lower()
-        checks["gmail_account"] = account_email or None
-        if not account_email or "@" not in account_email:
-            issues.append("Gmail OAuth account email is missing")
-        elif account_email not in config.recipient_emails:
-            issues.append("Gmail account does not match LIVE_EVAL_RECIPIENT_EMAILS")
+        config_email = str(connection_config.get("user_id") or "").strip().lower()
+        checks["connection_user_id"] = config_email or None
+        if not str(connection_config.get("access_token") or "").strip():
+            issues.append("Gmail OAuth access_token is missing")
 
         adapter = get_integration_adapter(
             integration_type=IntegrationType.GOOGLE_MAIL,
             connection_config=connection_config,
         )
+
+        profile_result = adapter.execute_action(action="get_profile", payload={})
+        profile_email = str(profile_result.get("email_address") or "").strip().lower()
+        checks["gmail_profile_email"] = profile_email or None
+        if not profile_email or "@" not in profile_email:
+            issues.append("Gmail profile email is missing")
+        elif profile_email not in config.recipient_emails:
+            issues.append("Gmail profile email does not match LIVE_EVAL_RECIPIENT_EMAILS")
+        if config_email and profile_email and config_email != profile_email:
+            issues.append("Gmail profile email does not match configured connection user_id")
+
         labels_result = adapter.execute_action(action="list_labels", payload={})
         labels = labels_result.get("labels") or []
         checks["label_count"] = len(labels)
@@ -97,6 +114,7 @@ def run_gmail_readiness_checks(
     except Exception as exc:
         issues.append(f"gmail readiness failed: {exc}")
 
+    checks["allowed_adapter_actions"] = sorted(_READ_ONLY_GMAIL_ACTIONS)
     checks["filter_contract"] = (
         "Operator must configure Gmail filter to apply "
         f"label:{label_name} (full filter test in 2F.2)"

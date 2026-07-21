@@ -1753,17 +1753,18 @@ def _run_gmail_inbox_sync(
         )
 
         try:
-            saved_job = JobRepository.create_job(db, job)
             if isinstance(input_data.get("live_eval"), dict):
-                from app.evaluation.live.registry import claim_live_eval_root_job
+                from app.evaluation.live.registry import create_and_claim_live_eval_root_job
 
-                claim_live_eval_root_job(
+                saved_job = create_and_claim_live_eval_root_job(
                     db,
+                    job=job,
                     evaluation_run_id=input_data["live_eval"]["evaluation_run_id"],
                     tenant_id=tenant_id,
                     root_gmail_message_id=message_id,
-                    root_job_id=saved_job.job_id,
                 )
+            else:
+                saved_job = JobRepository.create_job(db, job)
             processed_job = run_pipeline(saved_job, db)
         except Exception as exc:
             failed_messages.append({"message_id": message_id, "reason": str(exc)})

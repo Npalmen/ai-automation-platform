@@ -106,7 +106,9 @@ class LiveEvalRunRepository:
         tenant_id: str,
         root_gmail_message_id: str,
         root_job_id: str,
+        now: datetime | None = None,
     ) -> LiveEvalRunRow:
+        now = now or datetime.now(timezone.utc)
         row = LiveEvalRunRepository.get_run(db, evaluation_run_id, tenant_id=tenant_id)
         if row is None:
             raise LiveEvalRunNotFoundError(
@@ -134,12 +136,16 @@ class LiveEvalRunRepository:
                 LiveEvalRunRow.evaluation_run_id == evaluation_run_id,
                 LiveEvalRunRow.tenant_id == tenant_id,
                 LiveEvalRunRow.status == RUN_STATUS_REGISTERED,
+                LiveEvalRunRow.root_gmail_message_id.is_(None),
+                LiveEvalRunRow.expires_at > now,
             )
             .values(
                 status=RUN_STATUS_ACTIVE,
                 root_gmail_message_id=root_gmail_message_id,
                 root_job_id=root_job_id,
+                activated_at=now,
             )
+            .execution_options(synchronize_session=False)
         )
         result = db.execute(stmt)
         if int(result.rowcount or 0) != 1:
@@ -161,6 +167,7 @@ class LiveEvalRunRepository:
             )
 
         db.flush()
+        db.expire_all()
         claimed = LiveEvalRunRepository.get_run(
             db, evaluation_run_id, tenant_id=tenant_id
         )

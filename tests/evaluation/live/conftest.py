@@ -12,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.repositories.postgres.audit_models import AuditEventRecord
 from app.repositories.postgres.database import Base
+from app.repositories.postgres.job_models import JobRecord
 from app.repositories.postgres.live_eval_models import LiveEvalExternalEventRow, LiveEvalRunRow
 
 
@@ -48,6 +49,7 @@ def db(live_eval_env):
             LiveEvalRunRow.__table__,
             LiveEvalExternalEventRow.__table__,
             AuditEventRecord.__table__,
+            JobRecord.__table__,
         ],
     )
     Session = sessionmaker(bind=engine)

@@ -7,10 +7,13 @@ from unittest.mock import patch
 
 import pytest
 
+from app.domain.workflows.enums import JobType
+from app.domain.workflows.models import Job
 from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.live.registry import (
     claim_live_eval_root_job,
     complete_live_eval_run,
+    create_and_claim_live_eval_root_job,
     register_live_eval_run,
     trusted_snapshot_from_row,
 )
@@ -47,6 +50,40 @@ def test_register_and_claim_root_job(db, live_eval_env):
     snapshot = trusted_snapshot_from_row(row)
     assert snapshot.trusted is True
     assert not hasattr(snapshot, "gmail_message_id")
+
+
+def test_create_and_claim_is_atomic(db, live_eval_env, sample_run_row):
+    sample_run_row.evaluation_run_id = "run-atomic-1"
+    db.add(sample_run_row)
+    db.commit()
+
+    job = Job(
+        tenant_id="TENANT_LIVE_EVAL",
+        job_type=JobType.LEAD,
+        input_data={
+            "live_eval": {
+                "evaluation_run_id": "run-atomic-1",
+                "tenant_id": "TENANT_LIVE_EVAL",
+                "scenario_id": "S01_lead_laddbox_quality",
+                "attempt_id": 1,
+                "transport_mode": "live_gmail",
+                "ai_mode": "fixture_ai",
+                "trusted": True,
+            }
+        },
+    )
+    with patch("app.evaluation.live.registry.emit_live_eval_audit"):
+        saved = create_and_claim_live_eval_root_job(
+            db,
+            job=job,
+            evaluation_run_id="run-atomic-1",
+            tenant_id="TENANT_LIVE_EVAL",
+            root_gmail_message_id="msg-atomic-1",
+        )
+    row = LiveEvalRunRepository.get_run(db, "run-atomic-1", tenant_id="TENANT_LIVE_EVAL")
+    assert saved.job_id == row.root_job_id
+    assert row.status == "active"
+    assert row.activated_at is not None
 
 
 def test_duplicate_root_claim_rejected(db, live_eval_env, sample_run_row):

@@ -87,6 +87,24 @@ class GoogleMailAdapter(BaseIntegrationAdapter):
                 "labels": labels,
             }
 
+        if action == "get_profile":
+            from app.integrations.google.oauth_service import test_connection
+
+            access_token = str(self.connection_config.get("access_token") or "").strip()
+            if not access_token:
+                raise ValueError("get_profile requires a configured access_token.")
+            user_id = str(self.connection_config.get("user_id") or "me").strip()
+            profile = test_connection(access_token, user_id=user_id)
+            return {
+                "status": "success",
+                "integration": "google_mail",
+                "provider": "google_mail",
+                "action": action,
+                "email_address": profile.get("email_address"),
+                "messages_total": profile.get("messages_total"),
+                "threads_total": profile.get("threads_total"),
+            }
+
         if action == "get_message":
             message_id = payload.get("message_id")
             if not message_id:

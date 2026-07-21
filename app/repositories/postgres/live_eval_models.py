@@ -22,6 +22,7 @@ class LiveEvalRunRow(Base):
     status = Column(String(32), nullable=False, default="registered")
     root_gmail_message_id = Column(String(320), nullable=True)
     root_job_id = Column(String(64), nullable=True)
+    activated_at = Column(DateTime(timezone=True), nullable=True)
     created_by = Column(String(128), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)

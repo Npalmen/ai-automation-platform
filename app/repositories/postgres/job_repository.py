@@ -29,7 +29,7 @@ class JobRepository:
         )
 
     @staticmethod
-    def create_job(db: Session, job: Job) -> Job:
+    def create_job(db: Session, job: Job, *, commit: bool = True) -> Job:
         record = JobRecord(
             job_id=job.job_id,
             tenant_id=job.tenant_id,
@@ -44,7 +44,10 @@ class JobRepository:
             updated_at=job.updated_at,
         )
         db.add(record)
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         db.refresh(record)
         return JobRepository._to_domain(record)
 

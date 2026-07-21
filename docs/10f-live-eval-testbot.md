@@ -29,7 +29,7 @@ Migration `018_live_eval_external_events.sql` adds persistent telemetry with com
 3. Build `TrustedLiveEvalSnapshot` and store on `job.input_data.live_eval`.
 4. Thread continuation reuses the **immutable** root `live_eval` snapshot unchanged. Current `gmail_message_id` / `gmail_thread_id` live in `source` metadata only.
 5. Missing subject token on continuation is allowed when the root job is trusted; a present but mismatched token is safety-rejected.
-6. Root job claim is atomic (`registered` → `active` + `root_gmail_message_id` / `root_job_id`); at most one root job per run token.
+6. Root job claim is atomic (`registered` → `active` + `root_gmail_message_id` / `root_job_id` / `activated_at`); job creation and claim share one DB transaction in Gmail intake.
 
 Mail must not determine `ai_mode`, fixture bundle, tenant, or write policy.
 
@@ -37,7 +37,7 @@ Mail must not determine `ai_mode`, fixture bundle, tenant, or write policy.
 
 - `POST /admin/live-eval/runs` — register run (`X-Admin-API-Key`)
 - `POST /admin/live-eval/runs/{id}/status` — complete/abort (requires `tenant_id`)
-- `POST /admin/live-eval/gmail-readiness` — read-only Gmail profile/label/tenant/allowlist/intake verification (`LIVE_GMAIL_EVAL_ALLOWED`)
+- `POST /admin/live-eval/gmail-readiness` — read-only Gmail profile/label/tenant/allowlist/intake verification (`LIVE_GMAIL_EVAL_ALLOWED`); uses `get_profile` + `list_labels` only
 
 ### Safety gates
 

@@ -22,12 +22,14 @@ from app.evaluation.live.schemas import (
     LiveEvalRunResponse,
     TrustedLiveEvalSnapshot,
 )
+from app.domain.workflows.models import Job
 from app.repositories.postgres.live_eval_models import LiveEvalRunRow
 from app.repositories.postgres.live_eval_repository import (
     LiveEvalRunConflictError,
     LiveEvalRunNotFoundError,
     LiveEvalRunRepository,
 )
+from app.repositories.postgres.job_repository import JobRepository
 
 
 def _compute_config_hash(payload: dict) -> str:
@@ -108,6 +110,7 @@ def claim_live_eval_root_job(
     tenant_id: str,
     root_gmail_message_id: str,
     root_job_id: str,
+    commit: bool = True,
 ) -> LiveEvalRunResponse:
     try:
         row = LiveEvalRunRepository.claim_root_job(
@@ -131,9 +134,37 @@ def claim_live_eval_root_job(
             "root_gmail_message_id": root_gmail_message_id,
             "root_job_id": root_job_id,
         },
+        commit=commit,
     )
-    db.commit()
+    if commit:
+        db.commit()
     return LiveEvalRunResponse.model_validate(row, from_attributes=True)
+
+
+def create_and_claim_live_eval_root_job(
+    db: Session,
+    *,
+    job: Job,
+    evaluation_run_id: str,
+    tenant_id: str,
+    root_gmail_message_id: str,
+) -> Job:
+    """Atomically persist root job and claim the registered live-eval run."""
+    try:
+        saved_job = JobRepository.create_job(db, job, commit=False)
+        claim_live_eval_root_job(
+            db,
+            evaluation_run_id=evaluation_run_id,
+            tenant_id=tenant_id,
+            root_gmail_message_id=root_gmail_message_id,
+            root_job_id=saved_job.job_id,
+            commit=False,
+        )
+        db.commit()
+        return saved_job
+    except Exception:
+        db.rollback()
+        raise
 
 
 def complete_live_eval_run(
