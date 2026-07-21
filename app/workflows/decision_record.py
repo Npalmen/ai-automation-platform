@@ -27,6 +27,7 @@ ALLOWED_METADATA_KEYS = frozenset({
     "duration_ms",
     "supersedes_decision_id",
     "reconciliation_required",
+    "evaluation_run_id",
 })
 
 
