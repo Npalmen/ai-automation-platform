@@ -558,7 +558,7 @@ def ensure_runtime_schema(engine: Engine) -> None:
                 log.debug("Live eval events migration OK")
 
         log.info(
-            "Runtime schema safeguard complete (%d column(s), %d table/index statement(s), %d onboarding statement(s), %d slice2b statement(s), %d operator alerts statement(s), %d onboarding 2.0 statement(s), %d decision record statement(s), %d integration selection statement(s), %d live eval runs statement(s), %d live eval events statement(s) checked)",
+            "Runtime schema safeguard complete (%d column(s), %d table/index statement(s), %d onboarding statement(s), %d slice2b statement(s), %d operator alerts statement(s), %d onboarding 2.0 statement(s), %d decision record statement(s), %d integration selection statement(s), %d live eval runs statement(s), %d live eval runs 019 statement(s), %d live eval events statement(s) checked)",
             len(_REQUIRED_COLUMNS),
             len(_REQUIRED_TABLES),
             len(_ONBOARDING_MIGRATION_STATEMENTS),
