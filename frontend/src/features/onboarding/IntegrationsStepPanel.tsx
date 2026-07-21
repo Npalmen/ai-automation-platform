@@ -1,3 +1,4 @@
+import { FinanceDestinationPanel } from "./FinanceDestinationPanel"
 import { useIntegrationsStepQuery } from "./queries"
 import {
   useConnectIntegrationMutation,
@@ -76,6 +77,8 @@ function isSelected(item: IntegrationLifecycleItem): boolean {
   const status = item.selection_status ?? (item.requested ? "selected_optional" : "not_selected")
   return status === "selected_optional" || status === "selected_required"
 }
+
+const FINANCE_COMING_LATER_KEYS = new Set(["fortnox", "bokio"])
 
 function groupIntegrations(items: IntegrationLifecycleItem[]) {
   const groups = new Map<string, IntegrationLifecycleItem[]>()
@@ -529,7 +532,22 @@ export function IntegrationsStepPanel({
       {groupedIntegrations.map((group) => (
         <section key={group.category} className="space-y-3">
           <h3 className="text-body font-medium text-text-primary">{group.label}</h3>
-          {group.items.map((item) => (
+          {group.category === "finance" ? (
+            <FinanceDestinationPanel
+              tenantId={tenantId}
+              sessionId={sessionId}
+              version={version}
+              canWrite={canWrite}
+              status={data.finance_destination}
+            />
+          ) : null}
+          {group.items
+            .filter(
+              (item) =>
+                group.category !== "finance" ||
+                !FINANCE_COMING_LATER_KEYS.has(item.integration_key),
+            )
+            .map((item) => (
             <IntegrationCard
               key={item.integration_key}
               item={item}

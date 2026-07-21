@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.admin.onboarding.slice2b_registry import SHEETS_EXPORT_TABS
 
@@ -48,11 +48,24 @@ class IntegrationSelectionDraft(BaseModel):
 
 
 GroupImplementationType = Literal["manual_accounting_routing", "integration"]
+FinanceDestinationChoice = Literal["visma", "manual_accounting_routing", "none"]
+VismaDisposition = Literal["not_selected", "selected_optional"]
 
 
 class GroupImplementationDraft(BaseModel):
     type: GroupImplementationType
     integration_key: str | None = None
+
+
+class FinanceDestinationPatch(BaseModel):
+    choice: FinanceDestinationChoice
+    visma_disposition: VismaDisposition | None = None
+
+    @model_validator(mode="after")
+    def manual_requires_visma_disposition(self) -> "FinanceDestinationPatch":
+        if self.choice == "manual_accounting_routing" and self.visma_disposition is None:
+            raise ValueError("visma_disposition is required for manual_accounting_routing")
+        return self
 
 
 class IntegrationsDraftPayload(BaseModel):
@@ -84,6 +97,7 @@ class IntegrationsPatchRequest(BaseModel):
     requested_integrations: list[str] | None = None
     selections: dict[str, IntegrationSelectionDraft] | None = None
     group_implementations: dict[str, GroupImplementationDraft] | None = None
+    finance_destination: FinanceDestinationPatch | None = None
     gmail: GmailIntegrationConfig | None = None
     visma: VismaIntegrationConfig | None = None
     google_sheets: GoogleSheetsIntegrationConfig | None = None

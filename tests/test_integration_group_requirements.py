@@ -1,4 +1,4 @@
-"""Integration group requirement tests (Slice B commit 3)."""
+"""Integration group requirement tests (Slice B commit 3+4)."""
 
 from __future__ import annotations
 
@@ -9,12 +9,17 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.admin.onboarding.integration_draft_schemas import (
+    FinanceDestinationPatch,
     GroupImplementationDraft,
+    IntegrationSelectionDraft,
+    IntegrationsDraftPayload,
     IntegrationsPatchRequest,
 )
 from app.admin.onboarding.integration_groups import (
+    apply_finance_destination_patch,
     evaluate_required_integration_groups,
     has_valid_accounting_routing,
+    reject_coming_later_group_implementation,
 )
 from app.admin.onboarding.repository import OnboardingRepository
 from app.admin.onboarding.service import create_onboarding_session, patch_modules
@@ -159,3 +164,92 @@ class TestFinanceDestinationGroups:
         finance = next(item for item in evaluations if item.group_key == "finance_destination")
         assert finance.satisfied is True
         assert finance.implementation == "manual_accounting_routing"
+
+
+class TestFinanceDestinationPatchRules:
+    def test_manual_accounting_routing_requires_visma_disposition(self):
+        draft = IntegrationsDraftPayload()
+        with pytest.raises(ValueError, match="visma_disposition"):
+            apply_finance_destination_patch(
+                draft,
+                choice="manual_accounting_routing",
+                visma_disposition=None,
+            )
+
+    def test_manual_accounting_routing_sets_explicit_visma_disposition(self):
+        draft = IntegrationsDraftPayload(
+            selections={
+                "visma": IntegrationSelectionDraft(
+                    selection_status="selected_required",
+                    migration_review_required=False,
+                )
+            }
+        )
+        updated = apply_finance_destination_patch(
+            draft,
+            choice="manual_accounting_routing",
+            visma_disposition="selected_optional",
+        )
+        assert updated.group_implementations["finance_destination"].type == "manual_accounting_routing"
+        assert updated.selections["visma"].selection_status == "selected_optional"
+
+    def test_patch_endpoint_rejects_manual_without_disposition(self, db):
+        from pydantic import ValidationError
+
+        session = _session_with_invoice_handling(db)
+        with pytest.raises(ValidationError, match="visma_disposition"):
+            IntegrationsPatchRequest(
+                version=session.version,
+                finance_destination=FinanceDestinationPatch(
+                    choice="manual_accounting_routing"
+                ),
+            )
+
+    def test_coming_later_integration_rejected_as_group_implementation(self):
+        with pytest.raises(ValueError, match="not selectable"):
+            reject_coming_later_group_implementation("fortnox")
+
+    def test_removing_accounting_route_blocks_manual_finance_group(self, db):
+        session = _session_with_invoice_handling(db)
+        OnboardingRepository.upsert_draft(
+            db,
+            session_id=session.id,
+            step_key="service_profile",
+            payload={"selected_profiles": ["invoice_generic"], "lead_requirements": {}},
+        )
+        OnboardingRepository.upsert_draft(
+            db,
+            session_id=session.id,
+            step_key="routing",
+            payload={"route_overrides": {"invoice_generic": "finance"}},
+        )
+        patch_integrations_step(
+            db,
+            session_id=session.id,
+            operator=_operator(),
+            body=IntegrationsPatchRequest(
+                version=session.version,
+                finance_destination=FinanceDestinationPatch(
+                    choice="manual_accounting_routing",
+                    visma_disposition="not_selected",
+                ),
+            ),
+            settings=_settings(),
+        )
+        OnboardingRepository.upsert_draft(
+            db,
+            session_id=session.id,
+            step_key="routing",
+            payload={"route_overrides": {"invoice_generic": "support"}},
+        )
+        modules = OnboardingRepository.get_draft(db, session.id, "modules")
+        tenant = db.query(TenantConfigRecord).filter_by(tenant_id=session.tenant_id).first()
+        evaluation = evaluate_integrations_step(
+            db,
+            modules_draft=(modules.payload if modules else {}) or {},
+            tenant=tenant,
+            settings=_settings(),
+            session_id=session.id,
+        )
+        assert evaluation["blocks_activation"] is True
+        assert "group:finance_destination" in (evaluation.get("details") or {}).get("blocking", [])

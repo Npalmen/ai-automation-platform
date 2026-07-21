@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 
 import { CriticalActionDialog } from "@/components/operator/CriticalActionDialog"
@@ -35,7 +35,13 @@ import {
   useRoutingStepQuery,
   useServiceProfileStepQuery,
 } from "./queries"
-import { WIZARD_STEPS, type EffectiveRouteRow, type ReadinessResult } from "./types"
+import {
+  WIZARD_STEPS,
+  type EffectiveRouteRow,
+  type OnboardingRegistriesResponse,
+  type OnboardingSession,
+  type ReadinessResult,
+} from "./types"
 import {
   groupServiceProfiles,
   recommendedProfileKeys,
@@ -71,11 +77,39 @@ function stepVariant(status: string): "healthy" | "warning" | "failed" | "paused
   return "unknown"
 }
 
+function resolveWizardStep(
+  searchParams: URLSearchParams,
+  sessionCurrentStep: string | undefined,
+): string {
+  const stepParam = searchParams.get("step")
+  if (stepParam && WIZARD_STEPS.some((step) => step.key === stepParam)) {
+    return stepParam
+  }
+  return sessionCurrentStep || "identity"
+}
+
+type SessionViewProps = {
+  tenantId: string
+  session: OnboardingSession
+  registries: OnboardingRegistriesResponse
+  initialActiveStep: string
+  initialCompanyName: string
+  initialSlug: string
+  initialIndustries: string[]
+  initialCapabilities: string[]
+  initialIntegrations: string[]
+  initialPresetKey: string
+  initialPresetVersion: number
+  initialSelectedProfiles: string[]
+  initialLeadRequirements: Record<string, Record<string, LeadFieldMode>>
+  initialRouteOverrides: Record<string, string | null>
+  initialDataStartMode: "new_incoming_only"
+}
+
 export function OnboardingWizardPage() {
   const { tenantId } = useParams<{ tenantId: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { auth } = useAuth()
   const registriesQuery = useOnboardingRegistriesQuery()
   const sessionsQuery = useOnboardingSessionsQuery(true)
   const openSession = findOpenSessionForTenant(sessionsQuery.data, tenantId ?? "")
@@ -84,28 +118,138 @@ export function OnboardingWizardPage() {
   const session = sessionQuery.data
   const registries = registriesQuery.data
 
-  const [activeStep, setActiveStep] = useState("identity")
-  const [companyName, setCompanyName] = useState("")
-  const [slug, setSlug] = useState("")
-  const [industries, setIndustries] = useState<string[]>([])
-  const [capabilities, setCapabilities] = useState<string[]>([])
-  const [integrations, setIntegrations] = useState<string[]>([])
-  const [presetKey, setPresetKey] = useState("observe_only")
-  const [presetVersion, setPresetVersion] = useState(1)
+  const serviceProfileQuery = useServiceProfileStepQuery(sessionId, Boolean(sessionId))
+  const routingQuery = useRoutingStepQuery(sessionId, Boolean(sessionId))
+  const dataStartQuery = useDataStartStepQuery(sessionId, Boolean(sessionId))
+
+  if (registriesQuery.isLoading || sessionsQuery.isLoading || sessionQuery.isLoading) {
+    return <LoadingState label="Laddar onboarding…" rows={4} />
+  }
+
+  if (registriesQuery.isError || !registries) {
+    return (
+      <ErrorState
+        title="Kunde inte ladda register"
+        description="Produktregister kunde inte hämtas. Onboarding kan inte fortsätta utan registerdata."
+        technicalDetails={
+          registriesQuery.error instanceof Error
+            ? registriesQuery.error.message
+            : String(registriesQuery.error)
+        }
+      />
+    )
+  }
+
+  if (!tenantId || !sessionId || !session) {
+    return (
+      <ErrorState
+        title="Ingen öppen onboarding"
+        description="Det finns ingen aktiv onboarding-session för denna kund."
+        recommendedAction="Starta en ny onboarding från kundlistan."
+      />
+    )
+  }
+
+  if (session.status === "active") {
+    return (
+      <div className="space-y-4">
+        <PageHeader title="Onboarding klar" description="Kunden är redan aktiverad." />
+        <Button onClick={() => navigate(`/customers/${encodeURIComponent(tenantId)}`)}>
+          Öppna kunddetalj
+        </Button>
+      </div>
+    )
+  }
+
+  const spDraft = serviceProfileQuery.data?.draft as
+    | {
+        selected_profiles?: string[]
+        lead_requirements?: Record<string, Record<string, LeadFieldMode>>
+      }
+    | undefined
+  const rtDraft = routingQuery.data?.draft as
+    | { route_overrides?: Record<string, string | null> }
+    | undefined
+  const dsDraft = dataStartQuery.data?.draft as { mode?: "new_incoming_only" } | undefined
+
+  const viewKey = [
+    session.id,
+    session.version,
+    serviceProfileQuery.dataUpdatedAt ?? 0,
+    routingQuery.dataUpdatedAt ?? 0,
+    dataStartQuery.dataUpdatedAt ?? 0,
+  ].join(":")
+
+  return (
+    <OnboardingWizardSessionView
+      key={viewKey}
+      tenantId={tenantId}
+      session={session}
+      registries={registries}
+      initialActiveStep={resolveWizardStep(searchParams, session.current_step)}
+      initialCompanyName={session.company_name ?? ""}
+      initialSlug={session.slug ?? ""}
+      initialIndustries={session.industries ?? []}
+      initialCapabilities={session.capabilities ?? []}
+      initialIntegrations={session.integrations ?? []}
+      initialPresetKey={session.preset_key ?? "observe_only"}
+      initialPresetVersion={session.preset_version ?? 1}
+      initialSelectedProfiles={spDraft?.selected_profiles ?? []}
+      initialLeadRequirements={spDraft?.lead_requirements ?? {}}
+      initialRouteOverrides={rtDraft?.route_overrides ?? {}}
+      initialDataStartMode={dsDraft?.mode ?? "new_incoming_only"}
+    />
+  )
+}
+
+function OnboardingWizardSessionView({
+  tenantId,
+  session,
+  registries,
+  initialActiveStep,
+  initialCompanyName,
+  initialSlug,
+  initialIndustries,
+  initialCapabilities,
+  initialIntegrations,
+  initialPresetKey,
+  initialPresetVersion,
+  initialSelectedProfiles,
+  initialLeadRequirements,
+  initialRouteOverrides,
+  initialDataStartMode,
+}: SessionViewProps) {
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const { auth } = useAuth()
+  const sessionId = session.id
+
+  const stepParam = searchParams.get("step")
+  const urlStep =
+    stepParam && WIZARD_STEPS.some((step) => step.key === stepParam) ? stepParam : null
+  const [localActiveStep, setLocalActiveStep] = useState(initialActiveStep)
+  const activeStep = urlStep ?? localActiveStep
+  const setActiveStep = setLocalActiveStep
+
+  const [companyName, setCompanyName] = useState(initialCompanyName)
+  const [slug, setSlug] = useState(initialSlug)
+  const [industries, setIndustries] = useState(initialIndustries)
+  const [capabilities, setCapabilities] = useState(initialCapabilities)
+  const [integrations] = useState(initialIntegrations)
+  const [presetKey, setPresetKey] = useState(initialPresetKey)
+  const [presetVersion, setPresetVersion] = useState(initialPresetVersion)
   const [readiness, setReadiness] = useState<ReadinessResult | null>(null)
   const [acknowledgedWarnings, setAcknowledgedWarnings] = useState<string[]>([])
   const [activateOpen, setActivateOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [confirmationPhrase, setConfirmationPhrase] = useState("")
-  const [selectedProfiles, setSelectedProfiles] = useState<string[]>([])
-  const [leadRequirements, setLeadRequirements] = useState<
-    Record<string, Record<string, LeadFieldMode>>
-  >({})
-  const [routeOverrides, setRouteOverrides] = useState<Record<string, string | null>>({})
+  const [selectedProfiles, setSelectedProfiles] = useState(initialSelectedProfiles)
+  const [leadRequirements, setLeadRequirements] = useState(initialLeadRequirements)
+  const [routeOverrides, setRouteOverrides] = useState(initialRouteOverrides)
   const [routingPreviewRows, setRoutingPreviewRows] = useState<RoutingPreviewDisplayRow[] | null>(
     null,
   )
-  const [dataStartMode, setDataStartMode] = useState<"new_incoming_only">("new_incoming_only")
+  const [dataStartMode, setDataStartMode] = useState<"new_incoming_only">(initialDataStartMode)
 
   const planQuery = useActivationPlanQuery(sessionId, activeStep === "review")
   const serviceProfileQuery = useServiceProfileStepQuery(
@@ -115,67 +259,23 @@ export function OnboardingWizardPage() {
   const routingQuery = useRoutingStepQuery(sessionId, activeStep === "routing")
   const dataStartQuery = useDataStartStepQuery(sessionId, activeStep === "data_start")
 
-  const identityMutation = usePatchIdentityMutation(sessionId ?? "")
-  const modulesMutation = usePatchModulesMutation(sessionId ?? "")
-  const automationMutation = usePatchAutomationMutation(sessionId ?? "")
-  const serviceProfileMutation = usePatchServiceProfileMutation(sessionId ?? "")
-  const routingMutation = usePatchRoutingMutation(sessionId ?? "")
-  const previewRoutingMutation = usePreviewRoutingMutation(sessionId ?? "")
-  const resetRoutingMutation = useResetRoutingMutation(sessionId ?? "")
-  const dataStartMutation = usePatchDataStartMutation(sessionId ?? "")
-  const readinessMutation = useRunReadinessMutation(sessionId ?? "")
-  const activateMutation = useActivateOnboardingMutation(sessionId ?? "")
-  const cancelMutation = useCancelOnboardingMutation(sessionId ?? "")
-
-  useEffect(() => {
-    if (!session) return
-    setCompanyName(session.company_name ?? "")
-    setSlug(session.slug ?? "")
-    setIndustries(session.industries ?? [])
-    setCapabilities(session.capabilities ?? [])
-    setIntegrations(session.integrations ?? [])
-    if (session.preset_key) setPresetKey(session.preset_key)
-    if (session.preset_version) setPresetVersion(session.preset_version)
-  }, [session])
-
-  useEffect(() => {
-    if (!session) return
-    const stepParam = searchParams.get("step")
-    if (stepParam && WIZARD_STEPS.some((step) => step.key === stepParam)) {
-      setActiveStep(stepParam)
-      return
-    }
-    setActiveStep(session.current_step || "identity")
-  }, [session?.id, searchParams])
-
-  useEffect(() => {
-    if (!serviceProfileQuery.data) return
-    const draft = serviceProfileQuery.data.draft as {
-      selected_profiles?: string[]
-      lead_requirements?: Record<string, Record<string, LeadFieldMode>>
-    }
-    setSelectedProfiles(draft.selected_profiles ?? [])
-    setLeadRequirements(draft.lead_requirements ?? {})
-  }, [serviceProfileQuery.data])
-
-  useEffect(() => {
-    if (!routingQuery.data) return
-    const draft = routingQuery.data.draft as { route_overrides?: Record<string, string | null> }
-    setRouteOverrides(draft.route_overrides ?? {})
-    setRoutingPreviewRows(null)
-  }, [routingQuery.data])
-
-  useEffect(() => {
-    if (!dataStartQuery.data) return
-    const draft = dataStartQuery.data.draft as { mode?: "new_incoming_only" }
-    if (draft.mode) setDataStartMode(draft.mode)
-  }, [dataStartQuery.data])
+  const identityMutation = usePatchIdentityMutation(sessionId)
+  const modulesMutation = usePatchModulesMutation(sessionId)
+  const automationMutation = usePatchAutomationMutation(sessionId)
+  const serviceProfileMutation = usePatchServiceProfileMutation(sessionId)
+  const routingMutation = usePatchRoutingMutation(sessionId)
+  const previewRoutingMutation = usePreviewRoutingMutation(sessionId)
+  const resetRoutingMutation = useResetRoutingMutation(sessionId)
+  const dataStartMutation = usePatchDataStartMutation(sessionId)
+  const readinessMutation = useRunReadinessMutation(sessionId)
+  const activateMutation = useActivateOnboardingMutation(sessionId)
+  const cancelMutation = useCancelOnboardingMutation(sessionId)
 
   const role = auth.status === "authenticated" ? auth.operator.role : null
 
   const isAdmin = role === "admin"
   const canWrite = role === "operations" || role === "admin"
-  const registryReady = registriesQuery.isSuccess && Boolean(registries)
+  const registryReady = true
 
   const registryCapabilityKeys = useMemo(
     () => new Set(registries?.product_capabilities.map((item) => item.key) ?? []),
@@ -240,45 +340,6 @@ export function OnboardingWizardPage() {
     () => WIZARD_STEPS.findIndex((step) => step.key === activeStep),
     [activeStep],
   )
-
-  if (registriesQuery.isLoading || sessionsQuery.isLoading || sessionQuery.isLoading) {
-    return <LoadingState label="Laddar onboarding…" rows={4} />
-  }
-
-  if (registriesQuery.isError || !registries) {
-    return (
-      <ErrorState
-        title="Kunde inte ladda register"
-        description="Produktregister kunde inte hämtas. Onboarding kan inte fortsätta utan registerdata."
-        technicalDetails={
-          registriesQuery.error instanceof Error
-            ? registriesQuery.error.message
-            : String(registriesQuery.error)
-        }
-      />
-    )
-  }
-
-  if (!tenantId || !sessionId || !session) {
-    return (
-      <ErrorState
-        title="Ingen öppen onboarding"
-        description="Det finns ingen aktiv onboarding-session för denna kund."
-        recommendedAction="Starta en ny onboarding från kundlistan."
-      />
-    )
-  }
-
-  if (session.status === "active") {
-    return (
-      <div className="space-y-4">
-        <PageHeader title="Onboarding klar" description="Kunden är redan aktiverad." />
-        <Button onClick={() => navigate(`/customers/${encodeURIComponent(tenantId)}`)}>
-          Öppna kunddetalj
-        </Button>
-      </div>
-    )
-  }
 
   async function saveIdentity() {
     await identityMutation.mutateAsync({

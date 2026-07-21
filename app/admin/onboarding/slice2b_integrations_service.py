@@ -26,6 +26,11 @@ from app.admin.onboarding.integration_fingerprint import (
     fingerprint_visma,
 )
 from app.admin.onboarding.integration_verification import IntegrationVerificationStore
+from app.admin.onboarding.integration_groups import (
+    apply_finance_destination_patch,
+    build_finance_destination_status,
+    reject_coming_later_group_implementation,
+)
 from app.admin.onboarding.integration_selection_draft import (
     apply_selections_to_legacy_draft,
     effective_selection_status,
@@ -488,6 +493,15 @@ def get_integrations_step(
         settings=settings,
         session_id=session_id,
     )
+    sp_record = OnboardingRepository.get_draft(db, session_id, "service_profile")
+    rt_record = OnboardingRepository.get_draft(db, session_id, "routing")
+    finance_status = build_finance_destination_status(
+        draft=draft,
+        modules_draft=modules_payload,
+        service_profile_draft=(sp_record.payload if sp_record else {}) or {},
+        routing_draft=(rt_record.payload if rt_record else {}) or {},
+        tenant_id=session.tenant_id,
+    )
     return {
         "step_key": "integrations",
         "step_status": evaluation["step_status"],
@@ -497,6 +511,7 @@ def get_integrations_step(
         "draft": draft.model_dump(),
         "integrations": items,
         "details": evaluation.get("details") or {},
+        "finance_destination": finance_status,
     }
 
 
@@ -519,9 +534,21 @@ def patch_integrations_step(
         current = merge_selection_patch(current, body.selections)
 
     if body.group_implementations is not None:
+        for _, impl in body.group_implementations.items():
+            reject_coming_later_group_implementation(impl.integration_key)
         merged_groups = dict(current.group_implementations)
         merged_groups.update(body.group_implementations)
         current = current.model_copy(update={"group_implementations": merged_groups})
+
+    if body.finance_destination is not None:
+        try:
+            current = apply_finance_destination_patch(
+                current,
+                choice=body.finance_destination.choice,
+                visma_disposition=body.finance_destination.visma_disposition,
+            )
+        except ValueError as exc:
+            raise OnboardingValidationError(str(exc)) from exc
 
     gmail = body.gmail if body.gmail is not None else current.gmail
     visma = body.visma if body.visma is not None else current.visma
@@ -576,6 +603,7 @@ def patch_integrations_step(
         if body.requested_integrations is not None
         or body.selections is not None
         or body.group_implementations is not None
+        or body.finance_destination is not None
         else INTEGRATION_CONFIGURATION_UPDATED
     )
     emit_onboarding_audit(
