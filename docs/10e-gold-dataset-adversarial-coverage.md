@@ -21,11 +21,12 @@ Slice B + pilot scripts stashed before branch — **not applied** during 2E:
 - ordered `scenarios` (exactly 20)
 - `smoke` set (exactly 10)
 
-**hash_algorithm:** `semantic-json-v1`  
-**manifest_hash:** `220bf9f76419b70049bb2bc44ba1c03115bc6a222c695c3c64f4e32c319e6ecb`
+**hash_algorithm:** `semantic-json-v2`  
+**manifest_hash:** `600e7fd601227d0e327951df8f2a91f48eb6af713410f2a76f819d4db5a793d8`
 
 Scenario and manifest hashes use validated semantic JSON (UTF-8, sorted keys, stable separators).  
-Runtime execution provenance (`generation` on scenarios) is excluded. Line endings and YAML formatting do not affect hashes.
+Static generation provenance (`parent_scenario_id`, `template_id`, `seed`, `variation_id`, `generator_model`, `generator_prompt_version`, `mutation_types`) is included when present; empty/absent generation blocks hash identically.  
+Runtime execution provenance is excluded from scenario hashes.
 
 ```bash
 python -m scripts.run_eval_harness -q

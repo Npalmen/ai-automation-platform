@@ -1,17 +1,20 @@
-"""Semantic dataset hashing tests for Kapitel 2E.1."""
+"""Semantic dataset hashing tests for Kapitel 2E."""
 
 from __future__ import annotations
 
 from pathlib import Path
+
 import yaml
 
 from app.evaluation.dataset_manifest import (
+    GENERATION_HASH_FIELDS,
     HASH_ALGORITHM,
     compute_manifest_hash,
     compute_scenario_content_hash,
     compute_scenario_file_hash,
+    generation_hash_payload,
 )
-from app.evaluation.schema.scenario import ScenarioContract
+from app.evaluation.schema.scenario import GenerationContract, ScenarioContract
 
 
 def _minimal_scenario(**overrides) -> ScenarioContract:
@@ -25,8 +28,87 @@ def _minimal_scenario(**overrides) -> ScenarioContract:
     return ScenarioContract.model_validate(payload)
 
 
+def _generation_metadata(**overrides) -> dict:
+    base = {
+        "template_id": "tpl-1",
+        "seed": 42,
+        "variation_id": "v1",
+        "generator_model": "gpt-test",
+        "generator_prompt_version": "p1",
+        "parent_scenario_id": "S01_lead_laddbox_quality",
+        "mutation_types": ["paraphrase", "tone_shift"],
+    }
+    base.update(overrides)
+    return base
+
+
 def test_hash_algorithm_constant():
-    assert HASH_ALGORITHM == "semantic-json-v1"
+    assert HASH_ALGORITHM == "semantic-json-v2"
+
+
+def test_same_scenario_and_generation_metadata_produces_same_hash():
+    metadata = _generation_metadata()
+    first = _minimal_scenario(generation=metadata)
+    second = _minimal_scenario(generation=dict(metadata))
+    assert compute_scenario_content_hash(first) == compute_scenario_content_hash(second)
+
+
+def test_empty_and_absent_generation_produce_same_hash():
+    absent = _minimal_scenario()
+    explicit_empty = _minimal_scenario(generation={})
+    assert compute_scenario_content_hash(absent) == compute_scenario_content_hash(explicit_empty)
+
+
+def test_seed_change_produces_different_hash():
+    base = _minimal_scenario(generation=_generation_metadata())
+    changed = _minimal_scenario(generation=_generation_metadata(seed=99))
+    assert compute_scenario_content_hash(base) != compute_scenario_content_hash(changed)
+
+
+def test_mutation_type_change_produces_different_hash():
+    base = _minimal_scenario(generation=_generation_metadata())
+    changed = _minimal_scenario(
+        generation=_generation_metadata(mutation_types=["paraphrase", "urgency_boost"])
+    )
+    assert compute_scenario_content_hash(base) != compute_scenario_content_hash(changed)
+
+
+def test_generator_prompt_version_change_produces_different_hash():
+    base = _minimal_scenario(generation=_generation_metadata())
+    changed = _minimal_scenario(generation=_generation_metadata(generator_prompt_version="p2"))
+    assert compute_scenario_content_hash(base) != compute_scenario_content_hash(changed)
+
+
+def test_mutation_types_order_is_preserved_in_hash_payload():
+    payload = generation_hash_payload(
+        GenerationContract.model_validate({"mutation_types": ["b", "a"]})
+    )
+    assert payload["mutation_types"] == ["b", "a"]
+
+
+def test_generation_hash_fields_cover_contract():
+    assert set(GENERATION_HASH_FIELDS) == {
+        "parent_scenario_id",
+        "template_id",
+        "seed",
+        "variation_id",
+        "generator_model",
+        "generator_prompt_version",
+        "mutation_types",
+    }
+
+
+def test_runtime_execution_fields_not_part_of_scenario_hash_contract():
+    scenario_fields = set(ScenarioContract.model_fields)
+    runtime_fields = {
+        "run_id",
+        "pipeline_run_id",
+        "action_operation_id",
+        "gmail_message_id",
+        "received_at",
+        "sent_at",
+    }
+    assert runtime_fields.isdisjoint(scenario_fields)
 
 
 def test_crlf_and_lf_yaml_produce_same_scenario_hash(tmp_path: Path):
@@ -68,22 +150,6 @@ def test_semantic_change_produces_different_hash():
     assert compute_scenario_content_hash(base) != compute_scenario_content_hash(changed)
 
 
-def test_runtime_generation_provenance_excluded_from_hash():
-    base = _minimal_scenario()
-    with_generation = _minimal_scenario(
-        generation={
-            "template_id": "tpl-1",
-            "seed": 42,
-            "variation_id": "v1",
-            "generator_model": "gpt-test",
-            "generator_prompt_version": "p1",
-            "parent_scenario_id": "S01_lead_laddbox_quality",
-            "mutation_types": ["paraphrase"],
-        }
-    )
-    assert compute_scenario_content_hash(base) == compute_scenario_content_hash(with_generation)
-
-
 def test_manifest_hash_includes_algorithm_and_ordered_lists():
     info = compute_manifest_hash()
     canonical = info["canonical"]
@@ -94,7 +160,7 @@ def test_manifest_hash_includes_algorithm_and_ordered_lists():
     assert len(info["manifest_hash"]) == 64
 
 
-def test_manifest_hash_stable_across_line_endings(tmp_path: Path, monkeypatch):
+def test_manifest_hash_stable_across_line_endings(tmp_path: Path):
     manifest_src = Path("tests/evaluation/datasets/k2e-v1.yaml").read_text(encoding="utf-8")
     manifest_lf = tmp_path / "manifest-lf.yaml"
     manifest_crlf = tmp_path / "manifest-crlf.yaml"
@@ -107,9 +173,7 @@ def test_manifest_hash_stable_across_line_endings(tmp_path: Path, monkeypatch):
     for name in src_root.glob("S*.yaml"):
         text = name.read_text(encoding="utf-8")
         (scenarios_dir / name.name).write_text(text, encoding="utf-8", newline="\n")
-        (scenarios_dir / f"crlf_{name.name}").write_text(text.replace("\n", "\r\n"), encoding="utf-8", newline="\n")
 
-    # Point manifest scenarios_dir at copied LF scenarios only.
     raw = yaml.safe_load(manifest_lf.read_text(encoding="utf-8"))
     raw["scenarios_dir"] = "scenarios"
     manifest_lf.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")

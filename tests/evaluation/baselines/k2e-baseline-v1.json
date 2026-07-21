@@ -3,9 +3,9 @@
   "harness_version": "2e.0.0",
   "dataset_version": "1.0.0",
   "schema_version": "2e.1",
-  "hash_algorithm": "semantic-json-v1",
+  "hash_algorithm": "semantic-json-v2",
   "created_at": "2026-07-21",
-  "manifest_hash": "220bf9f76419b70049bb2bc44ba1c03115bc6a222c695c3c64f4e32c319e6ecb",
+  "manifest_hash": "600e7fd601227d0e327951df8f2a91f48eb6af713410f2a76f819d4db5a793d8",
   "scenario_status": {
     "S01_lead_laddbox_quality": "pass",
     "S08_sensitive_inkasso": "pass",

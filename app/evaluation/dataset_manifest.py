@@ -12,16 +12,23 @@ from pydantic import BaseModel, Field
 
 from app.evaluation.errors import ScenarioValidationError
 from app.evaluation.loader import load_scenario
-from app.evaluation.schema.scenario import ScenarioContract
+from app.evaluation.schema.scenario import GenerationContract, ScenarioContract
 
 DEFAULT_MANIFEST = (
     Path(__file__).resolve().parents[2] / "tests" / "evaluation" / "datasets" / "k2e-v1.yaml"
 )
 
-HASH_ALGORITHM = "semantic-json-v1"
+HASH_ALGORITHM = "semantic-json-v2"
 
-# Runtime execution provenance — excluded from semantic scenario content hashes.
-_SCENARIO_RUNTIME_FIELDS = frozenset({"generation"})
+GENERATION_HASH_FIELDS = (
+    "parent_scenario_id",
+    "template_id",
+    "seed",
+    "variation_id",
+    "generator_model",
+    "generator_prompt_version",
+    "mutation_types",
+)
 
 
 class DatasetManifest(BaseModel):
@@ -38,10 +45,27 @@ def canonical_json_bytes(payload: Any) -> bytes:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
+def generation_hash_payload(generation: GenerationContract) -> dict[str, Any]:
+    raw = generation.model_dump(mode="json")
+    out: dict[str, Any] = {}
+    for key in GENERATION_HASH_FIELDS:
+        value = raw.get(key)
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        if isinstance(value, list) and not value:
+            continue
+        out[key] = value
+    return out
+
+
 def scenario_content_payload(scenario: ScenarioContract) -> dict[str, Any]:
     payload = scenario.model_dump(mode="json")
-    for key in _SCENARIO_RUNTIME_FIELDS:
-        payload.pop(key, None)
+    payload.pop("generation", None)
+    generation = generation_hash_payload(scenario.generation)
+    if generation:
+        payload["generation"] = generation
     return payload
 
 
