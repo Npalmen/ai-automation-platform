@@ -21,9 +21,11 @@ Slice B + pilot scripts stashed before branch — **not applied** during 2E:
 - ordered `scenarios` (exactly 20)
 - `smoke` set (exactly 10)
 
-**manifest_hash (v1):** `f0acdcc3f2cac2848001257945906e61f60096bba301c0a13649c46e1d6d0814`
+**hash_algorithm:** `semantic-json-v1`  
+**manifest_hash:** `220bf9f76419b70049bb2bc44ba1c03115bc6a222c695c3c64f4e32c319e6ecb`
 
-Per-scenario SHA-256 hashes are embedded in baseline and emitted by:
+Scenario and manifest hashes use validated semantic JSON (UTF-8, sorted keys, stable separators).  
+Runtime execution provenance (`generation` on scenarios) is excluded. Line endings and YAML formatting do not affect hashes.
 
 ```bash
 python -m scripts.run_eval_harness -q

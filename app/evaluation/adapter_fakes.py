@@ -8,6 +8,13 @@ from app.evaluation.telemetry import get_telemetry
 from app.integrations.base import BaseIntegrationAdapter
 from app.integrations.enums import IntegrationType
 
+EVAL_INTEGRATION_CONNECTION_CONFIG = {
+    "access_token": "eval-harness-token",
+    "api_url": "https://gmail.eval.invalid/v1",
+    "user_id": "me",
+    "credential_source": "eval_harness",
+}
+
 
 class EvalFakeAdapter(BaseIntegrationAdapter):
     """Records adapter calls without network access."""
@@ -41,3 +48,13 @@ def eval_get_integration_adapter(
 ) -> BaseIntegrationAdapter:
     """Harness hook: always fake; never call real external adapters."""
     return EvalFakeAdapter(integration_type, connection_config)
+
+
+def eval_get_integration_connection_config(
+    tenant_id: str,
+    integration_type: IntegrationType,
+    db: Any | None = None,
+) -> dict[str, Any]:
+    """Deterministic eval connection config — never reads platform env or DB."""
+    _ = tenant_id, integration_type, db
+    return dict(EVAL_INTEGRATION_CONNECTION_CONFIG)

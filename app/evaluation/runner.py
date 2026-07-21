@@ -13,7 +13,11 @@ from sqlalchemy.orm import Session
 
 from app.domain.workflows.enums import JobType
 from app.domain.workflows.models import Job
-from app.evaluation.adapter_fakes import eval_get_integration_adapter
+from app.evaluation.adapter_fakes import (
+    EVAL_INTEGRATION_CONNECTION_CONFIG,
+    eval_get_integration_adapter,
+    eval_get_integration_connection_config,
+)
 from app.evaluation.assertions import evaluate_quality, evaluate_safety
 from app.evaluation.db_isolation import unique_eval_tenant_id
 from app.evaluation.errors import (
@@ -261,6 +265,18 @@ class EvalHarnessRunner:
                     patch(
                         "app.workflows.action_executor.get_integration_adapter",
                         side_effect=eval_get_integration_adapter,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "app.workflows.action_executor.is_integration_configured",
+                        return_value=True,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "app.workflows.action_executor.get_integration_connection_config",
+                        side_effect=eval_get_integration_connection_config,
                     )
                 )
                 stack.enter_context(

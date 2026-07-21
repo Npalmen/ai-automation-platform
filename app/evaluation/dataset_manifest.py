@@ -18,6 +18,11 @@ DEFAULT_MANIFEST = (
     Path(__file__).resolve().parents[2] / "tests" / "evaluation" / "datasets" / "k2e-v1.yaml"
 )
 
+HASH_ALGORITHM = "semantic-json-v1"
+
+# Runtime execution provenance — excluded from semantic scenario content hashes.
+_SCENARIO_RUNTIME_FIELDS = frozenset({"generation"})
+
 
 class DatasetManifest(BaseModel):
     dataset_id: str
@@ -27,6 +32,25 @@ class DatasetManifest(BaseModel):
     scenarios_dir: str = "scenarios"
     scenarios: list[str] = Field(default_factory=list)
     smoke: list[str] = Field(default_factory=list)
+
+
+def canonical_json_bytes(payload: Any) -> bytes:
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def scenario_content_payload(scenario: ScenarioContract) -> dict[str, Any]:
+    payload = scenario.model_dump(mode="json")
+    for key in _SCENARIO_RUNTIME_FIELDS:
+        payload.pop(key, None)
+    return payload
+
+
+def compute_scenario_content_hash(scenario: ScenarioContract) -> str:
+    return hashlib.sha256(canonical_json_bytes(scenario_content_payload(scenario))).hexdigest()
+
+
+def compute_scenario_file_hash(path: Path) -> str:
+    return compute_scenario_content_hash(load_scenario(path))
 
 
 def load_manifest(path: Path | None = None) -> DatasetManifest:
@@ -77,19 +101,16 @@ def load_manifest_scenarios(
     return manifest, root, items
 
 
-def hash_file(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
 def compute_manifest_hash(manifest_path: Path | None = None) -> dict[str, Any]:
     path = manifest_path or DEFAULT_MANIFEST
     manifest = load_manifest(path)
     root = resolve_scenarios_root(manifest, path)
-    scenario_hashes = {}
+    scenario_hashes: dict[str, str] = {}
     for sid in manifest.scenarios:
         sp = root / f"{sid}.yaml"
-        scenario_hashes[sid] = hash_file(sp) if sp.exists() else "missing"
+        scenario_hashes[sid] = compute_scenario_file_hash(sp) if sp.exists() else "missing"
     canonical = {
+        "hash_algorithm": HASH_ALGORITHM,
         "dataset_id": manifest.dataset_id,
         "dataset_version": manifest.dataset_version,
         "schema_version": manifest.schema_version,
@@ -98,10 +119,9 @@ def compute_manifest_hash(manifest_path: Path | None = None) -> dict[str, Any]:
         "smoke": manifest.smoke,
         "scenario_hashes": scenario_hashes,
     }
-    digest = hashlib.sha256(
-        json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
+    digest = hashlib.sha256(canonical_json_bytes(canonical)).hexdigest()
     return {
+        "hash_algorithm": HASH_ALGORITHM,
         "manifest_path": str(path),
         "manifest_hash": digest,
         "scenario_hashes": scenario_hashes,

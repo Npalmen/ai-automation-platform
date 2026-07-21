@@ -12,6 +12,7 @@ from pathlib import Path
 from app.evaluation.coverage import validate_coverage
 from app.evaluation.dataset_manifest import (
     DEFAULT_MANIFEST,
+    HASH_ALGORITHM,
     compute_manifest_hash,
     load_manifest,
     load_manifest_scenarios,
@@ -50,6 +51,7 @@ def _write_baseline(result, manifest_hash: str, manifest, path: Path) -> None:
         "harness_version": HARNESS_VERSION,
         "dataset_version": manifest.dataset_version,
         "schema_version": manifest.schema_version,
+        "hash_algorithm": HASH_ALGORITHM,
         "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "manifest_hash": manifest_hash,
         "scenario_status": {sc.scenario_id: sc.status for sc in result.scenarios},
