@@ -30,6 +30,7 @@ class TestEnsureRuntimeSchemaHappyPath:
         from app.repositories.postgres.schema_migrations import (
             _DECISION_RECORD_MIGRATION_STATEMENTS,
             _INTEGRATION_OAUTH_STATE_MIGRATION_STATEMENTS,
+            _INTEGRATION_SELECTION_MIGRATION_STATEMENTS,
             _ONBOARDING_2_MIGRATION_STATEMENTS,
             _ONBOARDING_MIGRATION_STATEMENTS,
             _OPERATOR_ALERTS_MIGRATION_STATEMENTS,
@@ -49,6 +50,7 @@ class TestEnsureRuntimeSchemaHappyPath:
             + len(_OPERATOR_ALERTS_MIGRATION_STATEMENTS)
             + len(_ONBOARDING_2_MIGRATION_STATEMENTS)
             + len(_DECISION_RECORD_MIGRATION_STATEMENTS)
+            + len(_INTEGRATION_SELECTION_MIGRATION_STATEMENTS)
         )
         assert conn.execute.call_count == expected
 

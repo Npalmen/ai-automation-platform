@@ -10,6 +10,10 @@
 
 2026-07-21 (Slice A integration selection — canonical on `main` commit `7c511ee`; pilot RC `krowolf-app:rc-7c511eeb0719`; tenant `T_NIKLAS_DEMO_001`; Gmail soak not resumed.)
 
+2026-07-21 (Slice B — branch `feature/integration-selection-slice-b` @ Commit 4 `11a261a`: selections SoT, integration groups, `manual_accounting_routing` UI, `visma_disposition` required, frontend lint PASS. Commit 5 adds conflict/credential gates + docs. Pilot deploy/merge pending.)
+
+2026-07-21 (Slice B partial — superseded by Commit 4+5 reconciliation on same branch.)
+
 ## Verification method
 
 - `python -m pytest --tb=no -q` — run locally against in-memory/mock DB

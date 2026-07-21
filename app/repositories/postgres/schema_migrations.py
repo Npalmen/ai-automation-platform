@@ -317,6 +317,23 @@ _ONBOARDING_2_MIGRATION_STATEMENTS: list[str] = [
     "UPDATE tenant_configs SET lifecycle_status = 'active' WHERE status = 'active' AND lifecycle_status = 'onboarding'",
 ]
 
+_INTEGRATION_SELECTION_MIGRATION_STATEMENTS: list[str] = [
+    """
+    CREATE TABLE IF NOT EXISTS integration_selection_backfill_runs (
+        id              VARCHAR(36)  PRIMARY KEY,
+        started_at      TIMESTAMPTZ  NOT NULL,
+        completed_at    TIMESTAMPTZ,
+        dry_run         BOOLEAN      NOT NULL DEFAULT FALSE,
+        status          VARCHAR(32)  NOT NULL,
+        tenants_seen    INTEGER      NOT NULL DEFAULT 0,
+        tenants_updated INTEGER      NOT NULL DEFAULT 0,
+        tenants_skipped INTEGER      NOT NULL DEFAULT 0,
+        report_json     JSON         NOT NULL DEFAULT '{}'
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_integration_selection_backfill_runs_started ON integration_selection_backfill_runs (started_at DESC)",
+]
+
 _DECISION_RECORD_MIGRATION_STATEMENTS: list[str] = [
     """
     CREATE TABLE IF NOT EXISTS decision_records (
@@ -462,8 +479,12 @@ def ensure_runtime_schema(engine: Engine) -> None:
                 conn.execute(text(ddl))
                 log.debug("Decision record migration OK")
 
+            for ddl in _INTEGRATION_SELECTION_MIGRATION_STATEMENTS:
+                conn.execute(text(ddl))
+                log.debug("Integration selection migration OK")
+
         log.info(
-            "Runtime schema safeguard complete (%d column(s), %d table/index statement(s), %d onboarding statement(s), %d slice2b statement(s), %d operator alerts statement(s), %d onboarding 2.0 statement(s), %d decision record statement(s) checked)",
+            "Runtime schema safeguard complete (%d column(s), %d table/index statement(s), %d onboarding statement(s), %d slice2b statement(s), %d operator alerts statement(s), %d onboarding 2.0 statement(s), %d decision record statement(s), %d integration selection statement(s) checked)",
             len(_REQUIRED_COLUMNS),
             len(_REQUIRED_TABLES),
             len(_ONBOARDING_MIGRATION_STATEMENTS),
@@ -471,6 +492,7 @@ def ensure_runtime_schema(engine: Engine) -> None:
             len(_OPERATOR_ALERTS_MIGRATION_STATEMENTS),
             len(_ONBOARDING_2_MIGRATION_STATEMENTS),
             len(_DECISION_RECORD_MIGRATION_STATEMENTS),
+            len(_INTEGRATION_SELECTION_MIGRATION_STATEMENTS),
         )
     except Exception as exc:
         log.error(

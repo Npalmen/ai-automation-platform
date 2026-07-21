@@ -350,6 +350,38 @@ python scripts/smoke_check.py --base-url http://127.0.0.1:8000 --expect-producti
 
 ---
 
+## Slice B integration selection gates (2026-07-21)
+
+Branch: `feature/integration-selection-slice-b`. Use a **clean worktree** (no untracked evaluation 2e scenarios) for full harness collection.
+
+```bash
+# Slice B bundle
+python -m pytest \
+  tests/test_integration_selection_slice_b.py \
+  tests/test_integration_group_requirements.py \
+  tests/test_integration_selection_migration_016.py \
+  tests/test_integration_selection_parity.py \
+  tests/test_admin_onboarding_slice2b.py \
+  tests/test_admin_tenant_directory.py \
+  tests/test_super_admin.py \
+  tests/test_security_secret_scan.py \
+  tests/test_integration_health.py \
+  -q
+
+# Migration 016 fixture matrix (sqlite; postgres optional via SLICE_B_TEST_DATABASE_URL)
+python -m pytest tests/test_integration_selection_migration_016.py -q
+
+# Backfill dry-run (requires postgres test DB — not production)
+PYTHONPATH=. python scripts/run_integration_selection_backfill.py --dry-run --verify
+
+# Frontend
+cd frontend && npm run typecheck && npm run lint && npm run test:contracts && npm run test:onboarding && npm run build
+```
+
+Merge requires: Slice B bundle PASS, migration 016 fixture tests PASS, lint 0 errors, browser smoke on integrations step, no new failures vs `origin/main` under identical test DB/env.
+
+---
+
 ## No markdown/docs linter configured
 
 No `package.json`, `pyproject.toml` with markdown lint, `ruff.toml`, or `setup.cfg` with markdown linting was found in the repository. No docs lint was run in this session. If a linter is added in the future, document the command here.

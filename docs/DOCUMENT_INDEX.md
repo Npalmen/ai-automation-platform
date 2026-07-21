@@ -24,6 +24,7 @@
 | `frontend/README.md` | Frontend build, contracts, operator panel |
 | `docs/DOCUMENT_INDEX.md` | This file |
 | `docs/onboarding-2.0-architecture.md` | Onboarding 2.0 architecture (DEC-032) |
+| `docs/onboarding-2.0-operator-flow.md` | Operator integrations/routing flow (Slice B) |
 | `docs/10b-decision-contract-resolution.md` | Kapitel 2B decision contract & action authorization (DEC-033) |
 | `docs/10c-decision-trace-foundation.md` | Kapitel 2C decision trace foundation (DEC-034) |
 | `docs/10d-evaluation-harness.md` | Kapitel 2D deterministic evaluation harness (DEC-035) |
