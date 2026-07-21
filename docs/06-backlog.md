@@ -25,7 +25,7 @@
 
 - [x] **Slice A — selection resolver + health gating** — canonical keys (`app/integrations/keys.py`); `app/admin/integrations/selection_resolver.py`; platform vs tenant health split; gated triage, tenant directory, alerts; frontend customer detail filtering. No migration 015. Cherry-picked to `main` from `a99c33c` (feature branch `feature/kapitel-2d1-approval-trace` not merged). Tests: parity + health + tenant_directory + super_admin (144 passed).
 - [x] **Slice B — explicit `settings.integrations.selections`** — migration **016** (structure SQL + `integration_selection_backfill_runs`); backfill service `run_integration_selection_backfill.py`; `enabled_external_writes` fail-closed; onboarding tri-state UI; `finance_destination` panel + `manual_accounting_routing` + mandatory `visma_disposition`; integration groups; Niklas + conflict/credential gate tests. **Local gates green on branch** — merge/deploy pending browser smoke + postgres dry-run in operator environment.
-- [ ] **Slice C — transactional customer settings edits** — backend commits 1–2C done (`customer_settings` module, aggregate GET with `effective_readiness`, deterministic automation projection, HTTP contract tests with isolated admin key, `_readiness` protected). **Commit 3 frontend (`CustomerSettingsPage`) pending.**
+- [ ] **Slice C — transactional customer settings edits** — backend commits 1–2C done; **Commit 3 frontend done** (`CustomerSettingsPage` at `/ops/customers/:tenantId/settings`, domain tabs, preview/conflict UX, 29 frontend contract tests). Commit 4 gates pending.
 - [ ] **Slice D — slutgates + pilot deploy** — after B/C.
 
 ---
