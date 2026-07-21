@@ -590,16 +590,21 @@ Reference: `app/admin/integrations/selection_resolver.py`, `app/health/integrati
 
 ## DEC-037 — Explicit integration selections source of truth (Slice B, 2026-07-21)
 
-**Status:** Active — in progress on `feature/integration-selection-slice-b`
+**Status:** Active — implemented on `feature/integration-selection-slice-b` (Commits 1–5)
 
 | # | Rule | Consequence |
 |---|------|-------------|
 | 1 | **`settings.integrations.selections` is SoT** after backfill/activation | Legacy fallback only when selections absent |
 | 2 | **`migration_review_required` is boolean** | Not a `selection_status` value |
-| 3 | **Migration 016 SQL ≠ backfill** | SQL creates structure/table; `run_integration_selection_backfill.py` classifies tenants |
+| 3 | **Migration 016 SQL ≠ backfill** | SQL creates `integration_selection_backfill_runs`; `run_integration_selection_backfill.py` classifies tenants |
 | 4 | **Backfill actor** | `configured_by=system:migration_016`, `requirement_source=legacy_backfill` |
 | 5 | **Runtime writes** | `enabled_external_writes` separate from `allowed_integrations`; selection/verification alone never enables writes |
 | 6 | **Sheets cautious backfill** | `google_sheets` in allowlist without tenant evidence → `selected_optional` + `migration_review_required=true` |
 | 7 | **Sync fail-closed** | `sync_allowed_integrations_from_selections` never expands external writes without verification |
+| 8 | **Selection ≠ connection ≠ verification ≠ runtime write** | UI and PATCH layers are separate; no implicit OAuth or verify on selection change |
+| 9 | **One `finance_destination` implementation** | Either Visma selection path or `manual_accounting_routing` group impl — never both active |
+| 10 | **Manual routing requires valid accounting routing** | `invoice_generic` → `finance` or `invoice`; else readiness blocks |
+| 11 | **No automatic provider selection** | Module group satisfaction does not silently set Visma to required |
+| 12 | **Credentials preserved on deselection** | Switching to manual routing may change Visma **selection** via explicit `visma_disposition` only; OAuth rows are not deleted |
 
-Reference: `app/admin/integrations/selection_backfill.py`, `selection_sync.py`, `selection_materialize.py`
+Reference: `app/admin/integrations/selection_backfill.py`, `selection_sync.py`, `integration_groups.py`, `docs/onboarding-2.0-operator-flow.md`

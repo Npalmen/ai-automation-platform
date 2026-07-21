@@ -10,7 +10,9 @@
 
 2026-07-21 (Slice A integration selection — canonical on `main` commit `7c511ee`; pilot RC `krowolf-app:rc-7c511eeb0719`; tenant `T_NIKLAS_DEMO_001`; Gmail soak not resumed.)
 
-2026-07-21 (Slice B partial — branch `feature/integration-selection-slice-b`: backend kernel + Niklas gate PASS; onboarding `IntegrationsStepPanel` tri-state per integration with category groups; `selections` draft/PATCH; selection-aware `evaluate_integrations_step`; registry API exposes `category` / `alternatives_group` / `support_status`. Deploy + merge pending.)
+2026-07-21 (Slice B — branch `feature/integration-selection-slice-b` @ Commit 4 `11a261a`: selections SoT, integration groups, `manual_accounting_routing` UI, `visma_disposition` required, frontend lint PASS. Commit 5 adds conflict/credential gates + docs. Pilot deploy/merge pending.)
+
+2026-07-21 (Slice B partial — superseded by Commit 4+5 reconciliation on same branch.)
 
 ## Verification method
 

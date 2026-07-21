@@ -296,8 +296,11 @@ npm run tokens:generate
 npm run typecheck
 npm run lint
 npm run test:contracts
+npm run test:onboarding
 npm run build
 ```
+
+`test:onboarding` includes `src/features/onboarding/financeDestination.test.mjs` (Slice B ekonomidestination panel).
 
 ## Responsive manual checklist
 

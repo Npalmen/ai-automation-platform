@@ -54,3 +54,26 @@ See plan DEC-032: paused is operational (not lifecycle), super_admin via operato
 - Scheduler: only `lifecycle_status=active` + `scheduler.run_mode=scheduled`
 - Gmail intake: `internalDate` UTC vs `intake_cutoff_at` before job creation
 - Readiness stale when `config_version` changes after last check
+
+## Integration selections (Slice B — migration 016)
+
+| Concept | Location |
+|---------|----------|
+| Source of truth | `settings.integrations.selections` (canonical keys via `app/integrations/keys.py`) |
+| Runtime allowlist | `allowed_integrations` — derived from selections (fail-closed sync) |
+| External writes | `enabled_external_writes` — selection + verified credential only |
+| Group requirements | `required_integration_groups` on capabilities (e.g. `invoice_handling` → `finance_destination`) |
+| Group implementation | `group_implementations.finance_destination.type = manual_accounting_routing` |
+| Backfill audit table | `integration_selection_backfill_runs` (migration 016 SQL only) |
+| Backfill service | `scripts/run_integration_selection_backfill.py` — idempotent, dry-run capable |
+
+### Canonical keys
+
+- `gmail` → `google_mail` at ingest
+- Registry keys (`visma`, `google_sheets`) map to canonical keys in selections
+
+### Readiness
+
+`evaluate_integrations_step` emits `integration_groups` and blocks with `group:finance_destination` when manual routing lacks valid invoice accounting route.
+
+Operator flow: `docs/onboarding-2.0-operator-flow.md`
