@@ -628,7 +628,9 @@ python -m pytest tests/test_integration_selection_slice_b.py \
   tests/test_onboarding_smoke_gates.py -q
 
 # Backfill audit (SQLite; PostgreSQL optional via SLICE_B_TEST_DATABASE_URL)
-python -m pytest tests/test_integration_selection_migration_016.py -q -m "not integration_db"
+python -m pytest tests/test_integration_selection_migration_016.py tests/test_canonical_commit.py -q -m "not integration_db"
+
+Backfill audit rows store `canonical_commit` in `report_json`, resolved from (in order): `--canonical-commit`, runtime env (`BUILD_COMMIT_SHA` / `GIT_COMMIT` / `COMMIT_SHA`), `/app/build-metadata.json`, or git HEAD in dev/test only.
 
 # API smoke (live stack required)
 python scripts/customer_settings_gate_smoke.py \
