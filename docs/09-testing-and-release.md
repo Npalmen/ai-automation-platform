@@ -61,6 +61,8 @@ Reports: `scripts/kapitel12_slice3_report.json`, `scripts/kapitel12_browser_repo
 
 **Browser matrix (pilot):** `docs/runbooks/kapitel12-browser-matrix.md` — env `/opt/krowolf/.env.browser-test`; per-role CDP via `kapitel12_browser_pilot_verify.py`.
 
+**Customer Settings role verifier (pilot, manual):** `scripts/customer_settings_pilot_role_verify.py` — four roles (`read_only`, `operations`, `admin`, `super_admin`); host-run only; **not** in CI. Sync via `scripts/k12_sync_browser_scripts_pilot.sh`; no app image rebuild for script-only changes.
+
 **Verified 2026-07-19:** Browseraggregat PASS (read_only, operations, admin); security bundle **240 passed**; full suite **3589 passed / 0 failed**; frontend gates PASS; release **GO** (see `docs/kapitel-12-release-notes.md`, DEC-030).
 
 **Verified 2026-07-20 (stabilization reconciliation):** R1 release gate **524 + 157 passed**; secret scan **4 passed**; frontend typecheck + contracts + build PASS; pilot preflight PASS; clean Niklas baseline PASS. Canonical tag: `krowolf-pilot-baseline-20260720-final`. See `docs/DOCUMENT_INDEX.md`.

@@ -12,11 +12,13 @@ FILES=(
   scripts/k12_browser_approval_fixture.py
   scripts/kapitel12_browser_pilot_verify.py
   scripts/kapitel12_browser_aggregate.py
+  scripts/customer_settings_pilot_role_verify.py
+  scripts/k12_customer_settings_role_matrix_pilot.sh
   scripts/env.browser-test.example
   docs/runbooks/kapitel12-browser-matrix.md
 )
 "${GIT[@]}" checkout origin/main -- "${FILES[@]}"
-chmod +x scripts/k12_verify_browser_env.py scripts/kapitel12_browser_pilot_verify.py scripts/kapitel12_browser_aggregate.py 2>/dev/null || true
+chmod +x scripts/k12_verify_browser_env.py scripts/kapitel12_browser_pilot_verify.py scripts/kapitel12_browser_aggregate.py scripts/customer_settings_pilot_role_verify.py scripts/k12_customer_settings_role_matrix_pilot.sh 2>/dev/null || true
 echo "ORIGIN_MAIN=$("${GIT[@]}" rev-parse origin/main)"
 echo "WORKTREE_HEAD=$("${GIT[@]}" rev-parse HEAD)"
 for f in scripts/k12_verify_browser_env.py scripts/k12_browser_common.py scripts/k12_browser_cdp.py scripts/k12_browser_approval_fixture.py scripts/kapitel12_browser_pilot_verify.py scripts/kapitel12_browser_aggregate.py; do
