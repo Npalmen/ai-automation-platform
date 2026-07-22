@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.evaluation.live.delivery import mask_email
+from app.evaluation.live.redaction import redact_sensitive
 from app.repositories.postgres.decision_record_repository import DecisionRecordRepository
 from app.repositories.postgres.live_eval_repository import (
     LiveEvalExternalEventRepository,
@@ -100,20 +101,25 @@ def build_job_observation(db: Session, tenant_id: str, job_id: str) -> dict[str,
     policy = get_latest_processor_payload(job, "policy_processor") or {}
 
     records = DecisionRecordRepository.list_for_job(db, tenant_id=tenant_id, job_id=job_id)
-    decision_rows = [
-        {
-            "record_type": r.record_type,
-            "event_sequence": r.event_sequence,
-            "policy_authorization": r.policy_authorization,
-            "action_authorization": r.action_authorization,
-            "pipeline_run_id": r.pipeline_run_id,
-            "metadata": {
-                k: _truncate(v)
-                for k, v in (r.metadata_json or {}).items()
-            },
-        }
-        for r in records[:_MAX_DECISION_RECORDS]
-    ]
+    decision_rows = []
+    for r in records[:_MAX_DECISION_RECORDS]:
+        raw_metadata = r.metadata_json or {}
+        redacted_metadata = redact_sensitive(raw_metadata)
+        if not isinstance(redacted_metadata, dict):
+            redacted_metadata = {}
+        decision_rows.append(
+            {
+                "record_type": r.record_type,
+                "event_sequence": r.event_sequence,
+                "policy_authorization": r.policy_authorization,
+                "action_authorization": r.action_authorization,
+                "pipeline_run_id": r.pipeline_run_id,
+                "metadata": {
+                    k: _truncate(v)
+                    for k, v in redacted_metadata.items()
+                },
+            }
+        )
 
     pipeline_run_id = None
     for row in decision_rows:

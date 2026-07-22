@@ -199,6 +199,19 @@ def _message_in_send_window(
     return (start.timestamp() - 60) <= msg_at.timestamp() <= end.timestamp()
 
 
+def _sent_recipient_emails(msg: dict[str, Any]) -> list[str]:
+    from email.utils import getaddresses
+
+    parts: list[str] = []
+    for key in ("to", "delivered_to"):
+        value = str(msg.get(key) or "").strip()
+        if value:
+            parts.append(value)
+    if not parts:
+        return []
+    return [email.strip().lower() for _, email in getaddresses(parts) if email.strip()]
+
+
 def _validate_sent_candidate(
     msg: dict[str, Any],
     *,
@@ -221,8 +234,10 @@ def _validate_sent_candidate(
         return False
     if _parse_from_email(str(msg.get("from") or "")) != expected_sender.strip().lower():
         return False
-    recipient = _parse_recipient_email(msg)
-    if recipient and recipient != expected_recipient.strip().lower():
+    recipients = _sent_recipient_emails(msg)
+    if len(recipients) != 1:
+        return False
+    if recipients[0] != expected_recipient.strip().lower():
         return False
     return _message_in_send_window(msg, window_start=window_start, window_end=window_end)
 
@@ -323,10 +338,12 @@ def reconcile_sent_message(
     after_epoch = int(send_window_start.astimezone(timezone.utc).timestamp()) - 60
     token = f"KROWOLF-EVAL/{evaluation_run_id}"
     query = f'in:sent to:{expected_recipient} after:{after_epoch} subject:"{token}"'
-    stub_ids = client.list_message_ids(max_results=_RECONCILE_CANDIDATE_CAP, query=query)
+    page = client.list_messages_page(max_results=_RECONCILE_CANDIDATE_CAP, query=query)
+    if page.truncated:
+        raise LiveEvalSafetyError("correlation_failure: sent list truncated")
     window_end = expires_at or datetime.now(timezone.utc)
     matches: list[SendOutcome] = []
-    for message_id in stub_ids:
+    for message_id in page.message_ids:
         detail = client.get_message(message_id)
         if not _validate_sent_candidate(
             detail,

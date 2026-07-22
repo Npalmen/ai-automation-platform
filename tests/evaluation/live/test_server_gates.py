@@ -114,3 +114,24 @@ def test_delivery_readonly_allowed_without_mutation_gate(live_eval_client, db, m
             headers={"X-Admin-API-Key": "test-admin-key"},
         )
     assert response.status_code == 200
+
+
+def test_status_update_rejects_non_allowlisted_tenant(live_eval_client):
+    assert _register(live_eval_client, "run-status-tenant").status_code == 200
+    response = live_eval_client.post(
+        "/admin/live-eval/runs/run-status-tenant/status",
+        headers={"X-Admin-API-Key": "test-admin-key"},
+        json={"tenant_id": "OTHER_TENANT", "status": "aborted"},
+    )
+    assert response.status_code == 400
+
+
+def test_status_update_allows_allowlisted_tenant(live_eval_client):
+    assert _register(live_eval_client, "run-status-ok").status_code == 200
+    response = live_eval_client.post(
+        "/admin/live-eval/runs/run-status-ok/status",
+        headers={"X-Admin-API-Key": "test-admin-key"},
+        json={"tenant_id": "TENANT_LIVE_EVAL", "status": "aborted"},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "aborted"

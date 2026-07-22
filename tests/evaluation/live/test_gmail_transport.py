@@ -12,6 +12,7 @@ from app.evaluation.live.delivery import (
     observe_delivery_candidates,
     validate_delivery_candidate,
 )
+from app.integrations.google.mail_client import GmailMessageListResult
 from app.evaluation.live.subject_parser import build_subject_with_token
 from app.repositories.postgres.live_eval_models import LiveEvalRunRow
 
@@ -88,7 +89,10 @@ def test_observe_delivery_duplicate_detected(db, run_row, live_eval_env):
     }
 
     adapter = MagicMock()
-    adapter.client.list_message_ids.return_value = ["m1", "m2"]
+    adapter.client.list_messages_page.return_value = GmailMessageListResult(
+        message_ids=["m1", "m2"],
+        truncated=False,
+    )
     adapter.execute_action.side_effect = [
         {"labels": [{"name": "krowolf-live-eval", "id": "Label_krowolf"}]},
         {"message": msg},

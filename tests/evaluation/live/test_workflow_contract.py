@@ -22,3 +22,14 @@ def test_live_eval_workflow_contract():
 
     run_step = next(step for step in transport["steps"] if "run-scenario" in (step.get("run") or ""))
     assert "--run-id-file" in run_step["run"]
+
+    cleanup_step = next(step for step in transport["steps"] if step.get("id") == "cleanup")
+    assert cleanup_step.get("if") == "always()"
+    assert "|| true" not in (cleanup_step.get("run") or "")
+
+    gate_step = next(step for step in transport["steps"] if step.get("name") == "Cleanup gate")
+    assert gate_step.get("if") == "always()"
+    assert "steps.cleanup.outcome" in (gate_step.get("run") or "")
+
+    artifact_step = next(step for step in transport["steps"] if "Upload redacted artifacts" in step.get("name", ""))
+    assert artifact_step.get("if") == "always() && env.RUN_ID != ''"

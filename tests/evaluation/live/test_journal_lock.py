@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
 
 import pytest
 
@@ -54,7 +54,7 @@ def test_release_requires_matching_lock_id(storage_root):
         release_run_writer_lock(lock)
 
 
-def test_force_unlock_requires_env_and_stale_age(storage_root, monkeypatch):
+def test_force_unlock_same_host_dead_pid(storage_root, monkeypatch):
     first = acquire_run_writer_lock("run-lock-4")
     try:
         with pytest.raises(LiveEvalSafetyError, match="run_directory_locked"):
@@ -68,7 +68,7 @@ def test_force_unlock_requires_env_and_stale_age(storage_root, monkeypatch):
                 {
                     "lock_id": first.lock_id,
                     "pid": 999999,
-                    "hostname": "other-host",
+                    "hostname": socket.gethostname(),
                     "created_at": stale.isoformat(),
                 }
             ),
@@ -79,3 +79,23 @@ def test_force_unlock_requires_env_and_stale_age(storage_root, monkeypatch):
     finally:
         if (run_directory("run-lock-4") / ".writer.lock").exists():
             release_run_writer_lock(first)
+
+
+def test_force_unlock_rejects_other_host(storage_root, monkeypatch):
+    acquire_run_writer_lock("run-lock-5")
+    monkeypatch.setenv("LIVE_EVAL_FORCE_UNLOCK", "yes")
+    stale = datetime.now(timezone.utc) - timedelta(hours=3)
+    lock_path = run_directory("run-lock-5") / ".writer.lock"
+    lock_path.write_text(
+        json.dumps(
+            {
+                "lock_id": "other-lock",
+                "pid": 999999,
+                "hostname": "remote-host",
+                "created_at": stale.isoformat(),
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(LiveEvalSafetyError, match="cross_host_lock_not_recoverable"):
+        acquire_run_writer_lock("run-lock-5", force_unlock=True)

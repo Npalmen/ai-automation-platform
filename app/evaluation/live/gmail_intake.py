@@ -326,6 +326,7 @@ def _record_intake_telemetry(
         outcome=event_outcome,
         category=category,
         operation=message_id,
+        integration_type=IntegrationType.GOOGLE_MAIL.value,
         job_id=job_id,
         pipeline_run_id=pipeline_run_id,
         snapshot=snapshot,

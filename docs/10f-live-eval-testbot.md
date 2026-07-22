@@ -177,8 +177,10 @@ Never commit tokens. Report schema version: `2f.2`.
 ### Writer lock
 
 - Atomic `.writer.lock` via `O_CREAT|O_EXCL` under `storage/live_eval/runs/<id>/`.
-- Force unlock requires `--force-unlock`, `LIVE_EVAL_FORCE_UNLOCK=yes`, stale age, and PID not alive on same host.
-- `lock_forced` transition recorded before re-acquire.
+- Run storage must be **local and non-shared** between concurrent runners (no NFS/shared volume).
+- Force unlock requires `--force-unlock`, `LIVE_EVAL_FORCE_UNLOCK=yes`, stale age, **same hostname**, and dead PID.
+- Cross-host locks return `cross_host_lock_not_recoverable` (never force-unlocked).
+- `lock_forced` transition recorded before re-acquire on same-host stale recovery.
 
 ### Send budget (locked for 2F.2)
 
@@ -226,4 +228,8 @@ python scripts/run_live_eval.py show-report --run-id <id>   # redacted JSON only
 
 ### Live workflow
 
-Manual `workflow_dispatch` only. `timeout-minutes: 45`, `concurrency.group: live-gmail-eval`, exact run-ID file for cleanup and artifacts. No `.last_run_id` / `ls -t` discovery.
+Manual `workflow_dispatch` only. `timeout-minutes: 45`, `concurrency.group: live-gmail-eval`, exact run-ID file for cleanup and artifacts. Cleanup failures fail the job via a final gate step; artifacts still upload. No `.last_run_id` / `ls -t` discovery.
+
+### OAuth seed database guard (F-08)
+
+`seed_live_eval_gmail_oauth.py` reuses the same substring-based production URL heuristic as `seed_live_eval_tenant.py`. No shared positive test-database fingerprint model exists in-repo yet; changing this is deferred as LOW to a separate seed-script hardening task. All other guards (`ENV=test`, `LIVE_EVAL_SEED_ALLOWED`, tenant allowlist, `is_test_tenant`) remain enforced.

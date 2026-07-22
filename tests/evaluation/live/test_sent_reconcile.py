@@ -12,6 +12,7 @@ from app.evaluation.live.gmail_transport import reconcile_sent_message
 from app.evaluation.live.journal import RunCheckpoint, assert_journal_send_budget
 from app.evaluation.live.safety import validate_config_readiness
 from app.evaluation.live.subject_parser import build_subject_with_token
+from app.integrations.google.mail_client import GmailMessageListResult
 
 
 def test_send_budget_config_validation(live_eval_env, monkeypatch):
@@ -46,7 +47,7 @@ def test_journal_send_budget_blocks_second_send(live_eval_env):
 def test_reconcile_zero_candidates_returns_none(live_eval_env, monkeypatch):
     monkeypatch.setenv("EXTERNAL_SIDE_EFFECT_TESTS", "yes")
     client = MagicMock()
-    client.list_message_ids.return_value = []
+    client.list_messages_page.return_value = GmailMessageListResult(message_ids=[], truncated=False)
     with patch("app.evaluation.live.gmail_transport.build_sender_client", return_value=client):
         result = reconcile_sent_message(
             evaluation_run_id="run-reconcile-0",
@@ -79,7 +80,7 @@ def test_reconcile_one_candidate_resolves(live_eval_env, monkeypatch):
         "internet_message_id": "<abc@mail>",
     }
     client = MagicMock()
-    client.list_message_ids.return_value = ["sent-1"]
+    client.list_messages_page.return_value = GmailMessageListResult(message_ids=["sent-1"], truncated=False)
     client.get_message.return_value = msg
     with patch("app.evaluation.live.gmail_transport.build_sender_client", return_value=client):
         result = reconcile_sent_message(
@@ -113,7 +114,7 @@ def test_reconcile_wrong_recipient_rejected(live_eval_env, monkeypatch):
         "internal_date_ms": now_ms,
     }
     client = MagicMock()
-    client.list_message_ids.return_value = ["sent-1"]
+    client.list_messages_page.return_value = GmailMessageListResult(message_ids=["sent-1"], truncated=False)
     client.get_message.return_value = msg
     with patch("app.evaluation.live.gmail_transport.build_sender_client", return_value=client):
         result = reconcile_sent_message(
@@ -146,12 +147,61 @@ def test_reconcile_multiple_candidates_fails(live_eval_env, monkeypatch):
         "internal_date_ms": now_ms,
     }
     client = MagicMock()
-    client.list_message_ids.return_value = ["sent-1", "sent-2"]
+    client.list_messages_page.return_value = GmailMessageListResult(
+        message_ids=["sent-1", "sent-2"], truncated=False
+    )
     client.get_message.return_value = msg
     with patch("app.evaluation.live.gmail_transport.build_sender_client", return_value=client):
         with pytest.raises(LiveEvalSafetyError, match="multiple sent matches"):
             reconcile_sent_message(
                 evaluation_run_id=run_id,
+                scenario_id="S01_lead_laddbox_quality",
+                attempt_id=1,
+                expected_sender="sender@eval.test",
+                expected_recipient="recipient@eval.test",
+                send_window_start=datetime.now(timezone.utc),
+            )
+
+
+def test_reconcile_missing_to_rejected(live_eval_env, monkeypatch):
+    monkeypatch.setenv("EXTERNAL_SIDE_EFFECT_TESTS", "yes")
+    run_id = "run-reconcile-no-to"
+    subject = build_subject_with_token(
+        evaluation_run_id=run_id,
+        scenario_id="S01_lead_laddbox_quality",
+        attempt_id=1,
+        base_subject="Test",
+    )
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    msg = {
+        "message_id": "sent-1",
+        "subject": subject,
+        "from": "sender@eval.test",
+        "internal_date_ms": now_ms,
+    }
+    client = MagicMock()
+    client.list_messages_page.return_value = GmailMessageListResult(message_ids=["sent-1"], truncated=False)
+    client.get_message.return_value = msg
+    with patch("app.evaluation.live.gmail_transport.build_sender_client", return_value=client):
+        result = reconcile_sent_message(
+            evaluation_run_id=run_id,
+            scenario_id="S01_lead_laddbox_quality",
+            attempt_id=1,
+            expected_sender="sender@eval.test",
+            expected_recipient="recipient@eval.test",
+            send_window_start=datetime.now(timezone.utc),
+        )
+    assert result is None
+
+
+def test_reconcile_truncated_list_fails(live_eval_env, monkeypatch):
+    monkeypatch.setenv("EXTERNAL_SIDE_EFFECT_TESTS", "yes")
+    client = MagicMock()
+    client.list_messages_page.return_value = GmailMessageListResult(message_ids=["sent-1"], truncated=True)
+    with patch("app.evaluation.live.gmail_transport.build_sender_client", return_value=client):
+        with pytest.raises(LiveEvalSafetyError, match="truncated"):
+            reconcile_sent_message(
+                evaluation_run_id="run-reconcile-trunc",
                 scenario_id="S01_lead_laddbox_quality",
                 attempt_id=1,
                 expected_sender="sender@eval.test",

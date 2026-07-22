@@ -170,6 +170,7 @@ jobs:
         run: python scripts/run_live_eval.py validate-config --gmail-readiness --confirm-read-only --tenant-id TENANT_LIVE_EVAL
 
       - name: Live Gmail S01 scenario
+        id: run_scenario
         run: |
           python scripts/run_live_eval.py run-scenario \
             --scenario-id S01_lead_laddbox_quality \
@@ -178,20 +179,33 @@ jobs:
             --run-id-file "${RUNNER_TEMP}/live_eval_run_id"
 
       - name: Exact cleanup
+        id: cleanup
         if: always()
         run: |
-          RUN_ID=$(cat "${RUNNER_TEMP}/live_eval_run_id")
-          python scripts/run_live_eval.py cleanup-run --run-id "$RUN_ID" --confirm-external || true
+          if [ -f "${RUNNER_TEMP}/live_eval_run_id" ]; then
+            RUN_ID=$(cat "${RUNNER_TEMP}/live_eval_run_id")
+            python scripts/run_live_eval.py cleanup-run --run-id "$RUN_ID" --confirm-external
+          fi
 
-      - name: Upload live eval report
+      - name: Set run ID for artifacts
         if: always()
         run: |
-          RUN_ID=$(cat "${RUNNER_TEMP}/live_eval_run_id")
-          echo "RUN_ID=$RUN_ID" >> "$GITHUB_ENV"
+          if [ -f "${RUNNER_TEMP}/live_eval_run_id" ]; then
+            RUN_ID=$(cat "${RUNNER_TEMP}/live_eval_run_id")
+            echo "RUN_ID=$RUN_ID" >> "$GITHUB_ENV"
+          fi
 
       - name: Upload redacted artifacts
-        if: always()
+        if: always() && env.RUN_ID != ''
         uses: actions/upload-artifact@v4
         with:
           name: live-eval-report-${{ env.RUN_ID }}
           path: storage/live_eval/runs/${{ env.RUN_ID }}/
+
+      - name: Cleanup gate
+        if: always()
+        run: |
+          if [ -f "${RUNNER_TEMP}/live_eval_run_id" ] && [ "${{ steps.cleanup.outcome }}" != "success" ]; then
+            echo "cleanup required but step outcome was: ${{ steps.cleanup.outcome }}"
+            exit 1
+          fi

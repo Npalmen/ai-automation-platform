@@ -43,6 +43,7 @@ class DeliveryObservationResult:
     duplicate_detected: bool
     confirmed: DeliveryCandidate | None
     rejection_reasons: list[str]
+    truncated: bool = False
 
 
 def _normalize_email(value: str | None) -> str:
@@ -238,10 +239,20 @@ def observe_delivery_candidates(
         run_created_at=row.created_at,
         unread_only=unread_only,
     )
-    stub_ids = adapter.client.list_message_ids(
+    page = adapter.client.list_messages_page(
         max_results=_DELIVERY_CANDIDATE_CAP,
         query=query,
     )
+    if page.truncated:
+        return DeliveryObservationResult(
+            candidate_count=len(page.message_ids),
+            valid_count=0,
+            duplicate_detected=True,
+            confirmed=None,
+            rejection_reasons=["gmail_list_truncated"],
+            truncated=True,
+        )
+    stub_ids = page.message_ids
     rejection_reasons: list[str] = []
     valid: list[DeliveryCandidate] = []
 

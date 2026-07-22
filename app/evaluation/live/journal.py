@@ -327,9 +327,11 @@ def _can_force_unlock(lock_data: dict[str, Any]) -> bool:
         return False
     if not _is_lock_stale(lock_data):
         return False
-    pid = int(lock_data.get("pid") or 0)
     hostname = str(lock_data.get("hostname") or "")
-    if hostname and hostname == socket.gethostname() and _pid_alive(pid):
+    if hostname != socket.gethostname():
+        return False
+    pid = int(lock_data.get("pid") or 0)
+    if _pid_alive(pid):
         return False
     return True
 
@@ -360,20 +362,24 @@ def acquire_run_writer_lock(
         return RunWriterLock(evaluation_run_id=evaluation_run_id, lock_id=lock_id, path=path)
     except FileExistsError:
         existing = _read_lock_file(path)
-        if force_unlock and _can_force_unlock(existing):
-            append_transition(
-                evaluation_run_id,
-                {
-                    "state": "lock_forced",
-                    "previous_lock_id": existing.get("lock_id"),
-                    "previous_pid": existing.get("pid"),
-                },
-            )
-            try:
-                os.unlink(path)
-            except OSError as exc:
-                raise LiveEvalSafetyError(f"failed to remove stale lock: {exc}") from exc
-            return acquire_run_writer_lock(evaluation_run_id, force_unlock=False)
+        if force_unlock:
+            hostname = str(existing.get("hostname") or "")
+            if hostname and hostname != socket.gethostname():
+                raise LiveEvalSafetyError("cross_host_lock_not_recoverable")
+            if _can_force_unlock(existing):
+                append_transition(
+                    evaluation_run_id,
+                    {
+                        "state": "lock_forced",
+                        "previous_lock_id": existing.get("lock_id"),
+                        "previous_pid": existing.get("pid"),
+                    },
+                )
+                try:
+                    os.unlink(path)
+                except OSError as exc:
+                    raise LiveEvalSafetyError(f"failed to remove stale lock: {exc}") from exc
+                return acquire_run_writer_lock(evaluation_run_id, force_unlock=False)
         raise LiveEvalSafetyError("run_directory_locked") from None
 
 

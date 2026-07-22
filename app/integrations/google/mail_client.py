@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import base64
 import logging
+from dataclasses import dataclass
 from email.message import EmailMessage
 from email.utils import formataddr
 from typing import Any
 
 import requests
+
+
+@dataclass(frozen=True)
+class GmailMessageListResult:
+    message_ids: list[str]
+    truncated: bool
 
 
 logger = logging.getLogger(__name__)
@@ -363,7 +370,7 @@ class GoogleMailClient:
             raise ValueError("message_id is required.")
         self.modify_message_labels(message_id, remove_label_ids=["INBOX", "UNREAD"])
 
-    def list_message_ids(self, max_results: int = 10, query: str = "") -> list[str]:
+    def list_messages_page(self, max_results: int = 10, query: str = "") -> GmailMessageListResult:
         params: dict[str, Any] = {"maxResults": max_results}
         if query:
             params["q"] = query
@@ -372,7 +379,14 @@ class GoogleMailClient:
             params=params,
         )
         stubs = data.get("messages") or []
-        return [str(stub.get("id", "")) for stub in stubs if stub.get("id")]
+        message_ids = [str(stub.get("id", "")) for stub in stubs if stub.get("id")]
+        return GmailMessageListResult(
+            message_ids=message_ids,
+            truncated=bool(data.get("nextPageToken")),
+        )
+
+    def list_message_ids(self, max_results: int = 10, query: str = "") -> list[str]:
+        return self.list_messages_page(max_results=max_results, query=query).message_ids
 
     def get_profile_email(self) -> str:
         data = self._get_with_refresh(f"/users/{self.user_id}/profile")

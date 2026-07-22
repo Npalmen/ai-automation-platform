@@ -141,6 +141,7 @@ def get_live_eval_delivery(
             outcome="succeeded",
             category=TELEMETRY_APP_DELIVERY_OBSERVED,
             operation=result.confirmed.message_id,
+            integration_type=IntegrationType.GOOGLE_MAIL.value,
             snapshot=snapshot,
             metadata={
                 "recipient_gmail_message_id": result.confirmed.message_id,
@@ -337,6 +338,7 @@ def update_live_eval_run_status(
 ):
     require_live_eval_enabled()
     try:
+        require_tenant_allowed(body.tenant_id)
         return complete_live_eval_run(
             db,
             evaluation_run_id,

@@ -14,6 +14,7 @@ from app.repositories.postgres.audit_models import AuditEventRecord
 from app.repositories.postgres.database import Base
 from app.repositories.postgres.job_models import JobRecord
 from app.repositories.postgres.live_eval_models import LiveEvalExternalEventRow, LiveEvalRunRow
+from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 
 
 @pytest.fixture
@@ -54,6 +55,7 @@ def db(live_eval_env):
             LiveEvalExternalEventRow.__table__,
             AuditEventRecord.__table__,
             JobRecord.__table__,
+            TenantConfigRecord.__table__,
         ],
     )
     Session = sessionmaker(bind=engine)

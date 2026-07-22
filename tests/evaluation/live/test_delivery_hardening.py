@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.evaluation.live.delivery import validate_delivery_candidate
+from app.evaluation.live.delivery import observe_delivery_candidates, validate_delivery_candidate
 from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.live.safety import validate_delivery_observation_allowed
 from app.evaluation.live.subject_parser import build_subject_with_token
@@ -80,3 +81,74 @@ def test_active_without_root_binding_rejected(run_row):
     run_row.status = "active"
     with pytest.raises(LiveEvalSafetyError, match="missing root binding"):
         validate_delivery_observation_allowed(run_row)
+
+
+def _valid_msg(run_row):
+    subject = build_subject_with_token(
+        evaluation_run_id=run_row.evaluation_run_id,
+        scenario_id=run_row.scenario_id,
+        attempt_id=run_row.attempt_id,
+        base_subject="Test",
+    )
+    return {
+        "message_id": "m1",
+        "thread_id": "t1",
+        "from": "sender@eval.test",
+        "to": "recipient@eval.test",
+        "subject": subject,
+        "internet_message_id": "<a@b>",
+        "body_text": "",
+        "internal_date_ms": int(run_row.created_at.timestamp() * 1000),
+        "label_ids": ["Label_krowolf"],
+    }
+
+
+def test_delivery_truncated_gmail_list_correlation_failure(db, run_row, live_eval_env):
+    from app.integrations.google.mail_client import GmailMessageListResult
+
+    db.add(run_row)
+    db.commit()
+    adapter = MagicMock()
+    adapter.client.list_messages_page.return_value = GmailMessageListResult(
+        message_ids=["m1"], truncated=True
+    )
+    adapter.execute_action.return_value = {
+        "labels": [{"name": "krowolf-live-eval", "id": "Label_krowolf"}],
+    }
+    with patch(
+        "app.evaluation.live.delivery.get_integration_connection_config",
+        return_value={},
+    ), patch(
+        "app.evaluation.live.delivery.get_integration_adapter",
+        return_value=adapter,
+    ):
+        result = observe_delivery_candidates(db, run_row)
+    assert result.truncated is True
+    assert result.duplicate_detected is True
+    assert result.confirmed is None
+
+
+def test_delivery_one_valid_candidate(db, run_row, live_eval_env):
+    from app.integrations.google.mail_client import GmailMessageListResult
+
+    db.add(run_row)
+    db.commit()
+    msg = _valid_msg(run_row)
+    adapter = MagicMock()
+    adapter.client.list_messages_page.return_value = GmailMessageListResult(
+        message_ids=["m1"], truncated=False
+    )
+    adapter.execute_action.side_effect = [
+        {"labels": [{"name": "krowolf-live-eval", "id": "Label_krowolf"}]},
+        {"message": msg},
+    ]
+    with patch(
+        "app.evaluation.live.delivery.get_integration_connection_config",
+        return_value={},
+    ), patch(
+        "app.evaluation.live.delivery.get_integration_adapter",
+        return_value=adapter,
+    ):
+        result = observe_delivery_candidates(db, run_row)
+    assert result.valid_count == 1
+    assert result.confirmed is not None
