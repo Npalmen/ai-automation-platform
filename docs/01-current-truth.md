@@ -8,6 +8,8 @@
 
 ## Last verified date
 
+2026-07-22 (Super-admin role hierarchy fix — merged to `main` @ `b196132` / fix commit `245fafa`; pilot RC `krowolf-app:rc-b196132ff683` digest `sha256:cd4a9cda0f665bcc2316305689dfac4a25613a2c9b4884efd4efed1f966b43cb`; tenant `T_NIKLAS_DEMO_001`; super_admin session smoke PASS — usage/system/onboarding/operator-actions; scheduler `paused`; jobs=0; approvals=0; credentials unchanged; external side effects 0; Gmail soak not resumed.)
+
 2026-07-22 (Slice C — merged to `main` @ `a725471`; pilot RC `krowolf-app:rc-a72547176d8c`; tenant `T_NIKLAS_DEMO_001`; Customer Settings API gates PASS on pilot; backfill dry-run `tenant_data_changed=false`; scheduler `paused`; credentials unchanged; external side effects 0; Gmail soak not resumed.)
 
 2026-07-21 (Slice A integration selection — canonical on `main` commit `7c511ee`; pilot RC `krowolf-app:rc-7c511eeb0719`; tenant `T_NIKLAS_DEMO_001`; Gmail soak not resumed.)
