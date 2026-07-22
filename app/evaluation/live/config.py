@@ -28,6 +28,8 @@ class LiveEvalConfig:
     max_runtime_minutes: int
     storage_root: str
     env_fingerprint: str
+    external_side_effects_enabled: bool
+    sender_eval_label: str
 
 
 def _parse_csv_set(raw: str) -> frozenset[str]:
@@ -56,11 +58,14 @@ def get_live_eval_config(settings: Settings | None = None) -> LiveEvalConfig:
         reply_domains=_parse_csv_set(os.environ.get("LIVE_EVAL_REPLY_DOMAINS", "")),
         intake_label=os.environ.get("LIVE_EVAL_GMAIL_LABEL", "krowolf-live-eval").strip()
         or "krowolf-live-eval",
-        max_scenarios_per_run=int(os.environ.get("LIVE_EVAL_MAX_SCENARIOS_PER_RUN", "5")),
-        max_gmail_sends_per_run=int(os.environ.get("LIVE_EVAL_MAX_GMAIL_SENDS", "10")),
-        max_gmail_replies_per_run=int(os.environ.get("LIVE_EVAL_MAX_GMAIL_REPLIES", "10")),
+        max_scenarios_per_run=int(os.environ.get("LIVE_EVAL_MAX_SCENARIOS_PER_RUN", "1")),
+        max_gmail_sends_per_run=int(os.environ.get("LIVE_EVAL_MAX_GMAIL_SENDS", "1")),
+        max_gmail_replies_per_run=int(os.environ.get("LIVE_EVAL_MAX_GMAIL_REPLIES", "0")),
         max_llm_calls_per_run=int(os.environ.get("LIVE_EVAL_MAX_LLM_CALLS", "20")),
         max_runtime_minutes=int(os.environ.get("LIVE_EVAL_MAX_RUNTIME_MINUTES", "30")),
         storage_root=storage_root,
         env_fingerprint=fingerprint,
+        external_side_effects_enabled=_env_truthy("EXTERNAL_SIDE_EFFECT_TESTS"),
+        sender_eval_label=os.environ.get("LIVE_EVAL_SENDER_GMAIL_LABEL", "krowolf-live-eval-sent").strip()
+        or "krowolf-live-eval-sent",
     )

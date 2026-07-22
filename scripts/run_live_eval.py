@@ -1,4 +1,4 @@
-"""Kapitel 2F.1 live-eval CLI — validate-config and offline dry-run only."""
+"""Kapitel 2F live-eval CLI."""
 
 from __future__ import annotations
 
@@ -14,60 +14,53 @@ if str(ROOT) not in sys.path:
 
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.constants import PYTEST_MARKER_EXPR, REPORT_SCHEMA_VERSION
-from app.evaluation.live.journal import append_transition, load_transitions, write_report_atomic
+from app.evaluation.live.journal import append_transition, load_transitions, run_directory, write_report_atomic
 from app.evaluation.live.readiness import run_offline_readiness_checks
 from app.evaluation.live.registry import new_evaluation_run_id
+from app.evaluation.live.runner import LiveEvalRunner, cleanup_only
 from app.evaluation.live.schemas import LiveEvalReport
 from app.evaluation.live.subject_parser import build_subject_with_token, parse_subject_token
+
+
+def _resolve_sender_recipient(config) -> tuple[str, str]:
+    senders = sorted(config.sender_emails)
+    recipients = sorted(config.recipient_emails)
+    if len(senders) != 1 or len(recipients) != 1:
+        raise SystemExit("Exactly one allowlisted sender and recipient required for run-scenario")
+    return senders[0], recipients[0]
 
 
 def cmd_validate_config(args: argparse.Namespace) -> int:
     if args.gmail_readiness:
         if not args.confirm_read_only:
-            print(
-                json.dumps(
-                    {
-                        "ready": False,
-                        "issues": ["--confirm-read-only is required for Gmail readiness"],
-                    },
-                    indent=2,
-                )
-            )
+            print(json.dumps({"ready": False, "issues": ["--confirm-read-only is required"]}, indent=2))
             return 1
         if not args.tenant_id:
-            print(
-                json.dumps(
-                    {"ready": False, "issues": ["--tenant-id is required"]},
-                    indent=2,
-                )
-            )
+            print(json.dumps({"ready": False, "issues": ["--tenant-id is required"]}, indent=2))
             return 1
         base = (args.app_base_url or os.environ.get("LIVE_EVAL_APP_BASE_URL") or "").rstrip("/")
         admin_key = os.environ.get("ADMIN_API_KEY", "").strip()
         if not base or not admin_key:
-            print(
-                json.dumps(
-                    {
-                        "ready": False,
-                        "issues": [
-                            "LIVE_EVAL_APP_BASE_URL and ADMIN_API_KEY required for Gmail readiness"
-                        ],
-                    },
-                    indent=2,
-                )
-            )
+            print(json.dumps({"ready": False, "issues": ["LIVE_EVAL_APP_BASE_URL and ADMIN_API_KEY required"]}, indent=2))
             return 1
         import httpx
 
-        response = httpx.post(
+        response = httpx.get(
+            f"{base}/admin/live-eval/runtime-readiness",
+            headers={"X-Admin-API-Key": admin_key},
+            timeout=30.0,
+        )
+        runtime = response.json()
+        gmail = httpx.post(
             f"{base}/admin/live-eval/gmail-readiness",
             headers={"X-Admin-API-Key": admin_key},
             json={"tenant_id": args.tenant_id},
             timeout=30.0,
-        )
-        payload = response.json()
+        ).json()
+        payload = {"runtime": runtime, "gmail": gmail}
         print(json.dumps(payload, indent=2, ensure_ascii=False))
-        return 0 if response.status_code == 200 and payload.get("ready") else 1
+        ready = response.status_code == 200 and runtime.get("database_ok") and gmail.get("ready")
+        return 0 if ready else 1
 
     report = run_offline_readiness_checks()
     payload = {
@@ -82,7 +75,6 @@ def cmd_validate_config(args: argparse.Namespace) -> int:
 
 
 def cmd_dry_run(args: argparse.Namespace) -> int:
-    """Offline dry-run: subject parser + journal/report validation (no Gmail/LLM)."""
     config = get_live_eval_config()
     run_id = args.evaluation_run_id or new_evaluation_run_id()
     scenario_id = args.scenario_id or "S01_lead_laddbox_quality"
@@ -97,16 +89,7 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
     if parsed is None:
         print("Subject parser failed", file=sys.stderr)
         return 1
-
-    append_transition(
-        run_id,
-        {
-            "state": "dry_run_started",
-            "scenario_id": scenario_id,
-            "attempt_id": attempt_id,
-            "transport_mode": "offline",
-        },
-    )
+    append_transition(run_id, {"state": "dry_run_started", "scenario_id": scenario_id})
     append_transition(
         run_id,
         {
@@ -116,7 +99,6 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
             "attempt_id": parsed.attempt_id,
         },
     )
-
     transitions = load_transitions(run_id)
     report = LiveEvalReport(
         evaluation_run_id=run_id,
@@ -127,29 +109,133 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
         state_transitions=transitions,
     )
     report_path = write_report_atomic(run_id, report)
-    payload = {
-        "evaluation_run_id": run_id,
-        "subject": subject,
-        "parsed": {
-            "evaluation_run_id": parsed.evaluation_run_id,
-            "scenario_id": parsed.scenario_id,
-            "attempt_id": parsed.attempt_id,
-        },
-        "report_schema_version": REPORT_SCHEMA_VERSION,
-        "report_path": str(report_path),
-        "storage_root": config.storage_root,
-        "env_fingerprint": config.env_fingerprint,
-        "transition_count": len(transitions),
-    }
-    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    print(
+        json.dumps(
+            {
+                "evaluation_run_id": run_id,
+                "report_schema_version": REPORT_SCHEMA_VERSION,
+                "report_path": str(report_path),
+                "transition_count": len(transitions),
+            },
+            indent=2,
+        )
+    )
     return 0
 
 
+def cmd_run_scenario(args: argparse.Namespace) -> int:
+    if not args.confirm_external:
+        print("--confirm-external is required", file=sys.stderr)
+        return 2
+    config = get_live_eval_config()
+    base = (args.app_base_url or os.environ.get("LIVE_EVAL_APP_BASE_URL") or "").rstrip("/")
+    admin_key = os.environ.get("ADMIN_API_KEY", "").strip()
+    tenant_id = args.tenant_id or next(iter(config.tenant_ids), "")
+    if not base or not admin_key or not tenant_id:
+        print("LIVE_EVAL_APP_BASE_URL, ADMIN_API_KEY, and tenant required", file=sys.stderr)
+        return 2
+    sender, recipient = _resolve_sender_recipient(config)
+
+    evaluation_run_id = args.evaluation_run_id
+    scenario_id = args.scenario_id
+    attempt_id = args.attempt_id or 1
+    if args.resume:
+        if not evaluation_run_id:
+            print("--run-id required for resume", file=sys.stderr)
+            return 2
+        from app.evaluation.live.journal import load_run_config
+
+        run_config = load_run_config(evaluation_run_id)
+        if not run_config:
+            print("run_config.json missing for resume", file=sys.stderr)
+            return 2
+        scenario_id = run_config.get("scenario_id", scenario_id)
+        attempt_id = int(run_config.get("attempt_id", attempt_id))
+        if args.scenario_id and args.scenario_id != scenario_id:
+            print("scenario_id override not allowed on resume", file=sys.stderr)
+            return 2
+        if args.attempt_id and args.attempt_id != attempt_id:
+            print("attempt_id override not allowed on resume", file=sys.stderr)
+            return 2
+
+    runner = LiveEvalRunner(
+        base_url=base,
+        admin_api_key=admin_key,
+        tenant_id=tenant_id,
+        scenario_id=scenario_id,
+        expected_sender=sender,
+        expected_recipient=recipient,
+        evaluation_run_id=evaluation_run_id,
+        attempt_id=attempt_id,
+        resume=args.resume,
+        force_unlock=getattr(args, "force_unlock", False),
+        run_id_file=getattr(args, "run_id_file", None),
+    )
+    return runner.run()
+
+
+def cmd_show_report(args: argparse.Namespace) -> int:
+    from app.evaluation.live.redaction import redact_sensitive
+
+    path = run_directory(args.run_id) / "report.json"
+    if not path.exists():
+        print(f"report not found: {path}", file=sys.stderr)
+        return 1
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        print(f"invalid report json: {exc}", file=sys.stderr)
+        return 1
+    redacted = redact_sensitive(payload)
+    print(json.dumps(redacted, indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_abort_run(args: argparse.Namespace) -> int:
+    import httpx
+
+    config = get_live_eval_config()
+    base = (args.app_base_url or os.environ.get("LIVE_EVAL_APP_BASE_URL") or "").rstrip("/")
+    admin_key = os.environ.get("ADMIN_API_KEY", "").strip()
+    tenant_id = args.tenant_id or next(iter(config.tenant_ids), "")
+    response = httpx.post(
+        f"{base}/admin/live-eval/runs/{args.run_id}/status",
+        headers={"X-Admin-API-Key": admin_key},
+        json={"tenant_id": tenant_id, "status": "aborted"},
+        timeout=30.0,
+    )
+    print(response.text)
+    return 0 if response.status_code == 200 else 1
+
+
+def cmd_cleanup_run(args: argparse.Namespace) -> int:
+    if not args.confirm_external:
+        return 2
+    config = get_live_eval_config()
+    base = (args.app_base_url or os.environ.get("LIVE_EVAL_APP_BASE_URL") or "").rstrip("/")
+    admin_key = os.environ.get("ADMIN_API_KEY", "").strip()
+    tenant_id = args.tenant_id or next(iter(config.tenant_ids), "")
+    return cleanup_only(
+        base_url=base,
+        admin_api_key=admin_key,
+        tenant_id=tenant_id,
+        evaluation_run_id=args.run_id,
+        recipient_gmail_message_id=args.recipient_message_id,
+        phase=args.phase,
+    )
+
+
+def cmd_resume_run(args: argparse.Namespace) -> int:
+    args.resume = True
+    args.confirm_external = True
+    return cmd_run_scenario(args)
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Live evaluation foundation CLI (2F.1)")
+    parser = argparse.ArgumentParser(description="Live evaluation CLI (2F)")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    validate = sub.add_parser("validate-config", help="Verify gates and readiness")
+    validate = sub.add_parser("validate-config")
     validate.add_argument("--offline", action="store_true", default=True)
     validate.add_argument("--gmail-readiness", action="store_true")
     validate.add_argument("--confirm-read-only", action="store_true")
@@ -157,11 +243,51 @@ def build_parser() -> argparse.ArgumentParser:
     validate.add_argument("--app-base-url", default=None)
     validate.set_defaults(func=cmd_validate_config)
 
-    dry_run = sub.add_parser("dry-run", help="Offline journal/report dry-run")
+    dry_run = sub.add_parser("dry-run")
     dry_run.add_argument("--evaluation-run-id", default=None)
     dry_run.add_argument("--scenario-id", default=None)
     dry_run.add_argument("--attempt-id", type=int, default=None)
     dry_run.set_defaults(func=cmd_dry_run)
+
+    run = sub.add_parser("run-scenario")
+    run.add_argument("--scenario-id", default="S01_lead_laddbox_quality")
+    run.add_argument("--tenant-id", default=None)
+    run.add_argument("--evaluation-run-id", default=None)
+    run.add_argument("--attempt-id", type=int, default=None)
+    run.add_argument("--app-base-url", default=None)
+    run.add_argument("--confirm-external", action="store_true")
+    run.add_argument("--resume", action="store_true", default=False)
+    run.add_argument("--force-unlock", action="store_true", default=False)
+    run.add_argument("--run-id-file", default=None)
+    run.set_defaults(func=cmd_run_scenario)
+
+    show = sub.add_parser("show-report")
+    show.add_argument("--run-id", required=True)
+    show.set_defaults(func=cmd_show_report)
+
+    abort = sub.add_parser("abort-run")
+    abort.add_argument("--run-id", required=True)
+    abort.add_argument("--tenant-id", default=None)
+    abort.add_argument("--app-base-url", default=None)
+    abort.set_defaults(func=cmd_abort_run)
+
+    cleanup = sub.add_parser("cleanup-run")
+    cleanup.add_argument("--run-id", required=True)
+    cleanup.add_argument("--tenant-id", default=None)
+    cleanup.add_argument("--recipient-message-id", default=None)
+    cleanup.add_argument("--phase", default="post_claim", choices=["pre_claim", "post_claim"])
+    cleanup.add_argument("--app-base-url", default=None)
+    cleanup.add_argument("--confirm-external", action="store_true")
+    cleanup.set_defaults(func=cmd_cleanup_run)
+
+    resume = sub.add_parser("resume-run")
+    resume.add_argument("--run-id", required=True, dest="evaluation_run_id")
+    resume.add_argument("--scenario-id", default="S01_lead_laddbox_quality")
+    resume.add_argument("--tenant-id", default=None)
+    resume.add_argument("--attempt-id", type=int, default=None)
+    resume.add_argument("--app-base-url", default=None)
+    resume.add_argument("--force-unlock", action="store_true")
+    resume.set_defaults(func=cmd_resume_run)
 
     return parser
 
