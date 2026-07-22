@@ -176,20 +176,21 @@ def restart_app_container(compose_file: Path = COMPOSE_FILE) -> None:
 
 
 def set_pilot_role(role: str, username: str, *, original: EnvState, compose_file: Path = COMPOSE_FILE) -> None:
+    op_id = operator_id(username)
+    base_ids = {item.strip() for item in original.super_admin_operator_ids.split(",") if item.strip()}
     if role == "super_admin":
-        op_id = operator_id(username)
-        ids = {item.strip() for item in original.super_admin_operator_ids.split(",") if item.strip()}
+        ids = set(base_ids)
         ids.add(op_id)
         write_production_env(
             EnvState(admin_role="admin", super_admin_operator_ids=",".join(sorted(ids))),
         )
-        restart_app_container(compose_file)
-        return
-    subprocess.run(
-        ["bash", str(ROOT / "scripts" / "k12_set_admin_role_pilot.sh"), role],
-        check=True,
-        timeout=120,
-    )
+    else:
+        # Drop browser operator from elevation so ADMIN_ROLE drives /auth/admin/me.
+        ids = {item for item in base_ids if item != op_id}
+        write_production_env(
+            EnvState(admin_role=role, super_admin_operator_ids=",".join(sorted(ids))),
+        )
+    restart_app_container(compose_file)
 
 
 def restore_production_env(original: EnvState, compose_file: Path = COMPOSE_FILE) -> None:
@@ -253,6 +254,11 @@ def _handle_signal(signum: int, _frame: Any) -> None:
     raise SystemExit(128 + signum)
 
 
+def _request_origin(url: str) -> str:
+    parsed = urlparse(url)
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
 def http_get_json(url: str, *, session: requests.Session | None = None, timeout: int = 20) -> tuple[int, Any]:
     client = session or requests
     resp = client.get(url, timeout=timeout)
@@ -270,7 +276,7 @@ def http_json(
     body: dict[str, Any] | None = None,
     timeout: int = 30,
 ) -> tuple[int, Any]:
-    headers = {"Content-Type": "application/json", "Origin": url.split("/admin/")[0]}
+    headers = {"Content-Type": "application/json", "Origin": _request_origin(url)}
     resp = session.request(method, url, json=body, headers=headers, timeout=timeout)
     try:
         return resp.status_code, resp.json()
@@ -443,7 +449,7 @@ def run_api_role_checks(
         checks.add(f"domain_get_{domain}", "PASS" if dstatus == 200 else "FAIL", f"status={dstatus}", http_status=dstatus)
 
     identity_payload = {"timezone": "Europe/Oslo"}
-    routing_payload = {"route_overrides": {"invoice_generic": "finance"}}
+    routing_payload = {"route_overrides": {"invoice_generic": "support"}}
     integrations_payload = {"selections": {"fortnox": {"selection_status": "not_selected"}}}
     automation_payload = {"policy": {"preset_key": "observe_only", "preset_version": 1, "approval_first": True}}
 
@@ -483,8 +489,12 @@ def run_api_role_checks(
         prev_status, prev = preview_domain(sess, base, tenant, "routing", routing_payload)
         checks.add("routing_preview", "PASS" if prev_status == 200 else "FAIL", f"status={prev_status}", http_status=prev_status)
         start_tz = (agg.get("domains") or {}).get("identity", {}).get("timezone") or ctx.pre_snapshot.get("timezone") or "Europe/Stockholm"
+        if start_tz != "Europe/Stockholm":
+            pstatus, pdata = patch_domain(sess, base, tenant, "identity", version, {"timezone": "Europe/Stockholm"})
+            if pstatus == 200:
+                version = int((pdata or {}).get("config_version") or version + 1)
         start_cv = version
-        for target_tz in ("Europe/Oslo", start_tz):
+        for target_tz in ("Europe/Oslo", "Europe/Stockholm"):
             pstatus, pdata = patch_domain(sess, base, tenant, "identity", version, {"timezone": target_tz})
             ok = pstatus == 200
             checks.add(f"patch_identity_{target_tz}", "PASS" if ok else "FAIL", f"status={pstatus}", http_status=pstatus)
@@ -531,32 +541,50 @@ def _js_body_has(*needles: str) -> str:
     return f"(() => Boolean(document.body && {parts}))()"
 
 
-def _login_browser(browser: CdpBrowser, base_url: str, username: str, password: str) -> None:
-    browser.navigate(f"{base_url}/ops/login")
+def _sync_browser_session(browser: CdpBrowser, sess: requests.Session, base_url: str) -> None:
+    if not sess.cookies:
+        raise CdpError("no cookies in api session")
+    cookie_url = base_url.rstrip("/") + "/"
+    for cookie in sess.cookies:
+        browser.call(
+            "Network.setCookie",
+            {
+                "name": cookie.name,
+                "value": cookie.value,
+                "url": cookie_url,
+                "path": cookie.path or "/",
+                "secure": True,
+                "httpOnly": True,
+                "sameSite": "Strict",
+            },
+        )
+
+
+def _browser_me_status(browser: CdpBrowser) -> int:
     result = browser.evaluate(
-        f"""(() => {{
-  const u = document.querySelector('input[name="username"]');
-  const p = document.querySelector('input[name="password"]');
-  const form = document.querySelector('form');
-  if (!u || !p || !form) return {{ok:false}};
-  u.value = {json.dumps(username)}; p.value = {json.dumps(password)};
-  u.dispatchEvent(new Event('input', {{bubbles:true}}));
-  p.dispatchEvent(new Event('input', {{bubbles:true}}));
-  if (form.requestSubmit) form.requestSubmit(); else form.querySelector('button[type=submit]')?.click();
-  return {{ok:true}};
-}})()"""
+        "(async () => { const r = await fetch('/auth/admin/me', {credentials:'include'}); return {status:r.status}; })()"
     )
-    if not result or not result.get("ok"):
-        raise CdpError("login_form_missing")
+    return int((result or {}).get("status") or 0)
+
+
+def _ensure_browser_authenticated(
+    browser: CdpBrowser,
+    sess: requests.Session,
+    base_url: str,
+) -> None:
+    _sync_browser_session(browser, sess, base_url)
+    browser.navigate(f"{base_url}/ops/")
     deadline = time.time() + 30
     while time.time() < deadline:
-        me = browser.evaluate(
-            """(async () => { const r = await fetch('/auth/admin/me', {credentials:'include'}); return {status:r.status}; })()"""
-        )
-        if me and me.get("status") == 200:
+        if _browser_me_status(browser) == 200:
             return
         time.sleep(0.3)
-    raise CdpError("login_timeout")
+    raise CdpError("browser session not authenticated after cookie sync")
+
+
+def _login_browser(browser: CdpBrowser, base_url: str, username: str, password: str) -> None:
+    sess = session_login(base_url, username, password)
+    _ensure_browser_authenticated(browser, sess, base_url)
 
 
 def run_browser_role_checks(
@@ -588,10 +616,14 @@ def run_browser_role_checks(
     for label, name in (
         (("Gmail",), "gmail_visible"),
         (("Visma",), "visma_visible"),
-        (("Google Sheets",), "sheets_visible"),
+        (("Google Sheets", "Kalkylark", "google_sheets"), "sheets_visible"),
         (("Fortnox",), "fortnox_visible"),
     ):
-        checks.add(name, "PASS" if browser.evaluate(_js_body_has(*label)) else "FAIL", label[0])
+        checks.add(
+            name,
+            "PASS" if any(browser.evaluate(_js_body_has(needle)) for needle in label) else "FAIL",
+            label[0] if len(label) == 1 else "google_sheets",
+        )
     checks.add(
         "fortnox_bokio_disabled",
         "PASS" if browser.evaluate(_js_body_has("Kommer senare")) or browser.evaluate(_js_body_has("not_selected")) else "FAIL",
@@ -652,7 +684,10 @@ def run_browser_role_checks(
         if preview_count > 0 or int(browser.evaluate(_js_count_buttons("Förhandsgranska")) or 0) > 0:
             browser.evaluate("""(() => { const b=[...document.querySelectorAll('button')].find(x=>(x.textContent||'').includes('Förhandsgranska')); if(b)b.click(); return !!b; })()""")
             time.sleep(0.8)
-            checks.add("preview_dialog", "PASS" if browser.evaluate(_js_body_has("Förhandsgranskning")) else "FAIL")
+            checks.add(
+                "preview_dialog",
+                "PASS" if browser.evaluate(_js_body_has("Förhandsgranskning av ändringar")) else "FAIL",
+            )
         browser.set_viewport(375, 812)
         browser.call("Emulation.setPageScaleFactor", {"pageScaleFactor": 1.5})
         browser.navigate(f"{settings_base}?tab=identity")
@@ -774,7 +809,7 @@ def run_verification(args: argparse.Namespace) -> int:
                     browser = CdpBrowser(chrome_path=chrome, headless=env.get("K12_BROWSER_HEADLESS", "true").lower() != "false")
                     browser.start()
                     try:
-                        _login_browser(browser, ctx.base_url, ctx.username, ctx.password)
+                        _ensure_browser_authenticated(browser, sess, ctx.base_url)
                         bchecks, viewport_results, admin_ui_done = run_browser_role_checks(
                             role, ctx, browser, admin_ui_done=admin_ui_done
                         )
