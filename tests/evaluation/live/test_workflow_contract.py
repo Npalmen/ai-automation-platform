@@ -183,10 +183,25 @@ def test_live_eval_workflow_contract():
 
     gate_step = _step_by_name(steps, "Cleanup gate")
     assert gate_step.get("if") == "always() && inputs.confirm_live_gmail == 'RUN_S01'"
-    assert "steps.cleanup.outcome" in (gate_step.get("run") or "")
+    gate_run = gate_step.get("run") or ""
+    assert 'steps.cleanup.outcome }}" = "failure"' in gate_run
 
     artifact_step = _step_by_name(steps, "Upload redacted artifacts")
-    assert artifact_step.get("if") == "always() && inputs.confirm_live_gmail == 'RUN_S01' && env.RUN_ID != ''"
+    assert artifact_step.get("if") == "always() && inputs.confirm_live_gmail == 'RUN_S01' && env.RUN_ARTIFACT_DIR != ''"
+    artifact_path = str(artifact_step.get("with", {}).get("path", ""))
+    assert "RUN_ARTIFACT_DIR" in artifact_path
+    assert "storage/live_eval/runs" not in artifact_path
+    assert artifact_step.get("with", {}).get("if-no-files-found") == "error"
+
+    resolve_step = _step_by_name(steps, "Resolve run artifact path")
+    assert resolve_step.get("if") == "always() && inputs.confirm_live_gmail == 'RUN_S01'"
+    assert "resolved_run_directory" in (resolve_step.get("run") or "")
+
+    verify_step = _step_by_name(steps, "Verify run artifacts present")
+    assert verify_step.get("if") == "always() && inputs.confirm_live_gmail == 'RUN_S01' && env.RUN_ID != ''"
+
+    transport_env = transport.get("env") or {}
+    assert transport_env.get("STORAGE_PATH") == "${{ github.workspace }}/storage/ci-live-eval"
 
     freeform_inputs = set(dispatch["inputs"].keys()) - {"confirm_live_gmail"}
     assert not freeform_inputs, f"unexpected workflow inputs: {freeform_inputs}"

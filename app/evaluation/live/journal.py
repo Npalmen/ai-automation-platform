@@ -13,7 +13,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.live.redaction import redact_sensitive
 from app.evaluation.live.schemas import LiveEvalReport
@@ -24,8 +23,9 @@ DEFAULT_LOCK_STALE_MINUTES = 120
 
 
 def run_directory(evaluation_run_id: str) -> Path:
-    config = get_live_eval_config()
-    return Path(config.storage_root) / "runs" / evaluation_run_id
+    from app.evaluation.live.paths import resolved_run_directory
+
+    return resolved_run_directory(evaluation_run_id)
 
 
 def ensure_run_directory(evaluation_run_id: str) -> Path:
@@ -174,13 +174,19 @@ def load_checkpoint(evaluation_run_id: str) -> RunCheckpoint:
 
     last_state = transitions[-1].get("state", "created") if transitions else "created"
     sender_id = _field_from_transitions(transitions, "sent", "sender_gmail_message_id")
+    if sender_id is None:
+        sender_id = _field_from_transitions(
+            transitions, "send_response_received", "sender_gmail_message_id"
+        )
     recipient_id = _field_from_transitions(transitions, "delivery_confirmed", "recipient_gmail_message_id")
     job_id = _field_from_transitions(transitions, "intake_completed", "job_id")
     pipeline_run_id = _field_from_transitions(transitions, "intake_completed", "pipeline_run_id")
 
     send_attempt_started = any(t.get("state") == "sending" for t in transitions)
     send_succeeded = sender_id is not None or any(
-        t.get("state") == "sent" and t.get("sender_gmail_message_id") for t in transitions
+        t.get("state") in ("sent", "send_response_received")
+        and t.get("sender_gmail_message_id")
+        for t in transitions
     )
 
     return RunCheckpoint(
@@ -226,6 +232,7 @@ TERMINAL_REPORT_RESULTS = frozenset({
 })
 NON_RESUMABLE_FAILURE_CATEGORIES = frozenset({
     "send_outcome_unresolved",
+    "outcome_unknown",
 })
 
 
@@ -257,7 +264,11 @@ def derive_resume_state(checkpoint: RunCheckpoint) -> ResumeState:
         "triggering_intake",
     ):
         return ResumeState(phase="post_delivery", checkpoint=checkpoint)
-    if checkpoint.send_succeeded or last in ("sent", "waiting_for_delivery"):
+    if checkpoint.send_succeeded or last in (
+        "sent",
+        "send_response_received",
+        "waiting_for_delivery",
+    ):
         return ResumeState(phase="post_send", checkpoint=checkpoint)
     if checkpoint.send_attempt_started and not checkpoint.send_succeeded:
         return ResumeState(phase="reconcile_only", checkpoint=checkpoint)

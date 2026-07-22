@@ -156,6 +156,7 @@ jobs:
 
     env:
       ENV: test
+      STORAGE_PATH: ${{ github.workspace }}/storage/ci-live-eval
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_platform
       LIVE_EVAL_ALLOWED: yes
       LIVE_EVAL_SEED_ALLOWED: yes
@@ -278,25 +279,36 @@ jobs:
             python scripts/run_live_eval.py cleanup-run --run-id "$RUN_ID" --confirm-external
           fi
 
-      - name: Set run ID for artifacts
+      - name: Resolve run artifact path
         if: always() && inputs.confirm_live_gmail == 'RUN_S01'
         run: |
           if [ -f "${RUNNER_TEMP}/live_eval_run_id" ]; then
             RUN_ID=$(cat "${RUNNER_TEMP}/live_eval_run_id")
+            ARTIFACT_DIR=$(python -c "from app.evaluation.live.paths import resolved_run_directory; print(resolved_run_directory('$RUN_ID'))")
             echo "RUN_ID=$RUN_ID" >> "$GITHUB_ENV"
+            echo "RUN_ARTIFACT_DIR=$ARTIFACT_DIR" >> "$GITHUB_ENV"
           fi
 
       - name: Upload redacted artifacts
-        if: always() && inputs.confirm_live_gmail == 'RUN_S01' && env.RUN_ID != ''
+        if: always() && inputs.confirm_live_gmail == 'RUN_S01' && env.RUN_ARTIFACT_DIR != ''
         uses: actions/upload-artifact@v4
         with:
           name: live-eval-report-${{ env.RUN_ID }}
-          path: storage/live_eval/runs/${{ env.RUN_ID }}/
+          path: ${{ env.RUN_ARTIFACT_DIR }}/
+          if-no-files-found: error
+
+      - name: Verify run artifacts present
+        if: always() && inputs.confirm_live_gmail == 'RUN_S01' && env.RUN_ID != ''
+        run: |
+          if [ ! -f "${RUN_ARTIFACT_DIR}/report.json" ]; then
+            echo "infrastructure failure: run_id=${RUN_ID} but report.json missing at ${RUN_ARTIFACT_DIR}" >&2
+            exit 1
+          fi
 
       - name: Cleanup gate
         if: always() && inputs.confirm_live_gmail == 'RUN_S01'
         run: |
-          if [ -f "${RUNNER_TEMP}/live_eval_run_id" ] && [ "${{ steps.cleanup.outcome }}" != "success" ]; then
-            echo "cleanup required but step outcome was: ${{ steps.cleanup.outcome }}"
+          if [ -f "${RUNNER_TEMP}/live_eval_run_id" ] && [ "${{ steps.cleanup.outcome }}" = "failure" ]; then
+            echo "cleanup required but step outcome was: failure"
             exit 1
           fi

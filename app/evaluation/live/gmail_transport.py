@@ -44,6 +44,8 @@ class SenderReadinessReport:
     issues: list[str]
     profile_email: str | None = None
     read_scope_verified: bool = False
+    send_scope_verified: bool = False
+    granted_send_scopes: list[str] | None = None
 
 
 @dataclass(frozen=True)

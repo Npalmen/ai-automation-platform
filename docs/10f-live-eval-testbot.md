@@ -258,6 +258,16 @@ Manual `workflow_dispatch` only on `main`. Workflow input `confirm_live_gmail` m
 
 `live_gmail_transport` needs `foundation` + `operator-gate`, uses environment `live-gmail-eval`, `timeout-minutes: 45`, `concurrency.group: live-gmail-eval`.
 
+**CI storage:** `STORAGE_PATH=${{ github.workspace }}/storage/ci-live-eval` so journals resolve to `storage/ci-live-eval/live_eval/runs/<id>/` and artifact upload uses the same resolved path via `resolved_run_directory()`.
+
+**Failure observability:** every `run-scenario` exit emits a redacted JSON summary to stdout and `GITHUB_STEP_SUMMARY`, and attaches `failure_summary` to `report.json`. Missing `report.json` after run-ID creation fails the verify-artifacts step.
+
+**Sender send-scope preflight (RUN_S01 only):** `verify_sender_send_scope()` checks send-capable Gmail scopes from OAuth refresh metadata only (`gmail.send`, `gmail.compose`, `gmail.modify`, `mail.google.com`) — no test-send, no tokeninfo. READINESS_ONLY read-only sender checks are unchanged.
+
+**Send states:** `not_attempted`, `sending`, `confirmed`, `outcome_unknown`, `failed_before_send`. `outcome_unknown` is non-resumable.
+
+**Cleanup:** without exact `recipient_gmail_message_id`, `cleanup-run` returns exit `0` with `cleanup_state=not_safe_to_execute` and performs no Gmail mutation.
+
 #### Readiness-only (`READINESS_ONLY`)
 
 Runs from `main` with protected environment `live-gmail-eval` and the same nine secrets as live S01. Verifies both Gmail accounts read-only:
