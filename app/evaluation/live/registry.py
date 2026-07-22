@@ -50,6 +50,13 @@ def register_live_eval_run(
         expected_sender=request.expected_sender,
         expected_recipient=request.expected_recipient,
     )
+    from app.evaluation.live.safety import validate_live_gmail_registration
+
+    validate_live_gmail_registration(
+        transport_mode=request.transport_mode,
+        scenario_id=request.scenario_id,
+        ai_mode=request.ai_mode,
+    )
     fixture_bundle_id = resolve_fixture_bundle_id(
         scenario_id=request.scenario_id,
         ai_mode=request.ai_mode,

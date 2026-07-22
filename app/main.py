@@ -1555,7 +1555,7 @@ def _run_gmail_inbox_sync(
             tenant_id=tenant_id,
             lifecycle_status=lifecycle_status,
             intake_settings=intake_settings,
-            message_internal_date_ms=msg.get("internal_date"),
+            message_internal_date_ms=msg.get("internal_date_ms") or msg.get("internal_date"),
         )
         if not intake_gate.get("allowed"):
             skipped_messages.append({
