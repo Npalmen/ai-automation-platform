@@ -491,6 +491,13 @@ def run_api_role_checks(
     elif role == "admin" and not admin_mutation_done:
         prev_status, prev = preview_domain(sess, base, tenant, "routing", routing_payload)
         checks.add("routing_preview", "PASS" if prev_status == 200 else "FAIL", f"status={prev_status}", http_status=prev_status)
+        int_prev_status, _ = preview_domain(sess, base, tenant, "integrations", integrations_payload)
+        checks.add(
+            "integrations_preview",
+            "PASS" if int_prev_status == 200 else "FAIL",
+            f"status={int_prev_status}",
+            http_status=int_prev_status,
+        )
         start_tz = (agg.get("domains") or {}).get("identity", {}).get("timezone") or ctx.pre_snapshot.get("timezone") or "Europe/Stockholm"
         start_cv = version
         targets: list[str] = []
@@ -542,9 +549,30 @@ def _js_count_buttons(label: str) -> str:
     return f"""(() => Array.from(document.querySelectorAll('button')).filter(b => (b.textContent||'').includes({json.dumps(label)})).length)()"""
 
 
+def _js_body_has_any(*needles: str) -> str:
+    parts = " || ".join(f"(document.body.innerText||'').includes({json.dumps(n)})" for n in needles)
+    return f"(() => Boolean(document.body && ({parts})))()"
+
+
 def _js_body_has(*needles: str) -> str:
     parts = " && ".join(f"(document.body.innerText||'').includes({json.dumps(n)})" for n in needles)
     return f"(() => Boolean(document.body && {parts}))()"
+
+
+def _wait_preview_dialog(browser: CdpBrowser, *, timeout_s: float = 10.0) -> bool:
+    deadline = time.time() + timeout_s
+    needles = (
+        "Förhandsgranskning av ändringar",
+        "Beräknar konsekvenser",
+        "Bekräfta och spara",
+        "Giltig men inte redo",
+        "Ogiltig konfiguration",
+    )
+    while time.time() < deadline:
+        if browser.evaluate(_js_body_has_any(*needles)):
+            return True
+        time.sleep(0.3)
+    return False
 
 
 def _sync_browser_session(browser: CdpBrowser, sess: requests.Session, base_url: str) -> None:
@@ -697,18 +725,15 @@ def run_browser_role_checks(
         checks.add("savebar_dirty", "PASS" if int(browser.evaluate(_js_count_buttons("Spara")) or 0) > 0 else "FAIL")
         preview_clicked = browser.evaluate(
             """(() => {
-              const b = [...document.querySelectorAll('button')].find(x => (x.textContent || '').includes('Förhandsgranska'));
-              if (!b || b.disabled) return false;
-              b.click();
-              return true;
+              const save = [...document.querySelectorAll('button')].find(x => (x.textContent || '').includes('Spara'));
+              if (save && !save.disabled) { save.click(); return true; }
+              const preview = [...document.querySelectorAll('button')].find(x => (x.textContent || '').includes('Förhandsgranska'));
+              if (preview && !preview.disabled) { preview.click(); return true; }
+              return false;
             })()"""
         )
         if dirty and preview_clicked:
-            time.sleep(1.2)
-            checks.add(
-                "preview_dialog",
-                "PASS" if browser.evaluate(_js_body_has("Förhandsgranskning av ändringar")) else "FAIL",
-            )
+            checks.add("preview_dialog", "PASS" if _wait_preview_dialog(browser) else "FAIL")
         else:
             checks.add("preview_dialog", "NOT_RUN", "no_dirty_integrations_control")
         browser.set_viewport(375, 812)
