@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin/tenants", tags=["admin-google-oauth"])
 
-_OPERATOR_WRITE_ROLES = frozenset({"operations", "admin"})
-_OPERATOR_READ_ROLES = frozenset({"read_only", "operations", "admin"})
+_OPERATOR_WRITE_ROLES = frozenset({"operations", "admin", "super_admin"})
+_OPERATOR_READ_ROLES = frozenset({"read_only", "operations", "admin", "super_admin"})
 
 OAUTH_STARTED = "integration.google_mail.oauth_started"
 OAUTH_DISCONNECTED = "integration.google_mail.oauth_disconnected"

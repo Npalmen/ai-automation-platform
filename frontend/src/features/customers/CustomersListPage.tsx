@@ -11,6 +11,7 @@ import { TenantIdentifier } from "@/components/operator/TenantIdentifier"
 import { Button } from "@/components/ui/button"
 import type { StatusVariant } from "@/design/types"
 import { useAuth } from "@/features/auth/AuthProvider"
+import { isRoleAllowed } from "@/features/auth/permissions"
 import { useListLayout } from "@/hooks/useListLayout"
 
 import { formatActivityAt, tenantStatusLabel } from "./formatters"
@@ -150,7 +151,7 @@ export function CustomersListPage() {
             : "Operativ kundlista över alla tenants."
         }
         actions={
-          role === "operations" || role === "admin" ? (
+          role && isRoleAllowed(role, ["operations", "admin"]) ? (
             <Button type="button" onClick={() => navigate("/customers/new")}>
               Ny kund
             </Button>

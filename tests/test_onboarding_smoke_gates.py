@@ -62,3 +62,29 @@ class TestOnboardingRegistriesSmoke:
         assert "industries" in body
         assert "service_profiles" in body
         assert len(body["service_profiles"]) > 0
+
+
+class TestSuperAdminOnboardingAccess:
+    def test_super_admin_can_read_registries(self, client, admin_headers):
+        with patch("app.core.admin_auth.resolve_authenticated_operator") as resolve:
+            resolve.return_value = {
+                "id": "operator-super",
+                "display_name": "Super",
+                "role": "super_admin",
+            }
+            response = client.get("/admin/onboarding/registries", headers=admin_headers)
+        assert response.status_code == 200
+
+    def test_read_only_still_blocked_from_create(self, client, admin_headers):
+        with patch("app.core.admin_auth.resolve_authenticated_operator") as resolve:
+            resolve.return_value = {
+                "id": "operator-read",
+                "display_name": "Read",
+                "role": "read_only",
+            }
+            response = client.post(
+                "/admin/onboarding",
+                headers=admin_headers,
+                json={"company_name": "Acme", "slug": "acme"},
+            )
+        assert response.status_code == 403

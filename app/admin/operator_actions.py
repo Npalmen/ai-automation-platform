@@ -27,7 +27,7 @@ from app.workflows.approval_service import resolve_dispatch_approval
 logger = logging.getLogger(__name__)
 
 _ACTION_CATEGORY = "operator_action"
-_EXECUTOR_ROLES = frozenset({"operations", "admin"})
+_EXECUTOR_ROLES = frozenset({"operations", "admin", "super_admin"})
 
 # Rejection is only exposed for dispatch approvals whose reject path is verified
 # local-only (resolve_dispatch_approval approved=False).
@@ -223,7 +223,7 @@ def _write_operator_audit(
 
 
 def _role_allowed(operator_role: str, required_role: str) -> bool:
-    if operator_role == "admin":
+    if operator_role in ("admin", "super_admin"):
         return True
     if operator_role == "operations":
         return required_role in ("operations", "read_only")

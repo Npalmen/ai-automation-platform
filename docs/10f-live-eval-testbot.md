@@ -110,6 +110,20 @@ CI gates (release-gate `live-eval-postgres` job):
 
 `validate-config` verifies label `krowolf-live-eval` and intake query. Filter must apply the label — verified end-to-end in 2F.2.
 
+#### Filter probe (before first real S01 run)
+
+Verify the recipient filter without starting the testbot or Krowolf app:
+
+1. Send a **manual** email from the dedicated sender account to the recipient account.
+2. Use a subject **without** any `KROWOLF-EVAL` token (for example `Filter probe`).
+3. Confirm the message receives exactly the label `krowolf-live-eval`.
+4. Mark the message as **read**.
+5. **Archive** the message (do not permanently delete by default).
+6. Remove the `krowolf-live-eval` label from the archived probe.
+7. Confirm no probe remains **unread** under the eval label.
+
+The probe message is **not** part of testbot send telemetry. It must **never** contain a live-eval token. The first real S01 run may start only after the probe is fully cleared from the unread eval-label queue.
+
 ## 2F.2 scope (live Gmail transport)
 
 2F.2 adds the first real Gmail transport path for scenario `S01_lead_laddbox_quality` (inbound-only, `awaiting_approval`, fixture AI).
@@ -234,7 +248,15 @@ python scripts/run_live_eval.py show-report --run-id <id>   # redacted JSON only
 
 ### Live workflow
 
-Manual `workflow_dispatch` only. `timeout-minutes: 45`, `concurrency.group: live-gmail-eval`, exact run-ID file for cleanup and artifacts. Cleanup failures fail the job via a final gate step; artifacts still upload. No `.last_run_id` / `ls -t` discovery.
+Manual `workflow_dispatch` only on `main`. Operator must select input `confirm_live_gmail=RUN_S01`; default `DO_NOT_RUN` blocks the live job.
+
+| Gate | Purpose |
+|------|---------|
+| `operator-gate` job | Requires `refs/heads/main` and `confirm_live_gmail=RUN_S01` (no environment secrets) |
+| GitHub environment `live-gmail-eval` | Required reviewer, deployment branch policy **main only**, dedicated test credentials only |
+| `BUILD_GIT_SHA` | Runtime SHA match via `GET /admin/live-eval/runtime-readiness` |
+
+`live_gmail_transport` needs `foundation` + `operator-gate`, uses environment `live-gmail-eval`, `timeout-minutes: 45`, `concurrency.group: live-gmail-eval`, exact run-ID file for cleanup and artifacts. Cleanup failures fail the job via a final gate step; artifacts still upload. No `.last_run_id` / `ls -t` discovery. Scenario remains hardcoded to `S01_lead_laddbox_quality` only.
 
 ### OAuth seed database guard (F-08)
 

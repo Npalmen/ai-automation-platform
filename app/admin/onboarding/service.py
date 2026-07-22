@@ -69,8 +69,8 @@ from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 logger = logging.getLogger(__name__)
 
 _ONBOARDING_AUDIT_CATEGORY = "onboarding"
-_WRITE_ROLES = frozenset({"operations", "admin"})
-_ADMIN_ROLES = frozenset({"admin"})
+_WRITE_ROLES = frozenset({"operations", "admin", "super_admin"})
+_ADMIN_ROLES = frozenset({"admin", "super_admin"})
 _READONLY_STEP_KEYS = frozenset()
 _WRITABLE_SLICE2A_STEPS = frozenset({"service_profile", "routing", "data_start"})
 _WRITABLE_SLICE2B_STEPS = frozenset({"integrations"})

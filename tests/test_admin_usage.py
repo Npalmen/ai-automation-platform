@@ -445,6 +445,95 @@ class TestUsageRoutes:
                 )
         assert response.status_code == 200
 
+    def test_super_admin_allowed(self):
+        from fastapi.testclient import TestClient
+        from app.admin.usage_schemas import (
+            AiCostBlock,
+            AiUsageBlock,
+            CapacityBlock,
+            ComparisonInt,
+            ComparisonProxyMetric,
+            NotMeasuredValue,
+            ProxyTimestampMetric,
+            UsageOverviewResponse,
+            UsagePeriod,
+            UsageSummary,
+        )
+        from app.main import app
+
+        now = _utc("2026-07-17T12:00:00+00:00")
+        started = now - timedelta(days=30)
+        comparison_started = now - timedelta(days=60)
+        zero_proxy = ComparisonProxyMetric(
+            current=ProxyTimestampMetric(value=0),
+            previous=ProxyTimestampMetric(value=0),
+            absolute_change=0,
+            percentage_change=None,
+        )
+        not_measured = NotMeasuredValue(reason="test")
+        summary = UsageSummary(
+            active_tenants=0,
+            tenants_with_activity=0,
+            jobs_received=ComparisonInt(
+                current=0, previous=0, absolute_change=0, percentage_change=None
+            ),
+            jobs_completed=zero_proxy,
+            jobs_failed=zero_proxy,
+            automation_rate=not_measured,
+            operator_actions=ComparisonInt(
+                current=0, previous=0, absolute_change=0, percentage_change=None
+            ),
+            gmail_manual_review_handoffs=ComparisonInt(
+                current=0, previous=0, absolute_change=0, percentage_change=None
+            ),
+            manual_reviews_created=not_measured,
+            open_manual_reviews_current=0,
+            pending_approvals_current=0,
+            incidents_created=ComparisonInt(
+                current=0, previous=0, absolute_change=0, percentage_change=None
+            ),
+            incidents_resolved=ComparisonInt(
+                current=0, previous=0, absolute_change=0, percentage_change=None
+            ),
+            open_incidents_current=0,
+            critical_incidents_created=ComparisonInt(
+                current=0, previous=0, absolute_change=0, percentage_change=None
+            ),
+            integration_errors=ComparisonInt(
+                current=0, previous=0, absolute_change=0, percentage_change=None
+            ),
+            needs_help_open_current=0,
+            tenants_with_open_signals_current=0,
+        )
+        payload = UsageOverviewResponse(
+            generated_at=now,
+            period=UsagePeriod(
+                days=30,
+                started_at=started,
+                ended_at=now,
+                comparison_started_at=comparison_started,
+                comparison_ended_at=started,
+            ),
+            summary=summary,
+            ai_usage=AiUsageBlock(status="not_measured"),
+            ai_cost=AiCostBlock(status="unknown", amount=None),
+            capacity=CapacityBlock(status="baseline_missing"),
+        )
+
+        client = TestClient(app, raise_server_exceptions=False)
+        with patch("app.admin.usage.get_usage_overview", return_value=payload):
+            with patch("app.core.admin_auth.resolve_authenticated_operator") as resolve:
+                resolve.return_value = {
+                    "id": "op",
+                    "display_name": "Op",
+                    "role": "super_admin",
+                }
+                response = client.get(
+                    "/admin/usage/overview",
+                    headers={"X-Admin-API-Key": "test-admin-key"},
+                )
+        assert response.status_code == 200
+
     def test_tenant_key_rejected(self):
         from fastapi.testclient import TestClient
         from app.main import app

@@ -2,6 +2,18 @@ name: Live Eval (2F)
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm_live_gmail:
+        description: "Select RUN_S01 to authorize one real Gmail S01 evaluation"
+        required: true
+        type: choice
+        default: DO_NOT_RUN
+        options:
+          - DO_NOT_RUN
+          - RUN_S01
+
+permissions:
+  contents: read
 
 concurrency:
   group: live-gmail-eval
@@ -63,9 +75,19 @@ jobs:
       - name: Offline dry-run journal/report
         run: python scripts/run_live_eval.py dry-run
 
+  operator-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify live Gmail authorization
+        run: |
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "${{ inputs.confirm_live_gmail }}" = "RUN_S01"
+
   live_gmail_transport:
     runs-on: ubuntu-latest
-    needs: foundation
+    needs:
+      - foundation
+      - operator-gate
     timeout-minutes: 45
     environment: live-gmail-eval
 
