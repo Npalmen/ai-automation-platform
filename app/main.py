@@ -115,9 +115,9 @@ def _openapi_urls_for(app_settings) -> dict:
 
 app = FastAPI(title=settings.APP_NAME, **_openapi_urls_for(settings))
 
-_OPERATOR_WRITE_ROLES = frozenset({"operations", "admin"})
-_ADMIN_ROLES = frozenset({"admin"})
-_USAGE_READ_ROLES = frozenset({"read_only", "operations", "admin"})
+_OPERATOR_WRITE_ROLES = frozenset({"operations", "admin", "super_admin"})
+_ADMIN_ROLES = frozenset({"admin", "super_admin"})
+_USAGE_READ_ROLES = frozenset({"read_only", "operations", "admin", "super_admin"})
 
 
 def _enforce_rate_limit(key: str, *, max_calls: int, window_seconds: float) -> None:
@@ -8058,7 +8058,7 @@ def admin_operator_reject_approval(
 # Incident management (Kapitel 6)
 # ===========================================================================
 
-_OPERATOR_READ_ROLES = frozenset({"read_only", "operations", "admin"})
+_OPERATOR_READ_ROLES = frozenset({"read_only", "operations", "admin", "super_admin"})
 
 
 def _run_incident_action(handler):

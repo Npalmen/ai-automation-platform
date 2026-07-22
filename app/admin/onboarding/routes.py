@@ -100,9 +100,9 @@ from app.api.dependencies import get_db
 
 router = APIRouter(prefix="/admin/onboarding", tags=["admin"])
 
-_OPERATOR_WRITE_ROLES = frozenset({"operations", "admin"})
-_OPERATOR_READ_ROLES = frozenset({"read_only", "operations", "admin"})
-_ADMIN_ROLES = frozenset({"admin"})
+_OPERATOR_WRITE_ROLES = frozenset({"operations", "admin", "super_admin"})
+_OPERATOR_READ_ROLES = frozenset({"read_only", "operations", "admin", "super_admin"})
+_ADMIN_ROLES = frozenset({"admin", "super_admin"})
 
 
 def _run_onboarding_action(handler):

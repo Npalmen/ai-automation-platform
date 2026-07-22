@@ -84,6 +84,15 @@ class TestResolveAvailableActions:
         assert actions[0].allowed is True
         assert actions[0].action_id == "tenant.pause_automation"
 
+    def test_super_admin_allowed_for_applicable_actions(self):
+        actions = resolve_available_actions(
+            ["tenant.pause_automation"],
+            "super_admin",
+            {"automation_paused": False, "scheduler_paused": False},
+        )
+        assert len(actions) == 1
+        assert actions[0].allowed is True
+
 
 class TestPauseAutomation:
     def test_unknown_tenant_raises(self):
@@ -367,6 +376,36 @@ class TestOperatorActionEndpoints:
                 headers={"X-Admin-API-Key": "test-admin-key"},
             )
         assert response.status_code == 500
+
+    def test_super_admin_not_forbidden_on_pause(self):
+        client = self._client()
+        record = _mock_tenant_record(demo_mode=False)
+        with patch("app.core.admin_auth.resolve_authenticated_operator") as resolve, patch(
+            "app.core.admin_session.require_same_origin",
+        ), patch(
+            "app.admin.operator_actions.TenantConfigRepository.get",
+            return_value=record,
+        ), patch(
+            "app.admin.operator_actions.TenantConfigRepository.update_settings",
+        ), patch(
+            "app.admin.operator_actions.create_audit_event",
+            return_value=MagicMock(event_id="evt-1"),
+        ):
+            resolve.return_value = {
+                "id": "operator-super",
+                "display_name": "Super",
+                "role": "super_admin",
+            }
+            response = client.post(
+                "/admin/tenants/T_TEST/actions/pause",
+                json=_valid_body(),
+                headers={
+                    "X-Admin-API-Key": "test-admin-key",
+                    "Origin": "http://testserver",
+                },
+            )
+        assert response.status_code == 200
+        assert response.json()["status"] == "completed"
 
 
 class TestNeedsHelpAvailableActions:

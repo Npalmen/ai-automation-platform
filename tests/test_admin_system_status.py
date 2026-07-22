@@ -215,6 +215,28 @@ class TestSystemStatusRoutes:
                     headers={"X-Admin-API-Key": "test-admin-key"},
                 )
         assert response.status_code == 200
+
+    def test_super_admin_allowed(self, tmp_path):
+        from fastapi.testclient import TestClient
+        from app.main import app
+
+        client = TestClient(app, raise_server_exceptions=False)
+        with patch("app.core.admin_auth.resolve_authenticated_operator") as resolve:
+            resolve.return_value = {
+                "id": "op",
+                "display_name": "Op",
+                "role": "super_admin",
+            }
+            with patch("app.admin.system_status.get_system_status") as mock_status:
+                mock_status.return_value = get_system_status(
+                    _make_sqlite_session(),
+                    app_settings=_settings(tmp_path),
+                )
+                response = client.get(
+                    "/admin/system/status",
+                    headers={"X-Admin-API-Key": "test-admin-key"},
+                )
+        assert response.status_code == 200
         SystemStatusResponse.model_validate(response.json())
 
     def test_database_unreachable_returns_503(self):

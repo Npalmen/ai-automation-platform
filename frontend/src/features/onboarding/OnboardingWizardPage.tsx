@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/operator/PageHeader"
 import { StatusBadge } from "@/components/operator/StatusBadge"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/features/auth/AuthProvider"
+import { isRoleAllowed } from "@/features/auth/permissions"
 
 import { ReadinessActionLink } from "./readinessActionLink"
 import { IntegrationsStepPanel } from "./IntegrationsStepPanel"
@@ -273,8 +274,8 @@ function OnboardingWizardSessionView({
 
   const role = auth.status === "authenticated" ? auth.operator.role : null
 
-  const isAdmin = role === "admin"
-  const canWrite = role === "operations" || role === "admin"
+  const isAdmin = role ? isRoleAllowed(role, ["admin"]) : false
+  const canWrite = role ? isRoleAllowed(role, ["operations", "admin"]) : false
   const registryReady = true
 
   const registryCapabilityKeys = useMemo(

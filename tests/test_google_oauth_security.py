@@ -425,6 +425,13 @@ class TestSecretScanAndAuditRedaction:
         assert "ya29" not in blob
         assert "1//" not in blob
 
+    def test_super_admin_can_read_status(self, db):
+        super_operator = {"id": "op-super", "role": "super_admin", "display_name": "Super"}
+        out = admin_google_mail_status(
+            TENANT_A, db=db, operator=super_operator, settings=_settings()
+        )
+        assert out["connection_state"] == "not_connected"
+
     @patch("app.integrations.google.oauth_service.get_settings")
     def test_auth_url_excludes_send_scope_and_secrets(self, mock_settings):
         import app.integrations.google.oauth_service as oauth_service

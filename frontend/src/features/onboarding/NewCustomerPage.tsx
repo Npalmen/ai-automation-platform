@@ -5,6 +5,7 @@ import { ErrorState } from "@/components/operator/ErrorState"
 import { PageHeader } from "@/components/operator/PageHeader"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/features/auth/AuthProvider"
+import { isRoleAllowed } from "@/features/auth/permissions"
 
 import { formatOnboardingError, useCreateOnboardingMutation } from "./mutations"
 
@@ -19,7 +20,7 @@ export function NewCustomerPage() {
   const [slug, setSlug] = useState("")
 
   const role = auth.status === "authenticated" ? auth.operator.role : null
-  const canCreate = role === "operations" || role === "admin"
+  const canCreate = role ? isRoleAllowed(role, ["operations", "admin"]) : false
   const canSubmit =
     companyName.trim().length > 0 && slug.trim().length >= 2 && !createMutation.isPending
 
