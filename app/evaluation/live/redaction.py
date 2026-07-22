@@ -16,6 +16,7 @@ FORBIDDEN_KEYS = frozenset(
         "raw_prompt",
         "email_body",
         "body",
+        "body_text",
         "message_body",
         "message_text",
         "full_text",
