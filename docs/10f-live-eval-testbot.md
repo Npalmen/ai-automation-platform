@@ -158,14 +158,20 @@ Never commit tokens. Report schema version: `2f.2`.
 
 ### Implementation status (2F.2 hardening)
 
+**Merged to `main` @ `4d343f8` (PR #11, 2026-07-22).** Post-merge CI (Release Gate `29926558386`): hermetic 2F.2 tests 107 PASS (local); 2E smoke 10/10; `real_external_calls=0`; backend 4002 PASS; live-eval PG 5/5; telemetry PG 2/2; migration 016 PG 1/1; frontend PASS; Docker PASS. Gmail sends to date: **0**.
+
 | Area | Status |
 |------|--------|
-| Code implemented in branch | Yes |
-| Hermetic unit/contract tests | Yes (no Gmail/LLM in CI hermetic job) |
+| Code merged to `main` | Yes (`4d343f8`) |
+| Hermetic unit/contract tests | Yes (107; no Gmail/LLM in CI hermetic job) |
+| Security review (F-01–F-07) | Closed |
+| Manual `live_gmail_transport` workflow | Built (`workflow_dispatch` only; not auto-run on merge) |
 | Real Gmail send verified | **No** |
-| Live Gmail E2E verified | **No** |
+| Live Gmail E2E verified | **Pending operator verification** |
 | Live LLM enabled | **No** |
-| Operator secrets/config after merge | Required |
+| Operator secrets/config | **Required — not configured** |
+| 2F.2 slice complete | **No** |
+| 2F.3 started | **No** |
 
 ### Resume / no-resend
 
