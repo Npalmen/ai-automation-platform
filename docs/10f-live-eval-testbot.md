@@ -288,3 +288,5 @@ Unchanged S01 flow: exact one send, journal, assertions, exact cleanup, redacted
 ### OAuth seed database guard (F-08)
 
 `seed_live_eval_gmail_oauth.py` reuses the same substring-based production URL heuristic as `seed_live_eval_tenant.py`. No shared positive test-database fingerprint model exists in-repo yet; changing this is deferred as LOW to a separate seed-script hardening task. All other guards (`ENV=test`, `LIVE_EVAL_SEED_ALLOWED`, tenant allowlist, `is_test_tenant`) remain enforced.
+
+Recipient Gmail OAuth rows may store `user_id="me"` in connection config. That value is a Gmail API selector for the authenticated account, not the mailbox identity. Readiness verifies the real recipient address via `get_profile.email_address` against `LIVE_EVAL_RECIPIENT_EMAILS`.

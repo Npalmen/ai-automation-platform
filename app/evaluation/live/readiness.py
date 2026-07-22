@@ -22,6 +22,56 @@ from app.integrations.service import get_integration_connection_config
 _READ_ONLY_GMAIL_ACTIONS = frozenset({"get_profile", "list_labels"})
 
 
+def _normalize_email(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def _looks_like_email(value: str) -> bool:
+    normalized = _normalize_email(value)
+    if normalized.count("@") != 1:
+        return False
+    local, domain = normalized.split("@", 1)
+    return bool(local) and "." in domain
+
+
+def _normalized_recipient_allowlist(config: LiveEvalConfig) -> frozenset[str]:
+    return frozenset(
+        email for email in (_normalize_email(item) for item in config.recipient_emails) if email
+    )
+
+
+def _validate_gmail_account_identity(
+    *,
+    connection_user_id: str,
+    profile_email: str,
+    recipient_allowlist: frozenset[str],
+) -> list[str]:
+    issues: list[str] = []
+    selector = connection_user_id.strip()
+    selector_lower = selector.lower()
+
+    if not profile_email or "@" not in profile_email:
+        issues.append("Gmail profile email is missing")
+        return issues
+
+    if profile_email not in recipient_allowlist:
+        issues.append("Gmail profile email does not match LIVE_EVAL_RECIPIENT_EMAILS")
+        return issues
+
+    if selector_lower == "me":
+        return issues
+
+    if _looks_like_email(selector):
+        if _normalize_email(selector) != profile_email:
+            issues.append("Gmail profile email does not match configured connection user_id")
+        return issues
+
+    if selector:
+        issues.append("configured connection user_id is not a valid Gmail selector or email address")
+
+    return issues
+
+
 @dataclass
 class ReadinessReport:
     ready: bool
@@ -80,8 +130,8 @@ def run_gmail_readiness_checks(
             integration_type=IntegrationType.GOOGLE_MAIL,
             db=db,
         )
-        config_email = str(connection_config.get("user_id") or "").strip().lower()
-        checks["connection_user_id"] = config_email or None
+        connection_user_id = str(connection_config.get("user_id") or "").strip()
+        checks["connection_user_id"] = connection_user_id.lower() or None
         if not str(connection_config.get("access_token") or "").strip():
             issues.append("Gmail OAuth access_token is missing")
 
@@ -91,14 +141,15 @@ def run_gmail_readiness_checks(
         )
 
         profile_result = adapter.execute_action(action="get_profile", payload={})
-        profile_email = str(profile_result.get("email_address") or "").strip().lower()
+        profile_email = _normalize_email(profile_result.get("email_address"))
         checks["gmail_profile_email"] = profile_email or None
-        if not profile_email or "@" not in profile_email:
-            issues.append("Gmail profile email is missing")
-        elif profile_email not in config.recipient_emails:
-            issues.append("Gmail profile email does not match LIVE_EVAL_RECIPIENT_EMAILS")
-        if config_email and profile_email and config_email != profile_email:
-            issues.append("Gmail profile email does not match configured connection user_id")
+        issues.extend(
+            _validate_gmail_account_identity(
+                connection_user_id=connection_user_id,
+                profile_email=profile_email,
+                recipient_allowlist=_normalized_recipient_allowlist(config),
+            )
+        )
 
         labels_result = adapter.execute_action(action="list_labels", payload={})
         labels = labels_result.get("labels") or []
