@@ -176,20 +176,21 @@ def restart_app_container(compose_file: Path = COMPOSE_FILE) -> None:
 
 
 def set_pilot_role(role: str, username: str, *, original: EnvState, compose_file: Path = COMPOSE_FILE) -> None:
+    op_id = operator_id(username)
+    base_ids = {item.strip() for item in original.super_admin_operator_ids.split(",") if item.strip()}
     if role == "super_admin":
-        op_id = operator_id(username)
-        ids = {item.strip() for item in original.super_admin_operator_ids.split(",") if item.strip()}
+        ids = set(base_ids)
         ids.add(op_id)
         write_production_env(
             EnvState(admin_role="admin", super_admin_operator_ids=",".join(sorted(ids))),
         )
-        restart_app_container(compose_file)
-        return
-    subprocess.run(
-        ["bash", str(ROOT / "scripts" / "k12_set_admin_role_pilot.sh"), role],
-        check=True,
-        timeout=120,
-    )
+    else:
+        # Drop browser operator from elevation so ADMIN_ROLE drives /auth/admin/me.
+        ids = {item for item in base_ids if item != op_id}
+        write_production_env(
+            EnvState(admin_role=role, super_admin_operator_ids=",".join(sorted(ids))),
+        )
+    restart_app_container(compose_file)
 
 
 def restore_production_env(original: EnvState, compose_file: Path = COMPOSE_FILE) -> None:
@@ -253,6 +254,11 @@ def _handle_signal(signum: int, _frame: Any) -> None:
     raise SystemExit(128 + signum)
 
 
+def _request_origin(url: str) -> str:
+    parsed = urlparse(url)
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
 def http_get_json(url: str, *, session: requests.Session | None = None, timeout: int = 20) -> tuple[int, Any]:
     client = session or requests
     resp = client.get(url, timeout=timeout)
@@ -270,7 +276,7 @@ def http_json(
     body: dict[str, Any] | None = None,
     timeout: int = 30,
 ) -> tuple[int, Any]:
-    headers = {"Content-Type": "application/json", "Origin": url.split("/admin/")[0]}
+    headers = {"Content-Type": "application/json", "Origin": _request_origin(url)}
     resp = session.request(method, url, json=body, headers=headers, timeout=timeout)
     try:
         return resp.status_code, resp.json()
@@ -531,32 +537,50 @@ def _js_body_has(*needles: str) -> str:
     return f"(() => Boolean(document.body && {parts}))()"
 
 
-def _login_browser(browser: CdpBrowser, base_url: str, username: str, password: str) -> None:
-    browser.navigate(f"{base_url}/ops/login")
+def _sync_browser_session(browser: CdpBrowser, sess: requests.Session, base_url: str) -> None:
+    if not sess.cookies:
+        raise CdpError("no cookies in api session")
+    cookie_url = base_url.rstrip("/") + "/"
+    for cookie in sess.cookies:
+        browser.call(
+            "Network.setCookie",
+            {
+                "name": cookie.name,
+                "value": cookie.value,
+                "url": cookie_url,
+                "path": cookie.path or "/",
+                "secure": True,
+                "httpOnly": True,
+                "sameSite": "Strict",
+            },
+        )
+
+
+def _browser_me_status(browser: CdpBrowser) -> int:
     result = browser.evaluate(
-        f"""(() => {{
-  const u = document.querySelector('input[name="username"]');
-  const p = document.querySelector('input[name="password"]');
-  const form = document.querySelector('form');
-  if (!u || !p || !form) return {{ok:false}};
-  u.value = {json.dumps(username)}; p.value = {json.dumps(password)};
-  u.dispatchEvent(new Event('input', {{bubbles:true}}));
-  p.dispatchEvent(new Event('input', {{bubbles:true}}));
-  if (form.requestSubmit) form.requestSubmit(); else form.querySelector('button[type=submit]')?.click();
-  return {{ok:true}};
-}})()"""
+        "(async () => { const r = await fetch('/auth/admin/me', {credentials:'include'}); return {status:r.status}; })()"
     )
-    if not result or not result.get("ok"):
-        raise CdpError("login_form_missing")
+    return int((result or {}).get("status") or 0)
+
+
+def _ensure_browser_authenticated(
+    browser: CdpBrowser,
+    sess: requests.Session,
+    base_url: str,
+) -> None:
+    _sync_browser_session(browser, sess, base_url)
+    browser.navigate(f"{base_url}/ops/")
     deadline = time.time() + 30
     while time.time() < deadline:
-        me = browser.evaluate(
-            """(async () => { const r = await fetch('/auth/admin/me', {credentials:'include'}); return {status:r.status}; })()"""
-        )
-        if me and me.get("status") == 200:
+        if _browser_me_status(browser) == 200:
             return
         time.sleep(0.3)
-    raise CdpError("login_timeout")
+    raise CdpError("browser session not authenticated after cookie sync")
+
+
+def _login_browser(browser: CdpBrowser, base_url: str, username: str, password: str) -> None:
+    sess = session_login(base_url, username, password)
+    _ensure_browser_authenticated(browser, sess, base_url)
 
 
 def run_browser_role_checks(
@@ -774,7 +798,7 @@ def run_verification(args: argparse.Namespace) -> int:
                     browser = CdpBrowser(chrome_path=chrome, headless=env.get("K12_BROWSER_HEADLESS", "true").lower() != "false")
                     browser.start()
                     try:
-                        _login_browser(browser, ctx.base_url, ctx.username, ctx.password)
+                        _ensure_browser_authenticated(browser, sess, ctx.base_url)
                         bchecks, viewport_results, admin_ui_done = run_browser_role_checks(
                             role, ctx, browser, admin_ui_done=admin_ui_done
                         )
