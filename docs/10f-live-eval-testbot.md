@@ -109,3 +109,127 @@ CI gates (release-gate `live-eval-postgres` job):
 ### Operator contract (Gmail filter)
 
 `validate-config` verifies label `krowolf-live-eval` and intake query. Filter must apply the label — verified end-to-end in 2F.2.
+
+## 2F.2 scope (live Gmail transport)
+
+2F.2 adds the first real Gmail transport path for scenario `S01_lead_laddbox_quality` (inbound-only, `awaiting_approval`, fixture AI).
+
+### Architecture
+
+- **Testbot process** (`scripts/run_live_eval.py`, `app/evaluation/live/runner.py`): sender credentials, journal, HTTP observer, cleanup.
+- **Krowolf app**: recipient OAuth, duplicate-safe delivery observation, exact-message `process-delivery`, pipeline, telemetry.
+
+### Gates
+
+| Env var | Purpose |
+|---------|---------|
+| `EXTERNAL_SIDE_EFFECT_TESTS=yes` | Required for send, process-delivery, cleanup (both processes) |
+| `LIVE_GMAIL_EVAL_ALLOWED=yes` | Gmail transport |
+| `BUILD_GIT_SHA` | Runtime SHA match via `GET /admin/live-eval/runtime-readiness` |
+
+### Admin routes (2F.2)
+
+- `GET /admin/live-eval/runtime-readiness`
+- `GET /admin/live-eval/runs/{id}` — redacted run summary
+- `GET /admin/live-eval/runs/{id}/delivery` — duplicate-safe (max 2 candidates)
+- `GET /admin/live-eval/runs/{id}/observation` — job + DecisionRecords (redacted)
+- `POST /admin/live-eval/runs/{id}/process-delivery` — exact message intake
+- `POST /admin/live-eval/runs/{id}/cleanup-recipient` — pre/post claim archive
+
+### CLI
+
+```bash
+python scripts/run_live_eval.py run-scenario --scenario-id S01_lead_laddbox_quality --confirm-external
+python scripts/run_live_eval.py cleanup-run --run-id <id> --confirm-external
+python scripts/run_live_eval.py show-report --run-id <id>
+```
+
+### Live workflow
+
+Manual `workflow_dispatch` only. Job `live_gmail_transport` uses ephemeral app (PostgreSQL + uvicorn) in GitHub environment `live-gmail-eval`.
+
+### Sender credentials (testbot only)
+
+- `LIVE_EVAL_SENDER_GMAIL_REFRESH_TOKEN`
+- `LIVE_EVAL_SENDER_GMAIL_CLIENT_ID`
+- `LIVE_EVAL_SENDER_GMAIL_CLIENT_SECRET`
+
+Never commit tokens. Report schema version: `2f.2`.
+
+### Implementation status (2F.2 hardening)
+
+| Area | Status |
+|------|--------|
+| Code implemented in branch | Yes |
+| Hermetic unit/contract tests | Yes (no Gmail/LLM in CI hermetic job) |
+| Real Gmail send verified | **No** |
+| Live Gmail E2E verified | **No** |
+| Live LLM enabled | **No** |
+| Operator secrets/config after merge | Required |
+
+### Resume / no-resend
+
+- `run_config.json` stores fingerprints (not raw addresses), `config_hash`, transport/ai modes, and `send_window_start`.
+- `derive_resume_state()` drives phases: `pre_send`, `reconcile_only`, `post_send`, `post_delivery`, `post_intake`, `cleanup_only`.
+- Registry vs journal mismatch → fail-closed `registry_journal_mismatch`.
+- Terminal states (`passed`, `failed`, `send_outcome_unresolved`, etc.) are not resumable.
+
+### Writer lock
+
+- Atomic `.writer.lock` via `O_CREAT|O_EXCL` under `storage/live_eval/runs/<id>/`.
+- Run storage must be **local and non-shared** between concurrent runners (no NFS/shared volume).
+- Force unlock requires `--force-unlock`, `LIVE_EVAL_FORCE_UNLOCK=yes`, stale age, **same hostname**, and dead PID.
+- Cross-host locks return `cross_host_lock_not_recoverable` (never force-unlocked).
+- `lock_forced` transition recorded before re-acquire on same-host stale recovery.
+
+### Send budget (locked for 2F.2)
+
+- `max_scenarios_per_run = 1`
+- `max_gmail_sends_per_run = 1`
+- `max_gmail_replies_per_run = 0`
+- Journal enforces no second send; `sending` without `sent` → reconcile only.
+
+### Sent reconciliation
+
+- Search `in:sent` only, max 2 candidates, full `get_message`, full token match (run/scenario/attempt), sender/recipient, window, optional RFC Message-ID.
+- 0 → unresolved; 1 → resolved; >1 → correlation failure; never resend.
+
+### Delivery hardening
+
+- Exact Gmail label ID (list labels → resolve name → require ID in `label_ids`).
+- `internal_date_ms=None` rejected.
+- Run status gates on observation and process-delivery.
+
+### Unexpected reply
+
+- Observed after pipeline, before assertions.
+- Full token + sender/recipient relation + window + metadata verification.
+- Failure category `unexpected_external_write`; cleanup requires exact message ID.
+
+### Server-side gates (`transport_mode=live_gmail`)
+
+- Scenario `S01_lead_laddbox_quality`, `ai_mode=fixture_ai`, tenant allowlist, all live-eval mutation gates on process-delivery/cleanup.
+- Idempotent process-delivery when run is `active` with matching `root_gmail_message_id`.
+
+### OAuth seed
+
+```bash
+python scripts/seed_live_eval_gmail_oauth.py --tenant-id TENANT_LIVE_EVAL          # dry-run
+python scripts/seed_live_eval_gmail_oauth.py --tenant-id TENANT_LIVE_EVAL --apply  # requires LIVE_EVAL_SEED_ALLOWED=yes
+```
+
+### CLI additions
+
+```bash
+python scripts/run_live_eval.py run-scenario --run-id-file "$RUNNER_TEMP/live_eval_run_id" ...
+python scripts/run_live_eval.py resume-run --run-id <id> --force-unlock
+python scripts/run_live_eval.py show-report --run-id <id>   # redacted JSON only
+```
+
+### Live workflow
+
+Manual `workflow_dispatch` only. `timeout-minutes: 45`, `concurrency.group: live-gmail-eval`, exact run-ID file for cleanup and artifacts. Cleanup failures fail the job via a final gate step; artifacts still upload. No `.last_run_id` / `ls -t` discovery.
+
+### OAuth seed database guard (F-08)
+
+`seed_live_eval_gmail_oauth.py` reuses the same substring-based production URL heuristic as `seed_live_eval_tenant.py`. No shared positive test-database fingerprint model exists in-repo yet; changing this is deferred as LOW to a separate seed-script hardening task. All other guards (`ENV=test`, `LIVE_EVAL_SEED_ALLOWED`, tenant allowlist, `is_test_tenant`) remain enforced.

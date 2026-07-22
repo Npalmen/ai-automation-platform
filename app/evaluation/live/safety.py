@@ -8,6 +8,7 @@ from app.evaluation.live.config import LiveEvalConfig, get_live_eval_config
 from app.evaluation.live.constants import (
     ALLOWED_AI_MODES,
     ALLOWED_TRANSPORT_MODES,
+    RUN_STATUS_ACTIVE,
     RUN_STATUS_REGISTERED,
     TERMINAL_RUN_STATUSES,
 )
@@ -95,6 +96,25 @@ def validate_run_row_for_intake(
         raise LiveEvalSafetyError(f"intake query must include {label_token}")
 
 
+def require_live_eval_external_mutation_enabled(
+    config: LiveEvalConfig | None = None,
+) -> LiveEvalConfig:
+    """Gate for live-eval mutations (send, intake trigger, cleanup)."""
+    config = require_gmail_eval_enabled(config)
+    if not config.external_side_effects_enabled:
+        raise LiveEvalSafetyError("EXTERNAL_SIDE_EFFECT_TESTS=yes is required for live mutations")
+    return config
+
+
+def require_scenario_allowed_for_2f2(scenario_id: str) -> None:
+    from app.evaluation.live.constants import ALLOWED_2F2_SCENARIOS
+
+    if scenario_id not in ALLOWED_2F2_SCENARIOS:
+        raise LiveEvalSafetyError(
+            f"scenario_id {scenario_id!r} is not allowed for 2F.2 live Gmail transport"
+        )
+
+
 def require_gmail_eval_enabled(config: LiveEvalConfig | None = None) -> LiveEvalConfig:
     config = require_live_eval_enabled(config)
     if not config.gmail_enabled:
@@ -116,4 +136,82 @@ def validate_config_readiness(config: LiveEvalConfig | None = None) -> list[str]
         issues.append("LIVE_EVAL_RECIPIENT_EMAILS is empty")
     if not config.intake_label:
         issues.append("LIVE_EVAL_GMAIL_LABEL is empty")
+    if config.max_scenarios_per_run != 1:
+        issues.append("LIVE_EVAL_MAX_SCENARIOS_PER_RUN must be 1 for 2F.2")
+    if config.max_gmail_sends_per_run != 1:
+        issues.append("LIVE_EVAL_MAX_GMAIL_SENDS must be 1 for 2F.2")
+    if config.max_gmail_replies_per_run != 0:
+        issues.append("LIVE_EVAL_MAX_GMAIL_REPLIES must be 0 for 2F.2")
     return issues
+
+
+def validate_live_gmail_registration(
+    *,
+    transport_mode: str,
+    scenario_id: str,
+    ai_mode: str,
+) -> None:
+    if transport_mode != "live_gmail":
+        return
+    require_scenario_allowed_for_2f2(scenario_id)
+    if ai_mode != "fixture_ai":
+        raise LiveEvalSafetyError("live_gmail transport requires ai_mode fixture_ai")
+
+
+def require_live_eval_mutation_context(
+    tenant_id: str,
+    config: LiveEvalConfig | None = None,
+) -> LiveEvalConfig:
+    """All mutation gates for live-eval Gmail routes."""
+    config = require_live_eval_external_mutation_enabled(config)
+    return require_tenant_allowed(tenant_id, config)
+
+
+def validate_live_gmail_run_for_mutation(
+    row: LiveEvalRunRow,
+    *,
+    tenant_id: str,
+    recipient_message_id: str | None = None,
+    allow_active_idempotent: bool = False,
+) -> None:
+    require_tenant_allowed(tenant_id)
+    if row.tenant_id != tenant_id:
+        raise LiveEvalSafetyError("run tenant mismatch")
+    require_scenario_allowed_for_2f2(row.scenario_id)
+    if row.ai_mode != "fixture_ai":
+        raise LiveEvalSafetyError("fixture_ai required for live Gmail mutation")
+    if row.transport_mode != "live_gmail":
+        raise LiveEvalSafetyError("transport_mode must be live_gmail")
+    now = datetime.now(timezone.utc)
+    expires_at = row.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < now:
+        raise LiveEvalSafetyError("run has expired")
+    if row.status in TERMINAL_RUN_STATUSES:
+        raise LiveEvalSafetyError(f"run status is terminal: {row.status}")
+
+    if row.status == RUN_STATUS_REGISTERED:
+        return
+
+    if row.status == RUN_STATUS_ACTIVE:
+        if not row.root_gmail_message_id or not row.root_job_id:
+            raise LiveEvalSafetyError("active run missing root binding")
+        if allow_active_idempotent and recipient_message_id:
+            if recipient_message_id != row.root_gmail_message_id:
+                raise LiveEvalSafetyError("recipient message id does not match registry root")
+        return
+
+    raise LiveEvalSafetyError(f"run status {row.status!r} does not allow mutation")
+
+
+def validate_delivery_observation_allowed(row: LiveEvalRunRow) -> None:
+    if row.status == RUN_STATUS_REGISTERED:
+        return
+    if row.status == RUN_STATUS_ACTIVE:
+        if row.root_gmail_message_id and row.root_job_id:
+            return
+        raise LiveEvalSafetyError("active run missing root binding for delivery observation")
+    if row.status in TERMINAL_RUN_STATUSES:
+        raise LiveEvalSafetyError(f"run status is terminal: {row.status}")
+    raise LiveEvalSafetyError(f"run status {row.status!r} not allowed for delivery observation")

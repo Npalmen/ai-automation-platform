@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import base64
 import logging
+from dataclasses import dataclass
 from email.message import EmailMessage
 from email.utils import formataddr
 from typing import Any
 
 import requests
+
+
+@dataclass(frozen=True)
+class GmailMessageListResult:
+    message_ids: list[str]
+    truncated: bool
 
 
 logger = logging.getLogger(__name__)
@@ -239,17 +246,28 @@ class GoogleMailClient:
         payload = data.get("payload") or {}
         hdrs = payload.get("headers") or []
 
+        internal_date_raw = data.get("internalDate")
+        internal_date_ms: int | None = None
+        if internal_date_raw is not None:
+            try:
+                internal_date_ms = int(internal_date_raw)
+            except (TypeError, ValueError):
+                internal_date_ms = None
+
         return {
             "message_id": data.get("id", ""),
             "thread_id": data.get("threadId", ""),
             "from": self._extract_header(hdrs, "From"),
             "to": self._extract_header(hdrs, "To"),
+            "cc": self._extract_header(hdrs, "Cc"),
+            "delivered_to": self._extract_header(hdrs, "Delivered-To"),
             "subject": self._extract_header(hdrs, "Subject"),
             "internet_message_id": self._extract_header(hdrs, "Message-ID"),
             "received_at": self._extract_header(hdrs, "Date"),
             "snippet": data.get("snippet", ""),
             "label_ids": data.get("labelIds", []),
             "body_text": self._extract_body_text(payload),
+            "internal_date_ms": internal_date_ms,
         }
 
     def _post_with_refresh(self, path: str, body: dict) -> dict[str, Any]:
@@ -338,6 +356,41 @@ class GoogleMailClient:
         if not message_id or not message_id.strip():
             raise ValueError("message_id is required.")
         self.modify_message_labels(message_id, add_label_ids=["UNREAD"])
+
+    def apply_label(self, message_id: str, label_name: str) -> str:
+        if not message_id or not message_id.strip():
+            raise ValueError("message_id is required.")
+        label_id = self.ensure_label(label_name)
+        self.modify_message_labels(message_id, add_label_ids=[label_id])
+        return label_id
+
+    def archive_from_inbox(self, message_id: str) -> None:
+        """Remove from inbox without deleting (archive)."""
+        if not message_id or not message_id.strip():
+            raise ValueError("message_id is required.")
+        self.modify_message_labels(message_id, remove_label_ids=["INBOX", "UNREAD"])
+
+    def list_messages_page(self, max_results: int = 10, query: str = "") -> GmailMessageListResult:
+        params: dict[str, Any] = {"maxResults": max_results}
+        if query:
+            params["q"] = query
+        data = self._get_with_refresh(
+            f"/users/{self.user_id}/messages",
+            params=params,
+        )
+        stubs = data.get("messages") or []
+        message_ids = [str(stub.get("id", "")) for stub in stubs if stub.get("id")]
+        return GmailMessageListResult(
+            message_ids=message_ids,
+            truncated=bool(data.get("nextPageToken")),
+        )
+
+    def list_message_ids(self, max_results: int = 10, query: str = "") -> list[str]:
+        return self.list_messages_page(max_results=max_results, query=query).message_ids
+
+    def get_profile_email(self) -> str:
+        data = self._get_with_refresh(f"/users/{self.user_id}/profile")
+        return str(data.get("emailAddress") or "").strip().lower()
 
     def list_messages(self, max_results: int = 10, query: str = "") -> list[dict[str, Any]]:
         params: dict[str, Any] = {"maxResults": max_results, "format": "metadata"}

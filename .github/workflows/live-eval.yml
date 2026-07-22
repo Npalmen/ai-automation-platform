@@ -1,7 +1,11 @@
-name: Live Eval Foundation (2F.1)
+name: Live Eval (2F)
 
 on:
   workflow_dispatch:
+
+concurrency:
+  group: live-gmail-eval
+  cancel-in-progress: false
 
 jobs:
   foundation:
@@ -31,6 +35,9 @@ jobs:
       LIVE_EVAL_RECIPIENT_EMAILS: eval-recipient@example.com
       LIVE_EVAL_GMAIL_LABEL: krowolf-live-eval
       LIVE_GMAIL_EVAL_ALLOWED: yes
+      LIVE_EVAL_MAX_SCENARIOS_PER_RUN: "1"
+      LIVE_EVAL_MAX_GMAIL_SENDS: "1"
+      LIVE_EVAL_MAX_GMAIL_REPLIES: "0"
       ADMIN_API_KEY: ci-admin-key
 
     steps:
@@ -47,11 +54,158 @@ jobs:
       - name: Run live-eval PostgreSQL atomicity tests
         run: python -m pytest tests/evaluation/live -m integration_db -q --tb=short
 
-      - name: Run live-eval foundation tests
-        run: python -m pytest tests/evaluation/live -m "not integration_db" -q --tb=short
+      - name: Run live-eval hermetic tests
+        run: python -m pytest tests/evaluation/live -m "not integration_db and not live_gmail_eval" -q --tb=short
 
       - name: Validate config (offline)
         run: python scripts/run_live_eval.py validate-config
 
       - name: Offline dry-run journal/report
         run: python scripts/run_live_eval.py dry-run
+
+  live_gmail_transport:
+    runs-on: ubuntu-latest
+    needs: foundation
+    timeout-minutes: 45
+    environment: live-gmail-eval
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ai_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ai_platform"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_platform
+      LIVE_EVAL_ALLOWED: yes
+      LIVE_EVAL_SEED_ALLOWED: yes
+      LIVE_EVAL_TENANT_IDS: TENANT_LIVE_EVAL
+      LIVE_EVAL_SENDER_EMAILS: ${{ secrets.LIVE_EVAL_SENDER_EMAIL }}
+      LIVE_EVAL_RECIPIENT_EMAILS: ${{ secrets.LIVE_EVAL_RECIPIENT_EMAIL }}
+      LIVE_EVAL_GMAIL_LABEL: krowolf-live-eval
+      LIVE_GMAIL_EVAL_ALLOWED: yes
+      EXTERNAL_SIDE_EFFECT_TESTS: yes
+      LIVE_EVAL_MAX_SCENARIOS_PER_RUN: "1"
+      LIVE_EVAL_MAX_GMAIL_SENDS: "1"
+      LIVE_EVAL_MAX_GMAIL_REPLIES: "0"
+      ADMIN_API_KEY: ${{ secrets.LIVE_EVAL_ADMIN_API_KEY }}
+      LIVE_EVAL_APP_BASE_URL: http://127.0.0.1:8010
+      BUILD_GIT_SHA: ${{ github.sha }}
+      LIVE_EVAL_SENDER_GMAIL_REFRESH_TOKEN: ${{ secrets.LIVE_EVAL_SENDER_GMAIL_REFRESH_TOKEN }}
+      LIVE_EVAL_SENDER_GMAIL_CLIENT_ID: ${{ secrets.LIVE_EVAL_SENDER_GMAIL_CLIENT_ID }}
+      LIVE_EVAL_SENDER_GMAIL_CLIENT_SECRET: ${{ secrets.LIVE_EVAL_SENDER_GMAIL_CLIENT_SECRET }}
+      LIVE_EVAL_RECIPIENT_GMAIL_REFRESH_TOKEN: ${{ secrets.LIVE_EVAL_RECIPIENT_GMAIL_REFRESH_TOKEN }}
+      LIVE_EVAL_RECIPIENT_GMAIL_CLIENT_ID: ${{ secrets.LIVE_EVAL_RECIPIENT_GMAIL_CLIENT_ID }}
+      LIVE_EVAL_RECIPIENT_GMAIL_CLIENT_SECRET: ${{ secrets.LIVE_EVAL_RECIPIENT_GMAIL_CLIENT_SECRET }}
+      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.LIVE_EVAL_RECIPIENT_GMAIL_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.LIVE_EVAL_RECIPIENT_GMAIL_CLIENT_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: PostgreSQL health
+        run: |
+          for i in $(seq 1 30); do
+            pg_isready -h localhost -p 5432 -U postgres && break
+            sleep 2
+          done
+
+      - name: Bootstrap PostgreSQL schema
+        run: python -m scripts.ci.bootstrap_postgres_schema
+
+      - name: Seed eval tenant
+        run: python scripts/seed_live_eval_tenant.py --tenant-id TENANT_LIVE_EVAL --apply
+
+      - name: Seed recipient Gmail OAuth
+        run: python scripts/seed_live_eval_gmail_oauth.py --tenant-id TENANT_LIVE_EVAL --apply
+
+      - name: Start Krowolf app
+        run: |
+          uvicorn app.main:app --host 127.0.0.1 --port 8010 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8010/health && break
+            sleep 2
+          done
+
+      - name: Runtime readiness and BUILD_GIT_SHA
+        run: |
+          curl -sf -H "X-Admin-API-Key: $ADMIN_API_KEY" \
+            "$LIVE_EVAL_APP_BASE_URL/admin/live-eval/runtime-readiness" | tee runtime.json
+          python - <<'PY'
+          import json, os, sys
+          data = json.load(open("runtime.json"))
+          assert data.get("env") == "test"
+          assert data.get("build_git_sha") == os.environ.get("BUILD_GIT_SHA")
+          PY
+
+      - name: Offline live-eval validation
+        run: python scripts/run_live_eval.py validate-config
+
+      - name: App-side read-only Gmail readiness
+        run: |
+          curl -sf -X POST -H "X-Admin-API-Key: $ADMIN_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"tenant_id":"TENANT_LIVE_EVAL"}' \
+            "$LIVE_EVAL_APP_BASE_URL/admin/live-eval/gmail-readiness"
+
+      - name: Sender read-only readiness
+        run: python scripts/run_live_eval.py validate-config --gmail-readiness --confirm-read-only --tenant-id TENANT_LIVE_EVAL
+
+      - name: Live Gmail S01 scenario
+        id: run_scenario
+        run: |
+          python scripts/run_live_eval.py run-scenario \
+            --scenario-id S01_lead_laddbox_quality \
+            --tenant-id TENANT_LIVE_EVAL \
+            --confirm-external \
+            --run-id-file "${RUNNER_TEMP}/live_eval_run_id"
+
+      - name: Exact cleanup
+        id: cleanup
+        if: always()
+        run: |
+          if [ -f "${RUNNER_TEMP}/live_eval_run_id" ]; then
+            RUN_ID=$(cat "${RUNNER_TEMP}/live_eval_run_id")
+            python scripts/run_live_eval.py cleanup-run --run-id "$RUN_ID" --confirm-external
+          fi
+
+      - name: Set run ID for artifacts
+        if: always()
+        run: |
+          if [ -f "${RUNNER_TEMP}/live_eval_run_id" ]; then
+            RUN_ID=$(cat "${RUNNER_TEMP}/live_eval_run_id")
+            echo "RUN_ID=$RUN_ID" >> "$GITHUB_ENV"
+          fi
+
+      - name: Upload redacted artifacts
+        if: always() && env.RUN_ID != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-eval-report-${{ env.RUN_ID }}
+          path: storage/live_eval/runs/${{ env.RUN_ID }}/
+
+      - name: Cleanup gate
+        if: always()
+        run: |
+          if [ -f "${RUNNER_TEMP}/live_eval_run_id" ] && [ "${{ steps.cleanup.outcome }}" != "success" ]; then
+            echo "cleanup required but step outcome was: ${{ steps.cleanup.outcome }}"
+            exit 1
+          fi
