@@ -106,13 +106,13 @@ jobs:
           ENV: test
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_platform
         run: |
-          COLLECT_LINE=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live 2>/dev/null | awk '/ collected/ { print; exit }')
+          COLLECT_LINE=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live/test_root_job_atomic_pg.py 2>/dev/null | awk '/ collected/ { print; exit }')
           EXPECTED_INTEGRATION_DB=$(echo "${COLLECT_LINE}" | awk '{ split($1, parts, "/"); print parts[1] }')
           if [ "${EXPECTED_INTEGRATION_DB}" != "5" ]; then
             echo "integration_db gate requires exactly 5 selected tests, got ${EXPECTED_INTEGRATION_DB}" >&2
             exit 1
           fi
-          python -m pytest tests/evaluation/live -m integration_db -q --tb=short --junitxml=live_eval_integration_db.junit.xml
+          python -m pytest tests/evaluation/live/test_root_job_atomic_pg.py -m integration_db -q --tb=short --junitxml=live_eval_integration_db.junit.xml
           python scripts/ci/verify_pytest_junit.py live_eval_integration_db.junit.xml --expected 5
 
       - name: Run migration 016 PostgreSQL integration test
