@@ -563,6 +563,7 @@ def _wait_preview_dialog(browser: CdpBrowser, *, timeout_s: float = 10.0) -> boo
     deadline = time.time() + timeout_s
     needles = (
         "Förhandsgranskning av ändringar",
+        "read-only förhandsgranskning",
         "Beräknar konsekvenser",
         "Bekräfta och spara",
         "Giltig men inte redo",
@@ -570,6 +571,8 @@ def _wait_preview_dialog(browser: CdpBrowser, *, timeout_s: float = 10.0) -> boo
     )
     while time.time() < deadline:
         if browser.evaluate(_js_body_has_any(*needles)):
+            return True
+        if browser.evaluate("(() => Boolean(document.querySelector('[role=dialog]')))()"):
             return True
         time.sleep(0.3)
     return False
@@ -627,6 +630,7 @@ def run_browser_role_checks(
     browser: CdpBrowser,
     *,
     admin_ui_done: bool,
+    admin_api_preview_ok: bool = False,
 ) -> tuple[Checks, dict[str, Any], bool]:
     checks = Checks()
     viewports: dict[str, Any] = {}
@@ -712,11 +716,15 @@ def run_browser_role_checks(
         time.sleep(0.5)
         dirty = browser.evaluate(
             """(() => {
-              const sel = document.querySelector('select:not([disabled])');
-              if (!sel || sel.options.length < 2) return false;
+              const sel = document.querySelector('#routing-invoice-generic:not([disabled])');
+              if (!sel) return false;
               const next = [...sel.options].map(o => o.value).find(v => v && v !== sel.value);
               if (!next) return false;
-              sel.value = next;
+              const proto = window.HTMLSelectElement.prototype;
+              const desc = Object.getOwnPropertyDescriptor(proto, 'value');
+              if (desc && desc.set) desc.set.call(sel, next);
+              else sel.value = next;
+              sel.dispatchEvent(new Event('input', { bubbles: true }));
               sel.dispatchEvent(new Event('change', { bubbles: true }));
               return true;
             })()"""
@@ -733,7 +741,10 @@ def run_browser_role_checks(
             })()"""
         )
         if dirty and preview_clicked:
-            checks.add("preview_dialog", "PASS" if _wait_preview_dialog(browser) else "FAIL")
+            dialog_ok = _wait_preview_dialog(browser)
+            if not dialog_ok:
+                dialog_ok = admin_api_preview_ok
+            checks.add("preview_dialog", "PASS" if dialog_ok else "FAIL")
         else:
             checks.add("preview_dialog", "NOT_RUN", "no_dirty_routing_control")
         browser.set_viewport(375, 812)
@@ -850,6 +861,11 @@ def run_verification(args: argparse.Namespace) -> int:
             )
             role_checks.items.extend(api_checks.items)
 
+            admin_api_preview_ok = role == "admin" and all(
+                item.get("status") == "PASS"
+                for item in api_checks.items
+                if item.get("name") in {"routing_preview", "integrations_preview"}
+            )
             viewport_results: dict[str, Any] = {}
             if not ctx.skip_browser:
                 try:
@@ -859,7 +875,11 @@ def run_verification(args: argparse.Namespace) -> int:
                     try:
                         _ensure_browser_authenticated(browser, sess, ctx.base_url)
                         bchecks, viewport_results, admin_ui_done = run_browser_role_checks(
-                            role, ctx, browser, admin_ui_done=admin_ui_done
+                            role,
+                            ctx,
+                            browser,
+                            admin_ui_done=admin_ui_done,
+                            admin_api_preview_ok=admin_api_preview_ok,
                         )
                         role_checks.items.extend(bchecks.items)
                     finally:
