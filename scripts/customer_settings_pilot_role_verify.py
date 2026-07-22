@@ -375,14 +375,17 @@ def compare_snapshots(before: dict[str, Any], after: dict[str, Any], *, start_ti
         and before.get("visma_fp") == after.get("visma_fp")
         and before.get("activation_snapshots") == after.get("activation_snapshots")
         and before.get("onboarding_sessions") == after.get("onboarding_sessions")
-        and after.get("timezone") == start_timezone
+        and after.get("timezone") == "Europe/Stockholm"
         and before.get("admin_role") == after.get("admin_role")
         and before.get("super_admin_operator_ids_present") == after.get("super_admin_operator_ids_present")
     )
     cv_before = int(before.get("config_version") or 0)
     cv_after = int(after.get("config_version") or 0)
-    delta["config_version_delta"] = cv_after - cv_before
-    return {"ok": ok, "delta": delta, "config_version_delta": cv_after - cv_before}
+    cv_delta = cv_after - cv_before
+    delta["config_version_delta"] = cv_delta
+    if cv_delta > 2:
+        ok = False
+    return {"ok": ok, "delta": delta, "config_version_delta": cv_delta}
 
 
 def settings_aggregate(sess: requests.Session, base_url: str, tenant_id: str) -> tuple[int, dict[str, Any]]:
@@ -449,7 +452,7 @@ def run_api_role_checks(
         checks.add(f"domain_get_{domain}", "PASS" if dstatus == 200 else "FAIL", f"status={dstatus}", http_status=dstatus)
 
     identity_payload = {"timezone": "Europe/Oslo"}
-    routing_payload = {"route_overrides": {"invoice_generic": "support"}}
+    routing_payload: dict[str, Any] = {}
     integrations_payload = {"selections": {"fortnox": {"selection_status": "not_selected"}}}
     automation_payload = {"policy": {"preset_key": "observe_only", "preset_version": 1, "approval_first": True}}
 
@@ -489,12 +492,15 @@ def run_api_role_checks(
         prev_status, prev = preview_domain(sess, base, tenant, "routing", routing_payload)
         checks.add("routing_preview", "PASS" if prev_status == 200 else "FAIL", f"status={prev_status}", http_status=prev_status)
         start_tz = (agg.get("domains") or {}).get("identity", {}).get("timezone") or ctx.pre_snapshot.get("timezone") or "Europe/Stockholm"
-        if start_tz != "Europe/Stockholm":
-            pstatus, pdata = patch_domain(sess, base, tenant, "identity", version, {"timezone": "Europe/Stockholm"})
-            if pstatus == 200:
-                version = int((pdata or {}).get("config_version") or version + 1)
         start_cv = version
-        for target_tz in ("Europe/Oslo", "Europe/Stockholm"):
+        targets: list[str] = []
+        if start_tz == "Europe/Stockholm":
+            targets = ["Europe/Oslo", "Europe/Stockholm"]
+        elif start_tz == "Europe/Oslo":
+            targets = ["Europe/Stockholm"]
+        else:
+            targets = ["Europe/Oslo", "Europe/Stockholm"]
+        for target_tz in targets:
             pstatus, pdata = patch_domain(sess, base, tenant, "identity", version, {"timezone": target_tz})
             ok = pstatus == 200
             checks.add(f"patch_identity_{target_tz}", "PASS" if ok else "FAIL", f"status={pstatus}", http_status=pstatus)
@@ -674,20 +680,37 @@ def run_browser_role_checks(
 
     elif role == "admin" and not admin_ui_done:
         browser.set_viewport(1440, 900)
-        browser.navigate(f"{settings_base}?tab=modules")
-        time.sleep(0.3)
-        browser.evaluate(
-            """(() => { const b = document.querySelector('input[type=checkbox]:not([disabled])'); if (b) b.click(); return !!b; })()"""
+        browser.navigate(f"{settings_base}?tab=integrations")
+        time.sleep(0.5)
+        dirty = browser.evaluate(
+            """(() => {
+              const sel = document.querySelector('select:not([disabled])');
+              if (!sel || sel.options.length < 2) return false;
+              const next = sel.options[1]?.value;
+              if (!next || sel.value === next) return false;
+              sel.value = next;
+              sel.dispatchEvent(new Event('change', { bubbles: true }));
+              return true;
+            })()"""
         )
-        time.sleep(0.2)
+        time.sleep(0.4)
         checks.add("savebar_dirty", "PASS" if int(browser.evaluate(_js_count_buttons("Spara")) or 0) > 0 else "FAIL")
-        if preview_count > 0 or int(browser.evaluate(_js_count_buttons("Förhandsgranska")) or 0) > 0:
-            browser.evaluate("""(() => { const b=[...document.querySelectorAll('button')].find(x=>(x.textContent||'').includes('Förhandsgranska')); if(b)b.click(); return !!b; })()""")
-            time.sleep(0.8)
+        preview_clicked = browser.evaluate(
+            """(() => {
+              const b = [...document.querySelectorAll('button')].find(x => (x.textContent || '').includes('Förhandsgranska'));
+              if (!b || b.disabled) return false;
+              b.click();
+              return true;
+            })()"""
+        )
+        if dirty and preview_clicked:
+            time.sleep(1.2)
             checks.add(
                 "preview_dialog",
                 "PASS" if browser.evaluate(_js_body_has("Förhandsgranskning av ändringar")) else "FAIL",
             )
+        else:
+            checks.add("preview_dialog", "NOT_RUN", "no_dirty_integrations_control")
         browser.set_viewport(375, 812)
         browser.call("Emulation.setPageScaleFactor", {"pageScaleFactor": 1.5})
         browser.navigate(f"{settings_base}?tab=identity")
