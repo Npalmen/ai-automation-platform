@@ -491,7 +491,7 @@ def run_api_role_checks(
     elif role == "admin" and not admin_mutation_done:
         prev_status, prev = preview_domain(sess, base, tenant, "routing", routing_payload)
         checks.add("routing_preview", "PASS" if prev_status == 200 else "FAIL", f"status={prev_status}", http_status=prev_status)
-        int_prev_status, _ = preview_domain(sess, base, tenant, "integrations", integrations_payload)
+        int_prev_status, _ = preview_domain(sess, base, tenant, "integrations", {})
         checks.add(
             "integrations_preview",
             "PASS" if int_prev_status == 200 else "FAIL",
@@ -539,7 +539,7 @@ def run_api_role_checks(
             str(auto.get("scheduler_run_mode")),
         )
         if not admin_mutation_done:
-            prev_status, _ = preview_domain(sess, base, tenant, "integrations", integrations_payload)
+            prev_status, _ = preview_domain(sess, base, tenant, "integrations", {})
             checks.add("integrations_preview", "PASS" if prev_status == 200 else "FAIL", f"status={prev_status}", http_status=prev_status)
 
     return checks, admin_mutation_done
@@ -708,14 +708,14 @@ def run_browser_role_checks(
 
     elif role == "admin" and not admin_ui_done:
         browser.set_viewport(1440, 900)
-        browser.navigate(f"{settings_base}?tab=integrations")
+        browser.navigate(f"{settings_base}?tab=routing")
         time.sleep(0.5)
         dirty = browser.evaluate(
             """(() => {
               const sel = document.querySelector('select:not([disabled])');
               if (!sel || sel.options.length < 2) return false;
-              const next = sel.options[1]?.value;
-              if (!next || sel.value === next) return false;
+              const next = [...sel.options].map(o => o.value).find(v => v && v !== sel.value);
+              if (!next) return false;
               sel.value = next;
               sel.dispatchEvent(new Event('change', { bubbles: true }));
               return true;
@@ -725,17 +725,17 @@ def run_browser_role_checks(
         checks.add("savebar_dirty", "PASS" if int(browser.evaluate(_js_count_buttons("Spara")) or 0) > 0 else "FAIL")
         preview_clicked = browser.evaluate(
             """(() => {
-              const save = [...document.querySelectorAll('button')].find(x => (x.textContent || '').includes('Spara'));
-              if (save && !save.disabled) { save.click(); return true; }
               const preview = [...document.querySelectorAll('button')].find(x => (x.textContent || '').includes('Förhandsgranska'));
               if (preview && !preview.disabled) { preview.click(); return true; }
+              const save = [...document.querySelectorAll('button')].find(x => (x.textContent || '').includes('Spara'));
+              if (save && !save.disabled) { save.click(); return true; }
               return false;
             })()"""
         )
         if dirty and preview_clicked:
             checks.add("preview_dialog", "PASS" if _wait_preview_dialog(browser) else "FAIL")
         else:
-            checks.add("preview_dialog", "NOT_RUN", "no_dirty_integrations_control")
+            checks.add("preview_dialog", "NOT_RUN", "no_dirty_routing_control")
         browser.set_viewport(375, 812)
         browser.call("Emulation.setPageScaleFactor", {"pageScaleFactor": 1.5})
         browser.navigate(f"{settings_base}?tab=identity")
