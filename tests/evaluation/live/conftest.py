@@ -26,6 +26,10 @@ def live_eval_env(monkeypatch):
     monkeypatch.setenv("LIVE_EVAL_SENDER_EMAILS", "sender@eval.test")
     monkeypatch.setenv("LIVE_EVAL_RECIPIENT_EMAILS", "recipient@eval.test")
     monkeypatch.setenv("LIVE_EVAL_GMAIL_LABEL", "krowolf-live-eval")
+    monkeypatch.setenv("EXTERNAL_SIDE_EFFECT_TESTS", "yes")
+    monkeypatch.setenv("LIVE_EVAL_MAX_SCENARIOS_PER_RUN", "1")
+    monkeypatch.setenv("LIVE_EVAL_MAX_GMAIL_SENDS", "1")
+    monkeypatch.setenv("LIVE_EVAL_MAX_GMAIL_REPLIES", "0")
     from app.core.settings import get_settings
     from app.evaluation.live.config import get_live_eval_config
 
