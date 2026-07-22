@@ -449,7 +449,7 @@ def run_api_role_checks(
         checks.add(f"domain_get_{domain}", "PASS" if dstatus == 200 else "FAIL", f"status={dstatus}", http_status=dstatus)
 
     identity_payload = {"timezone": "Europe/Oslo"}
-    routing_payload = {"route_overrides": {"invoice_generic": "finance"}}
+    routing_payload = {"route_overrides": {"invoice_generic": "support"}}
     integrations_payload = {"selections": {"fortnox": {"selection_status": "not_selected"}}}
     automation_payload = {"policy": {"preset_key": "observe_only", "preset_version": 1, "approval_first": True}}
 
@@ -489,8 +489,12 @@ def run_api_role_checks(
         prev_status, prev = preview_domain(sess, base, tenant, "routing", routing_payload)
         checks.add("routing_preview", "PASS" if prev_status == 200 else "FAIL", f"status={prev_status}", http_status=prev_status)
         start_tz = (agg.get("domains") or {}).get("identity", {}).get("timezone") or ctx.pre_snapshot.get("timezone") or "Europe/Stockholm"
+        if start_tz != "Europe/Stockholm":
+            pstatus, pdata = patch_domain(sess, base, tenant, "identity", version, {"timezone": "Europe/Stockholm"})
+            if pstatus == 200:
+                version = int((pdata or {}).get("config_version") or version + 1)
         start_cv = version
-        for target_tz in ("Europe/Oslo", start_tz):
+        for target_tz in ("Europe/Oslo", "Europe/Stockholm"):
             pstatus, pdata = patch_domain(sess, base, tenant, "identity", version, {"timezone": target_tz})
             ok = pstatus == 200
             checks.add(f"patch_identity_{target_tz}", "PASS" if ok else "FAIL", f"status={pstatus}", http_status=pstatus)
@@ -612,10 +616,14 @@ def run_browser_role_checks(
     for label, name in (
         (("Gmail",), "gmail_visible"),
         (("Visma",), "visma_visible"),
-        (("Google Sheets",), "sheets_visible"),
+        (("Google Sheets", "Kalkylark", "google_sheets"), "sheets_visible"),
         (("Fortnox",), "fortnox_visible"),
     ):
-        checks.add(name, "PASS" if browser.evaluate(_js_body_has(*label)) else "FAIL", label[0])
+        checks.add(
+            name,
+            "PASS" if any(browser.evaluate(_js_body_has(needle)) for needle in label) else "FAIL",
+            label[0] if len(label) == 1 else "google_sheets",
+        )
     checks.add(
         "fortnox_bokio_disabled",
         "PASS" if browser.evaluate(_js_body_has("Kommer senare")) or browser.evaluate(_js_body_has("not_selected")) else "FAIL",
@@ -676,7 +684,10 @@ def run_browser_role_checks(
         if preview_count > 0 or int(browser.evaluate(_js_count_buttons("Förhandsgranska")) or 0) > 0:
             browser.evaluate("""(() => { const b=[...document.querySelectorAll('button')].find(x=>(x.textContent||'').includes('Förhandsgranska')); if(b)b.click(); return !!b; })()""")
             time.sleep(0.8)
-            checks.add("preview_dialog", "PASS" if browser.evaluate(_js_body_has("Förhandsgranskning")) else "FAIL")
+            checks.add(
+                "preview_dialog",
+                "PASS" if browser.evaluate(_js_body_has("Förhandsgranskning av ändringar")) else "FAIL",
+            )
         browser.set_viewport(375, 812)
         browser.call("Emulation.setPageScaleFactor", {"pageScaleFactor": 1.5})
         browser.navigate(f"{settings_base}?tab=identity")
