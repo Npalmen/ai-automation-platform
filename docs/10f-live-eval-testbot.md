@@ -248,15 +248,42 @@ python scripts/run_live_eval.py show-report --run-id <id>   # redacted JSON only
 
 ### Live workflow
 
-Manual `workflow_dispatch` only on `main`. Operator must select input `confirm_live_gmail=RUN_S01`; default `DO_NOT_RUN` blocks the live job.
+Manual `workflow_dispatch` only on `main`. Workflow input `confirm_live_gmail` must be `READINESS_ONLY` or `RUN_S01`; default `DO_NOT_RUN` blocks the live job.
 
 | Gate | Purpose |
 |------|---------|
-| `operator-gate` job | Requires `refs/heads/main` and `confirm_live_gmail=RUN_S01` (no environment secrets) |
+| `operator-gate` job | Requires `refs/heads/main` and `confirm_live_gmail` in `{READINESS_ONLY, RUN_S01}` (no environment secrets) |
 | GitHub environment `live-gmail-eval` | Required reviewer, deployment branch policy **main only**, dedicated test credentials only |
 | `BUILD_GIT_SHA` | Runtime SHA match via `GET /admin/live-eval/runtime-readiness` |
 
-`live_gmail_transport` needs `foundation` + `operator-gate`, uses environment `live-gmail-eval`, `timeout-minutes: 45`, `concurrency.group: live-gmail-eval`, exact run-ID file for cleanup and artifacts. Cleanup failures fail the job via a final gate step; artifacts still upload. No `.last_run_id` / `ls -t` discovery. Scenario remains hardcoded to `S01_lead_laddbox_quality` only.
+`live_gmail_transport` needs `foundation` + `operator-gate`, uses environment `live-gmail-eval`, `timeout-minutes: 45`, `concurrency.group: live-gmail-eval`.
+
+#### Readiness-only (`READINESS_ONLY`)
+
+Runs from `main` with protected environment `live-gmail-eval` and the same nine secrets as live S01. Verifies both Gmail accounts read-only:
+
+- recipient via authenticated `POST /admin/live-eval/gmail-readiness`
+- sender via `validate-config --sender-readiness --confirm-read-only`
+
+Does **not** register a live-eval run, write a run-ID file, send Gmail, mutate Gmail, run cleanup, or invoke live LLM. Produces a redacted `readiness_report.json` artifact (`external_sends=0`, `gmail_mutations=0`).
+
+```bash
+python scripts/run_live_eval.py readiness-only \
+  --tenant-id TENANT_LIVE_EVAL \
+  --confirm-read-only \
+  --report-file /path/to/readiness_report.json
+```
+
+#### Live S01 (`RUN_S01`)
+
+Unchanged S01 flow: exact one send, journal, assertions, exact cleanup, redacted run artifact. Cleanup failures fail the job via a final gate step; artifacts still upload on failure. Scenario remains hardcoded to `S01_lead_laddbox_quality` only.
+
+#### Operator sequence
+
+1. Configure environment, nine secrets, and Gmail label/filter (including filter probe cleanup).
+2. Dispatch workflow with `READINESS_ONLY` from `main`.
+3. Verify readiness artifact: sender/recipient profile match, label present, `external_sends=0`, `gmail_mutations=0`.
+4. Separately approve and dispatch `RUN_S01` for the first real S01 send.
 
 ### OAuth seed database guard (F-08)
 

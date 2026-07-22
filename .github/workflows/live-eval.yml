@@ -4,12 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       confirm_live_gmail:
-        description: "Select RUN_S01 to authorize one real Gmail S01 evaluation"
+        description: "Select READINESS_ONLY or RUN_S01"
         required: true
         type: choice
         default: DO_NOT_RUN
         options:
           - DO_NOT_RUN
+          - READINESS_ONLY
           - RUN_S01
 
 permissions:
@@ -81,7 +82,10 @@ jobs:
       - name: Verify live Gmail authorization
         run: |
           test "${GITHUB_REF}" = "refs/heads/main"
-          test "${{ inputs.confirm_live_gmail }}" = "RUN_S01"
+          case "${{ inputs.confirm_live_gmail }}" in
+            READINESS_ONLY|RUN_S01) ;;
+            *) echo "confirm_live_gmail must be READINESS_ONLY or RUN_S01"; exit 1 ;;
+          esac
 
   live_gmail_transport:
     runs-on: ubuntu-latest
@@ -181,18 +185,39 @@ jobs:
       - name: Offline live-eval validation
         run: python scripts/run_live_eval.py validate-config
 
-      - name: App-side read-only Gmail readiness
+      - name: Recipient read-only Gmail readiness
         run: |
           curl -sf -X POST -H "X-Admin-API-Key: $ADMIN_API_KEY" \
             -H "Content-Type: application/json" \
             -d '{"tenant_id":"TENANT_LIVE_EVAL"}' \
             "$LIVE_EVAL_APP_BASE_URL/admin/live-eval/gmail-readiness"
 
-      - name: Sender read-only readiness
-        run: python scripts/run_live_eval.py validate-config --gmail-readiness --confirm-read-only --tenant-id TENANT_LIVE_EVAL
+      - name: Sender read-only Gmail readiness
+        run: |
+          python scripts/run_live_eval.py validate-config \
+            --sender-readiness \
+            --confirm-read-only \
+            --tenant-id TENANT_LIVE_EVAL
+
+      - name: Readiness-only report
+        id: readiness_report
+        if: inputs.confirm_live_gmail == 'READINESS_ONLY'
+        run: |
+          python scripts/run_live_eval.py readiness-only \
+            --tenant-id TENANT_LIVE_EVAL \
+            --confirm-read-only \
+            --report-file "${RUNNER_TEMP}/readiness_report.json"
+
+      - name: Upload readiness artifact
+        if: always() && inputs.confirm_live_gmail == 'READINESS_ONLY'
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-eval-readiness-${{ github.sha }}
+          path: ${{ runner.temp }}/readiness_report.json
 
       - name: Live Gmail S01 scenario
         id: run_scenario
+        if: inputs.confirm_live_gmail == 'RUN_S01'
         run: |
           python scripts/run_live_eval.py run-scenario \
             --scenario-id S01_lead_laddbox_quality \
@@ -202,7 +227,7 @@ jobs:
 
       - name: Exact cleanup
         id: cleanup
-        if: always()
+        if: always() && inputs.confirm_live_gmail == 'RUN_S01'
         run: |
           if [ -f "${RUNNER_TEMP}/live_eval_run_id" ]; then
             RUN_ID=$(cat "${RUNNER_TEMP}/live_eval_run_id")
@@ -210,7 +235,7 @@ jobs:
           fi
 
       - name: Set run ID for artifacts
-        if: always()
+        if: always() && inputs.confirm_live_gmail == 'RUN_S01'
         run: |
           if [ -f "${RUNNER_TEMP}/live_eval_run_id" ]; then
             RUN_ID=$(cat "${RUNNER_TEMP}/live_eval_run_id")
@@ -218,14 +243,14 @@ jobs:
           fi
 
       - name: Upload redacted artifacts
-        if: always() && env.RUN_ID != ''
+        if: always() && inputs.confirm_live_gmail == 'RUN_S01' && env.RUN_ID != ''
         uses: actions/upload-artifact@v4
         with:
           name: live-eval-report-${{ env.RUN_ID }}
           path: storage/live_eval/runs/${{ env.RUN_ID }}/
 
       - name: Cleanup gate
-        if: always()
+        if: always() && inputs.confirm_live_gmail == 'RUN_S01'
         run: |
           if [ -f "${RUNNER_TEMP}/live_eval_run_id" ] && [ "${{ steps.cleanup.outcome }}" != "success" ]; then
             echo "cleanup required but step outcome was: ${{ steps.cleanup.outcome }}"

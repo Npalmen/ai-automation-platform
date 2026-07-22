@@ -17,6 +17,10 @@ def _workflow_trigger(data: dict) -> dict:
     return data.get("on") or data[True]
 
 
+def _step_by_name(steps: list[dict], needle: str) -> dict:
+    return next(step for step in steps if needle in (step.get("name") or ""))
+
+
 def test_live_eval_workflow_contract():
     data = _load_workflow()
     transport = data["jobs"]["live_gmail_transport"]
@@ -39,34 +43,55 @@ def test_live_eval_workflow_contract():
     assert confirm_input["required"] is True
     assert confirm_input["type"] == "choice"
     assert confirm_input["default"] == "DO_NOT_RUN"
-    assert confirm_input["options"] == ["DO_NOT_RUN", "RUN_S01"]
+    assert confirm_input["options"] == ["DO_NOT_RUN", "READINESS_ONLY", "RUN_S01"]
 
     operator_gate = data["jobs"]["operator-gate"]
     assert "environment" not in operator_gate
     gate_run = operator_gate["steps"][0]["run"]
     assert 'test "${GITHUB_REF}" = "refs/heads/main"' in gate_run
-    assert 'test "${{ inputs.confirm_live_gmail }}" = "RUN_S01"' in gate_run
+    assert "READINESS_ONLY|RUN_S01" in gate_run
+    assert 'test "${{ inputs.confirm_live_gmail }}" = "RUN_S01"' not in gate_run
 
-    step_names = [step.get("name", "") for step in transport["steps"]]
+    steps = transport["steps"]
+    step_names = [step.get("name", "") for step in steps]
     assert any("PostgreSQL" in name or "Bootstrap" in name for name in step_names)
     assert any("recipient Gmail OAuth" in name or "OAuth" in name for name in step_names)
-    assert not any("live_gmail_eval" in (step.get("run") or "") for step in transport["steps"])
+    assert not any("live_gmail_eval" in (step.get("run") or "") for step in steps)
 
-    run_step = next(step for step in transport["steps"] if "run-scenario" in (step.get("run") or ""))
-    assert "--run-id-file" in run_step["run"]
-    assert "S01_lead_laddbox_quality" in run_step["run"]
-    assert "--scenario-id" in run_step["run"]
+    recipient_step = _step_by_name(steps, "Recipient read-only")
+    assert "gmail-readiness" in (recipient_step.get("run") or "")
 
-    cleanup_step = next(step for step in transport["steps"] if step.get("id") == "cleanup")
-    assert cleanup_step.get("if") == "always()"
+    sender_step = _step_by_name(steps, "Sender read-only")
+    sender_run = sender_step.get("run") or ""
+    assert "--sender-readiness" in sender_run
+    assert "--confirm-read-only" in sender_run
+
+    readiness_step = _step_by_name(steps, "Readiness-only report")
+    assert readiness_step.get("if") == "inputs.confirm_live_gmail == 'READINESS_ONLY'"
+    readiness_run = readiness_step.get("run") or ""
+    assert "readiness-only" in readiness_run
+    assert "run-scenario" not in readiness_run
+
+    readiness_artifact = _step_by_name(steps, "Upload readiness artifact")
+    assert readiness_artifact.get("if") == "always() && inputs.confirm_live_gmail == 'READINESS_ONLY'"
+
+    run_step = _step_by_name(steps, "Live Gmail S01 scenario")
+    assert run_step.get("if") == "inputs.confirm_live_gmail == 'RUN_S01'"
+    run_run = run_step.get("run") or ""
+    assert "--run-id-file" in run_run
+    assert "S01_lead_laddbox_quality" in run_run
+    assert "--scenario-id" in run_run
+
+    cleanup_step = next(step for step in steps if step.get("id") == "cleanup")
+    assert cleanup_step.get("if") == "always() && inputs.confirm_live_gmail == 'RUN_S01'"
     assert "|| true" not in (cleanup_step.get("run") or "")
 
-    gate_step = next(step for step in transport["steps"] if step.get("name") == "Cleanup gate")
-    assert gate_step.get("if") == "always()"
+    gate_step = _step_by_name(steps, "Cleanup gate")
+    assert gate_step.get("if") == "always() && inputs.confirm_live_gmail == 'RUN_S01'"
     assert "steps.cleanup.outcome" in (gate_step.get("run") or "")
 
-    artifact_step = next(step for step in transport["steps"] if "Upload redacted artifacts" in step.get("name", ""))
-    assert artifact_step.get("if") == "always() && env.RUN_ID != ''"
+    artifact_step = _step_by_name(steps, "Upload redacted artifacts")
+    assert artifact_step.get("if") == "always() && inputs.confirm_live_gmail == 'RUN_S01' && env.RUN_ID != ''"
 
     freeform_inputs = set(dispatch["inputs"].keys()) - {"confirm_live_gmail"}
     assert not freeform_inputs, f"unexpected workflow inputs: {freeform_inputs}"

@@ -43,6 +43,7 @@ class SenderReadinessReport:
     ready: bool
     issues: list[str]
     profile_email: str | None = None
+    read_scope_verified: bool = False
 
 
 @dataclass(frozen=True)
@@ -113,20 +114,32 @@ def _validate_send_budget_config(config: LiveEvalConfig) -> list[str]:
     return issues
 
 
-def run_sender_readiness(
+def _validate_exact_allowlist_addresses(config: LiveEvalConfig) -> list[str]:
+    issues: list[str] = []
+    if len(config.sender_emails) != 1:
+        issues.append("exactly one LIVE_EVAL_SENDER_EMAILS entry required")
+    if len(config.recipient_emails) != 1:
+        issues.append("exactly one LIVE_EVAL_RECIPIENT_EMAILS entry required")
+    return issues
+
+
+def run_sender_readiness_read_only(
     *,
     expected_sender: str,
     expected_recipient: str,
     config: LiveEvalConfig | None = None,
 ) -> SenderReadinessReport:
+    """Read-only sender Gmail verification (no send, mutate, or run registration)."""
+    from app.evaluation.live.safety import require_gmail_eval_enabled
+
     config = config or get_live_eval_config()
     issues: list[str] = []
     try:
-        require_live_eval_external_mutation_enabled(config)
+        require_gmail_eval_enabled(config)
     except LiveEvalSafetyError as exc:
         return SenderReadinessReport(ready=False, issues=[str(exc)])
 
-    issues.extend(_validate_send_budget_config(config))
+    issues.extend(_validate_exact_allowlist_addresses(config))
 
     sender = expected_sender.strip().lower()
     recipient = expected_recipient.strip().lower()
@@ -136,21 +149,56 @@ def run_sender_readiness(
         issues.append("expected_recipient is not allowlisted")
 
     profile_email: str | None = None
+    read_scope_verified = False
     try:
         client = build_sender_client()
         profile_email = client.get_profile_email()
         if profile_email != sender:
             issues.append("sender profile email does not match expected allowlist")
+        client.list_messages_page(max_results=1, query="in:inbox")
+        read_scope_verified = True
     except LiveEvalSafetyError as exc:
         issues.append(str(exc))
     except _TRANSPORT_ERRORS as exc:
         issues.append(f"sender_auth: {exc}")
 
+    if not read_scope_verified and not any("sender_auth" in item for item in issues):
+        issues.append("sender read scope verification failed")
+
     return SenderReadinessReport(
         ready=not issues,
         issues=issues,
         profile_email=profile_email,
+        read_scope_verified=read_scope_verified,
     )
+
+
+def run_sender_readiness(
+    *,
+    expected_sender: str,
+    expected_recipient: str,
+    config: LiveEvalConfig | None = None,
+) -> SenderReadinessReport:
+    config = config or get_live_eval_config()
+    try:
+        require_live_eval_external_mutation_enabled(config)
+    except LiveEvalSafetyError as exc:
+        return SenderReadinessReport(ready=False, issues=[str(exc)])
+
+    budget_issues = _validate_send_budget_config(config)
+    read_only = run_sender_readiness_read_only(
+        expected_sender=expected_sender,
+        expected_recipient=expected_recipient,
+        config=config,
+    )
+    if budget_issues:
+        return SenderReadinessReport(
+            ready=False,
+            issues=budget_issues + read_only.issues,
+            profile_email=read_only.profile_email,
+            read_scope_verified=read_only.read_scope_verified,
+        )
+    return read_only
 
 
 def build_s01_message_body(*, evaluation_run_id: str) -> str:

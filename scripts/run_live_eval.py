@@ -14,8 +14,14 @@ if str(ROOT) not in sys.path:
 
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.constants import PYTEST_MARKER_EXPR, REPORT_SCHEMA_VERSION
+from app.evaluation.live.gmail_transport import run_sender_readiness_read_only
 from app.evaluation.live.journal import append_transition, load_transitions, run_directory, write_report_atomic
 from app.evaluation.live.readiness import run_offline_readiness_checks
+from app.evaluation.live.readiness_report import (
+    account_fingerprint,
+    build_readiness_report,
+    write_readiness_report_atomic,
+)
 from app.evaluation.live.registry import new_evaluation_run_id
 from app.evaluation.live.runner import LiveEvalRunner, cleanup_only
 from app.evaluation.live.schemas import LiveEvalReport
@@ -30,37 +36,101 @@ def _resolve_sender_recipient(config) -> tuple[str, str]:
     return senders[0], recipients[0]
 
 
+def _admin_http_context(args: argparse.Namespace) -> tuple[str, str]:
+    base = (args.app_base_url or os.environ.get("LIVE_EVAL_APP_BASE_URL") or "").rstrip("/")
+    admin_key = os.environ.get("ADMIN_API_KEY", "").strip()
+    if not base or not admin_key:
+        raise SystemExit("LIVE_EVAL_APP_BASE_URL and ADMIN_API_KEY required")
+    return base, admin_key
+
+
+def _fetch_runtime_and_recipient_readiness(
+    *,
+    base: str,
+    admin_key: str,
+    tenant_id: str,
+) -> tuple[dict, dict, int]:
+    import httpx
+
+    response = httpx.get(
+        f"{base}/admin/live-eval/runtime-readiness",
+        headers={"X-Admin-API-Key": admin_key},
+        timeout=30.0,
+    )
+    runtime = response.json()
+    gmail_response = httpx.post(
+        f"{base}/admin/live-eval/gmail-readiness",
+        headers={"X-Admin-API-Key": admin_key},
+        json={"tenant_id": tenant_id},
+        timeout=30.0,
+    )
+    return runtime, gmail_response.json(), gmail_response.status_code
+
+
+def _sender_readiness_payload(
+    *,
+    expected_sender: str,
+    expected_recipient: str,
+) -> dict:
+    report = run_sender_readiness_read_only(
+        expected_sender=expected_sender,
+        expected_recipient=expected_recipient,
+    )
+    return {
+        "ready": report.ready,
+        "issues": report.issues,
+        "sender_profile_match": bool(
+            report.profile_email
+            and report.profile_email == expected_sender.strip().lower()
+            and report.read_scope_verified
+        ),
+        "read_scope_verified": report.read_scope_verified,
+        "sender_account_fingerprint": account_fingerprint(expected_sender),
+    }
+
+
 def cmd_validate_config(args: argparse.Namespace) -> int:
-    if args.gmail_readiness:
+    if args.gmail_readiness or args.sender_readiness:
         if not args.confirm_read_only:
             print(json.dumps({"ready": False, "issues": ["--confirm-read-only is required"]}, indent=2))
             return 1
-        if not args.tenant_id:
-            print(json.dumps({"ready": False, "issues": ["--tenant-id is required"]}, indent=2))
-            return 1
-        base = (args.app_base_url or os.environ.get("LIVE_EVAL_APP_BASE_URL") or "").rstrip("/")
-        admin_key = os.environ.get("ADMIN_API_KEY", "").strip()
-        if not base or not admin_key:
-            print(json.dumps({"ready": False, "issues": ["LIVE_EVAL_APP_BASE_URL and ADMIN_API_KEY required"]}, indent=2))
-            return 1
-        import httpx
+        config = get_live_eval_config()
+        issues: list[str] = []
+        payload: dict = {"mode": "gmail_read_only"}
 
-        response = httpx.get(
-            f"{base}/admin/live-eval/runtime-readiness",
-            headers={"X-Admin-API-Key": admin_key},
-            timeout=30.0,
-        )
-        runtime = response.json()
-        gmail = httpx.post(
-            f"{base}/admin/live-eval/gmail-readiness",
-            headers={"X-Admin-API-Key": admin_key},
-            json={"tenant_id": args.tenant_id},
-            timeout=30.0,
-        ).json()
-        payload = {"runtime": runtime, "gmail": gmail}
+        if args.gmail_readiness:
+            if not args.tenant_id:
+                print(json.dumps({"ready": False, "issues": ["--tenant-id is required"]}, indent=2))
+                return 1
+            base, admin_key = _admin_http_context(args)
+            runtime, gmail, gmail_status = _fetch_runtime_and_recipient_readiness(
+                base=base,
+                admin_key=admin_key,
+                tenant_id=args.tenant_id,
+            )
+            payload["runtime"] = runtime
+            payload["gmail"] = gmail
+            if gmail_status != 200 or not runtime.get("database_ok") or not gmail.get("ready"):
+                issues.append("recipient gmail readiness failed")
+
+        if args.sender_readiness:
+            try:
+                sender, recipient = _resolve_sender_recipient(config)
+            except SystemExit as exc:
+                print(json.dumps({"ready": False, "issues": [str(exc)]}, indent=2))
+                return 1
+            sender_payload = _sender_readiness_payload(
+                expected_sender=sender,
+                expected_recipient=recipient,
+            )
+            payload["sender"] = sender_payload
+            if not sender_payload["ready"]:
+                issues.extend(sender_payload.get("issues") or [])
+
+        payload["ready"] = not issues
+        payload["issues"] = issues
         print(json.dumps(payload, indent=2, ensure_ascii=False))
-        ready = response.status_code == 200 and runtime.get("database_ok") and gmail.get("ready")
-        return 0 if ready else 1
+        return 0 if not issues else 1
 
     report = run_offline_readiness_checks()
     payload = {
@@ -72,6 +142,92 @@ def cmd_validate_config(args: argparse.Namespace) -> int:
     }
     print(json.dumps(payload, indent=2, ensure_ascii=False))
     return 0 if report.ready else 1
+
+
+def cmd_readiness_only(args: argparse.Namespace) -> int:
+    if not args.confirm_read_only:
+        print("--confirm-read-only is required", file=sys.stderr)
+        return 2
+    if not args.tenant_id:
+        print("--tenant-id is required", file=sys.stderr)
+        return 2
+    if not args.report_file:
+        print("--report-file is required", file=sys.stderr)
+        return 2
+
+    config = get_live_eval_config()
+    base, admin_key = _admin_http_context(args)
+    try:
+        sender, recipient = _resolve_sender_recipient(config)
+    except SystemExit:
+        sender, recipient = "", ""
+
+    issues: list[str] = []
+    runtime, gmail, gmail_status = _fetch_runtime_and_recipient_readiness(
+        base=base,
+        admin_key=admin_key,
+        tenant_id=args.tenant_id,
+    )
+    if gmail_status != 200 or not runtime.get("database_ok"):
+        issues.append("runtime or recipient readiness HTTP failure")
+    if not gmail.get("ready"):
+        issues.extend(gmail.get("issues") or ["recipient gmail readiness failed"])
+
+    sender_report = run_sender_readiness_read_only(
+        expected_sender=sender,
+        expected_recipient=recipient,
+    )
+    if not sender_report.ready:
+        issues.extend(sender_report.issues)
+
+    gmail_checks = gmail.get("checks") or {}
+    recipient_profile = str(gmail_checks.get("gmail_profile_email") or "").strip().lower()
+    recipient_profile_match = recipient_profile in config.recipient_emails and gmail.get("ready", False)
+    label_present = bool(gmail_checks.get("label_present"))
+    intake_query = str(gmail_checks.get("intake_query") or "")
+    intake_query_valid = (
+        f"label:{config.intake_label}".replace(" ", "").lower()
+        in intake_query.replace(" ", "").lower()
+    )
+
+    workflow_sha = os.environ.get("BUILD_GIT_SHA") or os.environ.get("GITHUB_SHA")
+    ready = not issues
+    report = build_readiness_report(
+        tenant_id=args.tenant_id,
+        workflow_sha=workflow_sha,
+        environment_status="live-gmail-eval",
+        sender_profile_match=bool(
+            sender_report.profile_email
+            and sender_report.profile_email == sender
+            and sender_report.read_scope_verified
+        ),
+        recipient_profile_match=recipient_profile_match,
+        recipient_label_found=label_present,
+        intake_query_valid=intake_query_valid,
+        result="passed" if ready else "failed",
+        failure_category=None if ready else "readiness_failed",
+        sender_fingerprint=account_fingerprint(sender) if sender else None,
+        recipient_fingerprint=account_fingerprint(recipient) if recipient else None,
+        issues=issues,
+        config=config,
+    )
+    write_readiness_report_atomic(args.report_file, report)
+
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        lines = [
+            "## Live Gmail readiness-only",
+            f"- result: **{report['result']}**",
+            f"- workflow_sha: `{workflow_sha or 'unknown'}`",
+            f"- sender_profile_match: {report['sender_profile_match']}",
+            f"- recipient_profile_match: {report['recipient_profile_match']}",
+            f"- recipient_label_found: {report['recipient_label_found']}",
+            f"- external_sends: {report['external_sends']}",
+        ]
+        Path(summary_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+    return 0 if ready else 1
 
 
 def cmd_dry_run(args: argparse.Namespace) -> int:
@@ -238,6 +394,7 @@ def build_parser() -> argparse.ArgumentParser:
     validate = sub.add_parser("validate-config")
     validate.add_argument("--offline", action="store_true", default=True)
     validate.add_argument("--gmail-readiness", action="store_true")
+    validate.add_argument("--sender-readiness", action="store_true")
     validate.add_argument("--confirm-read-only", action="store_true")
     validate.add_argument("--tenant-id", default=None)
     validate.add_argument("--app-base-url", default=None)
@@ -288,6 +445,13 @@ def build_parser() -> argparse.ArgumentParser:
     resume.add_argument("--app-base-url", default=None)
     resume.add_argument("--force-unlock", action="store_true")
     resume.set_defaults(func=cmd_resume_run)
+
+    readiness = sub.add_parser("readiness-only")
+    readiness.add_argument("--tenant-id", required=True)
+    readiness.add_argument("--report-file", required=True)
+    readiness.add_argument("--app-base-url", default=None)
+    readiness.add_argument("--confirm-read-only", action="store_true")
+    readiness.set_defaults(func=cmd_readiness_only)
 
     return parser
 
