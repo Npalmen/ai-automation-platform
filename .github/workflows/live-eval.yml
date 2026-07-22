@@ -40,8 +40,6 @@ jobs:
           --health-retries 5
 
     env:
-      ENV: test
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_platform
       LIVE_EVAL_ALLOWED: yes
       LIVE_EVAL_TENANT_IDS: TENANT_LIVE_EVAL
       LIVE_EVAL_SENDER_EMAILS: eval-sender@example.com
@@ -64,16 +62,62 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
-      - name: Run live-eval PostgreSQL atomicity tests
-        run: python -m pytest tests/evaluation/live -m integration_db -q --tb=short
+      - name: PostgreSQL service healthy
+        run: |
+          for i in $(seq 1 30); do
+            pg_isready -h localhost -p 5432 -U postgres && break
+            sleep 2
+          done
+
+      - name: Bootstrap PostgreSQL schema
+        env:
+          ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_platform
+        run: python -m scripts.ci.bootstrap_postgres_schema
+
+      - name: Verify integration_db test selection
+        env:
+          ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_platform
+        run: |
+          COLLECT_LINE=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live 2>/dev/null | awk '/ collected/ { print; exit }')
+          EXPECTED_INTEGRATION_DB=$(echo "${COLLECT_LINE}" | awk '{ split($1, parts, "/"); print parts[1] }')
+          if [ "${EXPECTED_INTEGRATION_DB}" != "7" ]; then
+            echo "foundation integration_db gate requires exactly 7 selected tests, got ${EXPECTED_INTEGRATION_DB}" >&2
+            exit 1
+          fi
+          ROOT_JOB=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live/test_root_job_atomic_pg.py 2>/dev/null | awk '/ collected/ { print; exit }' | awk '{ split($1, parts, "/"); print parts[1] }')
+          TELEMETRY=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live/test_telemetry_idempotency_pg.py 2>/dev/null | awk '/ collected/ { print; exit }' | awk '{ split($1, parts, "/"); print parts[1] }')
+          if [ "${ROOT_JOB}" != "5" ] || [ "${TELEMETRY}" != "2" ]; then
+            echo "foundation integration_db composition must be 5 root-job + 2 telemetry, got ${ROOT_JOB}+${TELEMETRY}" >&2
+            exit 1
+          fi
+
+      - name: Run live-eval PostgreSQL integration_db tests
+        env:
+          ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_platform
+        run: |
+          python -m pytest tests/evaluation/live \
+            -m integration_db \
+            -q \
+            --tb=short \
+            --junitxml=foundation_integration_db.junit.xml
+
+      - name: Verify integration_db JUnit gate
+        run: python scripts/ci/verify_pytest_junit.py foundation_integration_db.junit.xml --expected 7
 
       - name: Run live-eval hermetic tests
         run: python -m pytest tests/evaluation/live -m "not integration_db and not live_gmail_eval" -q --tb=short
 
       - name: Validate config (offline)
+        env:
+          ENV: test
         run: python scripts/run_live_eval.py validate-config
 
       - name: Offline dry-run journal/report
+        env:
+          ENV: test
         run: python scripts/run_live_eval.py dry-run
 
   operator-gate:
