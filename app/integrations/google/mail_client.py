@@ -21,17 +21,26 @@ logger = logging.getLogger(__name__)
 _GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 
 
-def refresh_access_token(
+@dataclass(frozen=True)
+class TokenRefreshResult:
+    access_token: str
+    granted_scopes: frozenset[str]
+
+
+def _parse_granted_scopes(data: dict) -> frozenset[str]:
+    raw = data.get("scope") or ""
+    if not isinstance(raw, str) or not raw.strip():
+        return frozenset()
+    return frozenset(part.strip() for part in raw.split() if part.strip())
+
+
+def refresh_access_token_with_metadata(
     refresh_token: str,
     client_id: str,
     client_secret: str,
     token_url: str = _GOOGLE_TOKEN_URL,
-) -> str:
-    """Exchange a refresh token for a new access token.
-
-    Returns the new access token string.
-    Raises RuntimeError if the refresh request fails.
-    """
+) -> TokenRefreshResult:
+    """Exchange a refresh token for a new access token and granted scopes."""
     response = requests.post(
         token_url,
         data={
@@ -51,7 +60,29 @@ def refresh_access_token(
     if not new_token:
         raise RuntimeError("Gmail token refresh succeeded but response contained no access_token.")
     logger.info("Gmail access token refreshed successfully.")
-    return new_token
+    return TokenRefreshResult(
+        access_token=new_token,
+        granted_scopes=_parse_granted_scopes(data),
+    )
+
+
+def refresh_access_token(
+    refresh_token: str,
+    client_id: str,
+    client_secret: str,
+    token_url: str = _GOOGLE_TOKEN_URL,
+) -> str:
+    """Exchange a refresh token for a new access token.
+
+    Returns the new access token string.
+    Raises RuntimeError if the refresh request fails.
+    """
+    return refresh_access_token_with_metadata(
+        refresh_token=refresh_token,
+        client_id=client_id,
+        client_secret=client_secret,
+        token_url=token_url,
+    ).access_token
 
 
 class GoogleMailClient:

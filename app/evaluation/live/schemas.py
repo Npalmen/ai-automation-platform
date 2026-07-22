@@ -75,7 +75,7 @@ class LiveEvalReport(BaseModel):
     attempt_id: int | None = None
     transport_mode: str | None = None
     ai_mode: str | None = None
-    result: Literal["passed", "failed", "aborted", "dry_run", "cleanup_failed"] = "dry_run"
+    result: Literal["passed", "failed", "aborted", "dry_run", "cleanup_failed", "preflight"] = "dry_run"
     failure_category: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
@@ -95,6 +95,7 @@ class LiveEvalReport(BaseModel):
     external_telemetry: dict[str, Any] = Field(default_factory=dict)
     latency_breakdown: dict[str, Any] = Field(default_factory=dict)
     redacted_diagnostics: dict[str, Any] = Field(default_factory=dict)
+    failure_summary: dict[str, Any] | None = None
 
 
 class ProcessDeliveryRequest(BaseModel):

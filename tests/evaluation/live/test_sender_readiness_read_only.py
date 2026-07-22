@@ -93,6 +93,22 @@ def test_sender_readiness_read_only_auth_failure(single_address_env):
     assert any("sender_auth" in issue for issue in report.issues)
 
 
+def test_sender_readiness_read_only_does_not_verify_send_scope(single_address_env):
+    client = MagicMock()
+    client.get_profile_email.return_value = "sender@eval.test"
+    client.list_messages_page.return_value = GmailMessageListResult(message_ids=[], truncated=False)
+
+    with patch("app.evaluation.live.gmail_transport.build_sender_client", return_value=client), patch(
+        "app.evaluation.live.sender_scope.verify_sender_send_scope"
+    ) as scope_check:
+        report = run_sender_readiness_read_only(
+            expected_sender="sender@eval.test",
+            expected_recipient="recipient@eval.test",
+        )
+    assert report.ready is True
+    scope_check.assert_not_called()
+
+
 def test_validate_config_sender_readiness_redacted_output(single_address_env, monkeypatch):
     client = MagicMock()
     client.get_profile_email.return_value = "sender@eval.test"
