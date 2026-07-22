@@ -654,6 +654,29 @@ python scripts/customer_settings_side_effect_gate.py \
 
 See DEC-038 (`docs/07-decisions.md`).
 
+### Pilot role/browser verifier (Customer Settings)
+
+Host-run script — **no new app image** when only scripts/docs change.
+
+**Preconditions:** scheduler paused; `/health=200`; `/opt/krowolf/.env.browser-test` (mode 600); Chromium on pilot host.
+
+```bash
+cd /opt/krowolf
+sudo bash scripts/k12_customer_settings_role_matrix_pilot.sh --role all \
+  --tenant-id T_NIKLAS_DEMO_001 \
+  --report-path /opt/krowolf/storage/status/customer_settings_pilot_role_report.json
+```
+
+Report: `/opt/krowolf/storage/status/customer_settings_pilot_role_report.json` (no secrets).
+
+On interrupt/failure the script restores `ADMIN_ROLE` and `SUPER_ADMIN_OPERATOR_IDS` in `finally`. If restore fails:
+
+```bash
+cd /opt/krowolf && sudo bash scripts/k12_set_admin_role_pilot.sh admin && bash scripts/k12_inspect_admin_role_pilot.sh
+```
+
+Sync scripts from `main` without touching env or containers: `bash scripts/k12_sync_browser_scripts_pilot.sh`.
+
 ---
 
 ## Security hardening (Kapitel 11)

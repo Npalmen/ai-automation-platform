@@ -130,4 +130,6 @@ Skapar `kapitel12_browser_report.json` — **PASS** endast om alla tre rollrappo
 | `scripts/k12_verify_browser_env.py` | Env-validering utan secrets |
 | `scripts/kapitel12_browser_pilot_verify.py` | CDP browsermatris per roll |
 | `scripts/kapitel12_browser_aggregate.py` | Samlar rollrapporter |
+| `scripts/customer_settings_pilot_role_verify.py` | Customer Settings roll+API+CDP (pilot, host-run) |
+| `scripts/k12_customer_settings_role_matrix_pilot.sh` | Preflight wrapper för CS-rollmatris |
 | `scripts/k12_browser_approval_fixture.py` | Syntetisk approval (tenant-isolerad) |
