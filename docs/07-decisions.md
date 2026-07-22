@@ -611,6 +611,27 @@ Reference: `app/admin/integrations/selection_backfill.py`, `selection_sync.py`, 
 
 ---
 
+## DEC-038 — Active customer settings canonical model (Slice C, 2026-07-21)
+
+**Status:** Active — implemented on `feature/customer-settings-slice-c` (Commits 1–4)
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **`tenant_configs.settings` is canonical business configuration** post-activation | Aggregate GET exposes domains; PATCH is domain-scoped |
+| 2 | **Runtime projections are derived state** | `allowed_integrations`, `enabled_job_types`, `auto_actions` updated by backend only — never accepted in PATCH payloads |
+| 3 | **Activation snapshots immutable** | Settings PATCH must not mutate `tenant_activation_snapshots` |
+| 4 | **Optimistic concurrency** | All PATCH requires `expected_config_version`; HTTP 409 on stale version |
+| 5 | **Domain-specific PATCH** | `identity`, `modules`, `services`, `integrations`, `routing`, `automation`, `intake` — no generic JSON bypass |
+| 6 | **Preview before risk changes** | `modules`, `integrations`, `routing`, `automation` support read-only preview POST |
+| 7 | **Scheduler not editable from settings** | `scheduler` forbidden in automation PATCH; UI read-only |
+| 8 | **Credentials preserved on deselection** | Integration PATCH may change selection; OAuth rows are not deleted |
+| 9 | **Legacy generic bypass closed** | Direct PATCH of `allowed_integrations`, `enabled_external_writes`, `auto_actions`, `_readiness` → 422 |
+| 10 | **Readiness blockers frontend-neutral** | Blockers expose `action_domain` only (no API URL navigation targets) |
+
+Reference: `app/admin/customer_settings/`, `frontend/src/features/customerSettings/`, `tests/test_customer_settings_*.py`
+
+---
+
 ## DEC-2F1-TRUST — Live-eval trust anchor at API boundary
 
 **Status:** Locked (2F.1 merge hardening)  
@@ -618,3 +639,4 @@ Reference: `app/admin/integrations/selection_backfill.py`, `selection_sync.py`, 
 **Reason:** Prevent tenant API keys from forging eval privileges in test/staging.  
 **Consequence:** Clients cannot self-register trusted eval context via job creation.  
 **Reference:** `app/evaluation/live/authorization.py`, `app/main.py` (`create_job`)
+

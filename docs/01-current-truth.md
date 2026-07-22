@@ -8,11 +8,19 @@
 
 ## Last verified date
 
+2026-07-22 (Slice C — merged to `main` @ `a725471`; pilot RC `krowolf-app:rc-a72547176d8c`; tenant `T_NIKLAS_DEMO_001`; Customer Settings API gates PASS on pilot; backfill dry-run `tenant_data_changed=false`; scheduler `paused`; credentials unchanged; external side effects 0; Gmail soak not resumed.)
+
 2026-07-21 (Slice A integration selection — canonical on `main` commit `7c511ee`; pilot RC `krowolf-app:rc-7c511eeb0719`; tenant `T_NIKLAS_DEMO_001`; Gmail soak not resumed.)
 
 2026-07-21 (Slice B — branch `feature/integration-selection-slice-b` @ Commit 4 `11a261a`: selections SoT, integration groups, `manual_accounting_routing` UI, `visma_disposition` required, frontend lint PASS. Commit 5 adds conflict/credential gates + docs. Pilot deploy/merge pending.)
 
 2026-07-21 (Slice B partial — superseded by Commit 4+5 reconciliation on same branch.)
+
+2026-07-21 (Slice C gates — branch `feature/customer-settings-slice-c` @ Commit 4: integration gate tests 17 service + 2 HTTP; customer settings bundle **86 passed**; Slice B parity bundle **110 passed**; frontend gates PASS (29 customer-settings + 21 onboarding contract tests); eval harness smoke **6/8** (S15/S18 baseline failures); full pytest **3814 passed / 18 failed** — failures match pre-Slice-C baseline categories: Monday live adapter, eval harness safety tel, onboarding wizard tenant-auth, admin alerts isolation.)
+
+2026-07-21 (Slice C frontend — branch `feature/customer-settings-slice-c` @ Commit 3: `CustomerSettingsPage` at `/ops/customers/:tenantId/settings`; aggregate GET + per-domain PATCH/preview; permissions from backend; optimistic concurrency with ConflictDialog; risk-domain ConsequencePreview; readiness blocker navigation via `action_domain`; 29 frontend contract tests pass.)
+
+2026-07-21 (Slice C backend — branch `feature/customer-settings-slice-c` @ Commit 2C: frontend-neutral readiness blockers (`code`, `domain`, `message`, `action_domain`, `affected_capabilities`); `_readiness` internal meta protected; 15 HTTP contract tests pass with isolated test `ADMIN_API_KEY`; automation PATCH/preview verified via HTTP.)
 
 ## Verification method
 

@@ -72,13 +72,13 @@ Route policy table: `src/routes/routePolicy.ts` (typed, includes foundation/desi
 | Path | Access |
 |------|--------|
 | `/ops/login` | Public |
-| `/ops`, `/ops/needs-help`, `/ops/customers`, `/ops/incidents`, `/ops/alerts`, `/ops/usage` | Authenticated (all roles) |
+| `/ops/customers`, `/ops/customers/:tenantId`, `/ops/customers/:tenantId/settings` | Authenticated (all roles); settings write per backend `permissions` |
 | `/ops/onboarding`, `/ops/onboarding/*` | `operations`, `admin` |
 | `/ops/digests`, `/ops/digests/*` | `operations`, `admin` |
 | `/ops/system` | `operations`, `admin` |
 | `/ops/foundation`, `/ops/design-reference` | `admin` only |
 
-`/ops` (index) is the live **Global översikt** (Kapitel 2). `/ops/needs-help` is the live **Behöver hjälp** queue (Kapitel 4). `/ops/customers` is the live **Kundlista** (Kapitel 3). `/ops/incidents` is the live **Incidenthantering** (Kapitel 6). `/ops/alerts` is the live **Larmcenter** (Kapitel 10). `/ops/digests` is the live **Operatörssammanfattningar** (Kapitel 10). `/ops/usage` is the live **Användning och kapacitet** (Kapitel 7). `/ops/system` is the live **Systemstatus** (Kapitel 8). Safe operator writes are available from customer detail and needs-help detail (Kapitel 5).
+`/ops` (index) is the live **Global översikt** (Kapitel 2). `/ops/needs-help` is the live **Behöver hjälp** queue (Kapitel 4). `/ops/customers` is the live **Kundlista** (Kapitel 3). `/ops/customers/:tenantId/settings` is **Kundinställningar** (Slice C). `/ops/incidents` is the live **Incidenthantering** (Kapitel 6). `/ops/alerts` is the live **Larmcenter** (Kapitel 10). `/ops/digests` is the live **Operatörssammanfattningar** (Kapitel 10). `/ops/usage` is the live **Användning och kapacitet** (Kapitel 7). `/ops/system` is the live **Systemstatus** (Kapitel 8). Safe operator writes are available from customer detail and needs-help detail (Kapitel 5).
 
 ## Systemstatus (Kapitel 8)
 
@@ -302,6 +302,22 @@ npm run build
 
 `test:onboarding` includes `src/features/onboarding/financeDestination.test.mjs` (Slice B ekonomidestination panel).
 
+## Customer settings (Slice C)
+
+Route: `/ops/customers/:tenantId/settings` — domain tabs with preview/conflict UX.
+
+| Area | Path |
+|------|------|
+| Page | `src/features/customerSettings/CustomerSettingsPage.tsx` |
+| API | `src/features/customerSettings/api.ts` |
+| Contract tests | `src/features/customerSettings/customerSettings.test.mjs` (29 tests) |
+
+```bash
+npm run test:customer-settings
+```
+
+Gate smoke (live stack): `python scripts/customer_settings_gate_smoke.py` from repo root.
+
 ## Responsive manual checklist
 
 Verify login, AppShell, and navigation at 320, 375, 768, 1024, 1100, 1250, 1366, 1440, 1920 px and 125%, 150%, 200% zoom.
@@ -326,8 +342,10 @@ Verify login, AppShell, and navigation at 320, 375, 768, 1024, 1100, 1250, 1366,
 ## Not built yet
 
 - Tenant selector / `X-Tenant-ID` context
-- Full Behöver hjälp queue, customer detail, incidents, usage trends
+- Full Behöver hjälp queue, incidents, usage trends
 - Critical writes, approvals, recovery actions from overview
+
+(Customer settings operator UI is built — Slice C.)
 
 ## Deploy note
 

@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
+import json
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
 from app.admin.integrations.selection_backfill import (
+    _redact_backfill_report,
     backfill_tenant_selections,
     classify_integration_for_backfill,
+    execute_backfill_run,
 )
 from app.admin.integrations.selection_models import parse_selections_map
 from app.admin.integrations.selection_sync import sync_allowed_integrations_from_selections
@@ -19,6 +22,53 @@ from app.repositories.postgres.oauth_credential_models import OAuthCredentialRec
 from app.repositories.postgres.schema_migrations import _INTEGRATION_SELECTION_MIGRATION_STATEMENTS
 from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 from tests.onboarding_db_tables import onboarding_sqlite_tables
+
+_BACKFILL_RUNS_DDL = """
+CREATE TABLE IF NOT EXISTS integration_selection_backfill_runs (
+    id VARCHAR(36) PRIMARY KEY,
+    started_at TIMESTAMP NOT NULL,
+    completed_at TIMESTAMP,
+    dry_run BOOLEAN NOT NULL DEFAULT 0,
+    status VARCHAR(32) NOT NULL,
+    tenants_seen INTEGER NOT NULL DEFAULT 0,
+    tenants_updated INTEGER NOT NULL DEFAULT 0,
+    tenants_skipped INTEGER NOT NULL DEFAULT 0,
+    report_json TEXT NOT NULL DEFAULT '{}'
+)
+"""
+
+
+def _ensure_backfill_runs_table(db) -> None:
+    db.execute(text(_BACKFILL_RUNS_DDL))
+    db.commit()
+
+
+def _count_backfill_runs(db) -> int:
+    return int(db.execute(text("SELECT COUNT(*) FROM integration_selection_backfill_runs")).scalar() or 0)
+
+
+def _latest_backfill_run(db) -> dict:
+    row = db.execute(
+        text(
+            """
+            SELECT id, dry_run, status, tenants_seen, tenants_updated, tenants_skipped, report_json
+            FROM integration_selection_backfill_runs
+            ORDER BY started_at DESC
+            LIMIT 1
+            """
+        )
+    ).mappings().first()
+    assert row is not None
+    report = json.loads(row["report_json"])
+    return {
+        "id": row["id"],
+        "dry_run": bool(row["dry_run"]),
+        "status": row["status"],
+        "tenants_seen": row["tenants_seen"],
+        "tenants_updated": row["tenants_updated"],
+        "tenants_skipped": row["tenants_skipped"],
+        "report": report,
+    }
 
 
 def _tenant(
@@ -46,8 +96,115 @@ def db():
     Base.metadata.create_all(bind=engine, tables=tables)
     Session = sessionmaker(bind=engine)
     session = Session()
+    _ensure_backfill_runs_table(session)
     yield session
     session.close()
+
+
+class TestBackfillRunAudit:
+    def test_successful_run_is_recorded_with_tenant_data_changed(self, db):
+        record = _tenant(
+            "T_AUDIT_OK",
+            allowed=["google_mail", "visma"],
+            job_types=["invoice"],
+        )
+        db.add(record)
+        db.commit()
+
+        before = dict(record.settings or {})
+        out = execute_backfill_run(db, tenant_id=record.tenant_id, dry_run=False)
+        db.commit()
+        db.refresh(record)
+
+        assert out["status"] == "completed"
+        assert out["tenant_data_changed"] is True
+        assert out["actor"] == "system:migration_016"
+        assert _count_backfill_runs(db) == 1
+        row = _latest_backfill_run(db)
+        assert row["status"] == "completed"
+        assert row["dry_run"] is False
+        assert row["tenants_updated"] == 1
+        assert row["report"]["tenant_data_changed"] is True
+        assert (record.settings or {}).get("integrations", {}).get("selections")
+        assert before != record.settings
+
+    def test_dry_run_is_recorded_without_tenant_data_change(self, db):
+        record = _tenant(
+            "T_AUDIT_DRY",
+            allowed=["google_mail", "visma"],
+            job_types=["invoice"],
+        )
+        db.add(record)
+        db.commit()
+        snapshot = dict(record.settings or {})
+
+        out = execute_backfill_run(db, tenant_id=record.tenant_id, dry_run=True)
+        db.commit()
+        db.refresh(record)
+
+        assert out["status"] == "completed"
+        assert out["tenant_data_changed"] is False
+        assert _count_backfill_runs(db) == 1
+        row = _latest_backfill_run(db)
+        assert row["status"] == "completed"
+        assert row["dry_run"] is True
+        assert row["tenants_updated"] == 0
+        assert record.settings == snapshot
+
+    def test_failed_run_is_recorded_without_tenant_data_change(self, db):
+        record = _tenant("T_AUDIT_FAIL", allowed=["google_mail"], job_types=[])
+        db.add(record)
+        db.commit()
+        snapshot = dict(record.settings or {})
+
+        with patch(
+            "app.admin.integrations.selection_backfill.backfill_tenant_selections",
+            side_effect=RuntimeError("simulated_failure"),
+        ):
+            with pytest.raises(RuntimeError, match="simulated_failure"):
+                execute_backfill_run(db, tenant_id=record.tenant_id, dry_run=False)
+        db.commit()
+        db.refresh(record)
+
+        assert _count_backfill_runs(db) == 1
+        row = _latest_backfill_run(db)
+        assert row["status"] == "failed"
+        assert row["report"]["tenant_data_changed"] is False
+        assert "simulated_failure" in row["report"]["error_summary"]
+        assert record.settings == snapshot
+
+    def test_report_redacts_secret_like_values(self):
+        redacted = _redact_backfill_report(
+            {
+                "tenants": [
+                    {
+                        "access_token": "ya29.secret-value",
+                        "refresh_token": "1//refresh",
+                        "api_key": "kw_abcdef",
+                        "tenant_id": "T_SAFE",
+                    }
+                ]
+            }
+        )
+        tenant = redacted["tenants"][0]
+        assert tenant["access_token"] == "[REDACTED]"
+        assert tenant["refresh_token"] == "[REDACTED]"
+        assert tenant["api_key"] == "[REDACTED]"
+        assert tenant["tenant_id"] == "T_SAFE"
+
+    def test_all_tenants_run_records_audit_row(self, db):
+        db.add(_tenant("T_A", allowed=["google_mail"], job_types=[]))
+        db.add(_tenant("T_B", allowed=[], job_types=[]))
+        db.commit()
+
+        out = execute_backfill_run(db, dry_run=True)
+        db.commit()
+
+        assert out["tenants_seen"] == 2
+        assert _count_backfill_runs(db) == 1
+        row = _latest_backfill_run(db)
+        assert row["status"] == "completed"
+        assert row["dry_run"] is True
 
 
 class TestMigration016Structure:
@@ -239,6 +396,7 @@ def test_postgres_migration_016_table_when_database_available():
 
     pytest.importorskip("psycopg2")
     from sqlalchemy import create_engine as create_pg_engine
+    from sqlalchemy.orm import sessionmaker
 
     from app.repositories.postgres.migration_runner import verify_ci_postgres_schema_provisioned
 
@@ -251,3 +409,55 @@ def test_postgres_migration_016_table_when_database_available():
             )
         ).fetchone()
     assert result is not None
+
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    try:
+        record = TenantConfigRecord(
+            tenant_id="T_PG_AUDIT_016",
+            name="PG Audit",
+            slug="pg-audit-016",
+            status="active",
+            allowed_integrations=["google_mail"],
+            enabled_job_types=[],
+            settings={},
+        )
+        session.add(record)
+        session.commit()
+
+        before_count = session.execute(
+            text("SELECT COUNT(*) FROM integration_selection_backfill_runs")
+        ).scalar()
+
+        out = execute_backfill_run(session, tenant_id=record.tenant_id, dry_run=True)
+        session.commit()
+
+        after_count = session.execute(
+            text("SELECT COUNT(*) FROM integration_selection_backfill_runs")
+        ).scalar()
+        assert after_count == before_count + 1
+
+        row = session.execute(
+            text(
+                """
+                SELECT status, dry_run, report_json::text
+                FROM integration_selection_backfill_runs
+                WHERE id = :run_id
+                """
+            ),
+            {"run_id": out["run_id"]},
+        ).mappings().first()
+        assert row is not None
+        assert row["status"] == "completed"
+        assert row["dry_run"] is True
+        report = json.loads(row["report_json"])
+        assert report["tenant_data_changed"] is False
+        assert report["actor"] == "system:migration_016"
+    finally:
+        session.execute(
+            text("DELETE FROM integration_selection_backfill_runs WHERE report_json::text LIKE '%T_PG_AUDIT_016%'")
+        )
+        session.execute(text("DELETE FROM tenant_configs WHERE tenant_id = 'T_PG_AUDIT_016'"))
+        session.commit()
+        session.close()
+
