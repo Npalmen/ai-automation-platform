@@ -947,6 +947,7 @@ def create_job(
     from app.workflows.decision_contract import is_force_approval_test_allowed
 
     input_data = dict(request.input_data or {})
+    input_data.pop("live_eval", None)
     if not is_force_approval_test_allowed(input_data, allow_flag=get_settings().ALLOW_FORCE_APPROVAL_TEST):
         input_data.pop("force_approval_test", None)
 
@@ -1421,6 +1422,13 @@ def _clean_gmail_subject(subject: str) -> str:
     return cleaned
 
 
+def _gmail_recipient_email(connection_config: dict) -> str:
+    user_id = str(connection_config.get("user_id") or "").strip().lower()
+    if "@" in user_id:
+        return user_id
+    return ""
+
+
 def _make_monday_item_name(sender_name: str, sender_email: str, subject: str) -> str:
     """Build a clean, truncated Monday item name for a Gmail lead."""
     short_subject = subject.strip()[:_SUBJECT_MAX_LEN].rstrip()
@@ -1622,6 +1630,25 @@ def _run_gmail_inbox_sync(
             updated_input["latest_subject"] = subject
             updated_input["latest_sender"] = sender_dict
 
+            from app.evaluation.live.continuation import enforce_live_eval_thread_continuation
+            from app.evaluation.live.errors import LiveEvalSafetyError
+
+            try:
+                live_eval_snapshot = enforce_live_eval_thread_continuation(
+                    db,
+                    root_input_data=continuation_job.input_data,
+                    subject=subject,
+                    tenant_id=tenant_id,
+                )
+                if live_eval_snapshot is not None:
+                    updated_input["live_eval"] = live_eval_snapshot
+            except LiveEvalSafetyError as exc:
+                failed_messages.append({
+                    "message_id": message_id,
+                    "reason": f"live_eval_safety:{exc}",
+                })
+                continue
+
             continuation_job.input_data = updated_input
             # Reset processor history so the pipeline runs fresh on updated data.
             continuation_job.processor_history = []
@@ -1685,6 +1712,29 @@ def _run_gmail_inbox_sync(
             "received_at": msg.get("received_at") or None,
         }
 
+        from app.evaluation.live.errors import LiveEvalSafetyError
+        from app.evaluation.live.intake import resolve_trusted_live_eval_from_message
+        from app.evaluation.live.subject_parser import parse_subject_token
+
+        if parse_subject_token(subject) is not None:
+            try:
+                live_eval_snapshot = resolve_trusted_live_eval_from_message(
+                    db,
+                    tenant_id=tenant_id,
+                    subject=subject,
+                    sender_email=sender_email,
+                    recipient_email=_gmail_recipient_email(connection_config),
+                    query=query_used,
+                )
+                if live_eval_snapshot is not None:
+                    input_data["live_eval"] = live_eval_snapshot.model_dump(mode="json")
+            except LiveEvalSafetyError as exc:
+                failed_messages.append({
+                    "message_id": message_id,
+                    "reason": f"live_eval_safety:{exc}",
+                })
+                continue
+
         if dry_run:
             created_jobs.append({
                 "message_id": message_id,
@@ -1704,7 +1754,18 @@ def _run_gmail_inbox_sync(
         )
 
         try:
-            saved_job = JobRepository.create_job(db, job)
+            if isinstance(input_data.get("live_eval"), dict):
+                from app.evaluation.live.registry import create_and_claim_live_eval_root_job
+
+                saved_job = create_and_claim_live_eval_root_job(
+                    db,
+                    job=job,
+                    evaluation_run_id=input_data["live_eval"]["evaluation_run_id"],
+                    tenant_id=tenant_id,
+                    root_gmail_message_id=message_id,
+                )
+            else:
+                saved_job = JobRepository.create_job(db, job)
             processed_job = run_pipeline(saved_job, db)
         except Exception as exc:
             failed_messages.append({"message_id": message_id, "reason": str(exc)})
@@ -8361,6 +8422,10 @@ app.include_router(onboarding_router)
 app.include_router(tenant_lifecycle_router)
 app.include_router(integration_invitations_admin_router)
 app.include_router(integration_invitations_public_router)
+
+from app.evaluation.live.routes import router as live_eval_router
+
+app.include_router(live_eval_router)
 
 
 def _validate_usage_days(days: int) -> int:

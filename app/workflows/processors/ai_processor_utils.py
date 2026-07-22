@@ -488,6 +488,8 @@ def run_ai_step(
     fallback_payload_builder,
 ) -> Job:
     started = time.perf_counter()
+    live_eval_raw = (job.input_data or {}).get("live_eval")
+    use_live_eval_llm = isinstance(live_eval_raw, dict) and bool(live_eval_raw.get("trusted"))
 
     try:
         prompt = render_prompt(
@@ -497,7 +499,14 @@ def run_ai_step(
             },
         )
 
-        raw_output = get_llm_client().generate_json(prompt)
+        if use_live_eval_llm:
+            from app.evaluation.live.llm_provider import resolve_llm_client
+
+            llm_client = resolve_llm_client(job=job)
+        else:
+            llm_client = get_llm_client()
+
+        raw_output = llm_client.generate_json(prompt)
         parsed = response_model.model_validate(raw_output)
 
         duration_ms = int((time.perf_counter() - started) * 1000)
@@ -525,7 +534,31 @@ def run_ai_step(
 
         return append_processor_result(job, processor_name, result)
 
-    except (LLMClientError, ValidationError, ValueError, TypeError) as exc:
+    except Exception as exc:
+        if use_live_eval_llm:
+            from app.evaluation.live.errors import LiveEvalSafetyError
+
+            if isinstance(exc, LiveEvalSafetyError):
+                duration_ms = int((time.perf_counter() - started) * 1000)
+                payload = fallback_payload_builder(str(exc))
+                payload = add_observability_fields(
+                    payload,
+                    processor_name=processor_name,
+                    prompt_name=prompt_name,
+                    used_fallback=False,
+                    duration_ms=duration_ms,
+                )
+                result = {
+                    "status": "completed",
+                    "summary": f"{success_summary} Live-eval safety stop.",
+                    "requires_human_review": True,
+                    "payload": payload,
+                }
+                return append_processor_result(job, processor_name, result)
+
+        if not isinstance(exc, (LLMClientError, ValidationError, ValueError, TypeError)):
+            raise
+
         duration_ms = int((time.perf_counter() - started) * 1000)
 
         payload = fallback_payload_builder(str(exc))

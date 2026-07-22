@@ -1,0 +1,57 @@
+name: Live Eval Foundation (2F.1)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ai_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ai_platform"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_platform
+      LIVE_EVAL_ALLOWED: yes
+      LIVE_EVAL_TENANT_IDS: TENANT_LIVE_EVAL
+      LIVE_EVAL_SENDER_EMAILS: eval-sender@example.com
+      LIVE_EVAL_RECIPIENT_EMAILS: eval-recipient@example.com
+      LIVE_EVAL_GMAIL_LABEL: krowolf-live-eval
+      LIVE_GMAIL_EVAL_ALLOWED: yes
+      ADMIN_API_KEY: ci-admin-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run live-eval PostgreSQL atomicity tests
+        run: python -m pytest tests/evaluation/live -m integration_db -q --tb=short
+
+      - name: Run live-eval foundation tests
+        run: python -m pytest tests/evaluation/live -m "not integration_db" -q --tb=short
+
+      - name: Validate config (offline)
+        run: python scripts/run_live_eval.py validate-config
+
+      - name: Offline dry-run journal/report
+        run: python scripts/run_live_eval.py dry-run

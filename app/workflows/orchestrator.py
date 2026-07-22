@@ -22,6 +22,8 @@ from app.workflows.pipeline_run_context import (
 )
 from app.repositories.postgres.decision_record_repository import DecisionRecordRepository
 from app.workflows.decision_record_service import record_pipeline_run_started
+from app.evaluation.live.context import live_eval_context, snapshot_from_job_input
+from app.evaluation.live.authorization import validate_trusted_live_eval_context
 
 
 BASE_PIPELINE = [
@@ -80,82 +82,100 @@ class WorkflowOrchestrator:
         source: PipelineRunSource = PipelineRunSource.INTAKE,
         parent_pipeline_run_id: str | None = None,
     ) -> Job:
-        current = job.model_copy(deep=True)
-        current.status = JobStatus.PROCESSING
-        current.updated_at = self._utcnow()
-        current = self._persist(current)
-
-        if parent_pipeline_run_id is None and source != PipelineRunSource.INTAKE:
-            parent_pipeline_run_id = self._latest_pipeline_run_id(current)
-
-        trace = create_trace_session(
-            current,
-            source=source,
-            db=self.db,
-            parent_pipeline_run_id=parent_pipeline_run_id,
-        )
-        record_pipeline_run_started(self.db, trace, current)
-
-        resolved_job_type = current.job_type
-
-        try:
-            for step in BASE_PIPELINE:
-                current = self._run_step(current, step, trace=trace)
-
-            resolved_job_type = self._detect_job_type(current)
-
-            pipeline = POST_CLASSIFICATION_PIPELINES.get(
-                resolved_job_type,
-                POST_CLASSIFICATION_PIPELINES[JobType.UNKNOWN],
+        snapshot = snapshot_from_job_input(job.input_data)
+        if snapshot is not None:
+            snapshot = validate_trusted_live_eval_context(
+                self.db,
+                job=job,
+                snapshot=snapshot,
+                require_active=True,
             )
+        with live_eval_context(snapshot, db=self.db):
+            current = job.model_copy(deep=True)
+            current.status = JobStatus.PROCESSING
+            current.updated_at = self._utcnow()
+            current = self._persist(current)
 
-            for step in pipeline:
-                if self._should_skip_step(current, step):
-                    continue
-                current = self._run_step(current, step, trace=trace)
+            if parent_pipeline_run_id is None and source != PipelineRunSource.INTAKE:
+                parent_pipeline_run_id = self._latest_pipeline_run_id(current)
 
-            return self._finalize_success(current, resolved_job_type)
-
-        except PipelineExecutionError as exc:
-            return self._finalize_failure(
-                job=current,
-                resolved_job_type=resolved_job_type,
-                failed_step=exc.step,
-                error_message=exc.message,
+            trace = create_trace_session(
+                current,
+                source=source,
+                db=self.db,
+                parent_pipeline_run_id=parent_pipeline_run_id,
             )
+            record_pipeline_run_started(self.db, trace, current)
+
+            resolved_job_type = current.job_type
+
+            try:
+                for step in BASE_PIPELINE:
+                    current = self._run_step(current, step, trace=trace)
+
+                resolved_job_type = self._detect_job_type(current)
+
+                pipeline = POST_CLASSIFICATION_PIPELINES.get(
+                    resolved_job_type,
+                    POST_CLASSIFICATION_PIPELINES[JobType.UNKNOWN],
+                )
+
+                for step in pipeline:
+                    if self._should_skip_step(current, step):
+                        continue
+                    current = self._run_step(current, step, trace=trace)
+
+                return self._finalize_success(current, resolved_job_type)
+
+            except PipelineExecutionError as exc:
+                return self._finalize_failure(
+                    job=current,
+                    resolved_job_type=resolved_job_type,
+                    failed_step=exc.step,
+                    error_message=exc.message,
+                )
 
     def resume_after_approval(self, job: Job) -> Job:
         """
         Resume only the post-approval execution path.
         This must NOT rerun intake/classification/policy or create a new approval.
         """
-        current = job.model_copy(deep=True)
-        current.status = JobStatus.PROCESSING
-        current.updated_at = self._utcnow()
-        current = self._persist(current)
-
-        parent_run_id = self._latest_pipeline_run_id(current)
-        trace = create_trace_session(
-            current,
-            source=PipelineRunSource.APPROVAL_RESUME,
-            db=self.db,
-            parent_pipeline_run_id=parent_run_id,
-        )
-        record_pipeline_run_started(self.db, trace, current)
-
-        resolved_job_type = self._detect_job_type(current)
-
-        try:
-            current = self._run_step(current, JobType.ACTION_DISPATCH, trace=trace)
-            return self._finalize_success(current, resolved_job_type)
-
-        except PipelineExecutionError as exc:
-            return self._finalize_failure(
-                job=current,
-                resolved_job_type=resolved_job_type,
-                failed_step=exc.step,
-                error_message=exc.message,
+        snapshot = snapshot_from_job_input(job.input_data)
+        if snapshot is not None:
+            snapshot = validate_trusted_live_eval_context(
+                self.db,
+                job=job,
+                snapshot=snapshot,
+                require_active=True,
             )
+        with live_eval_context(snapshot, db=self.db):
+            current = job.model_copy(deep=True)
+            current.status = JobStatus.PROCESSING
+            current.updated_at = self._utcnow()
+            current = self._persist(current)
+
+            parent_run_id = self._latest_pipeline_run_id(current)
+            trace = create_trace_session(
+                current,
+                source=PipelineRunSource.APPROVAL_RESUME,
+                db=self.db,
+                parent_pipeline_run_id=parent_run_id,
+            )
+            record_pipeline_run_started(self.db, trace, current)
+
+            resolved_job_type = self._detect_job_type(current)
+
+            try:
+                current = self._run_step(current, JobType.ACTION_DISPATCH, trace=trace)
+                return self._finalize_success(current, resolved_job_type)
+
+            except PipelineExecutionError as exc:
+                return self._finalize_failure(
+                    job=current,
+                    resolved_job_type=resolved_job_type,
+                    failed_step=exc.step,
+                    error_message=exc.message,
+                )
 
     def _latest_pipeline_run_id(self, job: Job) -> str | None:
         if self.db is None:

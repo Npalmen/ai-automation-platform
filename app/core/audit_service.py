@@ -11,7 +11,9 @@ def create_audit_event(
     category: str,
     action: str,
     status: str,
-    details: Dict[str, Any] | None = None
+    details: Dict[str, Any] | None = None,
+    *,
+    commit: bool = True,
 ) -> AuditEvent:
     event = AuditEvent(
         tenant_id=tenant_id,
@@ -21,5 +23,5 @@ def create_audit_event(
         details=details or {},
     )
 
-    AuditRepository.create_event(db, event)
+    AuditRepository.create_event(db, event, commit=commit)
     return event

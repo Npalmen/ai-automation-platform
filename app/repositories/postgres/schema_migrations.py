@@ -396,6 +396,69 @@ _TENANT_SETTING_DEFAULTS: list[tuple[str, str, dict]] = [
     ),
 ]
 
+_LIVE_EVAL_RUNS_MIGRATION_STATEMENTS: list[str] = [
+    """
+    CREATE TABLE IF NOT EXISTS live_eval_runs (
+        evaluation_run_id     VARCHAR(36)  PRIMARY KEY,
+        tenant_id             VARCHAR(64)  NOT NULL,
+        scenario_id           VARCHAR(128) NOT NULL,
+        attempt_id            INTEGER      NOT NULL,
+        transport_mode        VARCHAR(32)  NOT NULL,
+        ai_mode               VARCHAR(32)  NOT NULL,
+        fixture_bundle_id     VARCHAR(64),
+        expected_sender       VARCHAR(320) NOT NULL,
+        expected_recipient    VARCHAR(320) NOT NULL,
+        status                VARCHAR(32)  NOT NULL DEFAULT 'registered',
+        root_gmail_message_id VARCHAR(320),
+        root_job_id           VARCHAR(64),
+        created_by            VARCHAR(128) NOT NULL,
+        created_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        expires_at            TIMESTAMPTZ  NOT NULL,
+        config_hash           VARCHAR(64)  NOT NULL,
+        CONSTRAINT uq_live_eval_runs_tenant_run UNIQUE (tenant_id, evaluation_run_id)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_live_eval_runs_tenant_status ON live_eval_runs (tenant_id, status)",
+    "CREATE INDEX IF NOT EXISTS ix_live_eval_runs_expires_at ON live_eval_runs (expires_at)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_live_eval_runs_tenant_run ON live_eval_runs (tenant_id, evaluation_run_id)",
+]
+
+_LIVE_EVAL_RUNS_019_MIGRATION_STATEMENTS: list[str] = [
+    "ALTER TABLE live_eval_runs ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ",
+]
+
+_LIVE_EVAL_EVENTS_MIGRATION_STATEMENTS: list[str] = [
+    """
+    CREATE TABLE IF NOT EXISTS live_eval_external_events (
+        event_key             VARCHAR(160) PRIMARY KEY,
+        operation_key         VARCHAR(160) NOT NULL,
+        tenant_id             VARCHAR(64)  NOT NULL,
+        evaluation_run_id     VARCHAR(36)  NOT NULL,
+        job_id                VARCHAR(64),
+        pipeline_run_id       VARCHAR(36),
+        action_operation_id   VARCHAR(36),
+        integration_type      VARCHAR(64)  NOT NULL,
+        category              VARCHAR(64)  NOT NULL,
+        operation             VARCHAR(64)  NOT NULL,
+        target                VARCHAR(320),
+        outcome               VARCHAR(32)  NOT NULL,
+        started_at            TIMESTAMPTZ  NOT NULL,
+        completed_at          TIMESTAMPTZ,
+        redacted_metadata     JSON         NOT NULL DEFAULT '{}',
+        CONSTRAINT fk_live_eval_events_run
+            FOREIGN KEY (tenant_id, evaluation_run_id)
+            REFERENCES live_eval_runs (tenant_id, evaluation_run_id)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_live_eval_external_events_run ON live_eval_external_events (evaluation_run_id, category)",
+    "CREATE INDEX IF NOT EXISTS ix_live_eval_external_events_tenant ON live_eval_external_events (tenant_id, category)",
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_live_eval_external_events_operation_succeeded
+        ON live_eval_external_events (operation_key)
+        WHERE outcome = 'succeeded'
+    """,
+]
+
 
 def provision_tenant_defaults(engine: Engine) -> None:
     """Seed tenant-level settings defaults on startup (no-clobber — never overwrites existing values)."""
@@ -483,8 +546,20 @@ def ensure_runtime_schema(engine: Engine) -> None:
                 conn.execute(text(ddl))
                 log.debug("Integration selection migration OK")
 
+            for ddl in _LIVE_EVAL_RUNS_MIGRATION_STATEMENTS:
+                conn.execute(text(ddl))
+                log.debug("Live eval runs migration OK")
+
+            for ddl in _LIVE_EVAL_RUNS_019_MIGRATION_STATEMENTS:
+                conn.execute(text(ddl))
+                log.debug("Live eval runs 019 migration OK")
+
+            for ddl in _LIVE_EVAL_EVENTS_MIGRATION_STATEMENTS:
+                conn.execute(text(ddl))
+                log.debug("Live eval events migration OK")
+
         log.info(
-            "Runtime schema safeguard complete (%d column(s), %d table/index statement(s), %d onboarding statement(s), %d slice2b statement(s), %d operator alerts statement(s), %d onboarding 2.0 statement(s), %d decision record statement(s), %d integration selection statement(s) checked)",
+            "Runtime schema safeguard complete (%d column(s), %d table/index statement(s), %d onboarding statement(s), %d slice2b statement(s), %d operator alerts statement(s), %d onboarding 2.0 statement(s), %d decision record statement(s), %d integration selection statement(s), %d live eval runs statement(s), %d live eval runs 019 statement(s), %d live eval events statement(s) checked)",
             len(_REQUIRED_COLUMNS),
             len(_REQUIRED_TABLES),
             len(_ONBOARDING_MIGRATION_STATEMENTS),
@@ -493,6 +568,9 @@ def ensure_runtime_schema(engine: Engine) -> None:
             len(_ONBOARDING_2_MIGRATION_STATEMENTS),
             len(_DECISION_RECORD_MIGRATION_STATEMENTS),
             len(_INTEGRATION_SELECTION_MIGRATION_STATEMENTS),
+            len(_LIVE_EVAL_RUNS_MIGRATION_STATEMENTS),
+            len(_LIVE_EVAL_RUNS_019_MIGRATION_STATEMENTS),
+            len(_LIVE_EVAL_EVENTS_MIGRATION_STATEMENTS),
         )
     except Exception as exc:
         log.error(

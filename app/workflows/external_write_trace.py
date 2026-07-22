@@ -42,6 +42,22 @@ def _operation_state(db: Session, tenant_id: str, operation_id: str) -> str | No
     )
 
 
+def _live_eval_category_for_action(action_type: str | None) -> str:
+    if action_type in ("send_customer_auto_reply", "send_email", "send_internal_handoff"):
+        return "app_gmail_reply"
+    if action_type == "create_monday_item":
+        return "app_monday"
+    return "app_other_external"
+
+
+def _live_eval_integration_type(action_type: str | None) -> str:
+    if action_type in ("send_customer_auto_reply", "send_email", "send_internal_handoff"):
+        return "google_mail"
+    if action_type == "create_monday_item":
+        return "monday"
+    return "other"
+
+
 def execute_external_write_with_trace(
     *,
     db: Session | None,
@@ -83,6 +99,35 @@ def execute_external_write_with_trace(
             "idempotent": True,
             "action_operation_id": operation_id,
         }
+
+    live_eval_snap = None
+    live_eval_operation_key = None
+    if db is not None and job is not None:
+        from app.evaluation.live.telemetry import (
+            build_operation_key,
+            operation_already_succeeded,
+            record_live_eval_external_event,
+            snapshot_from_job,
+        )
+
+        live_eval_snap = snapshot_from_job(job)
+        if live_eval_snap is not None:
+            category = _live_eval_category_for_action(action_type)
+            live_eval_operation_key = build_operation_key(
+                evaluation_run_id=live_eval_snap.evaluation_run_id,
+                category=category,
+                operation=str(action_type or "unknown"),
+                action_operation_id=operation_id,
+            )
+            if operation_already_succeeded(db, live_eval_operation_key):
+                return {
+                    "type": action_type,
+                    "status": "executed",
+                    "idempotent": True,
+                    "action_operation_id": operation_id,
+                    "live_eval_telemetry": True,
+                }
+
     if state in _UNRESOLVED_STATUSES:
         if state == ExecutionStatus.PENDING.value and action.get("_execute_after_intent_commit"):
             pass
@@ -105,6 +150,23 @@ def execute_external_write_with_trace(
     try:
         result = adapter_fn()
     except Exception as exc:
+        if db is not None and live_eval_snap is not None and live_eval_operation_key:
+            from app.evaluation.live.telemetry import record_live_eval_external_event
+
+            record_live_eval_external_event(
+                db,
+                operation_key=live_eval_operation_key,
+                outcome="failed",
+                category=_live_eval_category_for_action(action_type),
+                operation=str(action_type or "unknown"),
+                integration_type=_live_eval_integration_type(action_type),
+                job_id=getattr(job, "job_id", None),
+                pipeline_run_id=trace.pipeline_run.pipeline_run_id if trace else None,
+                action_operation_id=operation_id,
+                snapshot=live_eval_snap,
+                job_input_data=getattr(job, "input_data", None),
+                metadata={"error_class": type(exc).__name__},
+            )
         record_execution_outcome(
             db,
             trace,
@@ -154,6 +216,26 @@ def execute_external_write_with_trace(
         raise ReconciliationRequired(
             f"adapter may have succeeded but outcome not persisted for {operation_id}"
         ) from persist_exc
+
+    if db is not None and live_eval_snap is not None and live_eval_operation_key:
+        from app.evaluation.live.constants import EVENT_OUTCOME_SUCCEEDED
+        from app.evaluation.live.telemetry import record_live_eval_external_event
+
+        record_live_eval_external_event(
+            db,
+            operation_key=live_eval_operation_key,
+            outcome=EVENT_OUTCOME_SUCCEEDED,
+            category=_live_eval_category_for_action(action_type),
+            operation=str(action_type or "unknown"),
+            integration_type=_live_eval_integration_type(action_type),
+            target=str(action.get("to") or "")[:120] or None,
+            job_id=getattr(job, "job_id", None),
+            pipeline_run_id=trace.pipeline_run.pipeline_run_id if trace else None,
+            action_operation_id=operation_id,
+            snapshot=live_eval_snap,
+            job_input_data=getattr(job, "input_data", None),
+            metadata={"adapter_status": str(result.get("status"))},
+        )
 
     result["action_operation_id"] = operation_id
     return result

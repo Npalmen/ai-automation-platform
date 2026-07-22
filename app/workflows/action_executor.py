@@ -343,6 +343,42 @@ def execute_action(
         },
     )
 
+    pipeline_run_id = None
+    job_id = None
+    if job is not None:
+        job_id = getattr(job, "job_id", None)
+    if trace is not None:
+        pipeline_run_id = trace.pipeline_run.pipeline_run_id
+
+    from app.evaluation.live.errors import LiveEvalSafetyError
+    from app.evaluation.live.write_policy import enforce_live_eval_write_policy
+
+    try:
+        enforce_live_eval_write_policy(
+            action,
+            db=db,
+            job=job,
+            job_id=job_id,
+            pipeline_run_id=pipeline_run_id,
+            action_operation_id=action.get("_action_operation_id"),
+        )
+    except LiveEvalSafetyError as exc:
+        target = action.get("to") or action.get("item_name") or action.get("channel")
+        return {
+            "type": action_type,
+            "status": "skipped",
+            "skip_reason": "live_eval_safety",
+            "executed_at": _utcnow_iso(),
+            "target": str(target) if target is not None else None,
+            "provider": "none",
+            "payload": {k: v for k, v in action.items() if k != "type"},
+            "integration_result": {
+                "skipped": True,
+                "reason": "live_eval_safety",
+                "message": str(exc),
+            },
+        }
+
     tenant_id = _get_tenant_id(action)
     if not _integration_allowed_for_action(action_type, tenant_id, db=db):
         integration = _ACTION_INTEGRATION_MAP[action_type].value

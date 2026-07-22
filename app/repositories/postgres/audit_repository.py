@@ -7,7 +7,12 @@ from app.repositories.postgres.audit_models import AuditEventRecord
 class AuditRepository:
 
     @staticmethod
-    def create_event(db: Session, event: AuditEvent) -> AuditEventRecord:
+    def create_event(
+        db: Session,
+        event: AuditEvent,
+        *,
+        commit: bool = True,
+    ) -> AuditEventRecord:
         record = AuditEventRecord(
             event_id=event.event_id,
             tenant_id=event.tenant_id,
@@ -18,7 +23,10 @@ class AuditRepository:
             created_at=event.created_at,
         )
         db.add(record)
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         db.refresh(record)
         return record
 

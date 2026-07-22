@@ -629,3 +629,14 @@ Reference: `app/admin/integrations/selection_backfill.py`, `selection_sync.py`, 
 | 10 | **Readiness blockers frontend-neutral** | Blockers expose `action_domain` only (no API URL navigation targets) |
 
 Reference: `app/admin/customer_settings/`, `frontend/src/features/customerSettings/`, `tests/test_customer_settings_*.py`
+
+---
+
+## DEC-2F1-TRUST — Live-eval trust anchor at API boundary
+
+**Status:** Locked (2F.1 merge hardening)  
+**Decision:** `POST /jobs` must strip `input_data.live_eval` before persistence. Trusted live-eval snapshots may only originate from server-side Gmail intake + atomic root claim. Registry-backed validation (`config_hash`, tenant, active/expiry) is required before fixture AI, live LLM, or write-policy dispatch.  
+**Reason:** Prevent tenant API keys from forging eval privileges in test/staging.  
+**Consequence:** Clients cannot self-register trusted eval context via job creation.  
+**Reference:** `app/evaluation/live/authorization.py`, `app/main.py` (`create_job`)
+
