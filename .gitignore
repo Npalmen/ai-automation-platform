@@ -25,6 +25,17 @@ Thumbs.db
 # Local dev runtime logs (do not commit)
 storage/local_dev/logs/
 
+# Live eval run journals/reports (2F testbot; never commit)
+storage/live_eval/
+storage/local_dev/live_eval/
+**/live_eval/runs/**/transitions.jsonl
+**/live_eval/runs/**/report.json
+**/live_eval/runs/**/run_config.json
+
+# Local live-eval OAuth/testbot credential files (never commit)
+scripts/.live_eval*
+storage/**/.live_eval*
+
 # Dev HTTPS proxy certs (local only)
 scripts/.dev-certs/
 
