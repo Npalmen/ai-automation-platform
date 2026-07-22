@@ -15,6 +15,10 @@ def main() -> int:
     parser.add_argument("--tenant-id", help="Single tenant id (default: all tenants)")
     parser.add_argument("--dry-run", action="store_true", help="Classify only, do not persist")
     parser.add_argument("--verify", action="store_true", help="Compare selections vs allowed_integrations")
+    parser.add_argument(
+        "--canonical-commit",
+        help="Override canonical runtime commit SHA recorded in audit report_json",
+    )
     args = parser.parse_args()
 
     from app.admin.integrations.selection_backfill import execute_backfill_run
@@ -26,6 +30,7 @@ def main() -> int:
             tenant_id=args.tenant_id,
             dry_run=args.dry_run,
             verify=args.verify,
+            canonical_commit=args.canonical_commit,
         )
         db.commit()
         print(json.dumps(out, ensure_ascii=False, indent=2))

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -30,6 +29,7 @@ from app.integrations.keys import (
     normalize_integration_key_list,
     registry_key_to_canonical,
 )
+from app.core.canonical_commit import resolve_canonical_commit
 from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
 
 BackfillRunStatus = Literal["completed", "failed"]
@@ -80,14 +80,6 @@ class TenantBackfillReport:
 
 def _utcnow_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-
-
-def _resolve_canonical_commit() -> str | None:
-    for key in ("BUILD_COMMIT_SHA", "GIT_COMMIT", "COMMIT_SHA"):
-        value = os.environ.get(key, "").strip()
-        if value:
-            return value
-    return None
 
 
 def _redact_backfill_report(payload: Any, *, parent_key: str = "") -> Any:
@@ -168,6 +160,7 @@ def _envelope_from_core_report(
     verify_mode: bool,
     status: BackfillRunStatus,
     error_summary: str | None = None,
+    canonical_commit: str | None = None,
 ) -> dict[str, Any]:
     tenant_data_changed = bool(core.get("tenants_updated", 0)) and not dry_run
     envelope: dict[str, Any] = {
@@ -175,7 +168,7 @@ def _envelope_from_core_report(
         "actor": MIGRATION_BACKFILL_ACTOR,
         "verify_mode": verify_mode,
         "tenant_data_changed": tenant_data_changed,
-        "canonical_commit": _resolve_canonical_commit(),
+        "canonical_commit": resolve_canonical_commit(explicit=canonical_commit),
         "started_at": started_at.isoformat(),
         "completed_at": completed_at.isoformat(),
         "status": status,
@@ -192,6 +185,7 @@ def execute_backfill_run(
     tenant_id: str | None = None,
     dry_run: bool = False,
     verify: bool = False,
+    canonical_commit: str | None = None,
 ) -> dict[str, Any]:
     run_id = str(uuid.uuid4())
     started = datetime.now(timezone.utc)
@@ -215,6 +209,7 @@ def execute_backfill_run(
             dry_run=dry_run,
             verify_mode=verify,
             status="completed",
+            canonical_commit=canonical_commit,
         )
         record_backfill_run(
             db,
@@ -251,6 +246,7 @@ def execute_backfill_run(
             verify_mode=verify,
             status="failed",
             error_summary=f"{type(exc).__name__}: {exc}",
+            canonical_commit=canonical_commit,
         )
         record_backfill_run(
             db,

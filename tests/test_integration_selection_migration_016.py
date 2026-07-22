@@ -151,6 +151,39 @@ class TestBackfillRunAudit:
         assert row["tenants_updated"] == 0
         assert record.settings == snapshot
 
+    def test_dry_run_records_canonical_commit_from_env(self, db, monkeypatch):
+        record = _tenant(
+            "T_AUDIT_SHA",
+            allowed=["google_mail"],
+            job_types=["invoice"],
+        )
+        db.add(record)
+        db.commit()
+        monkeypatch.setenv("BUILD_COMMIT_SHA", "a72547176d8c2e738331856a347f83465831733d")
+
+        out = execute_backfill_run(db, tenant_id=record.tenant_id, dry_run=True)
+        db.commit()
+
+        assert out["canonical_commit"] == "a72547176d8c2e738331856a347f83465831733d"
+        row = _latest_backfill_run(db)
+        assert row["report"]["canonical_commit"] == "a72547176d8c2e738331856a347f83465831733d"
+
+    def test_explicit_canonical_commit_override(self, db, monkeypatch):
+        record = _tenant("T_AUDIT_CLI", allowed=["google_mail"], job_types=[])
+        db.add(record)
+        db.commit()
+        monkeypatch.setenv("BUILD_COMMIT_SHA", "b" * 40)
+
+        out = execute_backfill_run(
+            db,
+            tenant_id=record.tenant_id,
+            dry_run=True,
+            canonical_commit="c" * 40,
+        )
+        db.commit()
+
+        assert out["canonical_commit"] == "c" * 40
+
     def test_failed_run_is_recorded_without_tenant_data_change(self, db):
         record = _tenant("T_AUDIT_FAIL", allowed=["google_mail"], job_types=[])
         db.add(record)
