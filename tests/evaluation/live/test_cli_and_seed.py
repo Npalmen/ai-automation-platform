@@ -50,6 +50,17 @@ def test_dry_run_offline(monkeypatch, tmp_path):
     assert Path(payload["report_path"]).exists()
 
 
+def test_seed_script_sets_intake_cutoff_at(monkeypatch):
+    monkeypatch.setenv("ENV", "test")
+    monkeypatch.setenv("LIVE_EVAL_ALLOWED", "yes")
+    monkeypatch.setenv("LIVE_EVAL_TENANT_IDS", "TENANT_LIVE_EVAL")
+    from scripts.seed_live_eval_tenant import seed_intake_cutoff_at
+
+    cutoff = seed_intake_cutoff_at()
+    assert "T" in cutoff
+    assert cutoff != "2020"
+
+
 def test_seed_script_defaults_to_dry_run(monkeypatch):
     monkeypatch.setenv("ENV", "test")
     monkeypatch.setenv("LIVE_EVAL_ALLOWED", "yes")

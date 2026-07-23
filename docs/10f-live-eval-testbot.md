@@ -266,7 +266,17 @@ Manual `workflow_dispatch` only on `main`. Workflow input `confirm_live_gmail` m
 
 **Send states:** `not_attempted`, `sending`, `confirmed`, `outcome_unknown`, `failed_before_send`. `outcome_unknown` is non-resumable.
 
-**Cleanup:** without exact `recipient_gmail_message_id`, `cleanup-run` returns exit `0` with `cleanup_state=not_safe_to_execute` and performs no Gmail mutation.
+**Cleanup:** without exact `recipient_gmail_message_id`, `cleanup-run` resolves the recipient ID from the run journal (`delivery_confirmed` transitions only). If the journal yields zero, multiple distinct, or sender IDs, cleanup returns `cleanup_state=not_safe_to_execute` with `gmail_mutations=0`. Exit semantics: when the primary scenario already failed, blocked cleanup returns exit `0` (non-masking); when the primary scenario passed, blocked cleanup returns `EXIT_CLEANUP` (6) so the run cannot be treated as fully successful without cleanup.
+
+### 2F.2B intake observability and journal cleanup (in progress)
+
+**Intake skip (HTTP 409):** `POST .../process-delivery` returns a structured, allowlisted payload (`error_code=intake_skipped`, `intake_skip_reason`, `evaluation_run_id`, `failed_stage`, `http_status`, `run_status`, `root_claimed`, `job_created`, `retry_allowed`, `diagnostic_code`). The testbot observer parses this before `raise_for_status()` and raises `LiveEvalIntakeSkippedError`; the runner maps intake skip to `EXIT_CONFIG` (2), not `EXIT_TRANSPORT` (3).
+
+**Allowlisted `intake_skip_reason` values:** `missing_intake_cutoff`, `before_intake_cutoff`, `lead_disabled`, `customer_inquiry_disabled`, `invoice_disabled`, `duplicate`, `intake_skipped_unknown`.
+
+**Eval tenant seed:** `scripts/seed_live_eval_tenant.py` sets `intake.intake_cutoff_at` to UTC seed time minus a 300s tolerance window (not a static historical date). Dry-run remains default; all ENV/tenant/database guards unchanged.
+
+**Journal cleanup resolver:** `cleanup_only()` without `--recipient-message-id` loads `delivery_confirmed` transitions, deduplicates recipient IDs, requires exactly one unique ID, rejects sender ID matches, and verifies run/scenario/attempt/tenant metadata before exact cleanup.
 
 #### Readiness-only (`READINESS_ONLY`)
 

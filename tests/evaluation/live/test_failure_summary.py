@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.evaluation.live.exit_codes import (
     EXIT_CLEANUP,
+    EXIT_CONFIG,
     EXIT_INFRASTRUCTURE,
     EXIT_SUCCESS,
     EXIT_TRANSPORT,
@@ -77,7 +78,54 @@ def test_unresolved_send_preserved_over_cleanup_failure():
     assert final_code == EXIT_UNRESOLVED_SEND
 
 
+def test_intake_skip_reason_in_failure_summary():
+    from app.evaluation.live.exit_codes import EXIT_CONFIG
+
+    summary = build_failure_summary(
+        evaluation_run_id="run-intake-skip",
+        scenario_id="S01_lead_laddbox_quality",
+        attempt_id=1,
+        failure_category="intake_skipped",
+        failed_stage="triggering_intake",
+        primary_exit_code=EXIT_CONFIG,
+        cleanup_exit_code=None,
+        artifact_status="present",
+        send_state="confirmed",
+        send_attempted=True,
+        send_confirmed=True,
+        reconciliation_result="one",
+        recipient_delivery_observed=True,
+        root_job_bound=False,
+        cleanup_state="not_run",
+        intake_skip_reason="missing_intake_cutoff",
+    )
+    payload = summary.to_dict()
+    assert payload["intake_skip_reason"] == "missing_intake_cutoff"
+    assert payload["primary_exit_code"] == EXIT_CONFIG
+    assert payload["final_exit_code"] == EXIT_CONFIG
+
+
 def test_cleanup_failure_when_primary_success():
+    final_code = compute_final_exit_code(
+        primary_exit_code=EXIT_SUCCESS,
+        cleanup_exit_code=EXIT_CLEANUP,
+        artifact_status="present",
+    )
+    assert final_code == EXIT_CLEANUP
+
+
+def test_cleanup_not_safe_preserves_primary_failure_exit():
+    """Primary already failed: not_safe cleanup must not mask with EXIT_CLEANUP."""
+    final_code = compute_final_exit_code(
+        primary_exit_code=EXIT_CONFIG,
+        cleanup_exit_code=None,
+        artifact_status="present",
+    )
+    assert final_code == EXIT_CONFIG
+
+
+def test_cleanup_not_safe_after_primary_success_becomes_cleanup_failure():
+    """Primary passed but cleanup blocked: final exit must be EXIT_CLEANUP."""
     final_code = compute_final_exit_code(
         primary_exit_code=EXIT_SUCCESS,
         cleanup_exit_code=EXIT_CLEANUP,

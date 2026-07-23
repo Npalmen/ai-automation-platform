@@ -18,9 +18,10 @@ from app.evaluation.live.assertions import (
     assert_telemetry_summary,
 )
 from app.evaluation.live.cleanup import cleanup_recipient_message, cleanup_unexpected_reply
+from app.evaluation.live.cleanup_resolver import resolve_recipient_from_journal
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.constants import TELEMETRY_TESTBOT_SEND_RECONCILE
-from app.evaluation.live.errors import LiveEvalSafetyError
+from app.evaluation.live.errors import LiveEvalIntakeSkippedError, LiveEvalSafetyError
 from app.evaluation.live.exit_codes import (
     EXIT_ASSERTION,
     EXIT_CLEANUP,
@@ -106,6 +107,7 @@ class LiveEvalRunner:
         self.started_at = datetime.now(timezone.utc)
         self.send_window_start = self.started_at
         self.failure_category: str | None = None
+        self._intake_skip_reason: str | None = None
         self._registry_run: dict[str, Any] | None = None
         self._resume_phase: str = "pre_send"
         self._checkpoint = None
@@ -254,6 +256,7 @@ class LiveEvalRunner:
             cleanup_state=self._cleanup_state,
             gmail_mutations=self._gmail_mutations,
             error=self._last_error,
+            intake_skip_reason=self._intake_skip_reason,
         )
         emit_run_summary_stdout(summary)
         write_github_step_summary(summary)
@@ -370,6 +373,14 @@ class LiveEvalRunner:
             self._set_primary_failure(EXIT_TIMEOUT, category=str(exc))
             self._abort_run()
             self._write_report("failed", [str(exc)])
+        except LiveEvalIntakeSkippedError as exc:
+            self._last_error = exc
+            self._intake_skip_reason = str(
+                exc.payload.get("intake_skip_reason") or "intake_skipped_unknown"
+            )
+            self._set_primary_failure(EXIT_CONFIG, category="intake_skipped")
+            self._abort_run()
+            self._write_report("failed", [self._intake_skip_reason])
         except LiveEvalSafetyError as exc:
             self._last_error = exc
             msg = str(exc)
@@ -761,6 +772,35 @@ def checkpoint_sender_id(checkpoint) -> str:
     raise LiveEvalSafetyError("missing sender_gmail_message_id in checkpoint")
 
 
+def cleanup_not_safe_exit_code(evaluation_run_id: str) -> int:
+    """
+    Exit code when cleanup is blocked (not_safe_to_execute).
+
+    Preserve an existing primary scenario failure; otherwise fail cleanup so a
+    passed scenario cannot be reported as fully successful without cleanup.
+    """
+    from app.evaluation.live.journal import load_report
+
+    report = load_report(evaluation_run_id)
+    if not report:
+        return EXIT_SUCCESS
+
+    summary = report.get("failure_summary") or {}
+    primary = summary.get("primary_exit_code")
+    if primary is None:
+        result = report.get("result")
+        if result == "passed":
+            primary = EXIT_SUCCESS
+        elif result in ("failed", "cleanup_failed"):
+            return EXIT_SUCCESS
+        else:
+            return EXIT_SUCCESS
+
+    if primary not in (None, EXIT_SUCCESS):
+        return EXIT_SUCCESS
+    return EXIT_CLEANUP
+
+
 def cleanup_only(
     *,
     base_url: str,
@@ -778,19 +818,26 @@ def cleanup_only(
         message_id = recipient_gmail_message_id
 
         def _not_safe(reason: str) -> int:
+            exit_code = cleanup_not_safe_exit_code(evaluation_run_id)
+            cleanup_exit = EXIT_CLEANUP if exit_code == EXIT_CLEANUP else None
             print(
                 json.dumps(
                     {
                         "cleanup_state": "not_safe_to_execute",
                         "evaluation_run_id": evaluation_run_id,
                         "reason": reason,
-                        "cleanup_exit_code": None,
+                        "cleanup_exit_code": cleanup_exit,
                         "gmail_mutations": 0,
                     }
                 )
             )
-            return EXIT_SUCCESS
+            return exit_code
 
+        if not message_id:
+            resolution = resolve_recipient_from_journal(checkpoint)
+            if not resolution.resolved:
+                return _not_safe(resolution.blocked_reason or "journal_resolution_failed")
+            message_id = resolution.recipient_gmail_message_id
         if not message_id:
             return _not_safe("missing exact recipient_gmail_message_id")
         if sender_id and message_id == sender_id:
