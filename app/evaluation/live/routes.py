@@ -266,7 +266,15 @@ def process_live_eval_delivery(
     if intake_result.get("status") == "failed":
         raise HTTPException(status_code=400, detail=intake_result.get("reason", "intake failed"))
     if intake_result.get("status") == "skipped" and intake_result.get("reason") != "duplicate":
-        raise HTTPException(status_code=409, detail=intake_result.get("reason", "intake skipped"))
+        from app.evaluation.live.intake_errors import build_intake_skipped_payload
+
+        payload = build_intake_skipped_payload(
+            evaluation_run_id=evaluation_run_id,
+            raw_reason=intake_result.get("reason"),
+            run_status=str(row.status),
+            root_claimed=bool(row.root_job_id),
+        )
+        raise HTTPException(status_code=409, detail=payload.model_dump())
 
     refreshed = LiveEvalRunRepository.get_run(db, evaluation_run_id, tenant_id=body.tenant_id)
     return ProcessDeliveryResponse(

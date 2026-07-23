@@ -8,6 +8,8 @@ from typing import Any, Callable
 import httpx
 
 from app.evaluation.live.config import get_live_eval_config
+from app.evaluation.live.errors import LiveEvalIntakeSkippedError
+from app.evaluation.live.intake_errors import parse_intake_skipped_payload
 
 
 class LiveEvalObserver:
@@ -96,6 +98,10 @@ class LiveEvalObserver:
             },
             timeout=self.timeout,
         )
+        if response.status_code == 409:
+            payload = parse_intake_skipped_payload(response.json())
+            if payload is not None:
+                raise LiveEvalIntakeSkippedError(payload.model_dump())
         response.raise_for_status()
         return response.json()
 

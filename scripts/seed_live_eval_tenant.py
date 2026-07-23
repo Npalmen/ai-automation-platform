@@ -7,6 +7,8 @@ import os
 import sys
 from pathlib import Path
 
+from datetime import datetime, timedelta, timezone
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -15,6 +17,14 @@ from app.core.settings import get_settings
 from app.evaluation.live.config import get_live_eval_config
 from app.repositories.postgres.database import SessionLocal
 from app.repositories.postgres.tenant_config_models import TenantConfigRecord
+
+# Messages delivered shortly after seed must be after this anchor (not a static historical date).
+SEED_INTAKE_CUTOFF_TOLERANCE_SECONDS = 300
+
+
+def seed_intake_cutoff_at() -> str:
+    anchor = datetime.now(timezone.utc) - timedelta(seconds=SEED_INTAKE_CUTOFF_TOLERANCE_SECONDS)
+    return anchor.replace(microsecond=0).isoformat()
 
 
 def _is_production_db(database_url: str) -> bool:
@@ -70,7 +80,10 @@ def _seed_tenant(tenant_id: str) -> dict:
                 allowed_integrations=["google_mail"],
                 enabled_job_types=["lead", "customer_inquiry", "invoice"],
                 settings={
-                    "intake": {"enabled": True},
+                    "intake": {
+                        "enabled": True,
+                        "intake_cutoff_at": seed_intake_cutoff_at(),
+                    },
                     "live_eval": {"seeded": True},
                 },
             )
@@ -78,6 +91,10 @@ def _seed_tenant(tenant_id: str) -> dict:
         else:
             row.is_test_tenant = True
             settings = dict(row.settings or {})
+            intake = dict(settings.get("intake") or {})
+            intake["enabled"] = True
+            intake["intake_cutoff_at"] = seed_intake_cutoff_at()
+            settings["intake"] = intake
             settings.setdefault("live_eval", {})["seeded"] = True
             row.settings = settings
         db.commit()

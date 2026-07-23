@@ -68,6 +68,7 @@ class FailureSummary:
     cleanup_state: str
     gmail_mutations: int
     redacted_error: str | None = None
+    intake_skip_reason: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return redact_sensitive(
@@ -91,6 +92,7 @@ class FailureSummary:
                 "cleanup_state": self.cleanup_state,
                 "gmail_mutations": self.gmail_mutations,
                 "redacted_error": self.redacted_error,
+                "intake_skip_reason": self.intake_skip_reason,
             }
         )
 
@@ -114,6 +116,7 @@ def build_failure_summary(
     cleanup_state: str,
     gmail_mutations: int = 0,
     error: str | BaseException | None = None,
+    intake_skip_reason: str | None = None,
 ) -> FailureSummary:
     final_exit_code = compute_final_exit_code(
         primary_exit_code=primary_exit_code,
@@ -140,6 +143,7 @@ def build_failure_summary(
         cleanup_state=cleanup_state,
         gmail_mutations=gmail_mutations,
         redacted_error=redacted_error,
+        intake_skip_reason=intake_skip_reason,
     )
 
 
@@ -173,6 +177,8 @@ def write_github_step_summary(summary: FailureSummary) -> None:
     ]
     if payload.get("failure_category"):
         lines.append(f"- failure_category: `{payload['failure_category']}`")
+    if payload.get("intake_skip_reason"):
+        lines.append(f"- intake_skip_reason: `{payload['intake_skip_reason']}`")
     if payload.get("redacted_error"):
         lines.append(f"- redacted_error: {payload['redacted_error']}")
     Path(summary_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
