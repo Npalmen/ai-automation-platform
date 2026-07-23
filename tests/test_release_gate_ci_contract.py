@@ -11,7 +11,11 @@ import yaml
 RELEASE_GATE_WORKFLOW = (
     Path(__file__).resolve().parents[1] / ".github" / "workflows" / "release-gate.yml"
 )
+LIVE_EVAL_WORKFLOW = (
+    Path(__file__).resolve().parents[1] / ".github" / "workflows" / "live-eval.yml"
+)
 RELEASE_GATE_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/ai_platform"
+LIVE_EVAL_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/ai_platform"
 
 
 def test_release_gate_module_help_exits_zero():
@@ -66,3 +70,39 @@ def test_release_gate_live_eval_postgres_registry_refresh_contract():
         i for i, step in enumerate(steps) if "registry refresh" in (step.get("name") or "").lower()
     )
     assert bootstrap_idx < refresh_idx
+
+
+def test_live_eval_foundation_integration_db_count_contract():
+    data = yaml.safe_load(LIVE_EVAL_WORKFLOW.read_text(encoding="utf-8"))
+    foundation = data["jobs"]["foundation"]
+    transport = data["jobs"]["live_gmail_transport"]
+
+    assert foundation.get("environment") is None
+    assert transport["environment"] == "live-gmail-eval"
+    assert transport["needs"] == ["foundation", "operator-gate"]
+
+    steps = foundation["steps"]
+    collect = _step_by_name(steps, "Verify integration_db test selection")
+    collect_run = collect.get("run") or ""
+    assert '!= "8"' in collect_run or "!= \"8\"" in collect_run
+    assert "test_registry_refresh_pg.py" in collect_run
+    assert "test_root_job_atomic_pg.py" in collect_run
+    assert "test_telemetry_idempotency_pg.py" in collect_run
+    assert (collect.get("env") or {}) == {
+        "ENV": "test",
+        "DATABASE_URL": LIVE_EVAL_DATABASE_URL,
+    }
+
+    junit = _step_by_name(steps, "Verify integration_db JUnit gate")
+    assert "verify_pytest_junit.py foundation_integration_db.junit.xml --expected 8" in (
+        junit.get("run") or ""
+    )
+    assert junit.get("continue-on-error") is not True
+
+    transport_steps = transport["steps"]
+    run_scenario = _step_by_name(transport_steps, "Live Gmail S01 scenario")
+    cleanup = next(step for step in transport_steps if step.get("id") == "cleanup")
+    readiness = _step_by_name(transport_steps, "Readiness-only report")
+    assert run_scenario.get("if") == "inputs.confirm_live_gmail == 'RUN_S01'"
+    assert cleanup.get("if") == "always() && inputs.confirm_live_gmail == 'RUN_S01'"
+    assert readiness.get("if") == "inputs.confirm_live_gmail == 'READINESS_ONLY'"
