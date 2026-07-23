@@ -67,6 +67,11 @@ class FailureSummary:
     root_job_bound: bool
     cleanup_state: str
     gmail_mutations: int
+    scenario_cleanup_mutations: int = 0
+    workflow_cleanup_mutations: int = 0
+    total_gmail_mutations: int = 0
+    cleanup_adapter_called: bool = False
+    cleanup_adapter_result: str | None = None
     redacted_error: str | None = None
     intake_skip_reason: str | None = None
     safety_reason: str | None = None
@@ -96,6 +101,11 @@ class FailureSummary:
                 "root_job_bound": self.root_job_bound,
                 "cleanup_state": self.cleanup_state,
                 "gmail_mutations": self.gmail_mutations,
+                "scenario_cleanup_mutations": self.scenario_cleanup_mutations,
+                "workflow_cleanup_mutations": self.workflow_cleanup_mutations,
+                "total_gmail_mutations": self.total_gmail_mutations,
+                "cleanup_adapter_called": self.cleanup_adapter_called,
+                "cleanup_adapter_result": self.cleanup_adapter_result,
                 "redacted_error": self.redacted_error,
                 "intake_skip_reason": self.intake_skip_reason,
                 "safety_reason": self.safety_reason,
@@ -130,6 +140,11 @@ def build_failure_summary(
     root_job_bound: bool,
     cleanup_state: str,
     gmail_mutations: int = 0,
+    scenario_cleanup_mutations: int = 0,
+    workflow_cleanup_mutations: int = 0,
+    total_gmail_mutations: int | None = None,
+    cleanup_adapter_called: bool = False,
+    cleanup_adapter_result: str | None = None,
     error: str | BaseException | None = None,
     intake_skip_reason: str | None = None,
     safety_reason: str | None = None,
@@ -145,6 +160,15 @@ def build_failure_summary(
         artifact_status=artifact_status,
     )
     redacted_error = _truncate_error(str(error)) if error else None
+    resolved_total = (
+        total_gmail_mutations
+        if total_gmail_mutations is not None
+        else scenario_cleanup_mutations + workflow_cleanup_mutations
+    )
+    if gmail_mutations == 0 and resolved_total:
+        resolved_gmail_mutations = resolved_total
+    else:
+        resolved_gmail_mutations = gmail_mutations or resolved_total
     return FailureSummary(
         evaluation_run_id=evaluation_run_id,
         scenario_id=scenario_id,
@@ -162,7 +186,12 @@ def build_failure_summary(
         recipient_delivery_observed=recipient_delivery_observed,
         root_job_bound=root_job_bound,
         cleanup_state=cleanup_state,
-        gmail_mutations=gmail_mutations,
+        gmail_mutations=resolved_gmail_mutations,
+        scenario_cleanup_mutations=scenario_cleanup_mutations,
+        workflow_cleanup_mutations=workflow_cleanup_mutations,
+        total_gmail_mutations=resolved_total,
+        cleanup_adapter_called=cleanup_adapter_called,
+        cleanup_adapter_result=cleanup_adapter_result,
         redacted_error=redacted_error,
         intake_skip_reason=intake_skip_reason,
         safety_reason=safety_reason,
@@ -217,8 +246,13 @@ def write_github_step_summary(summary: FailureSummary) -> None:
         f"- root_job_bound: {payload['root_job_bound']}",
         f"- cleanup_state: `{payload['cleanup_state']}`",
         f"- gmail_mutations: {payload['gmail_mutations']}",
+        f"- scenario_cleanup_mutations: {payload.get('scenario_cleanup_mutations', 0)}",
+        f"- workflow_cleanup_mutations: {payload.get('workflow_cleanup_mutations', 0)}",
+        f"- total_gmail_mutations: {payload.get('total_gmail_mutations', payload['gmail_mutations'])}",
         ]
     )
+    if payload.get("cleanup_adapter_result"):
+        lines.append(f"- cleanup_adapter_result: `{payload['cleanup_adapter_result']}`")
     if payload.get("failure_category"):
         lines.append(f"- failure_category: `{payload['failure_category']}`")
     if payload.get("intake_skip_reason"):

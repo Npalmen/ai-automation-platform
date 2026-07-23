@@ -132,3 +132,32 @@ def test_cleanup_not_safe_after_primary_success_becomes_cleanup_failure():
         artifact_status="present",
     )
     assert final_code == EXIT_CLEANUP
+
+
+def test_failure_summary_mutation_fields_from_adapter():
+    summary = build_failure_summary(
+        evaluation_run_id="run-obs",
+        scenario_id="S01_lead_laddbox_quality",
+        attempt_id=1,
+        failure_category=None,
+        failed_stage="passed",
+        primary_exit_code=EXIT_SUCCESS,
+        cleanup_exit_code=EXIT_SUCCESS,
+        artifact_status="present",
+        send_state="confirmed",
+        send_attempted=True,
+        send_confirmed=True,
+        reconciliation_result="not_run",
+        recipient_delivery_observed=True,
+        root_job_bound=True,
+        cleanup_state="success",
+        workflow_cleanup_mutations=1,
+        cleanup_adapter_called=True,
+        cleanup_adapter_result="archived",
+    )
+    payload = summary.to_dict()
+    assert payload["workflow_cleanup_mutations"] == 1
+    assert payload["scenario_cleanup_mutations"] == 0
+    assert payload["total_gmail_mutations"] == 1
+    assert payload["cleanup_adapter_called"] is True
+    assert payload["cleanup_adapter_result"] == "archived"

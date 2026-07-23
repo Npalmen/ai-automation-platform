@@ -73,10 +73,11 @@ def test_foundation_postgres_bootstrap_contract():
     assert "--collect-only" in collect_run
     assert "tests/evaluation/live" in collect_run
     assert "-m integration_db" in collect_run
-    assert '"8"' in collect_run or "!= \"8\"" in collect_run or '!= "8"' in collect_run
+    assert '"11"' in collect_run or "!= \"11\"" in collect_run or '!= "11"' in collect_run
     assert "test_root_job_atomic_pg.py" in collect_run
     assert "test_telemetry_idempotency_pg.py" in collect_run
     assert "test_registry_refresh_pg.py" in collect_run
+    assert "test_cleanup_persistence_pg.py" in collect_run
     assert _foundation_db_env(collect) == {
         "ENV": "test",
         "DATABASE_URL": FOUNDATION_DATABASE_URL,
@@ -93,7 +94,7 @@ def test_foundation_postgres_bootstrap_contract():
     }
 
     junit = steps[junit_idx]
-    assert "verify_pytest_junit.py foundation_integration_db.junit.xml --expected 8" in (
+    assert "verify_pytest_junit.py foundation_integration_db.junit.xml --expected 11" in (
         junit.get("run") or ""
     )
     assert "env" not in junit or junit.get("env") is None

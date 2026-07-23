@@ -67,6 +67,18 @@ def cleanup_recipient_message(
             raise LiveEvalSafetyError("post_claim cleanup requires root_gmail_message_id")
         if row.root_gmail_message_id != recipient_gmail_message_id:
             raise LiveEvalSafetyError("recipient message id does not match registry root")
+    elif phase == "pre_claim":
+        operation_key = build_operation_key(
+            evaluation_run_id=evaluation_run_id,
+            category=TELEMETRY_APP_CLEANUP_ARCHIVED,
+            operation=f"pre_claim:{recipient_gmail_message_id}",
+        )
+        if operation_already_succeeded(db, operation_key):
+            return {
+                "phase": phase,
+                "recipient_gmail_message_id": recipient_gmail_message_id,
+                "result": "already_archived",
+            }
 
     connection_config = get_integration_connection_config(
         tenant_id=tenant_id,
@@ -93,18 +105,23 @@ def cleanup_recipient_message(
         raise LiveEvalSafetyError("pre_claim cleanup not allowed after root job exists")
 
     adapter.client.archive_from_inbox(recipient_gmail_message_id)
-    if phase == "post_claim":
+    if phase in ("post_claim", "pre_claim"):
+        operation = (
+            recipient_gmail_message_id
+            if phase == "post_claim"
+            else f"pre_claim:{recipient_gmail_message_id}"
+        )
         operation_key = build_operation_key(
             evaluation_run_id=evaluation_run_id,
             category=TELEMETRY_APP_CLEANUP_ARCHIVED,
-            operation=recipient_gmail_message_id,
+            operation=operation,
         )
         record_live_eval_external_event(
             db,
             operation_key=operation_key,
             outcome=EVENT_OUTCOME_SUCCEEDED,
             category=TELEMETRY_APP_CLEANUP_ARCHIVED,
-            operation=recipient_gmail_message_id,
+            operation=operation,
             integration_type=IntegrationType.GOOGLE_MAIL.value,
             snapshot=trusted_snapshot_from_row(row),
             metadata={"phase": phase},
