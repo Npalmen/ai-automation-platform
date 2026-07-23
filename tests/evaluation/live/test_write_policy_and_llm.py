@@ -91,6 +91,52 @@ def test_resolve_llm_client_uses_fixture_bundle(db, live_eval_env, sample_run_ro
         assert isinstance(client, FixtureEvalLLMClient)
 
 
+def test_run_ai_step_binds_fixture_prompt_name(db, live_eval_env, sample_run_row):
+    from app.ai.schemas import ClassificationResponse
+    from app.domain.workflows.enums import JobType
+    from app.domain.workflows.models import Job
+    from app.workflows.processors.ai_processor_utils import run_ai_step
+
+    sample_run_row.evaluation_run_id = "run-001"
+    sample_run_row.status = "active"
+    db.add(sample_run_row)
+    db.commit()
+
+    job = Job(
+        tenant_id="TENANT_LIVE_EVAL",
+        job_type=JobType.LEAD,
+        input_data={
+            "subject": "Offert laddbox",
+            "message_text": "Hej, jag vill ha offert.",
+            "live_eval": _snapshot().model_dump(mode="json"),
+        },
+    )
+    with live_eval_context(_snapshot(), db=db):
+        result = run_ai_step(
+            job=job,
+            processor_name="classification_processor",
+            prompt_name="classification_v1",
+            context={"job_id": "job-1"},
+            response_model=ClassificationResponse,
+            success_summary="classified",
+            success_payload_builder=lambda parsed: {
+                "detected_job_type": parsed.detected_job_type,
+                "confidence": parsed.confidence,
+                "reasons": parsed.reasons,
+            },
+            fallback_payload_builder=lambda _msg: {
+                "detected_job_type": "unknown",
+                "confidence": 0.0,
+                "reasons": ["fallback"],
+                "used_fallback": True,
+            },
+        )
+
+    payload = result.result["payload"]
+    assert payload["detected_job_type"] == "lead"
+    assert payload.get("used_fallback") is not True
+
+
 def test_resolve_llm_client_fail_closed_without_snapshot(live_eval_env):
     job = SimpleNamespace(
         input_data={"live_eval": _snapshot().model_dump(mode="json")},

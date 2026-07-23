@@ -17,6 +17,12 @@ from app.repositories.postgres.live_eval_models import LiveEvalExternalEventRow,
 from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 
 
+@pytest.fixture(autouse=True)
+def isolate_github_step_summary(monkeypatch, tmp_path):
+    """Prevent hermetic tests from writing fixture metadata to real CI summaries."""
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path / "step-summary.md"))
+
+
 @pytest.fixture
 def live_eval_env(monkeypatch):
     monkeypatch.setenv("ENV", "test")

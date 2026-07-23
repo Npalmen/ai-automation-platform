@@ -7,10 +7,21 @@ from typing import Literal
 from sqlalchemy.orm import Session
 
 from app.evaluation.live.config import get_live_eval_config
+from app.evaluation.live.constants import (
+    EVENT_OUTCOME_SUCCEEDED,
+    LIVE_EVAL_MUTATION_CLEANUP_ARCHIVE,
+    TELEMETRY_APP_CLEANUP_ARCHIVED,
+)
 from app.evaluation.live.delivery import validate_delivery_candidate, resolve_intake_label_id
 from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.live.gmail_transport import archive_unexpected_reply
+from app.evaluation.live.registry import trusted_snapshot_from_row
 from app.evaluation.live.safety import require_live_eval_mutation_context, validate_live_gmail_run_for_mutation
+from app.evaluation.live.telemetry import (
+    build_operation_key,
+    operation_already_succeeded,
+    record_live_eval_external_event,
+)
 from app.integrations.enums import IntegrationType
 from app.integrations.factory import get_integration_adapter
 from app.integrations.service import get_integration_connection_config
@@ -36,10 +47,22 @@ def cleanup_recipient_message(
         row,
         tenant_id=tenant_id,
         recipient_message_id=recipient_gmail_message_id,
-        allow_active_idempotent=(phase == "post_claim"),
+        mutation_operation=LIVE_EVAL_MUTATION_CLEANUP_ARCHIVE,
+        cleanup_phase=phase,
     )
 
     if phase == "post_claim":
+        operation_key = build_operation_key(
+            evaluation_run_id=evaluation_run_id,
+            category=TELEMETRY_APP_CLEANUP_ARCHIVED,
+            operation=recipient_gmail_message_id,
+        )
+        if operation_already_succeeded(db, operation_key):
+            return {
+                "phase": phase,
+                "recipient_gmail_message_id": recipient_gmail_message_id,
+                "result": "already_archived",
+            }
         if not row.root_gmail_message_id:
             raise LiveEvalSafetyError("post_claim cleanup requires root_gmail_message_id")
         if row.root_gmail_message_id != recipient_gmail_message_id:
@@ -70,6 +93,23 @@ def cleanup_recipient_message(
         raise LiveEvalSafetyError("pre_claim cleanup not allowed after root job exists")
 
     adapter.client.archive_from_inbox(recipient_gmail_message_id)
+    if phase == "post_claim":
+        operation_key = build_operation_key(
+            evaluation_run_id=evaluation_run_id,
+            category=TELEMETRY_APP_CLEANUP_ARCHIVED,
+            operation=recipient_gmail_message_id,
+        )
+        record_live_eval_external_event(
+            db,
+            operation_key=operation_key,
+            outcome=EVENT_OUTCOME_SUCCEEDED,
+            category=TELEMETRY_APP_CLEANUP_ARCHIVED,
+            operation=recipient_gmail_message_id,
+            integration_type=IntegrationType.GOOGLE_MAIL.value,
+            snapshot=trusted_snapshot_from_row(row),
+            metadata={"phase": phase},
+        )
+        db.commit()
     return {
         "phase": phase,
         "recipient_gmail_message_id": recipient_gmail_message_id,

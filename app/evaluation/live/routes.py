@@ -286,7 +286,6 @@ def process_live_eval_delivery(
                 row,
                 tenant_id=body.tenant_id,
                 recipient_message_id=body.recipient_gmail_message_id,
-                allow_active_idempotent=False,
             )
         else:
             validate_live_gmail_run_for_mutation(

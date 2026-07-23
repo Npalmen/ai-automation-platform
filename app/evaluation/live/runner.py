@@ -24,6 +24,7 @@ from app.evaluation.live.constants import TELEMETRY_TESTBOT_SEND_RECONCILE
 from app.evaluation.live.cleanup_phase import resolve_cleanup_phase
 from app.evaluation.live.errors import (
     LiveEvalIntakeSkippedError,
+    LiveEvalPipelinePollError,
     LiveEvalSafetyError,
     LiveEvalSafetyRejectedError,
 )
@@ -127,6 +128,10 @@ class LiveEvalRunner:
         self._artifact_status: str = "not_checked"
         self._gmail_mutations: int = 0
         self._last_failure_summary: dict[str, Any] | None = None
+        self._timeout_reason: str | None = None
+        self._timeout_job_snapshot: dict[str, Any] | None = None
+        self._poll_attempts: int | None = None
+        self._poll_duration_seconds: float | None = None
 
     def _transition(self, state: str, **extra: Any) -> None:
         self._failed_stage = state
@@ -268,6 +273,10 @@ class LiveEvalRunner:
                 os.environ.get("BUILD_GIT_SHA") or os.environ.get("GITHUB_SHA") or ""
             ).strip()
             or None,
+            timeout_reason=self._timeout_reason,
+            timeout_job_snapshot=self._timeout_job_snapshot,
+            poll_attempts=self._poll_attempts,
+            poll_duration_seconds=self._poll_duration_seconds,
         )
         emit_run_summary_stdout(summary)
         write_github_step_summary(summary)
@@ -299,6 +308,10 @@ class LiveEvalRunner:
     def _load_registry_run(self) -> dict[str, Any]:
         if self._registry_run is None:
             self._registry_run = self.observer.get_run(self.evaluation_run_id)
+        return self._registry_run
+
+    def _refresh_registry_run(self) -> dict[str, Any]:
+        self._registry_run = self.observer.get_run(self.evaluation_run_id)
         return self._registry_run
 
     def _validate_resume_consistency(self) -> None:
@@ -379,6 +392,15 @@ class LiveEvalRunner:
                 self._persist_run_config(config_hash=str(registry.get("config_hash") or ""))
                 self._transition("run_registered")
                 self._run_main_scenario()
+        except LiveEvalPipelinePollError as exc:
+            self._last_error = exc
+            self._timeout_reason = exc.timeout_reason
+            self._timeout_job_snapshot = exc.job_snapshot
+            self._poll_attempts = exc.poll_attempts
+            self._poll_duration_seconds = exc.poll_duration_seconds
+            self._set_primary_failure(EXIT_TIMEOUT, category=exc.timeout_reason)
+            self._abort_run()
+            self._write_report("failed", [exc.timeout_reason])
         except TimeoutError as exc:
             self._last_error = exc
             self._set_primary_failure(EXIT_TIMEOUT, category=str(exc))
@@ -479,15 +501,17 @@ class LiveEvalRunner:
         else:
             recipient_id = None
 
-        registry = self._load_registry_run()
+        registry = self._refresh_registry_run()
         if self._resume_phase in ("pre_send", "reconcile_only", "post_send", "post_delivery"):
             recipient_id = (ctx.confirmed or {}).get("message_id")
             if not registry.get("root_job_id"):
                 intake = self._process_delivery(recipient_id)
+                self._refresh_registry_run()
                 self._transition(
                     "intake_completed",
-                    job_id=intake.get("root_job_id"),
+                    job_id=intake.get("root_job_id") or intake.get("job_id"),
                     pipeline_run_id=intake.get("pipeline_run_id"),
+                    job_status=intake.get("job_status"),
                 )
             else:
                 self._transition(
@@ -880,9 +904,33 @@ def cleanup_only(
             resolved_phase = phase_resolution.phase
         observer.cleanup_recipient(evaluation_run_id, message_id, phase=resolved_phase)
         return EXIT_SUCCESS
-    except LiveEvalSafetyError:
+    except LiveEvalSafetyError as exc:
+        print(
+            json.dumps(
+                {
+                    "cleanup_state": "failed",
+                    "evaluation_run_id": evaluation_run_id,
+                    "reason": str(exc),
+                    "reason_type": "safety_error",
+                    "cleanup_exit_code": EXIT_CLEANUP,
+                    "gmail_mutations": 0,
+                }
+            )
+        )
         return EXIT_CLEANUP
-    except Exception:
+    except Exception as exc:
+        print(
+            json.dumps(
+                {
+                    "cleanup_state": "failed",
+                    "evaluation_run_id": evaluation_run_id,
+                    "reason": type(exc).__name__,
+                    "reason_type": "exception",
+                    "cleanup_exit_code": EXIT_CLEANUP,
+                    "gmail_mutations": 0,
+                }
+            )
+        )
         return EXIT_CLEANUP
     finally:
         release_run_writer_lock(writer_lock)
