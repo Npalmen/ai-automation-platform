@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import uuid
 from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
@@ -29,7 +30,22 @@ from app.evaluation.live.schemas import LiveEvalReport
 from app.repositories.postgres.live_eval_repository import LiveEvalRunRepository
 from app.repositories.postgres.migration_runner import verify_ci_postgres_schema_provisioned
 
-pytestmark = pytest.mark.integration_db
+
+def _evaluation_run_id() -> str:
+    value = str(uuid.uuid4())
+    assert len(value) == 36
+    return value
+
+
+def test_evaluation_run_id_helper_generates_valid_uuid():
+    first = _evaluation_run_id()
+    second = _evaluation_run_id()
+    assert isinstance(first, str)
+    assert len(first) == 36
+    assert len(second) == 36
+    assert first != second
+    uuid.UUID(first)
+    uuid.UUID(second)
 
 
 def _postgres_url() -> str:
@@ -150,8 +166,9 @@ def _cleanup_adapter_patches(adapter: MagicMock):
     )
 
 
+@pytest.mark.integration_db
 def test_pg_cleanup_success_finalizes_completed_from_new_session(pg_engine, tmp_path, monkeypatch, live_eval_env):
-    run_id = f"run-pg-cleanup-success-{datetime.now(timezone.utc).timestamp()}"
+    run_id = _evaluation_run_id()
     recipient_id = "msg-pg-success-recipient"
     _cleanup_pg(pg_engine, run_id)
     _insert_run(
@@ -207,8 +224,9 @@ def test_pg_cleanup_success_finalizes_completed_from_new_session(pg_engine, tmp_
     _cleanup_pg(pg_engine, run_id)
 
 
+@pytest.mark.integration_db
 def test_pg_cleanup_failure_finalizes_aborted_from_new_session(pg_engine, tmp_path, monkeypatch):
-    run_id = f"run-pg-cleanup-fail-{datetime.now(timezone.utc).timestamp()}"
+    run_id = _evaluation_run_id()
     recipient_id = "msg-pg-fail-recipient"
     _cleanup_pg(pg_engine, run_id)
     _insert_run(
@@ -291,8 +309,9 @@ def test_pg_cleanup_failure_finalizes_aborted_from_new_session(pg_engine, tmp_pa
     _cleanup_pg(pg_engine, run_id)
 
 
+@pytest.mark.integration_db
 def test_pg_aborted_pre_claim_archives_once_then_idempotent(pg_engine, tmp_path, monkeypatch, live_eval_env):
-    run_id = f"run-pg-preclaim-{datetime.now(timezone.utc).timestamp()}"
+    run_id = _evaluation_run_id()
     recipient_id = "msg-pg-preclaim-recipient"
     _cleanup_pg(pg_engine, run_id)
     _insert_run(pg_engine, run_id, status="aborted")
