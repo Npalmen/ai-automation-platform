@@ -181,6 +181,28 @@ def _validate_post_claim_cleanup_binding(
         raise LiveEvalSafetyError("recipient message id does not match registry root")
 
 
+def _validate_aborted_pre_claim_cleanup(
+    row: LiveEvalRunRow,
+    recipient_message_id: str | None,
+) -> None:
+    if row.root_job_id:
+        raise LiveEvalSafetyError("pre_claim cleanup not allowed when root_job_id is set")
+    if row.root_gmail_message_id:
+        raise LiveEvalSafetyError("pre_claim cleanup not allowed when root binding exists")
+    if not recipient_message_id:
+        raise LiveEvalSafetyError("pre_claim cleanup requires exact recipient_gmail_message_id")
+
+    from app.evaluation.live.cleanup_resolver import resolve_recipient_from_journal
+    from app.evaluation.live.journal import load_checkpoint
+
+    checkpoint = load_checkpoint(row.evaluation_run_id)
+    resolution = resolve_recipient_from_journal(checkpoint)
+    if not resolution.resolved:
+        raise LiveEvalSafetyError(resolution.blocked_reason or "journal_resolution_failed")
+    if resolution.recipient_gmail_message_id != recipient_message_id:
+        raise LiveEvalSafetyError("recipient message id does not match journal delivery_confirmed")
+
+
 def validate_live_gmail_run_for_mutation(
     row: LiveEvalRunRow,
     *,
@@ -208,12 +230,19 @@ def validate_live_gmail_run_for_mutation(
         mutation_operation == LIVE_EVAL_MUTATION_CLEANUP_ARCHIVE
         and cleanup_phase == "post_claim"
     )
+    is_pre_claim_cleanup_archive = (
+        mutation_operation == LIVE_EVAL_MUTATION_CLEANUP_ARCHIVE
+        and cleanup_phase == "pre_claim"
+    )
 
     if row.status == RUN_STATUS_ABORTED:
-        if not is_post_claim_cleanup_archive:
-            raise LiveEvalSafetyError(f"run status is terminal: {row.status}")
-        _validate_post_claim_cleanup_binding(row, recipient_message_id)
-        return
+        if is_post_claim_cleanup_archive:
+            _validate_post_claim_cleanup_binding(row, recipient_message_id)
+            return
+        if is_pre_claim_cleanup_archive:
+            _validate_aborted_pre_claim_cleanup(row, recipient_message_id)
+            return
+        raise LiveEvalSafetyError(f"run status is terminal: {row.status}")
 
     if row.status in TERMINAL_RUN_STATUSES:
         raise LiveEvalSafetyError(f"run status is terminal: {row.status}")
@@ -222,6 +251,9 @@ def validate_live_gmail_run_for_mutation(
         return
 
     if row.status == RUN_STATUS_ACTIVE:
+        if is_pre_claim_cleanup_archive:
+            _validate_aborted_pre_claim_cleanup(row, recipient_message_id)
+            return
         if not row.root_gmail_message_id or not row.root_job_id:
             raise LiveEvalSafetyError("active run missing root binding")
         if is_post_claim_cleanup_archive:

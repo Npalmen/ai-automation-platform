@@ -18,10 +18,18 @@ from app.evaluation.live.assertions import (
     assert_telemetry_summary,
 )
 from app.evaluation.live.cleanup import cleanup_recipient_message, cleanup_unexpected_reply
+from app.evaluation.live.cleanup_phase import resolve_cleanup_phase
 from app.evaluation.live.cleanup_resolver import resolve_recipient_from_journal
 from app.evaluation.live.config import get_live_eval_config
-from app.evaluation.live.constants import TELEMETRY_TESTBOT_SEND_RECONCILE
-from app.evaluation.live.cleanup_phase import resolve_cleanup_phase
+from app.evaluation.live.constants import (
+    CLEANUP_STATE_ALREADY_ARCHIVED,
+    CLEANUP_STATE_DEFERRED,
+    CLEANUP_STATE_FAILED,
+    CLEANUP_STATE_IN_PROGRESS,
+    CLEANUP_STATE_SUCCESS,
+    TELEMETRY_TESTBOT_SEND_RECONCILE,
+    TERMINAL_CLEANUP_STATES,
+)
 from app.evaluation.live.errors import (
     LiveEvalIntakeSkippedError,
     LiveEvalPipelinePollError,
@@ -161,6 +169,12 @@ class LiveEvalRunner:
             for t in transitions
         )
 
+    def _delivery_observed(self) -> bool:
+        from app.evaluation.live.journal import load_transitions
+
+        transitions = load_transitions(self.evaluation_run_id)
+        return any(t.get("state") == "delivery_confirmed" for t in transitions)
+
     def _record_send_confirmed(self, outcome: SendOutcome) -> None:
         self._send_state = "confirmed"
         self._transition(
@@ -255,14 +269,7 @@ class LiveEvalRunner:
             send_attempted=self._send_attempted(),
             send_confirmed=self._send_confirmed(),
             reconciliation_result=self._reconciliation_result,
-            recipient_delivery_observed=self._failed_stage
-            in (
-                "delivery_confirmed",
-                "triggering_intake",
-                "intake_completed",
-                "job_detected",
-                "pipeline_completed",
-            ),
+            recipient_delivery_observed=self._delivery_observed(),
             root_job_bound=bool(registry.get("root_job_id")),
             cleanup_state=self._cleanup_state,
             gmail_mutations=self._gmail_mutations,
@@ -563,17 +570,7 @@ class LiveEvalRunner:
                 cleanup_unexpected_reply(message_id=ctx.unexpected_reply["message_id"])
             return
 
-        cleanup_ok = self._cleanup_all(ctx)
-        self._transition("cleaning_up", cleanup_ok=cleanup_ok)
-        if not cleanup_ok:
-            self._set_primary_failure(EXIT_CLEANUP, category="cleanup_failure")
-            self._cleanup_state = "failed"
-            self._cleanup_exit_code = EXIT_CLEANUP
-            self._abort_run()
-            self._write_report("cleanup_failed", ["cleanup failed"], ctx)
-            return
-        self._cleanup_state = "success"
-        self.observer.complete_run(self.evaluation_run_id, "completed")
+        self._cleanup_state = CLEANUP_STATE_DEFERRED
         self._transition("passed")
         self._write_report("passed", [], ctx)
         self._set_primary_failure(EXIT_SUCCESS)
@@ -842,6 +839,151 @@ def cleanup_not_safe_exit_code(evaluation_run_id: str) -> int:
     return EXIT_CLEANUP
 
 
+def _read_report_cleanup_state(evaluation_run_id: str) -> str | None:
+    from app.evaluation.live.journal import load_report
+
+    report = load_report(evaluation_run_id)
+    if not report:
+        return None
+    summary = report.get("failure_summary") or {}
+    return summary.get("cleanup_state")
+
+
+def _scenario_passed(report: dict[str, Any]) -> bool:
+    summary = report.get("failure_summary") or {}
+    primary = summary.get("primary_exit_code")
+    if primary is not None:
+        return primary == EXIT_SUCCESS
+    return report.get("result") == "passed"
+
+
+def _cleanup_mutations_for_adapter_result(adapter_result: str | None) -> int:
+    return 1 if adapter_result == "archived" else 0
+
+
+def _emit_cleanup_stdout(payload: dict[str, Any]) -> None:
+    print(json.dumps(payload))
+
+
+def _persist_workflow_cleanup_outcome(
+    evaluation_run_id: str,
+    *,
+    cleanup_state: str,
+    workflow_cleanup_mutations: int,
+    cleanup_adapter_called: bool,
+    cleanup_adapter_result: str | None,
+    cleanup_exit_code: int | None,
+    cleanup_failure_reason: str | None = None,
+) -> None:
+    from app.evaluation.live.journal import load_report, write_report_atomic
+
+    payload = load_report(evaluation_run_id)
+    if not payload:
+        return
+    summary = dict(payload.get("failure_summary") or {})
+    scenario_mutations = int(summary.get("scenario_cleanup_mutations") or 0)
+    total_mutations = scenario_mutations + workflow_cleanup_mutations
+    summary.update(
+        {
+            "cleanup_state": cleanup_state,
+            "scenario_cleanup_mutations": scenario_mutations,
+            "workflow_cleanup_mutations": workflow_cleanup_mutations,
+            "total_gmail_mutations": total_mutations,
+            "gmail_mutations": total_mutations,
+            "cleanup_adapter_called": cleanup_adapter_called,
+            "cleanup_adapter_result": cleanup_adapter_result,
+            "cleanup_exit_code": cleanup_exit_code,
+        }
+    )
+    if cleanup_failure_reason:
+        summary["cleanup_failure_reason"] = cleanup_failure_reason
+    payload["failure_summary"] = summary
+    report = LiveEvalReport.model_validate(payload)
+    write_report_atomic(evaluation_run_id, report)
+
+
+def resolve_post_cleanup_run_status(
+    *,
+    scenario_passed: bool,
+    cleanup_succeeded: bool,
+    current_status: str,
+) -> str | None:
+    """Resolve registry terminal status after workflow cleanup without masking cleanup failure."""
+    if cleanup_succeeded:
+        if scenario_passed and current_status != "completed":
+            return "completed"
+        return None
+    if current_status == "active":
+        return "aborted"
+    return None
+
+
+def _finalize_run_after_cleanup(
+    observer: LiveEvalObserver,
+    evaluation_run_id: str,
+    *,
+    scenario_passed: bool,
+    cleanup_succeeded: bool,
+    current_status: str,
+) -> str | None:
+    next_status = resolve_post_cleanup_run_status(
+        scenario_passed=scenario_passed,
+        cleanup_succeeded=cleanup_succeeded,
+        current_status=current_status,
+    )
+    if next_status:
+        observer.complete_run(evaluation_run_id, next_status)
+    return next_status
+
+
+def _emit_idempotent_cleanup_skip(
+    evaluation_run_id: str,
+    *,
+    cleanup_state: str,
+    observer: LiveEvalObserver | None = None,
+) -> int:
+    adapter_result = (
+        CLEANUP_STATE_ALREADY_ARCHIVED
+        if cleanup_state == CLEANUP_STATE_ALREADY_ARCHIVED
+        else "idempotent_skip"
+    )
+    _persist_workflow_cleanup_outcome(
+        evaluation_run_id,
+        cleanup_state=cleanup_state,
+        workflow_cleanup_mutations=0,
+        cleanup_adapter_called=False,
+        cleanup_adapter_result=adapter_result,
+        cleanup_exit_code=EXIT_SUCCESS,
+    )
+    if observer is not None:
+        from app.evaluation.live.journal import load_report
+
+        report = load_report(evaluation_run_id) or {}
+        registry = observer.get_run(evaluation_run_id)
+        _finalize_run_after_cleanup(
+            observer,
+            evaluation_run_id,
+            scenario_passed=_scenario_passed(report),
+            cleanup_succeeded=True,
+            current_status=str(registry.get("status") or ""),
+        )
+    _emit_cleanup_stdout(
+        {
+            "cleanup_state": cleanup_state,
+            "evaluation_run_id": evaluation_run_id,
+            "cleanup_exit_code": EXIT_SUCCESS,
+            "gmail_mutations": 0,
+            "scenario_cleanup_mutations": 0,
+            "workflow_cleanup_mutations": 0,
+            "total_gmail_mutations": 0,
+            "cleanup_adapter_called": False,
+            "cleanup_adapter_result": adapter_result,
+            "idempotent": True,
+        }
+    )
+    return EXIT_SUCCESS
+
+
 def cleanup_only(
     *,
     base_url: str,
@@ -884,6 +1026,37 @@ def cleanup_only(
         if sender_id and message_id == sender_id:
             return _not_safe("recipient_gmail_message_id matches sender_gmail_message_id")
 
+        existing_cleanup = _read_report_cleanup_state(evaluation_run_id)
+        if existing_cleanup in TERMINAL_CLEANUP_STATES:
+            observer = LiveEvalObserver(
+                base_url=base_url,
+                admin_api_key=admin_api_key,
+                tenant_id=tenant_id,
+            )
+            return _emit_idempotent_cleanup_skip(
+                evaluation_run_id,
+                cleanup_state=existing_cleanup,
+                observer=observer,
+            )
+        if existing_cleanup == CLEANUP_STATE_FAILED:
+            from app.evaluation.live.journal import load_report
+
+            report = load_report(evaluation_run_id) or {}
+            summary = report.get("failure_summary") or {}
+            _emit_cleanup_stdout(
+                {
+                    "cleanup_state": CLEANUP_STATE_FAILED,
+                    "evaluation_run_id": evaluation_run_id,
+                    "cleanup_exit_code": EXIT_CLEANUP,
+                    "gmail_mutations": 0,
+                    "cleanup_adapter_called": False,
+                    "cleanup_adapter_result": "failed",
+                    "idempotent": True,
+                    "reason": summary.get("cleanup_failure_reason"),
+                }
+            )
+            return EXIT_CLEANUP
+
         observer = LiveEvalObserver(
             base_url=base_url,
             admin_api_key=admin_api_key,
@@ -902,35 +1075,128 @@ def cleanup_only(
             if not phase_resolution.resolved:
                 return _not_safe(phase_resolution.blocked_reason or "cleanup_phase_unresolved")
             resolved_phase = phase_resolution.phase
-        observer.cleanup_recipient(evaluation_run_id, message_id, phase=resolved_phase)
+
+        _persist_workflow_cleanup_outcome(
+            evaluation_run_id,
+            cleanup_state=CLEANUP_STATE_IN_PROGRESS,
+            workflow_cleanup_mutations=0,
+            cleanup_adapter_called=False,
+            cleanup_adapter_result=None,
+            cleanup_exit_code=None,
+        )
+        result = observer.cleanup_recipient(evaluation_run_id, message_id, phase=resolved_phase)
+        adapter_result = str(result.get("result") or "archived")
+        cleanup_state = (
+            CLEANUP_STATE_ALREADY_ARCHIVED
+            if adapter_result == "already_archived"
+            else CLEANUP_STATE_SUCCESS
+        )
+        workflow_mutations = _cleanup_mutations_for_adapter_result(adapter_result)
+        _persist_workflow_cleanup_outcome(
+            evaluation_run_id,
+            cleanup_state=cleanup_state,
+            workflow_cleanup_mutations=workflow_mutations,
+            cleanup_adapter_called=True,
+            cleanup_adapter_result=adapter_result,
+            cleanup_exit_code=EXIT_SUCCESS,
+        )
+
+        from app.evaluation.live.journal import load_report
+
+        report = load_report(evaluation_run_id) or {}
+        scenario_passed = _scenario_passed(report)
+        _finalize_run_after_cleanup(
+            observer,
+            evaluation_run_id,
+            scenario_passed=scenario_passed,
+            cleanup_succeeded=True,
+            current_status=str(registry.get("status") or ""),
+        )
+
+        _emit_cleanup_stdout(
+            {
+                "cleanup_state": cleanup_state,
+                "evaluation_run_id": evaluation_run_id,
+                "cleanup_exit_code": EXIT_SUCCESS,
+                "gmail_mutations": workflow_mutations,
+                "scenario_cleanup_mutations": 0,
+                "workflow_cleanup_mutations": workflow_mutations,
+                "total_gmail_mutations": workflow_mutations,
+                "cleanup_adapter_called": True,
+                "cleanup_adapter_result": adapter_result,
+                "phase": resolved_phase,
+                "recipient_gmail_message_id": message_id,
+            }
+        )
         return EXIT_SUCCESS
     except LiveEvalSafetyError as exc:
-        print(
-            json.dumps(
-                {
-                    "cleanup_state": "failed",
-                    "evaluation_run_id": evaluation_run_id,
-                    "reason": str(exc),
-                    "reason_type": "safety_error",
-                    "cleanup_exit_code": EXIT_CLEANUP,
-                    "gmail_mutations": 0,
-                }
-            )
+        reason = str(exc)
+        _handle_cleanup_failure(
+            evaluation_run_id,
+            base_url=base_url,
+            admin_api_key=admin_api_key,
+            tenant_id=tenant_id,
+            reason=reason,
+            reason_type="safety_error",
         )
         return EXIT_CLEANUP
     except Exception as exc:
-        print(
-            json.dumps(
-                {
-                    "cleanup_state": "failed",
-                    "evaluation_run_id": evaluation_run_id,
-                    "reason": type(exc).__name__,
-                    "reason_type": "exception",
-                    "cleanup_exit_code": EXIT_CLEANUP,
-                    "gmail_mutations": 0,
-                }
-            )
+        _handle_cleanup_failure(
+            evaluation_run_id,
+            base_url=base_url,
+            admin_api_key=admin_api_key,
+            tenant_id=tenant_id,
+            reason=type(exc).__name__,
+            reason_type="exception",
         )
         return EXIT_CLEANUP
     finally:
         release_run_writer_lock(writer_lock)
+
+
+def _handle_cleanup_failure(
+    evaluation_run_id: str,
+    *,
+    base_url: str,
+    admin_api_key: str,
+    tenant_id: str,
+    reason: str,
+    reason_type: str,
+) -> None:
+    from app.evaluation.live.journal import load_report
+
+    _persist_workflow_cleanup_outcome(
+        evaluation_run_id,
+        cleanup_state=CLEANUP_STATE_FAILED,
+        workflow_cleanup_mutations=0,
+        cleanup_adapter_called=False,
+        cleanup_adapter_result="failed",
+        cleanup_exit_code=EXIT_CLEANUP,
+        cleanup_failure_reason=reason,
+    )
+    report = load_report(evaluation_run_id) or {}
+    observer = LiveEvalObserver(
+        base_url=base_url,
+        admin_api_key=admin_api_key,
+        tenant_id=tenant_id,
+    )
+    registry = observer.get_run(evaluation_run_id)
+    _finalize_run_after_cleanup(
+        observer,
+        evaluation_run_id,
+        scenario_passed=_scenario_passed(report),
+        cleanup_succeeded=False,
+        current_status=str(registry.get("status") or ""),
+    )
+    _emit_cleanup_stdout(
+        {
+            "cleanup_state": "failed",
+            "evaluation_run_id": evaluation_run_id,
+            "reason": reason,
+            "reason_type": reason_type,
+            "cleanup_exit_code": EXIT_CLEANUP,
+            "gmail_mutations": 0,
+            "cleanup_adapter_called": False,
+            "cleanup_adapter_result": "failed",
+        }
+    )

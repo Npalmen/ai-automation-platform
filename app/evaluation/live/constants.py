@@ -51,6 +51,18 @@ TELEMETRY_APP_CLEANUP_ARCHIVED = "app_live_eval_cleanup_archived"
 
 LIVE_EVAL_MUTATION_CLEANUP_ARCHIVE = "cleanup_archive"
 
+# Authoritative cleanup lifecycle states for live-eval reporting.
+CLEANUP_STATE_NOT_STARTED = "not_started"
+CLEANUP_STATE_DEFERRED = "deferred"
+CLEANUP_STATE_IN_PROGRESS = "in_progress"
+CLEANUP_STATE_SUCCESS = "success"
+CLEANUP_STATE_ALREADY_ARCHIVED = "already_archived"
+CLEANUP_STATE_BLOCKED = "blocked"
+CLEANUP_STATE_FAILED = "failed"
+TERMINAL_CLEANUP_STATES = frozenset(
+    {CLEANUP_STATE_SUCCESS, CLEANUP_STATE_ALREADY_ARCHIVED}
+)
+
 ALLOWED_INTERLEAVED_DECISION_TYPES: frozenset[str] = frozenset()
 
 # Delivery time window skew (seconds)

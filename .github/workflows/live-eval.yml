@@ -82,15 +82,16 @@ jobs:
         run: |
           COLLECT_LINE=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live 2>/dev/null | awk '/ collected/ { print; exit }')
           EXPECTED_INTEGRATION_DB=$(echo "${COLLECT_LINE}" | awk '{ split($1, parts, "/"); print parts[1] }')
-          if [ "${EXPECTED_INTEGRATION_DB}" != "8" ]; then
-            echo "foundation integration_db gate requires exactly 8 selected tests, got ${EXPECTED_INTEGRATION_DB}" >&2
+          if [ "${EXPECTED_INTEGRATION_DB}" != "11" ]; then
+            echo "foundation integration_db gate requires exactly 11 selected tests, got ${EXPECTED_INTEGRATION_DB}" >&2
             exit 1
           fi
           ROOT_JOB=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live/test_root_job_atomic_pg.py 2>/dev/null | awk '/ collected/ { print; exit }' | awk '{ split($1, parts, "/"); print parts[1] }')
           TELEMETRY=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live/test_telemetry_idempotency_pg.py 2>/dev/null | awk '/ collected/ { print; exit }' | awk '{ split($1, parts, "/"); print parts[1] }')
           REGISTRY=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live/test_registry_refresh_pg.py 2>/dev/null | awk '/ collected/ { print; exit }' | awk '{ split($1, parts, "/"); print parts[1] }')
-          if [ "${ROOT_JOB}" != "5" ] || [ "${TELEMETRY}" != "2" ] || [ "${REGISTRY}" != "1" ]; then
-            echo "foundation integration_db composition must be 5 root-job + 2 telemetry + 1 registry refresh, got ${ROOT_JOB}+${TELEMETRY}+${REGISTRY}" >&2
+          CLEANUP=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live/test_cleanup_persistence_pg.py 2>/dev/null | awk '/ collected/ { print; exit }' | awk '{ split($1, parts, "/"); print parts[1] }')
+          if [ "${ROOT_JOB}" != "5" ] || [ "${TELEMETRY}" != "2" ] || [ "${REGISTRY}" != "1" ] || [ "${CLEANUP}" != "3" ]; then
+            echo "foundation integration_db composition must be 5 root-job + 2 telemetry + 1 registry refresh + 3 cleanup persistence, got ${ROOT_JOB}+${TELEMETRY}+${REGISTRY}+${CLEANUP}" >&2
             exit 1
           fi
 
@@ -106,7 +107,7 @@ jobs:
             --junitxml=foundation_integration_db.junit.xml
 
       - name: Verify integration_db JUnit gate
-        run: python scripts/ci/verify_pytest_junit.py foundation_integration_db.junit.xml --expected 8
+        run: python scripts/ci/verify_pytest_junit.py foundation_integration_db.junit.xml --expected 11
 
       - name: Run live-eval hermetic tests
         run: python -m pytest tests/evaluation/live -m "not integration_db and not live_gmail_eval" -q --tb=short
