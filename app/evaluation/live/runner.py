@@ -21,7 +21,12 @@ from app.evaluation.live.cleanup import cleanup_recipient_message, cleanup_unexp
 from app.evaluation.live.cleanup_resolver import resolve_recipient_from_journal
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.constants import TELEMETRY_TESTBOT_SEND_RECONCILE
-from app.evaluation.live.errors import LiveEvalIntakeSkippedError, LiveEvalSafetyError
+from app.evaluation.live.cleanup_phase import resolve_cleanup_phase
+from app.evaluation.live.errors import (
+    LiveEvalIntakeSkippedError,
+    LiveEvalSafetyError,
+    LiveEvalSafetyRejectedError,
+)
 from app.evaluation.live.exit_codes import (
     EXIT_ASSERTION,
     EXIT_CLEANUP,
@@ -108,6 +113,7 @@ class LiveEvalRunner:
         self.send_window_start = self.started_at
         self.failure_category: str | None = None
         self._intake_skip_reason: str | None = None
+        self._safety_reason: str | None = None
         self._registry_run: dict[str, Any] | None = None
         self._resume_phase: str = "pre_send"
         self._checkpoint = None
@@ -257,6 +263,11 @@ class LiveEvalRunner:
             gmail_mutations=self._gmail_mutations,
             error=self._last_error,
             intake_skip_reason=self._intake_skip_reason,
+            safety_reason=self._safety_reason,
+            workflow_sha=(
+                os.environ.get("BUILD_GIT_SHA") or os.environ.get("GITHUB_SHA") or ""
+            ).strip()
+            or None,
         )
         emit_run_summary_stdout(summary)
         write_github_step_summary(summary)
@@ -381,6 +392,12 @@ class LiveEvalRunner:
             self._set_primary_failure(EXIT_CONFIG, category="intake_skipped")
             self._abort_run()
             self._write_report("failed", [self._intake_skip_reason])
+        except LiveEvalSafetyRejectedError as exc:
+            self._last_error = exc
+            self._safety_reason = str(exc.payload.get("safety_reason") or "safety_rejected_unknown")
+            self._set_primary_failure(EXIT_CONFIG, category="safety_rejected")
+            self._abort_run()
+            self._write_report("failed", [self._safety_reason])
         except LiveEvalSafetyError as exc:
             self._last_error = exc
             msg = str(exc)
@@ -808,7 +825,7 @@ def cleanup_only(
     tenant_id: str,
     evaluation_run_id: str,
     recipient_gmail_message_id: str | None = None,
-    phase: str = "post_claim",
+    phase: str | None = None,
     force_unlock: bool = False,
 ) -> int:
     writer_lock = acquire_run_writer_lock(evaluation_run_id, force_unlock=force_unlock)
@@ -848,7 +865,20 @@ def cleanup_only(
             admin_api_key=admin_api_key,
             tenant_id=tenant_id,
         )
-        observer.cleanup_recipient(evaluation_run_id, message_id, phase=phase)
+        registry = observer.get_run(evaluation_run_id)
+        root_job_bound = bool(registry.get("root_job_id"))
+        root_gmail_message_id = registry.get("root_gmail_message_id")
+        resolved_phase = phase
+        if resolved_phase in (None, "", "auto"):
+            phase_resolution = resolve_cleanup_phase(
+                checkpoint,
+                root_job_bound=root_job_bound,
+                root_gmail_message_id=root_gmail_message_id,
+            )
+            if not phase_resolution.resolved:
+                return _not_safe(phase_resolution.blocked_reason or "cleanup_phase_unresolved")
+            resolved_phase = phase_resolution.phase
+        observer.cleanup_recipient(evaluation_run_id, message_id, phase=resolved_phase)
         return EXIT_SUCCESS
     except LiveEvalSafetyError:
         return EXIT_CLEANUP

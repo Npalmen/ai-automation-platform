@@ -69,6 +69,8 @@ class FailureSummary:
     gmail_mutations: int
     redacted_error: str | None = None
     intake_skip_reason: str | None = None
+    safety_reason: str | None = None
+    workflow_sha: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return redact_sensitive(
@@ -93,6 +95,8 @@ class FailureSummary:
                 "gmail_mutations": self.gmail_mutations,
                 "redacted_error": self.redacted_error,
                 "intake_skip_reason": self.intake_skip_reason,
+                "safety_reason": self.safety_reason,
+                "workflow_sha": self.workflow_sha,
             }
         )
 
@@ -117,6 +121,8 @@ def build_failure_summary(
     gmail_mutations: int = 0,
     error: str | BaseException | None = None,
     intake_skip_reason: str | None = None,
+    safety_reason: str | None = None,
+    workflow_sha: str | None = None,
 ) -> FailureSummary:
     final_exit_code = compute_final_exit_code(
         primary_exit_code=primary_exit_code,
@@ -144,6 +150,8 @@ def build_failure_summary(
         gmail_mutations=gmail_mutations,
         redacted_error=redacted_error,
         intake_skip_reason=intake_skip_reason,
+        safety_reason=safety_reason,
+        workflow_sha=workflow_sha,
     )
 
 
@@ -151,16 +159,32 @@ def emit_run_summary_stdout(summary: FailureSummary) -> None:
     print(json.dumps(summary.to_dict(), ensure_ascii=False))
 
 
+_FIXTURE_WORKFLOW_SHA_MARKERS = frozenset({"abc123", "abc", "abc1234"})
+
+
+def _resolve_workflow_sha_for_summary() -> str | None:
+    sha = (os.environ.get("BUILD_GIT_SHA") or os.environ.get("GITHUB_SHA") or "").strip()
+    if not sha or sha.lower() in _FIXTURE_WORKFLOW_SHA_MARKERS:
+        return None
+    return sha
+
+
 def write_github_step_summary(summary: FailureSummary) -> None:
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if not summary_path:
         return
     payload = summary.to_dict()
+    workflow_sha = payload.get("workflow_sha") or _resolve_workflow_sha_for_summary()
     lines = [
         "## Live Gmail eval run summary",
         f"- evaluation_run_id: `{payload['evaluation_run_id']}`",
         f"- scenario_id: `{payload['scenario_id']}`",
         f"- attempt_id: {payload['attempt_id']}",
+    ]
+    if workflow_sha:
+        lines.append(f"- workflow_sha: `{workflow_sha}`")
+    lines.extend(
+        [
         f"- final_exit_code: **{payload['final_exit_code']}**",
         f"- primary_exit_code: {payload['primary_exit_code']}",
         f"- cleanup_exit_code: {payload['cleanup_exit_code']}",
@@ -174,11 +198,14 @@ def write_github_step_summary(summary: FailureSummary) -> None:
         f"- root_job_bound: {payload['root_job_bound']}",
         f"- cleanup_state: `{payload['cleanup_state']}`",
         f"- gmail_mutations: {payload['gmail_mutations']}",
-    ]
+        ]
+    )
     if payload.get("failure_category"):
         lines.append(f"- failure_category: `{payload['failure_category']}`")
     if payload.get("intake_skip_reason"):
         lines.append(f"- intake_skip_reason: `{payload['intake_skip_reason']}`")
+    if payload.get("safety_reason"):
+        lines.append(f"- safety_reason: `{payload['safety_reason']}`")
     if payload.get("redacted_error"):
         lines.append(f"- redacted_error: {payload['redacted_error']}")
     Path(summary_path).write_text("\n".join(lines) + "\n", encoding="utf-8")

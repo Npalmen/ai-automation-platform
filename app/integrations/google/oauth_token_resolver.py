@@ -109,6 +109,7 @@ def resolve_google_mail_connection_config(
                 "user_id": user_id,
                 "refresh_token": refresh_token,
                 "credential_source": "tenant_oauth",
+                "metadata_json": meta,
             }
 
     # Platform-level fallback (legacy)

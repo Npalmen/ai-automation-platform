@@ -164,8 +164,11 @@ def test_cleanup_only_resolves_from_journal(live_eval_env, monkeypatch, tmp_path
         "app.evaluation.live.runner.acquire_run_writer_lock",
         return_value=MagicMock(),
     ), patch("app.evaluation.live.runner.release_run_writer_lock"), patch(
-        "app.evaluation.live.runner.LiveEvalObserver.cleanup_recipient"
-    ) as cleanup_mock:
+        "app.evaluation.live.runner.LiveEvalObserver"
+    ) as observer_cls:
+        observer = MagicMock()
+        observer.get_run.return_value = {"root_job_id": None, "root_gmail_message_id": None}
+        observer_cls.return_value = observer
         code = cleanup_only(
             base_url="http://localhost:8010",
             admin_api_key="key",
@@ -173,7 +176,7 @@ def test_cleanup_only_resolves_from_journal(live_eval_env, monkeypatch, tmp_path
             evaluation_run_id=run_id,
         )
 
-    cleanup_mock.assert_called_once_with(run_id, "recipient-msg-1", phase="post_claim")
+    observer.cleanup_recipient.assert_called_once_with(run_id, "recipient-msg-1", phase="pre_claim")
     assert code == EXIT_SUCCESS
 
 

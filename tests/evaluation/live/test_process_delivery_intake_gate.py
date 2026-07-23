@@ -415,7 +415,8 @@ def test_wrong_sender_blocked_before_intake(api_client, db):
         )
 
     assert response.status_code == 400
-    assert "sender_mismatch" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert detail["safety_reason"] == "sender_mismatch"
 
 
 def test_wrong_recipient_blocked(api_client, db):
@@ -437,7 +438,8 @@ def test_wrong_recipient_blocked(api_client, db):
         )
 
     assert response.status_code == 400
-    assert "recipient_mismatch" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert detail["safety_reason"] == "recipient_mismatch"
 
 
 def test_missing_intake_label_blocked(api_client, db):
@@ -463,7 +465,8 @@ def test_missing_intake_label_blocked(api_client, db):
         )
 
     assert response.status_code == 400
-    assert "missing_intake_label" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert detail["safety_reason"] == "missing_intake_label"
 
 
 def test_old_run_token_cannot_match_new_run(api_client, db):
@@ -491,7 +494,8 @@ def test_old_run_token_cannot_match_new_run(api_client, db):
         )
 
     assert response.status_code == 400
-    assert "evaluation_run_id_mismatch" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert detail["safety_reason"] == "evaluation_run_id_mismatch"
 
 
 def test_observer_preserves_intake_skip_reason():

@@ -303,15 +303,20 @@ def test_cleanup_only_resolves_recipient_from_journal(live_eval_env, monkeypatch
         "app.evaluation.live.runner.acquire_run_writer_lock",
         return_value=MagicMock(),
     ), patch("app.evaluation.live.runner.release_run_writer_lock"), patch(
-        "app.evaluation.live.runner.LiveEvalObserver.cleanup_recipient"
-    ) as cleanup_mock:
+        "app.evaluation.live.runner.LiveEvalObserver"
+    ) as observer_cls:
+        observer = MagicMock()
+        observer.get_run.return_value = {"root_job_id": None, "root_gmail_message_id": None}
+        observer_cls.return_value = observer
         code = cleanup_only(
             base_url="http://localhost:8010",
             admin_api_key="key",
             tenant_id="TENANT_LIVE_EVAL",
             evaluation_run_id=run_id,
         )
-    cleanup_mock.assert_called_once_with(run_id, "recipient-msg-journal", phase="post_claim")
+    observer.cleanup_recipient.assert_called_once_with(
+        run_id, "recipient-msg-journal", phase="pre_claim"
+    )
     assert code == EXIT_SUCCESS
 
 

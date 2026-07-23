@@ -265,6 +265,21 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
         state_transitions=transitions,
     )
     report_path = write_report_atomic(run_id, report)
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        Path(summary_path).write_text(
+            "\n".join(
+                [
+                    "## Live Gmail eval offline dry-run",
+                    "- mode: **offline/hermetic**",
+                    "- workflow_sha: _not applicable (offline dry-run)_",
+                    f"- evaluation_run_id: `{run_id}`",
+                    f"- transition_count: {len(transitions)}",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     print(
         json.dumps(
             {
@@ -432,7 +447,7 @@ def build_parser() -> argparse.ArgumentParser:
     cleanup.add_argument("--run-id", required=True)
     cleanup.add_argument("--tenant-id", default=None)
     cleanup.add_argument("--recipient-message-id", default=None)
-    cleanup.add_argument("--phase", default="post_claim", choices=["pre_claim", "post_claim"])
+    cleanup.add_argument("--phase", default="auto", choices=["auto", "pre_claim", "post_claim"])
     cleanup.add_argument("--app-base-url", default=None)
     cleanup.add_argument("--confirm-external", action="store_true")
     cleanup.set_defaults(func=cmd_cleanup_run)
