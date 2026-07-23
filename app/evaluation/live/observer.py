@@ -10,6 +10,7 @@ import httpx
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.errors import LiveEvalIntakeSkippedError, LiveEvalSafetyRejectedError
 from app.evaluation.live.intake_errors import parse_intake_skipped_payload
+from app.evaluation.live.pipeline_poll import poll_pipeline_observation
 from app.evaluation.live.safety_errors import parse_safety_rejected_payload
 
 
@@ -127,14 +128,12 @@ class LiveEvalObserver:
         timeout_seconds: float = 600,
         on_poll: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
-        return self._poll(
+        result = poll_pipeline_observation(
             lambda: self.get_observation(evaluation_run_id),
-            success_predicate=lambda p: (p.get("job") or {}).get("job_status") == "awaiting_approval",
-            duplicate_predicate=lambda _p: False,
             timeout_seconds=timeout_seconds,
             on_poll=on_poll,
-            failure_category="job_timeout",
         )
+        return result.observation
 
     def complete_run(self, evaluation_run_id: str, status: str) -> dict[str, Any]:
         response = httpx.post(

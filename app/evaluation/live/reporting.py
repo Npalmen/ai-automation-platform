@@ -71,10 +71,13 @@ class FailureSummary:
     intake_skip_reason: str | None = None
     safety_reason: str | None = None
     workflow_sha: str | None = None
+    timeout_reason: str | None = None
+    timeout_job_snapshot: dict[str, Any] | None = None
+    poll_attempts: int | None = None
+    poll_duration_seconds: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return redact_sensitive(
-            {
+        payload = {
                 "summary_schema_version": _FAILURE_SUMMARY_SCHEMA,
                 "evaluation_run_id": self.evaluation_run_id,
                 "scenario_id": self.scenario_id,
@@ -98,7 +101,15 @@ class FailureSummary:
                 "safety_reason": self.safety_reason,
                 "workflow_sha": self.workflow_sha,
             }
-        )
+        if self.timeout_reason:
+            payload["timeout_reason"] = self.timeout_reason
+        if self.timeout_job_snapshot:
+            payload["timeout_job_snapshot"] = self.timeout_job_snapshot
+        if self.poll_attempts is not None:
+            payload["poll_attempts"] = self.poll_attempts
+        if self.poll_duration_seconds is not None:
+            payload["poll_duration_seconds"] = round(self.poll_duration_seconds, 3)
+        return redact_sensitive(payload)
 
 
 def build_failure_summary(
@@ -123,6 +134,10 @@ def build_failure_summary(
     intake_skip_reason: str | None = None,
     safety_reason: str | None = None,
     workflow_sha: str | None = None,
+    timeout_reason: str | None = None,
+    timeout_job_snapshot: dict[str, Any] | None = None,
+    poll_attempts: int | None = None,
+    poll_duration_seconds: float | None = None,
 ) -> FailureSummary:
     final_exit_code = compute_final_exit_code(
         primary_exit_code=primary_exit_code,
@@ -152,6 +167,10 @@ def build_failure_summary(
         intake_skip_reason=intake_skip_reason,
         safety_reason=safety_reason,
         workflow_sha=workflow_sha,
+        timeout_reason=timeout_reason,
+        timeout_job_snapshot=timeout_job_snapshot,
+        poll_attempts=poll_attempts,
+        poll_duration_seconds=poll_duration_seconds,
     )
 
 
@@ -206,6 +225,10 @@ def write_github_step_summary(summary: FailureSummary) -> None:
         lines.append(f"- intake_skip_reason: `{payload['intake_skip_reason']}`")
     if payload.get("safety_reason"):
         lines.append(f"- safety_reason: `{payload['safety_reason']}`")
+    if payload.get("timeout_reason"):
+        lines.append(f"- timeout_reason: `{payload['timeout_reason']}`")
+    if payload.get("poll_attempts") is not None:
+        lines.append(f"- poll_attempts: {payload['poll_attempts']}")
     if payload.get("redacted_error"):
         lines.append(f"- redacted_error: {payload['redacted_error']}")
     Path(summary_path).write_text("\n".join(lines) + "\n", encoding="utf-8")

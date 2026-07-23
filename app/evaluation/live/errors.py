@@ -23,3 +23,21 @@ class LiveEvalSafetyRejectedError(Exception):
     def __init__(self, payload: dict[str, Any]):
         self.payload = payload
         super().__init__(str(payload.get("safety_reason") or "live_eval_safety"))
+
+
+class LiveEvalPipelinePollError(TimeoutError):
+    """Pipeline poll failed or timed out with structured, redacted observability."""
+
+    def __init__(
+        self,
+        *,
+        timeout_reason: str,
+        job_snapshot: dict[str, Any],
+        poll_attempts: int,
+        poll_duration_seconds: float,
+    ):
+        self.timeout_reason = timeout_reason
+        self.job_snapshot = job_snapshot
+        self.poll_attempts = poll_attempts
+        self.poll_duration_seconds = poll_duration_seconds
+        super().__init__(timeout_reason)

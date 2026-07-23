@@ -500,13 +500,18 @@ def run_ai_step(
         )
 
         if use_live_eval_llm:
+            from app.evaluation.fixture_ai import reset_active_prompt_name, set_active_prompt_name
             from app.evaluation.live.llm_provider import resolve_llm_client
 
             llm_client = resolve_llm_client(job=job)
+            prompt_token = set_active_prompt_name(prompt_name)
+            try:
+                raw_output = llm_client.generate_json(prompt)
+            finally:
+                reset_active_prompt_name(prompt_token)
         else:
             llm_client = get_llm_client()
-
-        raw_output = llm_client.generate_json(prompt)
+            raw_output = llm_client.generate_json(prompt)
         parsed = response_model.model_validate(raw_output)
 
         duration_ms = int((time.perf_counter() - started) * 1000)

@@ -8,6 +8,8 @@ from app.evaluation.live.config import LiveEvalConfig, get_live_eval_config
 from app.evaluation.live.constants import (
     ALLOWED_AI_MODES,
     ALLOWED_TRANSPORT_MODES,
+    LIVE_EVAL_MUTATION_CLEANUP_ARCHIVE,
+    RUN_STATUS_ABORTED,
     RUN_STATUS_ACTIVE,
     RUN_STATUS_REGISTERED,
     TERMINAL_RUN_STATUSES,
@@ -167,12 +169,25 @@ def require_live_eval_mutation_context(
     return require_tenant_allowed(tenant_id, config)
 
 
+def _validate_post_claim_cleanup_binding(
+    row: LiveEvalRunRow,
+    recipient_message_id: str | None,
+) -> None:
+    if not row.root_gmail_message_id or not row.root_job_id:
+        raise LiveEvalSafetyError("post_claim cleanup requires trusted root binding")
+    if not recipient_message_id:
+        raise LiveEvalSafetyError("post_claim cleanup requires exact recipient_gmail_message_id")
+    if recipient_message_id != row.root_gmail_message_id:
+        raise LiveEvalSafetyError("recipient message id does not match registry root")
+
+
 def validate_live_gmail_run_for_mutation(
     row: LiveEvalRunRow,
     *,
     tenant_id: str,
     recipient_message_id: str | None = None,
-    allow_active_idempotent: bool = False,
+    mutation_operation: str | None = None,
+    cleanup_phase: str | None = None,
 ) -> None:
     require_tenant_allowed(tenant_id)
     if row.tenant_id != tenant_id:
@@ -188,6 +203,18 @@ def validate_live_gmail_run_for_mutation(
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     if expires_at < now:
         raise LiveEvalSafetyError("run has expired")
+
+    is_post_claim_cleanup_archive = (
+        mutation_operation == LIVE_EVAL_MUTATION_CLEANUP_ARCHIVE
+        and cleanup_phase == "post_claim"
+    )
+
+    if row.status == RUN_STATUS_ABORTED:
+        if not is_post_claim_cleanup_archive:
+            raise LiveEvalSafetyError(f"run status is terminal: {row.status}")
+        _validate_post_claim_cleanup_binding(row, recipient_message_id)
+        return
+
     if row.status in TERMINAL_RUN_STATUSES:
         raise LiveEvalSafetyError(f"run status is terminal: {row.status}")
 
@@ -197,9 +224,8 @@ def validate_live_gmail_run_for_mutation(
     if row.status == RUN_STATUS_ACTIVE:
         if not row.root_gmail_message_id or not row.root_job_id:
             raise LiveEvalSafetyError("active run missing root binding")
-        if allow_active_idempotent and recipient_message_id:
-            if recipient_message_id != row.root_gmail_message_id:
-                raise LiveEvalSafetyError("recipient message id does not match registry root")
+        if is_post_claim_cleanup_archive:
+            _validate_post_claim_cleanup_binding(row, recipient_message_id)
         return
 
     raise LiveEvalSafetyError(f"run status {row.status!r} does not allow mutation")
