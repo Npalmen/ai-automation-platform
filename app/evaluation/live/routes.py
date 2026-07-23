@@ -26,6 +26,11 @@ from app.evaluation.live.delivery import (
 )
 from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.live.gmail_intake import process_gmail_message_by_id
+from app.evaluation.live.safety_errors import (
+    build_safety_rejected_payload,
+    build_safety_rejected_payload_from_exc,
+    classify_safety_reason,
+)
 from app.evaluation.live.observation import (
     build_full_observation,
     get_run_summary,
@@ -62,6 +67,49 @@ from app.integrations.service import get_integration_connection_config
 from app.repositories.postgres.live_eval_repository import LiveEvalRunRepository
 
 router = APIRouter(prefix="/admin/live-eval", tags=["admin", "live-eval"])
+
+
+def _safety_http_exception(
+    exc: LiveEvalSafetyError | str,
+    *,
+    evaluation_run_id: str,
+    scenario_id: str,
+    attempt_id: int,
+    tenant_id: str,
+    failed_stage: str,
+    root_job_created: bool = False,
+) -> HTTPException:
+    payload = build_safety_rejected_payload_from_exc(
+        exc,
+        evaluation_run_id=evaluation_run_id,
+        scenario_id=scenario_id,
+        attempt_id=attempt_id,
+        tenant_id=tenant_id,
+        failed_stage=failed_stage,
+        root_job_created=root_job_created,
+    )
+    return HTTPException(status_code=400, detail=payload.model_dump())
+
+
+def _intake_failed_http_exception(
+    *,
+    evaluation_run_id: str,
+    scenario_id: str,
+    attempt_id: int,
+    tenant_id: str,
+    reason: str,
+    root_job_created: bool = False,
+) -> HTTPException:
+    payload = build_safety_rejected_payload(
+        evaluation_run_id=evaluation_run_id,
+        scenario_id=scenario_id,
+        attempt_id=attempt_id,
+        tenant_id=tenant_id,
+        safety_reason=classify_safety_reason(reason),
+        failed_stage="triggering_intake",
+        root_job_created=root_job_created,
+    )
+    return HTTPException(status_code=400, detail=payload.model_dump())
 
 
 @router.post("/runs", response_model=LiveEvalRunResponse)
@@ -188,18 +236,34 @@ def process_live_eval_delivery(
     db: Session = Depends(get_db),
     _admin=Depends(require_admin_api_key),
 ):
-    try:
-        require_live_eval_mutation_context(body.tenant_id)
-    except LiveEvalSafetyError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
     row = LiveEvalRunRepository.get_run(db, evaluation_run_id, tenant_id=body.tenant_id)
     if row is None:
         raise HTTPException(status_code=404, detail="run not found")
 
+    try:
+        require_live_eval_mutation_context(body.tenant_id)
+    except LiveEvalSafetyError as exc:
+        raise _safety_http_exception(
+            exc,
+            evaluation_run_id=evaluation_run_id,
+            scenario_id=row.scenario_id,
+            attempt_id=row.attempt_id,
+            tenant_id=body.tenant_id,
+            failed_stage="triggering_intake",
+            root_job_created=bool(row.root_job_id),
+        ) from exc
+
     if row.status == RUN_STATUS_ACTIVE and row.root_job_id and row.root_gmail_message_id:
         if body.recipient_gmail_message_id != row.root_gmail_message_id:
-            raise HTTPException(status_code=400, detail="recipient message id does not match registry root")
+            raise _safety_http_exception(
+                "recipient message id does not match registry root",
+                evaluation_run_id=evaluation_run_id,
+                scenario_id=row.scenario_id,
+                attempt_id=row.attempt_id,
+                tenant_id=body.tenant_id,
+                failed_stage="triggering_intake",
+                root_job_created=True,
+            )
         return ProcessDeliveryResponse(
             evaluation_run_id=evaluation_run_id,
             recipient_gmail_message_id=body.recipient_gmail_message_id,
@@ -231,7 +295,15 @@ def process_live_eval_delivery(
                 recipient_message_id=body.recipient_gmail_message_id,
             )
     except LiveEvalSafetyError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise _safety_http_exception(
+            exc,
+            evaluation_run_id=evaluation_run_id,
+            scenario_id=row.scenario_id,
+            attempt_id=row.attempt_id,
+            tenant_id=body.tenant_id,
+            failed_stage="triggering_intake",
+            root_job_created=bool(row.root_job_id),
+        ) from exc
 
     connection_config = get_integration_connection_config(
         tenant_id=body.tenant_id,
@@ -252,7 +324,15 @@ def process_live_eval_delivery(
         msg, row=row, config=None, intake_label_id=intake_label_id
     )
     if not ok:
-        raise HTTPException(status_code=400, detail=f"delivery validation failed: {reason}")
+        raise _safety_http_exception(
+            f"delivery validation failed: {reason}",
+            evaluation_run_id=evaluation_run_id,
+            scenario_id=row.scenario_id,
+            attempt_id=row.attempt_id,
+            tenant_id=body.tenant_id,
+            failed_stage="triggering_intake",
+            root_job_created=bool(row.root_job_id),
+        )
 
     intake_query = f'label:{get_live_eval_config().intake_label} subject:"KROWOLF-EVAL/{evaluation_run_id}"'
     intake_result = process_gmail_message_by_id(
@@ -264,7 +344,15 @@ def process_live_eval_delivery(
         skip_slack_notify=True,
     )
     if intake_result.get("status") == "failed":
-        raise HTTPException(status_code=400, detail=intake_result.get("reason", "intake failed"))
+        reason = str(intake_result.get("reason") or "intake failed")
+        raise _intake_failed_http_exception(
+            evaluation_run_id=evaluation_run_id,
+            scenario_id=row.scenario_id,
+            attempt_id=row.attempt_id,
+            tenant_id=body.tenant_id,
+            reason=reason,
+            root_job_created=bool(row.root_job_id),
+        )
     if intake_result.get("status") == "skipped" and intake_result.get("reason") != "duplicate":
         from app.evaluation.live.intake_errors import build_intake_skipped_payload
 
@@ -299,6 +387,9 @@ def cleanup_live_eval_recipient(
     db: Session = Depends(get_db),
     _admin=Depends(require_admin_api_key),
 ):
+    row = LiveEvalRunRepository.get_run(db, evaluation_run_id, tenant_id=body.tenant_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="run not found")
     try:
         require_live_eval_mutation_context(body.tenant_id)
         return cleanup_recipient_message(
@@ -309,7 +400,15 @@ def cleanup_live_eval_recipient(
             phase=body.phase,
         )
     except LiveEvalSafetyError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise _safety_http_exception(
+            exc,
+            evaluation_run_id=evaluation_run_id,
+            scenario_id=row.scenario_id,
+            attempt_id=row.attempt_id,
+            tenant_id=body.tenant_id,
+            failed_stage="cleaning_up",
+            root_job_created=bool(row.root_job_id),
+        ) from exc
 
 
 @router.get("/runtime-readiness", response_model=RuntimeReadinessResponse)

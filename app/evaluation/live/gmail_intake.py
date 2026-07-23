@@ -13,8 +13,10 @@ from app.evaluation.live.constants import (
     TELEMETRY_APP_INTAKE_STARTED,
     TELEMETRY_APP_INTAKE_SUCCEEDED,
 )
+from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.live.intake import resolve_trusted_live_eval_from_message
+from app.evaluation.live.recipient_identity import resolve_canonical_recipient_email
 from app.evaluation.live.subject_parser import parse_subject_token
 from app.evaluation.live.telemetry import build_operation_key, record_live_eval_external_event
 from app.integrations.enums import IntegrationType
@@ -34,13 +36,6 @@ _INFERRED_TYPE_TO_JOB_TYPE = {
     "customer_inquiry": JobType.CUSTOMER_INQUIRY,
     "invoice": JobType.INVOICE,
 }
-
-
-def _gmail_recipient_email(connection_config: dict) -> str:
-    user_id = str(connection_config.get("user_id") or "").strip().lower()
-    if "@" in user_id:
-        return user_id
-    return ""
 
 
 def _parse_from_header(from_header: str) -> tuple[str, str]:
@@ -89,6 +84,19 @@ def process_gmail_message_by_id(
         integration_type=IntegrationType.GOOGLE_MAIL,
         db=db,
     )
+    config = get_live_eval_config()
+    canonical_recipient, identity_error = resolve_canonical_recipient_email(
+        connection_config,
+        metadata=connection_config.get("metadata_json") or {},
+        allowlist=config.recipient_emails,
+    )
+    if identity_error:
+        return {
+            "status": "failed",
+            "message_id": message_id,
+            "reason": identity_error,
+            "safety_reason": identity_error,
+        }
     adapter = get_integration_adapter(
         integration_type=IntegrationType.GOOGLE_MAIL,
         connection_config=connection_config,
@@ -173,7 +181,7 @@ def process_gmail_message_by_id(
                 tenant_id=tenant_id,
                 subject=subject,
                 sender_email=sender_email,
-                recipient_email=_gmail_recipient_email(connection_config),
+                recipient_email=canonical_recipient or "",
                 query=query_used,
             )
             if live_eval_snapshot is not None:

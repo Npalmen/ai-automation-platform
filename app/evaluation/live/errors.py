@@ -15,3 +15,11 @@ class LiveEvalIntakeSkippedError(Exception):
     def __init__(self, payload: dict[str, Any]):
         self.payload = payload
         super().__init__(str(payload.get("intake_skip_reason") or "intake_skipped"))
+
+
+class LiveEvalSafetyRejectedError(Exception):
+    """Structured live-eval safety rejection (HTTP 400) — configuration/safety, not transport."""
+
+    def __init__(self, payload: dict[str, Any]):
+        self.payload = payload
+        super().__init__(str(payload.get("safety_reason") or "live_eval_safety"))

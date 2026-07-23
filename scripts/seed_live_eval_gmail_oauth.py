@@ -43,6 +43,8 @@ def _validate_guards(tenant_id: str, *, apply: bool) -> list[str]:
         issues.append("explicit --tenant-id is required")
     if config.tenant_ids and tenant_id not in config.tenant_ids:
         issues.append(f"tenant_id {tenant_id!r} is not in LIVE_EVAL_TENANT_IDS")
+    if apply and len(sorted(config.recipient_emails)) != 1:
+        issues.append("exactly one LIVE_EVAL_RECIPIENT_EMAILS entry required for OAuth seed")
     if _is_production_db(settings.DATABASE_URL or ""):
         issues.append("refusing production-like DATABASE_URL")
 
@@ -74,7 +76,11 @@ def _validate_guards(tenant_id: str, *, apply: bool) -> list[str]:
 
 def _seed_oauth(tenant_id: str) -> dict:
     refresh = os.environ.get("LIVE_EVAL_RECIPIENT_GMAIL_REFRESH_TOKEN", "").strip()
-    email = os.environ.get("LIVE_EVAL_RECIPIENT_GMAIL_EMAIL", "").strip().lower()
+    config = get_live_eval_config()
+    recipients = sorted(config.recipient_emails)
+    if len(recipients) != 1:
+        raise ValueError("exactly one allowlisted LIVE_EVAL_RECIPIENT_EMAILS entry required")
+    email = recipients[0].strip().lower()
     scopes = os.environ.get(
         "LIVE_EVAL_RECIPIENT_GMAIL_SCOPES",
         "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify",
@@ -90,12 +96,13 @@ def _seed_oauth(tenant_id: str) -> dict:
             refresh_token=refresh,
             expires_at=datetime.now(timezone.utc),
             scopes=scopes,
-            metadata_json={"email": email} if email else {},
+            metadata_json={"email": email},
         )
         return {
             "tenant_id": tenant_id,
             "status": "seeded",
             "credential_source": "tenant_oauth",
+            "recipient_email_fingerprint": email[:1] + "***@" + email.split("@", 1)[-1],
         }
     finally:
         db.close()

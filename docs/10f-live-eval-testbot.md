@@ -268,7 +268,19 @@ Manual `workflow_dispatch` only on `main`. Workflow input `confirm_live_gmail` m
 
 **Cleanup:** without exact `recipient_gmail_message_id`, `cleanup-run` resolves the recipient ID from the run journal (`delivery_confirmed` transitions only). If the journal yields zero, multiple distinct, or sender IDs, cleanup returns `cleanup_state=not_safe_to_execute` with `gmail_mutations=0`. Exit semantics: when the primary scenario already failed, blocked cleanup returns exit `0` (non-masking); when the primary scenario passed, blocked cleanup returns `EXIT_CLEANUP` (6) so the run cannot be treated as fully successful without cleanup.
 
-### 2F.2B intake observability and journal cleanup (in progress)
+### 2F.2C recipient identity, pre-claim cleanup, structured safety (in progress)
+
+**Root cause (RUN_S01 #8):** delivery observation validates recipient via message headers; intake trust validation used OAuth `user_id="me"` when `metadata_json.email` was missing. `"me"` is never a verified mailbox address.
+
+**Canonical recipient identity:** `resolve_canonical_recipient_email()` prefers `metadata_json.email`, then syntactically valid `user_id`, else fail-closed (`recipient_identity_unverified`). OAuth seed stores the single allowlisted `LIVE_EVAL_RECIPIENT_EMAILS` entry in `metadata_json.email` (no duplicate secret).
+
+**Structured safety rejection (HTTP 400):** `process-delivery` and `cleanup-recipient` return allowlisted payloads (`error_code=live_eval_safety`, `safety_reason`, `evaluation_run_id`, `scenario_id`, `attempt_id`, `tenant_id`, `failed_stage`, `http_status`, `retry_allowed`, `root_job_created`, `diagnostic_code`). Observer raises `LiveEvalSafetyRejectedError`; runner maps to `EXIT_CONFIG` (2), not `EXIT_TRANSPORT` (3).
+
+**Pre-claim cleanup:** `cleanup-run` defaults to `--phase auto`. When `root_job_bound=false` and journal has exactly one `delivery_confirmed` recipient ID, cleanup uses `pre_claim` (archive only that message). `post_claim` requires trusted `root_gmail_message_id`.
+
+**Summary provenance:** RUN_S01 `GITHUB_STEP_SUMMARY` includes `workflow_sha` from `BUILD_GIT_SHA` only (fixture markers like `abc123` are blocked). Foundation offline dry-run summary is labeled `offline/hermetic` and does not claim a workflow SHA.
+
+### 2F.2B intake observability and journal cleanup
 
 **Intake skip (HTTP 409):** `POST .../process-delivery` returns a structured, allowlisted payload (`error_code=intake_skipped`, `intake_skip_reason`, `evaluation_run_id`, `failed_stage`, `http_status`, `run_status`, `root_claimed`, `job_created`, `retry_allowed`, `diagnostic_code`). The testbot observer parses this before `raise_for_status()` and raises `LiveEvalIntakeSkippedError`; the runner maps intake skip to `EXIT_CONFIG` (2), not `EXIT_TRANSPORT` (3).
 
@@ -309,4 +321,4 @@ Unchanged S01 flow: exact one send, journal, assertions, exact cleanup, redacted
 
 `seed_live_eval_gmail_oauth.py` reuses the same substring-based production URL heuristic as `seed_live_eval_tenant.py`. No shared positive test-database fingerprint model exists in-repo yet; changing this is deferred as LOW to a separate seed-script hardening task. All other guards (`ENV=test`, `LIVE_EVAL_SEED_ALLOWED`, tenant allowlist, `is_test_tenant`) remain enforced.
 
-Recipient Gmail OAuth rows may store `user_id="me"` in connection config. That value is a Gmail API selector for the authenticated account, not the mailbox identity. Readiness verifies the real recipient address via `get_profile.email_address` against `LIVE_EVAL_RECIPIENT_EMAILS`.
+Recipient Gmail OAuth rows may store `user_id="me"` in connection config as a Gmail API selector. **Intake trust validation** uses the canonical recipient email from OAuth `metadata_json.email` (seeded from `LIVE_EVAL_RECIPIENT_EMAILS`). Readiness still verifies the real recipient via `get_profile.email_address`.
