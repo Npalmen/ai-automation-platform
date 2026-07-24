@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -20,7 +21,8 @@ from app.evaluation.live.eval_llm_client import (
     classify_finish_reason_failure,
 )
 from app.evaluation.live.errors import LiveEvalSafetyError
-from app.evaluation.live.llm_operations import reserve_live_llm_operation
+from app.evaluation.live.llm_operations import _hash_validated_output, reserve_live_llm_operation
+from app.evaluation.live.llm_provider import PROMPT_RESPONSE_MODELS
 from app.evaluation.live.llm_report import (
     LLM_FAILURE_REPORT_SCHEMA_VERSION,
     build_live_eval_llm_failure_report,
@@ -39,6 +41,39 @@ from app.repositories.postgres.live_eval_models import (
     LiveEvalRunRow,
 )
 from tests.evaluation.live.fake_llm_client import FakeEvalLLMDelegate
+
+
+def _normalized_validated_output(prompt_name: str, raw_output: dict) -> dict:
+    response_model = PROMPT_RESPONSE_MODELS[prompt_name]
+    validated = response_model.model_validate(raw_output)
+    return json.loads(validated.model_dump_json())
+
+
+def _run_classification_operation(
+    contract_db,
+    *,
+    run_id: str,
+    fixture_output: dict,
+    returned_model: str = "gpt-4o-mini",
+    finish_reason: str | None = "stop",
+) -> tuple[LiveEvalLlmOperationRow, dict]:
+    _seed_run(contract_db, run_id)
+    snap = _snapshot(run_id)
+    delegate = FakeEvalLLMDelegate(
+        returned_model=returned_model,
+        finish_reason=finish_reason,
+        fixtures={"classification_v1": fixture_output},
+    )
+    client = EvalLLMClient(delegate, snapshot=snap, db=contract_db)
+    token = set_active_prompt_name("classification_v1")
+    with live_eval_context(snap, db=contract_db):
+        output = client.generate_json("classification_v1 prompt")
+    reset_active_prompt_name(token)
+    row = contract_db.query(LiveEvalLlmOperationRow).filter_by(
+        evaluation_run_id=run_id,
+        prompt_name="classification_v1",
+    ).one()
+    return row, output
 
 
 def _snapshot(run_id: str) -> TrustedLiveEvalSnapshot:
@@ -162,6 +197,105 @@ def test_eval_client_accepts_alias_and_snapshot(contract_db):
         assert row.status == "succeeded"
         assert row.returned_model == returned
         assert row.schema_validation_status == "passed"
+
+
+def test_output_hash_matches_pydantic_normalized_output(contract_db):
+    fixture_output = {
+        "detected_job_type": "lead",
+        "confidence": 0.9,
+        "reasons": ["keyword_match"],
+    }
+    row, output = _run_classification_operation(
+        contract_db,
+        run_id="run-output-hash",
+        fixture_output=fixture_output,
+        returned_model="gpt-4o-mini-2024-07-18",
+    )
+
+    assert row.status == "succeeded"
+    assert row.schema_validation_status == "passed"
+    assert output == _normalized_validated_output("classification_v1", fixture_output)
+
+    expected_hash = _hash_validated_output(output)
+    assert row.output_hash == expected_hash
+
+    raw_json_hash = hashlib.sha256(json.dumps(fixture_output).encode("utf-8")).hexdigest()
+    assert row.output_hash != raw_json_hash
+
+    transport_wrapper_hash = hashlib.sha256(
+        json.dumps(
+            {
+                "choices": [{"message": {"content": json.dumps(fixture_output)}}],
+                "usage": row.input_tokens,
+                "model": row.returned_model,
+                "finish_reason": row.finish_reason,
+            }
+        ).encode("utf-8")
+    ).hexdigest()
+    assert row.output_hash != transport_wrapper_hash
+
+
+def test_output_hash_invariant_across_raw_key_order(contract_db):
+    fixture_a = {
+        "detected_job_type": "lead",
+        "confidence": 0.9,
+        "reasons": ["keyword_match"],
+    }
+    fixture_b = {
+        "reasons": ["keyword_match"],
+        "confidence": 0.9,
+        "detected_job_type": "lead",
+    }
+
+    row_a, _ = _run_classification_operation(
+        contract_db,
+        run_id="run-hash-order-a",
+        fixture_output=fixture_a,
+        returned_model="gpt-4o-mini",
+    )
+    row_b, _ = _run_classification_operation(
+        contract_db,
+        run_id="run-hash-order-b",
+        fixture_output=fixture_b,
+        returned_model="gpt-4o-mini-2024-07-18",
+    )
+
+    normalized_a = _normalized_validated_output("classification_v1", fixture_a)
+    normalized_b = _normalized_validated_output("classification_v1", fixture_b)
+    assert normalized_a == normalized_b
+    assert row_a.output_hash == row_b.output_hash == _hash_validated_output(normalized_a)
+
+
+def test_output_hash_changes_when_validated_output_differs(contract_db):
+    base_fixture = {
+        "detected_job_type": "lead",
+        "confidence": 0.9,
+        "reasons": ["keyword_match"],
+    }
+    changed_fixture = {
+        "detected_job_type": "lead",
+        "confidence": 0.91,
+        "reasons": ["keyword_match", "follow_up"],
+    }
+
+    row_base, _ = _run_classification_operation(
+        contract_db,
+        run_id="run-hash-base",
+        fixture_output=base_fixture,
+    )
+    row_changed, _ = _run_classification_operation(
+        contract_db,
+        run_id="run-hash-changed",
+        fixture_output=changed_fixture,
+    )
+
+    assert row_base.output_hash != row_changed.output_hash
+    assert row_base.output_hash == _hash_validated_output(
+        _normalized_validated_output("classification_v1", base_fixture)
+    )
+    assert row_changed.output_hash == _hash_validated_output(
+        _normalized_validated_output("classification_v1", changed_fixture)
+    )
 
 
 def test_eval_client_schema_invalid_marks_failed_and_blocks_next(contract_db):
