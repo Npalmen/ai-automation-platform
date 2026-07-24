@@ -295,8 +295,12 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
 
 
 def cmd_llm_readiness_only(args: argparse.Namespace) -> int:
-    from app.evaluation.live.llm_readiness import run_llm_readiness_checks
-    from sqlalchemy import create_engine, text
+    from app.evaluation.live.llm_readiness import (
+        build_llm_readiness_artifact,
+        run_llm_offline_readiness_checks,
+        run_llm_readiness_checks,
+    )
+    from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
     config = get_live_eval_config()
@@ -309,38 +313,19 @@ def cmd_llm_readiness_only(args: argparse.Namespace) -> int:
             session = Session()
             try:
                 report = run_llm_readiness_checks(session, args.tenant_id, config=config)
+                payload = build_llm_readiness_artifact(report)
                 issues = report.issues
-                payload = {
-                    "ready": report.ready,
-                    "issues": report.issues,
-                    "checks": report.checks,
-                    "live_llm_calls": 0,
-                }
             finally:
                 session.close()
                 engine.dispose()
         else:
-            from app.evaluation.live.llm_readiness import run_llm_offline_readiness_checks
-
             report = run_llm_offline_readiness_checks(config)
+            payload = build_llm_readiness_artifact(report)
             issues = report.issues
-            payload = {
-                "ready": report.ready,
-                "issues": report.issues,
-                "checks": report.checks,
-                "live_llm_calls": 0,
-            }
     else:
-        from app.evaluation.live.llm_readiness import run_llm_offline_readiness_checks
-
         report = run_llm_offline_readiness_checks(config)
+        payload = build_llm_readiness_artifact(report)
         issues = report.issues
-        payload = {
-            "ready": report.ready,
-            "issues": report.issues,
-            "checks": report.checks,
-            "live_llm_calls": 0,
-        }
 
     if args.report_file:
         Path(args.report_file).write_text(

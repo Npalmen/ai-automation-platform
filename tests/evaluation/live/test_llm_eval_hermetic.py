@@ -52,9 +52,14 @@ from tests.evaluation.live.test_process_delivery_intake_gate import (
 def llm_eval_env(live_eval_env, monkeypatch):
     monkeypatch.setenv("LIVE_LLM_EVAL_ALLOWED", "yes")
     monkeypatch.setenv("LIVE_EVAL_LLM_PROVIDER", "openai")
-    monkeypatch.setenv("LIVE_EVAL_LLM_MODEL", "fake-eval-model")
-    monkeypatch.setenv("LIVE_EVAL_LLM_TIMEOUT", "30")
-    monkeypatch.setenv("LIVE_EVAL_LLM_MAX_TOKENS", "1024")
+    monkeypatch.setenv("LIVE_EVAL_LLM_MODEL", "gpt-4o-mini")
+    monkeypatch.setenv("LIVE_EVAL_LLM_TIMEOUT", "60")
+    monkeypatch.setenv("LIVE_EVAL_LLM_MAX_TOKENS", "2048")
+    monkeypatch.setenv("LIVE_EVAL_MAX_LLM_CALLS", "4")
+    monkeypatch.setenv("LLM_API_URL", "https://api.openai.com/v1/chat/completions")
+    monkeypatch.setenv("LLM_MODEL", "gpt-4o-mini")
+    monkeypatch.setenv("LLM_RETRY_ATTEMPTS", "0")
+    monkeypatch.setenv("LLM_TEMPERATURE", "0.0")
     monkeypatch.setenv("BUILD_GIT_SHA", "deadbeef1234567890abcdef1234567890abcdef")
     from app.core.settings import get_settings
     from app.evaluation.live.config import get_live_eval_config
@@ -135,7 +140,7 @@ def _register_fixture_llm(client, db, run_id: str):
                 "transport_mode": "fixture_input",
                 "ai_mode": "live_llm",
                 "llm_provider": "openai",
-                "llm_requested_model": "fake-eval-model",
+                "llm_requested_model": "gpt-4o-mini",
                 "expires_at": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
             },
         )
@@ -163,7 +168,7 @@ def _snapshot(run_id: str):
         expected_sender=None,
         expected_recipient=None,
         llm_provider="openai",
-        llm_requested_model="fake-eval-model",
+        llm_requested_model="gpt-4o-mini",
         llm_max_calls=4,
         config_hash="cfg",
         trusted=True,
@@ -184,7 +189,7 @@ def test_fixture_input_registration_without_gmail_fields(llm_client, llm_db):
     assert row.expected_sender is None
     assert row.expected_recipient is None
     assert row.llm_provider == "openai"
-    assert row.llm_requested_model == "fake-eval-model"
+    assert row.llm_requested_model == "gpt-4o-mini"
     assert row.llm_max_calls == 4
 
     summary = llm_client.get(
@@ -227,7 +232,7 @@ def test_fixture_input_registration_rejects_live_gmail_llm(llm_client):
             "expected_sender": "sender@eval.test",
             "expected_recipient": "recipient@eval.test",
             "llm_provider": "openai",
-            "llm_requested_model": "fake-eval-model",
+            "llm_requested_model": "gpt-4o-mini",
         },
     )
     assert response.status_code == 400
@@ -247,7 +252,7 @@ def test_fixture_input_registration_requires_workflow_sha(llm_client, llm_eval_e
             "transport_mode": "fixture_input",
             "ai_mode": "live_llm",
             "llm_provider": "openai",
-            "llm_requested_model": "fake-eval-model",
+            "llm_requested_model": "gpt-4o-mini",
         },
     )
     assert response.status_code == 400
@@ -263,6 +268,9 @@ def test_llm_readiness_has_zero_provider_calls(llm_eval_env):
 
 def test_llm_readiness_produces_redacted_artifact(llm_eval_env, tmp_path, monkeypatch):
     monkeypatch.setenv("STORAGE_PATH", str(tmp_path))
+    monkeypatch.setenv("LIVE_EVAL_SEED_ALLOWED", "yes")
+    monkeypatch.setenv("LLM_API_KEY", "eval-llm-secret-key")
+    monkeypatch.setenv("ADMIN_API_KEY", "eval-admin-secret-key")
     from app.core.settings import get_settings
     from app.evaluation.live.llm_readiness import run_llm_readiness_checks
     from app.evaluation.live.llm_report import write_llm_report_atomic
@@ -293,7 +301,7 @@ def test_llm_readiness_produces_redacted_artifact(llm_eval_env, tmp_path, monkey
                 "status": "preflight",
                 "config_hash": "cfg",
                 "llm_provider": "openai",
-                "llm_requested_model": "fake-eval-model",
+                "llm_requested_model": "gpt-4o-mini",
             },
             observation={"events": [], "job": {}},
             result="preflight",
@@ -321,7 +329,7 @@ def test_eval_llm_client_requires_usage(db, llm_eval_env):
             expected_sender=None,
             expected_recipient=None,
             llm_provider="openai",
-            llm_requested_model="fake-eval-model",
+            llm_requested_model="gpt-4o-mini",
             llm_max_calls=4,
             status="active",
             created_by="test",
@@ -358,7 +366,7 @@ def test_eval_llm_client_rejects_model_mismatch(db, llm_eval_env):
             expected_sender=None,
             expected_recipient=None,
             llm_provider="openai",
-            llm_requested_model="fake-eval-model",
+            llm_requested_model="gpt-4o-mini",
             llm_max_calls=4,
             status="active",
             created_by="test",
@@ -401,7 +409,7 @@ def test_live_llm_no_fallback_on_llm_error(db, llm_eval_env):
             expected_sender=None,
             expected_recipient=None,
             llm_provider="openai",
-            llm_requested_model="fake-eval-model",
+            llm_requested_model="gpt-4o-mini",
             llm_max_calls=4,
             status="active",
             created_by="test",
@@ -453,7 +461,7 @@ def test_write_policy_blocks_auto_reply_for_fixture_llm(db, llm_eval_env):
             expected_sender=None,
             expected_recipient=None,
             llm_provider="openai",
-            llm_requested_model="fake-eval-model",
+            llm_requested_model="gpt-4o-mini",
             llm_max_calls=4,
             status="active",
             created_by="test",
@@ -522,7 +530,7 @@ def test_fixture_input_pipeline_reaches_awaiting_approval(llm_client, llm_db):
     assert run_row.expected_sender is None
     assert run_row.expected_recipient is None
     assert run_row.llm_provider == "openai"
-    assert run_row.llm_requested_model == "fake-eval-model"
+    assert run_row.llm_requested_model == "gpt-4o-mini"
     assert run_row.llm_max_calls == 4
 
     jobs = llm_db.query(JobRecord).filter_by(tenant_id="TENANT_LIVE_EVAL").all()
@@ -592,7 +600,7 @@ def test_llm_report_redaction_excludes_secrets(llm_eval_env, tmp_path, monkeypat
             "status": "active",
             "config_hash": "abc",
             "llm_provider": "openai",
-            "llm_requested_model": "fake-eval-model",
+            "llm_requested_model": "gpt-4o-mini",
         },
         observation={
             "job": {
@@ -638,7 +646,7 @@ def test_operation_reservation_blocks_duplicate_prompt(db, llm_eval_env):
             expected_sender=None,
             expected_recipient=None,
             llm_provider="openai",
-            llm_requested_model="fake-eval-model",
+            llm_requested_model="gpt-4o-mini",
             llm_max_calls=4,
             status="registered",
             created_by="test",
@@ -653,12 +661,12 @@ def test_operation_reservation_blocks_duplicate_prompt(db, llm_eval_env):
         db,
         snapshot=snap,
         prompt_name="classification_v1",
-        requested_model="fake-eval-model",
+        requested_model="gpt-4o-mini",
     )
     with pytest.raises(LiveEvalSafetyError, match="in progress|retry blocked"):
         reserve_live_llm_operation(
             db,
             snapshot=snap,
             prompt_name="classification_v1",
-            requested_model="fake-eval-model",
+            requested_model="gpt-4o-mini",
         )

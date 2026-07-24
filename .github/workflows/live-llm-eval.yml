@@ -48,6 +48,10 @@ jobs:
       LIVE_EVAL_LLM_TIMEOUT: "60"
       LIVE_EVAL_LLM_MAX_TOKENS: "2048"
       LIVE_EVAL_MAX_LLM_CALLS: "4"
+      LLM_API_URL: https://api.openai.com/v1/chat/completions
+      LLM_MODEL: gpt-4o-mini
+      LLM_RETRY_ATTEMPTS: "0"
+      LLM_TEMPERATURE: "0.0"
       ADMIN_API_KEY: ci-admin-key
       BUILD_GIT_SHA: ${{ github.sha }}
 
@@ -164,8 +168,9 @@ jobs:
       LIVE_EVAL_ALLOWED: yes
       LIVE_LLM_EVAL_ALLOWED: yes
       LIVE_EVAL_TENANT_IDS: TENANT_LIVE_EVAL
+      LIVE_EVAL_SEED_ALLOWED: yes
       LIVE_EVAL_LLM_PROVIDER: openai
-      LIVE_EVAL_LLM_MODEL: ${{ secrets.LIVE_EVAL_LLM_MODEL }}
+      LIVE_EVAL_LLM_MODEL: gpt-4o-mini
       LIVE_EVAL_LLM_TIMEOUT: "60"
       LIVE_EVAL_LLM_MAX_TOKENS: "2048"
       LIVE_EVAL_MAX_LLM_CALLS: "4"
@@ -173,8 +178,10 @@ jobs:
       LIVE_EVAL_APP_BASE_URL: http://127.0.0.1:8010
       BUILD_GIT_SHA: ${{ github.sha }}
       LLM_API_KEY: ${{ secrets.LIVE_EVAL_LLM_API_KEY }}
-      LLM_API_URL: ${{ secrets.LIVE_EVAL_LLM_API_URL }}
-      LLM_MODEL: ${{ secrets.LIVE_EVAL_LLM_MODEL }}
+      LLM_API_URL: https://api.openai.com/v1/chat/completions
+      LLM_MODEL: gpt-4o-mini
+      LLM_RETRY_ATTEMPTS: "0"
+      LLM_TEMPERATURE: "0.0"
 
     steps:
       - uses: actions/checkout@v4
