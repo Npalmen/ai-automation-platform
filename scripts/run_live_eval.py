@@ -7,6 +7,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -26,6 +27,63 @@ from app.evaluation.live.registry import new_evaluation_run_id
 from app.evaluation.live.runner import LiveEvalRunner, cleanup_only
 from app.evaluation.live.schemas import LiveEvalReport
 from app.evaluation.live.subject_parser import build_subject_with_token, parse_subject_token
+
+
+def _extract_observation(value: object) -> dict[str, Any]:
+    from app.evaluation.live.errors import LiveEvalObservationContractError
+    from app.evaluation.live.pipeline_poll import PipelinePollResult
+
+    if isinstance(value, PipelinePollResult):
+        value = value.observation
+    if not isinstance(value, dict):
+        raise LiveEvalObservationContractError("pipeline observation must be a mapping")
+    return value
+
+
+def _build_fallback_llm_failure_report(
+    *,
+    evaluation_run_id: str,
+    scenario_id: str,
+    failure_stage: str,
+    failure_category: str | None,
+    error: str | BaseException | None = None,
+    workflow_sha: str | None = None,
+    report_builder_error: str | BaseException | None = None,
+) -> dict[str, Any]:
+    from app.evaluation.live.llm_report import LLM_FAILURE_REPORT_SCHEMA_VERSION
+    from app.evaluation.live.provider_redaction import sanitize_provider_error_message
+    from app.evaluation.live.redaction import redact_sensitive
+
+    payload = {
+        "report_schema_version": LLM_FAILURE_REPORT_SCHEMA_VERSION,
+        "evaluation_run_id": evaluation_run_id,
+        "scenario_id": scenario_id,
+        "workflow_sha": workflow_sha,
+        "result": "failed",
+        "failure_stage": failure_stage,
+        "failure_category": failure_category,
+        "redacted_error": sanitize_provider_error_message(error) or None,
+        "report_builder_error": sanitize_provider_error_message(report_builder_error) or None,
+        "operations": [],
+        "token_usage": {
+            "attempted": 0,
+            "succeeded": 0,
+            "failed": 0,
+            "outcome_unknown": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "latency_ms": 0,
+        },
+        "external_action_writes": 0,
+        "gmail_sends": 0,
+        "gmail_mutations": 0,
+        "app_replies": 0,
+        "live_llm_calls": 0,
+        "llm_operations": 0,
+        "external_writes": 0,
+    }
+    return redact_sensitive(payload)
 
 
 def _resolve_sender_recipient(config) -> tuple[str, str]:
@@ -359,6 +417,7 @@ def cmd_run_llm_s01(args: argparse.Namespace) -> int:
     import httpx
 
     from app.evaluation.live.constants import S01_LOCKED_SCENARIO_HASH
+    from app.evaluation.live.errors import LiveEvalObservationContractError
     from app.evaluation.live.llm_assertions import assert_s01_live_llm_semantics
     from app.evaluation.live.llm_report import (
         build_live_eval_llm_failure_report,
@@ -385,35 +444,53 @@ def cmd_run_llm_s01(args: argparse.Namespace) -> int:
     headers = {"X-Admin-API-Key": admin_key}
     failure_stage = "initialization"
     failure_category: str | None = None
-    observation: dict = {}
+    observation: dict[str, Any] = {}
     workflow_sha = os.environ.get("BUILD_GIT_SHA") or os.environ.get("GITHUB_SHA")
 
     if args.run_id_file:
         Path(args.run_id_file).write_text(run_id + "\n", encoding="utf-8")
+
+    def _failure_artifact_path() -> Path:
+        if args.failure_artifact_file:
+            return Path(args.failure_artifact_file)
+        return Path(os.environ.get("RUNNER_TEMP", ".")) / "llm_failure_report.json"
 
     def _write_failure(
         *,
         stage: str,
         category: str | None,
         error: str | BaseException | None = None,
-        obs: dict | None = None,
+        obs: dict[str, Any] | None = None,
     ) -> None:
-        payload = build_live_eval_llm_failure_report(
-            evaluation_run_id=run_id,
-            scenario_id=scenario_id,
-            failure_stage=stage,
-            failure_category=category,
-            error=error,
-            workflow_sha=workflow_sha,
-            observation=obs or observation,
-        )
-        if args.failure_artifact_file:
-            write_llm_failure_report_atomic(args.failure_artifact_file, payload)
-        else:
-            write_llm_failure_report_atomic(
-                Path(os.environ.get("RUNNER_TEMP", ".")) / "llm_failure_report.json",
-                payload,
+        selected = obs if obs is not None else observation
+        normalized_obs: dict[str, Any] | None = None
+        if selected is not None:
+            try:
+                normalized_obs = _extract_observation(selected)
+            except LiveEvalObservationContractError:
+                normalized_obs = None
+
+        try:
+            payload = build_live_eval_llm_failure_report(
+                evaluation_run_id=run_id,
+                scenario_id=scenario_id,
+                failure_stage=stage,
+                failure_category=category,
+                error=error,
+                workflow_sha=workflow_sha,
+                observation=normalized_obs,
             )
+        except Exception as report_exc:
+            payload = _build_fallback_llm_failure_report(
+                evaluation_run_id=run_id,
+                scenario_id=scenario_id,
+                failure_stage=stage,
+                failure_category=category,
+                error=error,
+                workflow_sha=workflow_sha,
+                report_builder_error=report_exc,
+            )
+        write_llm_failure_report_atomic(_failure_artifact_path(), payload)
 
     try:
         failure_stage = "registration"
@@ -463,10 +540,13 @@ def cmd_run_llm_s01(args: argparse.Namespace) -> int:
             return response.json()
 
         try:
-            observation = poll_pipeline_observation(_fetch_observation, timeout_seconds=120)
+            poll_result = poll_pipeline_observation(_fetch_observation, timeout_seconds=120)
+            observation = _extract_observation(poll_result)
+        except LiveEvalObservationContractError:
+            raise
         except Exception as exc:
             print(f"pipeline poll failed: {exc}", file=sys.stderr)
-            observation = _fetch_observation()
+            observation = _extract_observation(_fetch_observation())
 
         failure_stage = "assertions"
         violations = assert_s01_live_llm_semantics(observation)
@@ -510,10 +590,16 @@ def cmd_run_llm_s01(args: argparse.Namespace) -> int:
 
         print(json.dumps({"evaluation_run_id": run_id, "result": result, "violations": violations}, indent=2))
         return 0 if not violations else 1
+    except LiveEvalObservationContractError as exc:
+        if failure_category is None:
+            failure_category = "observation_contract_error"
+        _write_failure(stage=failure_stage, category=failure_category, error=exc)
+        print(str(exc), file=sys.stderr)
+        return 1
     except Exception as exc:
         if failure_category is None:
             failure_category = "report_failure"
-        _write_failure(stage=failure_stage, category=failure_category, error=exc, obs=observation)
+        _write_failure(stage=failure_stage, category=failure_category, error=exc)
         print(str(exc), file=sys.stderr)
         return 1
 
