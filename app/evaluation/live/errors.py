@@ -25,6 +25,10 @@ class LiveEvalSafetyRejectedError(Exception):
         super().__init__(str(payload.get("safety_reason") or "live_eval_safety"))
 
 
+class LiveEvalObservationContractError(LiveEvalSafetyError):
+    """Observation payload is not the required mapping contract."""
+
+
 class LiveEvalPipelinePollError(TimeoutError):
     """Pipeline poll failed or timed out with structured, redacted observability."""
 
