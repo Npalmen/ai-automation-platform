@@ -249,7 +249,8 @@ jobs:
             --scenario-id S01_lead_laddbox_quality \
             --tenant-id TENANT_LIVE_EVAL \
             --confirm-external \
-            --run-id-file "${RUNNER_TEMP}/live_llm_run_id"
+            --run-id-file "${RUNNER_TEMP}/live_llm_run_id" \
+            --failure-artifact-file "${RUNNER_TEMP}/llm_failure_report.json"
 
       - name: Resolve LLM artifact path
         if: always() && inputs.confirm_live_llm == 'RUN_LLM_S01'
@@ -269,10 +270,22 @@ jobs:
           path: ${{ env.RUN_ARTIFACT_DIR }}/
           if-no-files-found: warn
 
+      - name: Upload LLM failure artifact
+        if: always() && inputs.confirm_live_llm == 'RUN_LLM_S01'
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-llm-failure-${{ github.run_id }}
+          path: ${{ runner.temp }}/llm_failure_report.json
+          if-no-files-found: ignore
+
       - name: Verify LLM artifacts present
-        if: always() && inputs.confirm_live_llm == 'RUN_LLM_S01' && env.RUN_ID != ''
+        if: always() && inputs.confirm_live_llm == 'RUN_LLM_S01'
         run: |
-          if [ ! -f "${RUN_ARTIFACT_DIR}/llm_report.json" ]; then
-            echo "typed failure or infrastructure issue: llm_report.json missing at ${RUN_ARTIFACT_DIR}" >&2
-            exit 1
+          if [ -n "${RUN_ARTIFACT_DIR:-}" ] && [ -f "${RUN_ARTIFACT_DIR}/llm_report.json" ]; then
+            exit 0
           fi
+          if [ -f "${RUNNER_TEMP}/llm_failure_report.json" ]; then
+            exit 0
+          fi
+          echo "typed failure or infrastructure issue: no llm_report.json or llm_failure_report.json" >&2
+          exit 1

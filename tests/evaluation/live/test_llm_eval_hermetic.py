@@ -14,7 +14,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.ai.exceptions import LLMClientError
+from app.ai.exceptions import LLMClientError, LLMResponseError
 from app.ai.llm.client import LLMGenerationResult
 from app.api.dependencies import get_db
 from app.domain.workflows.statuses import JobStatus
@@ -347,7 +347,7 @@ def test_eval_llm_client_requires_usage(db, llm_eval_env):
 
     token = set_active_prompt_name("classification_v1")
     with live_eval_context(snap, db=db):
-        with pytest.raises(LiveEvalSafetyError, match="missing token usage"):
+        with pytest.raises(LLMResponseError, match="missing token usage"):
             client.generate_json("classification_v1 prompt")
     reset_active_prompt_name(token)
 
@@ -384,7 +384,7 @@ def test_eval_llm_client_rejects_model_mismatch(db, llm_eval_env):
 
     token = set_active_prompt_name("classification_v1")
     with live_eval_context(snap, db=db):
-        with pytest.raises(LiveEvalSafetyError, match="model does not match"):
+        with pytest.raises(LLMResponseError, match="not allowlisted"):
             client.generate_json("classification_v1 prompt")
     reset_active_prompt_name(token)
 

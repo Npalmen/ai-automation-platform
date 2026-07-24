@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from typing import Any
 
@@ -27,6 +28,9 @@ from app.evaluation.live.llm_operations import (
     record_live_llm_operation_result,
     reserve_live_llm_operation,
 )
+from app.evaluation.live.llm_provider import PROMPT_RESPONSE_MODELS
+from app.evaluation.live.model_identity import validate_returned_model_identity
+from app.evaluation.live.provider_redaction import sanitize_provider_error_message
 from app.evaluation.live.schemas import TrustedLiveEvalSnapshot
 
 _OUTCOME_UNKNOWN_REASONS = frozenset(
@@ -34,8 +38,21 @@ _OUTCOME_UNKNOWN_REASONS = frozenset(
 )
 
 
+def classify_finish_reason_failure(finish_reason: str | None) -> str | None:
+    normalized = (finish_reason or "").strip().lower()
+    if normalized == "stop":
+        return None
+    if not normalized:
+        return "incomplete_finish_reason"
+    if normalized == "content_filter":
+        return "safety_refusal"
+    if normalized in {"length", "tool_calls", "function_call"}:
+        return "incomplete_finish_reason"
+    return "incomplete_finish_reason"
+
+
 def classify_llm_provider_error(exc: Exception) -> str:
-    message = str(exc).lower()
+    message = sanitize_provider_error_message(exc).lower()
     if isinstance(exc, TimeoutError) or "timeout" in message:
         return "timeout"
     if isinstance(exc, LLMConfigurationError):
@@ -101,6 +118,46 @@ class EvalLLMClient:
             raise LiveEvalSafetyError("live_llm missing active prompt_name")
         return prompt_name
 
+    def _record_failed_operation(
+        self,
+        db: Session,
+        *,
+        operation_key: str,
+        prompt_name: str,
+        requested_model: str,
+        latency_ms: int,
+        failure_reason: str,
+        returned_model: str | None = None,
+        usage: dict[str, int] | None = None,
+        finish_reason: str | None = None,
+    ) -> None:
+        record_live_llm_operation_result(
+            db,
+            operation_key=operation_key,
+            snapshot=self._snapshot,
+            prompt_name=prompt_name,
+            outcome=EVENT_OUTCOME_FAILED,
+            requested_model=requested_model,
+            returned_model=returned_model,
+            latency_ms=latency_ms,
+            usage=usage,
+            finish_reason=finish_reason,
+            failure_reason=failure_reason,
+            schema_validation_status="failed",
+        )
+
+    def _validate_schema_output(
+        self,
+        *,
+        prompt_name: str,
+        output: dict[str, Any],
+    ) -> dict[str, Any]:
+        response_model = PROMPT_RESPONSE_MODELS.get(prompt_name)
+        if response_model is None:
+            raise LLMResponseError(f"live_llm missing schema mapping for {prompt_name!r}")
+        validated = response_model.model_validate(output)
+        return json.loads(validated.model_dump_json())
+
     def generate_json(self, prompt: str) -> dict[str, Any]:
         db = self._resolve_db()
         prompt_name = self._resolve_prompt_name(prompt)
@@ -135,16 +192,13 @@ class EvalLLMClient:
                 if failure_reason in _OUTCOME_UNKNOWN_REASONS
                 else EVENT_OUTCOME_FAILED
             )
-            record_live_llm_operation_result(
+            self._record_failed_operation(
                 db,
                 operation_key=operation_key,
-                snapshot=self._snapshot,
                 prompt_name=prompt_name,
-                outcome=outcome,
                 requested_model=requested_model,
                 latency_ms=latency_ms,
                 failure_reason=failure_reason,
-                schema_validation_status="failed",
             )
             if outcome == LLM_OPERATION_OUTCOME_UNKNOWN:
                 from app.evaluation.live.registry import complete_live_eval_run
@@ -159,74 +213,92 @@ class EvalLLMClient:
                 except Exception:
                     db.rollback()
                 raise LiveEvalSafetyError("LLM outcome_unknown aborted run") from exc
-            raise
+            if isinstance(exc, ValidationError):
+                raise
+            raise LLMResponseError(sanitize_provider_error_message(exc)) from exc
 
         latency_ms = int((time.perf_counter() - started) * 1000)
         usage = detailed.usage or {}
-        returned_model = (detailed.returned_model or "").strip()
-        if not returned_model:
-            record_live_llm_operation_result(
+        returned_model_raw = detailed.returned_model
+        try:
+            returned_model = validate_returned_model_identity(
+                requested_model=requested_model,
+                returned_model=returned_model_raw,
+            )
+        except LiveEvalSafetyError as exc:
+            self._record_failed_operation(
                 db,
                 operation_key=operation_key,
-                snapshot=self._snapshot,
                 prompt_name=prompt_name,
-                outcome=EVENT_OUTCOME_FAILED,
                 requested_model=requested_model,
                 latency_ms=latency_ms,
-                failure_reason="missing_returned_model",
-                schema_validation_status="failed",
+                returned_model=(returned_model_raw or "").strip() or None,
+                failure_reason="model_mismatch",
             )
-            raise LiveEvalSafetyError("live_llm provider missing returned model")
+            raise LLMResponseError(sanitize_provider_error_message(exc)) from exc
 
         if not usage or not any(
             usage.get(key) is not None for key in ("prompt_tokens", "completion_tokens", "total_tokens")
         ):
-            record_live_llm_operation_result(
+            self._record_failed_operation(
                 db,
                 operation_key=operation_key,
-                snapshot=self._snapshot,
                 prompt_name=prompt_name,
-                outcome=EVENT_OUTCOME_FAILED,
                 requested_model=requested_model,
                 returned_model=returned_model,
                 latency_ms=latency_ms,
                 failure_reason="missing_usage",
-                schema_validation_status="failed",
             )
-            raise LiveEvalSafetyError("live_llm provider missing token usage")
+            raise LLMResponseError("live_llm provider missing token usage")
 
-        if returned_model != requested_model:
-            record_live_llm_operation_result(
+        finish_reason_failure = classify_finish_reason_failure(detailed.finish_reason)
+        if finish_reason_failure is not None:
+            self._record_failed_operation(
                 db,
                 operation_key=operation_key,
-                snapshot=self._snapshot,
                 prompt_name=prompt_name,
-                outcome=EVENT_OUTCOME_FAILED,
                 requested_model=requested_model,
                 returned_model=returned_model,
                 latency_ms=latency_ms,
                 usage=usage,
-                failure_reason="model_mismatch",
-                schema_validation_status="failed",
+                finish_reason=detailed.finish_reason,
+                failure_reason=finish_reason_failure,
             )
-            raise LiveEvalSafetyError("live_llm returned model does not match pinned model")
+            raise LLMResponseError(f"live_llm finish_reason {detailed.finish_reason!r} is not allowed")
 
         output = detailed.output
         if not isinstance(output, dict):
-            record_live_llm_operation_result(
+            self._record_failed_operation(
                 db,
                 operation_key=operation_key,
-                snapshot=self._snapshot,
                 prompt_name=prompt_name,
-                outcome=EVENT_OUTCOME_FAILED,
                 requested_model=requested_model,
                 returned_model=returned_model,
                 latency_ms=latency_ms,
                 usage=usage,
+                finish_reason=detailed.finish_reason,
                 failure_reason="malformed_json",
-                schema_validation_status="failed",
             )
-            raise LiveEvalSafetyError("live_llm output must be a JSON object")
+            raise LLMResponseError("live_llm output must be a JSON object")
+
+        try:
+            validated_output = self._validate_schema_output(
+                prompt_name=prompt_name,
+                output=output,
+            )
+        except ValidationError:
+            self._record_failed_operation(
+                db,
+                operation_key=operation_key,
+                prompt_name=prompt_name,
+                requested_model=requested_model,
+                returned_model=returned_model,
+                latency_ms=latency_ms,
+                usage=usage,
+                finish_reason=detailed.finish_reason,
+                failure_reason="schema_validation",
+            )
+            raise
 
         record_live_llm_operation_result(
             db,
@@ -240,9 +312,9 @@ class EvalLLMClient:
             usage=usage,
             finish_reason=detailed.finish_reason,
             schema_validation_status="passed",
-            validated_output=output,
+            validated_output=validated_output,
         )
-        return output
+        return validated_output
 
 
 def build_eval_llm_client(
