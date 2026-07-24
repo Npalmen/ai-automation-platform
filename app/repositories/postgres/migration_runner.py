@@ -21,12 +21,14 @@ ORDERED_MIGRATION_FILES: tuple[str, ...] = (
     "017_live_eval_runs.sql",
     "018_live_eval_external_events.sql",
     "019_live_eval_runs_activated_at.sql",
+    "020_live_eval_llm_contract.sql",
+    "021_live_eval_llm_operations.sql",
 )
 
 MIGRATIONS_THROUGH_014: tuple[str, ...] = ORDERED_MIGRATION_FILES[:6]
 MIGRATIONS_THROUGH_015: tuple[str, ...] = ORDERED_MIGRATION_FILES[:7]
-MIGRATIONS_THROUGH_019: tuple[str, ...] = ORDERED_MIGRATION_FILES
-LATEST_MIGRATION_VERSION = "019"
+MIGRATIONS_THROUGH_019: tuple[str, ...] = ORDERED_MIGRATION_FILES[:10]
+LATEST_MIGRATION_VERSION = "021"
 
 # Tables created exclusively by migrations/009-015 SQL files (not create_tables.py baseline).
 MIGRATION_OWNED_TABLES: frozenset[str] = frozenset(
@@ -47,6 +49,7 @@ MIGRATION_OWNED_TABLES: frozenset[str] = frozenset(
         "integration_selection_backfill_runs",
         "live_eval_runs",
         "live_eval_external_events",
+        "live_eval_llm_operations",
     }
 )
 
@@ -55,6 +58,7 @@ _CI_REQUIRED_TABLES: tuple[str, ...] = (
     "jobs",
     "live_eval_runs",
     "live_eval_external_events",
+    "live_eval_llm_operations",
 )
 
 _CI_REQUIRED_INDEXES: tuple[tuple[str, str], ...] = (
@@ -62,11 +66,16 @@ _CI_REQUIRED_INDEXES: tuple[tuple[str, str], ...] = (
     ("live_eval_runs", "ix_live_eval_runs_expires_at"),
     ("live_eval_external_events", "ix_live_eval_external_events_run"),
     ("live_eval_external_events", "uq_live_eval_external_events_operation_succeeded"),
+    ("live_eval_llm_operations", "uq_live_eval_llm_operations_operation_key"),
+    ("live_eval_llm_operations", "uq_live_eval_llm_operations_run_prompt"),
+    ("live_eval_llm_operations", "uq_live_eval_llm_operations_run_ordinal"),
 )
 
 _CI_REQUIRED_CONSTRAINTS: tuple[tuple[str, str], ...] = (
     ("live_eval_runs", "uq_live_eval_runs_tenant_run"),
     ("live_eval_external_events", "fk_live_eval_events_run"),
+    ("live_eval_llm_operations", "fk_live_eval_llm_operations_run"),
+    ("live_eval_llm_operations", "ck_live_eval_llm_operations_ordinal"),
 )
 
 
@@ -172,6 +181,14 @@ def read_migration_state(engine: Engine) -> dict[str, object]:
         raise RuntimeError(
             "Migration state incomplete — live_eval_runs.activated_at missing (019)"
         )
+    if not column_exists(engine, "live_eval_runs", "llm_max_calls"):
+        raise RuntimeError(
+            "Migration state incomplete — live_eval_runs.llm_max_calls missing (021)"
+        )
+    if not table_exists(engine, "live_eval_llm_operations"):
+        raise RuntimeError(
+            "Migration state incomplete — live_eval_llm_operations missing (021)"
+        )
     return {
         "latest_version": LATEST_MIGRATION_VERSION,
         "latest_file": ORDERED_MIGRATION_FILES[-1],
@@ -193,6 +210,16 @@ def verify_ci_postgres_schema_provisioned(engine: Engine) -> dict[str, object]:
         raise RuntimeError(
             "PostgreSQL schema is not provisioned for integration_db tests. "
             "Missing column live_eval_runs.activated_at (migration 019)."
+        )
+    if not column_exists(engine, "live_eval_runs", "llm_max_calls"):
+        raise RuntimeError(
+            "PostgreSQL schema is not provisioned for integration_db tests. "
+            "Missing column live_eval_runs.llm_max_calls (migration 021)."
+        )
+    if not table_exists(engine, "live_eval_llm_operations"):
+        raise RuntimeError(
+            "PostgreSQL schema is not provisioned for integration_db tests. "
+            "Missing table live_eval_llm_operations (migration 021)."
         )
 
     for table_name, index_name in _CI_REQUIRED_INDEXES:

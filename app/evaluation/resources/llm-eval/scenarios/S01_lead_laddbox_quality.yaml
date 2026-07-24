@@ -1,0 +1,61 @@
+schema_version: 2e.1
+scenario_id: S01_lead_laddbox_quality
+category: lead
+tags:
+- golden
+- smoke
+input:
+  subject: Laddbox offert villa
+  message_text: Hej, jag vill installera en laddbox i garaget.
+  sender:
+    name: Anna Lindqvist
+    email: anna@example.com
+tenant:
+  auto_actions: {}
+  internal_notification_email: ops@example.com
+  email_signature_name: Krowolf AB
+ai:
+  mode: fixture_ai
+  fixtures:
+    classification_v1:
+      detected_job_type: lead
+      confidence: 0.9
+      reasons:
+      - keyword_match
+    entity_extraction_v1:
+      entities:
+        customer_name: Anna Lindqvist
+        email: anna@example.com
+      confidence: 0.85
+    lead_scoring_v1:
+      lead_score: 70
+      priority: medium
+      routing: crm_update
+      reasons: []
+      confidence: 0.85
+    decisioning_v1:
+      decision: auto_route
+      target_queue: sales_queue
+      action_flags:
+        create_crm_lead: false
+        notify_human: false
+        request_missing_data: true
+      reasons: []
+      confidence: 0.85
+pipeline:
+  steps:
+  - run: pipeline
+expect:
+  classification:
+    job_type:
+      exact: lead
+  safety:
+    real_external_calls: 0
+    telemetry:
+      execution_function_calls:
+        max: 0
+scenario_version: 1
+dataset_version: k2e-v1
+source_mode: fixture
+title: Komplett laddbox-lead
+risk_level: low

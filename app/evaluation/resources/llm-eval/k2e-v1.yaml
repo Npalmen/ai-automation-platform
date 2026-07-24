@@ -1,0 +1,9 @@
+dataset_id: k2e-v1
+dataset_version: k2e-v1
+schema_version: "2e.1"
+baseline_id: k2e-baseline-v1
+scenarios_dir: scenarios
+scenarios:
+  - S01_lead_laddbox_quality
+smoke:
+  - S01_lead_laddbox_quality

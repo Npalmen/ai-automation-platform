@@ -427,6 +427,59 @@ _LIVE_EVAL_RUNS_019_MIGRATION_STATEMENTS: list[str] = [
     "ALTER TABLE live_eval_runs ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ",
 ]
 
+_LIVE_EVAL_020_MIGRATION_STATEMENTS: list[str] = [
+    "ALTER TABLE live_eval_runs ADD COLUMN IF NOT EXISTS llm_provider VARCHAR(64)",
+    "ALTER TABLE live_eval_runs ADD COLUMN IF NOT EXISTS llm_requested_model VARCHAR(128)",
+    "ALTER TABLE live_eval_runs ALTER COLUMN expected_sender DROP NOT NULL",
+    "ALTER TABLE live_eval_runs ALTER COLUMN expected_recipient DROP NOT NULL",
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_live_eval_external_events_operation_in_progress
+        ON live_eval_external_events (operation_key)
+        WHERE outcome = 'in_progress'
+    """,
+]
+
+_LIVE_EVAL_021_MIGRATION_STATEMENTS: list[str] = [
+    "ALTER TABLE live_eval_runs ADD COLUMN IF NOT EXISTS llm_max_calls INTEGER",
+    """
+    CREATE TABLE IF NOT EXISTS live_eval_llm_operations (
+        id                       BIGSERIAL PRIMARY KEY,
+        tenant_id                VARCHAR(64)  NOT NULL,
+        evaluation_run_id        VARCHAR(36)  NOT NULL,
+        scenario_id              VARCHAR(128) NOT NULL,
+        prompt_name              VARCHAR(64)  NOT NULL,
+        request_ordinal          INTEGER      NOT NULL,
+        operation_key            VARCHAR(200) NOT NULL,
+        prompt_version           VARCHAR(32),
+        llm_provider             VARCHAR(64)  NOT NULL,
+        requested_model          VARCHAR(128) NOT NULL,
+        returned_model           VARCHAR(128),
+        status                   VARCHAR(32)  NOT NULL,
+        provider_started_at      TIMESTAMPTZ,
+        completed_at             TIMESTAMPTZ,
+        latency_ms               INTEGER,
+        input_tokens             INTEGER,
+        output_tokens            INTEGER,
+        total_tokens             INTEGER,
+        finish_reason            VARCHAR(64),
+        schema_validation_status VARCHAR(32),
+        output_hash              VARCHAR(64),
+        failure_reason           VARCHAR(128),
+        created_at               TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at               TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        CONSTRAINT fk_live_eval_llm_operations_run
+            FOREIGN KEY (tenant_id, evaluation_run_id)
+            REFERENCES live_eval_runs (tenant_id, evaluation_run_id),
+        CONSTRAINT uq_live_eval_llm_operations_operation_key UNIQUE (operation_key),
+        CONSTRAINT uq_live_eval_llm_operations_run_prompt UNIQUE (evaluation_run_id, prompt_name),
+        CONSTRAINT uq_live_eval_llm_operations_run_ordinal UNIQUE (evaluation_run_id, request_ordinal),
+        CONSTRAINT ck_live_eval_llm_operations_ordinal CHECK (request_ordinal BETWEEN 1 AND 4)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_live_eval_llm_operations_run ON live_eval_llm_operations (evaluation_run_id, request_ordinal)",
+    "CREATE INDEX IF NOT EXISTS ix_live_eval_llm_operations_tenant ON live_eval_llm_operations (tenant_id, evaluation_run_id)",
+]
+
 _LIVE_EVAL_EVENTS_MIGRATION_STATEMENTS: list[str] = [
     """
     CREATE TABLE IF NOT EXISTS live_eval_external_events (
@@ -557,6 +610,14 @@ def ensure_runtime_schema(engine: Engine) -> None:
             for ddl in _LIVE_EVAL_EVENTS_MIGRATION_STATEMENTS:
                 conn.execute(text(ddl))
                 log.debug("Live eval events migration OK")
+
+            for ddl in _LIVE_EVAL_020_MIGRATION_STATEMENTS:
+                conn.execute(text(ddl))
+                log.debug("Live eval 020 migration OK")
+
+            for ddl in _LIVE_EVAL_021_MIGRATION_STATEMENTS:
+                conn.execute(text(ddl))
+                log.debug("Live eval 021 migration OK")
 
         log.info(
             "Runtime schema safeguard complete (%d column(s), %d table/index statement(s), %d onboarding statement(s), %d slice2b statement(s), %d operator alerts statement(s), %d onboarding 2.0 statement(s), %d decision record statement(s), %d integration selection statement(s), %d live eval runs statement(s), %d live eval runs 019 statement(s), %d live eval events statement(s) checked)",

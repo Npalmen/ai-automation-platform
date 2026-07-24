@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 
 from app.evaluation.live.config import LiveEvalConfig, get_live_eval_config
@@ -15,6 +16,7 @@ from app.evaluation.live.constants import (
     TERMINAL_RUN_STATUSES,
 )
 from app.evaluation.live.errors import LiveEvalSafetyError
+from app.evaluation.live.reporting import _FIXTURE_WORKFLOW_SHA_MARKERS
 from app.repositories.postgres.live_eval_models import LiveEvalRunRow
 
 
@@ -37,8 +39,11 @@ def validate_registration_request(
     tenant_id: str,
     transport_mode: str,
     ai_mode: str,
-    expected_sender: str,
-    expected_recipient: str,
+    scenario_id: str,
+    expected_sender: str | None = None,
+    expected_recipient: str | None = None,
+    llm_provider: str | None = None,
+    llm_requested_model: str | None = None,
     config: LiveEvalConfig | None = None,
 ) -> LiveEvalConfig:
     config = require_tenant_allowed(tenant_id, config)
@@ -46,10 +51,23 @@ def validate_registration_request(
         raise LiveEvalSafetyError(f"transport_mode {transport_mode!r} is not allowed")
     if ai_mode not in ALLOWED_AI_MODES:
         raise LiveEvalSafetyError(f"ai_mode {ai_mode!r} is not allowed")
+    if transport_mode == "live_gmail" and ai_mode == "live_llm":
+        raise LiveEvalSafetyError("live_gmail + live_llm is not allowed")
+    if transport_mode == "fixture_input" and ai_mode == "fixture_ai":
+        raise LiveEvalSafetyError("fixture_input + fixture_ai is not allowed")
     if ai_mode == "live_llm" and not config.llm_enabled:
         raise LiveEvalSafetyError("LIVE_LLM_EVAL_ALLOWED is required for live_llm runs")
-    sender = expected_sender.strip().lower()
-    recipient = expected_recipient.strip().lower()
+    if transport_mode == "fixture_input":
+        validate_fixture_input_registration(
+            transport_mode=transport_mode,
+            ai_mode=ai_mode,
+            scenario_id=scenario_id,
+            llm_provider=llm_provider,
+            llm_requested_model=llm_requested_model,
+        )
+        return config
+    sender = (expected_sender or "").strip().lower()
+    recipient = (expected_recipient or "").strip().lower()
     if sender not in config.sender_emails:
         raise LiveEvalSafetyError("expected_sender is not allowlisted")
     if recipient not in config.recipient_emails:
@@ -106,6 +124,69 @@ def require_live_eval_external_mutation_enabled(
     if not config.external_side_effects_enabled:
         raise LiveEvalSafetyError("EXTERNAL_SIDE_EFFECT_TESTS=yes is required for live mutations")
     return config
+
+
+def require_scenario_allowed_for_2f3(scenario_id: str) -> None:
+    from app.evaluation.live.constants import ALLOWED_2F3_SCENARIOS
+
+    if scenario_id not in ALLOWED_2F3_SCENARIOS:
+        raise LiveEvalSafetyError(
+            f"scenario_id {scenario_id!r} is not allowed for 2F.3 fixture_input live LLM"
+        )
+
+
+def require_workflow_sha_for_fixture_input() -> str:
+    sha = (os.environ.get("BUILD_GIT_SHA") or os.environ.get("GITHUB_SHA") or "").strip()
+    if not sha:
+        raise LiveEvalSafetyError("BUILD_GIT_SHA or GITHUB_SHA is required for fixture_input")
+    if sha.lower() in _FIXTURE_WORKFLOW_SHA_MARKERS:
+        raise LiveEvalSafetyError("fixture_input requires a real workflow SHA")
+    return sha
+
+
+def validate_fixture_input_registration(
+    *,
+    transport_mode: str,
+    ai_mode: str,
+    scenario_id: str,
+    llm_provider: str | None,
+    llm_requested_model: str | None,
+) -> None:
+    if transport_mode != "fixture_input":
+        return
+    require_scenario_allowed_for_2f3(scenario_id)
+    if ai_mode != "live_llm":
+        raise LiveEvalSafetyError("fixture_input requires ai_mode live_llm")
+    if ai_mode == "fixture_ai":
+        raise LiveEvalSafetyError("fixture_input + fixture_ai is not allowed")
+    if not llm_provider or not llm_requested_model:
+        raise LiveEvalSafetyError(
+            "llm_provider and llm_requested_model are required for fixture_input"
+        )
+    require_workflow_sha_for_fixture_input()
+
+
+def validate_fixture_input_run_for_intake(
+    row: LiveEvalRunRow,
+    *,
+    tenant_id: str,
+) -> None:
+    require_tenant_allowed(tenant_id)
+    if row.tenant_id != tenant_id:
+        raise LiveEvalSafetyError("run tenant mismatch")
+    if row.transport_mode != "fixture_input":
+        raise LiveEvalSafetyError("transport_mode must be fixture_input")
+    if row.ai_mode != "live_llm":
+        raise LiveEvalSafetyError("ai_mode must be live_llm")
+    require_scenario_allowed_for_2f3(row.scenario_id)
+    if row.status not in (RUN_STATUS_REGISTERED, RUN_STATUS_ACTIVE):
+        raise LiveEvalSafetyError(f"run status {row.status!r} does not allow fixture intake")
+    now = datetime.now(timezone.utc)
+    expires_at = row.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < now:
+        raise LiveEvalSafetyError("run has expired")
 
 
 def require_scenario_allowed_for_2f2(scenario_id: str) -> None:

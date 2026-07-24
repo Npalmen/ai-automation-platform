@@ -543,6 +543,9 @@ def run_ai_step(
         if use_live_eval_llm:
             from app.evaluation.live.errors import LiveEvalSafetyError
 
+            ai_mode = live_eval_raw.get("ai_mode") if isinstance(live_eval_raw, dict) else None
+            if ai_mode == "live_llm" and isinstance(exc, (LLMClientError, ValidationError)):
+                raise
             if isinstance(exc, LiveEvalSafetyError):
                 duration_ms = int((time.perf_counter() - started) * 1000)
                 payload = fallback_payload_builder(str(exc))

@@ -61,6 +61,47 @@ def enforce_live_eval_write_policy(
     if snapshot is None:
         return
 
+    if (
+        snapshot.transport_mode == "fixture_input"
+        and snapshot.ai_mode == "live_llm"
+    ):
+        action_type = str(action.get("type") or "")
+        target = action.get("to") or action.get("recipient") or action.get("email")
+        reason = f"fixture_input live_llm blocked action {action_type!r}"
+        emit_live_eval_audit(
+            db,
+            tenant_id=snapshot.tenant_id,
+            action="safety_rejected",
+            status="blocked",
+            details={
+                "evaluation_run_id": snapshot.evaluation_run_id,
+                "action_type": action_type,
+                "target": _normalize_email(str(target or ""))[:120],
+            },
+        )
+        operation_key = build_operation_key(
+            evaluation_run_id=snapshot.evaluation_run_id,
+            category="app_external_write_blocked",
+            operation=action_type,
+            action_operation_id=action_operation_id,
+        )
+        record_live_eval_external_event(
+            db,
+            operation_key=operation_key,
+            outcome=EVENT_OUTCOME_BLOCKED,
+            category="app_external_write_blocked",
+            operation=action_type,
+            integration_type=IntegrationType.GOOGLE_MAIL.value,
+            target=_normalize_email(str(target or ""))[:120] or None,
+            job_id=job_id,
+            pipeline_run_id=pipeline_run_id,
+            action_operation_id=action_operation_id,
+            snapshot=snapshot,
+            job_input_data=getattr(job, "input_data", None) if job is not None else None,
+            metadata={"reason": reason},
+        )
+        raise LiveEvalSafetyError(reason)
+
     if job_id is None and job is not None:
         job_id = getattr(job, "job_id", None)
 

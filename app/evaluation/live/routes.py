@@ -25,6 +25,7 @@ from app.evaluation.live.delivery import (
     resolve_intake_label_id,
 )
 from app.evaluation.live.errors import LiveEvalSafetyError
+from app.evaluation.live.fixture_intake import process_fixture_input_for_run
 from app.evaluation.live.gmail_intake import process_gmail_message_by_id
 from app.evaluation.live.safety_errors import (
     build_safety_rejected_payload,
@@ -50,6 +51,8 @@ from app.evaluation.live.schemas import (
     LiveEvalRunStatusRequest,
     ProcessDeliveryRequest,
     ProcessDeliveryResponse,
+    ProcessFixtureInputRequest,
+    ProcessFixtureInputResponse,
     RecipientCleanupRequest,
     RuntimeReadinessResponse,
 )
@@ -227,6 +230,80 @@ def get_live_eval_observation(
     if not observation.get("run"):
         raise HTTPException(status_code=404, detail="run not found")
     return observation
+
+
+@router.post(
+    "/runs/{evaluation_run_id}/process-fixture-input",
+    response_model=ProcessFixtureInputResponse,
+)
+def process_live_eval_fixture_input(
+    evaluation_run_id: str,
+    body: ProcessFixtureInputRequest,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin_api_key),
+):
+    row = LiveEvalRunRepository.get_run(db, evaluation_run_id, tenant_id=body.tenant_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="run not found")
+
+    try:
+        require_live_eval_enabled()
+        require_tenant_allowed(body.tenant_id)
+        from app.evaluation.live.config import get_live_eval_config
+
+        config = get_live_eval_config()
+        if not config.llm_enabled:
+            raise LiveEvalSafetyError("LIVE_LLM_EVAL_ALLOWED is required for fixture_input")
+    except LiveEvalSafetyError as exc:
+        raise _safety_http_exception(
+            exc,
+            evaluation_run_id=evaluation_run_id,
+            scenario_id=row.scenario_id,
+            attempt_id=row.attempt_id,
+            tenant_id=body.tenant_id,
+            failed_stage="triggering_fixture_intake",
+            root_job_created=bool(row.root_job_id),
+        ) from exc
+
+    try:
+        intake_result = process_fixture_input_for_run(
+            db,
+            evaluation_run_id=evaluation_run_id,
+            tenant_id=body.tenant_id,
+        )
+    except LiveEvalSafetyError as exc:
+        raise _safety_http_exception(
+            exc,
+            evaluation_run_id=evaluation_run_id,
+            scenario_id=row.scenario_id,
+            attempt_id=row.attempt_id,
+            tenant_id=body.tenant_id,
+            failed_stage="triggering_fixture_intake",
+            root_job_created=bool(row.root_job_id),
+        ) from exc
+    except Exception as exc:
+        raise _intake_failed_http_exception(
+            evaluation_run_id=evaluation_run_id,
+            scenario_id=row.scenario_id,
+            attempt_id=row.attempt_id,
+            tenant_id=body.tenant_id,
+            reason=str(exc),
+            root_job_created=bool(row.root_job_id),
+        ) from exc
+
+    refreshed = LiveEvalRunRepository.get_run(db, evaluation_run_id, tenant_id=body.tenant_id)
+    return ProcessFixtureInputResponse(
+        evaluation_run_id=evaluation_run_id,
+        root_job_id=intake_result.get("job_id") or (refreshed.root_job_id if refreshed else None),
+        job_status=intake_result.get("job_status"),
+        pipeline_run_id=intake_result.get("pipeline_run_id"),
+        intake_status=str(intake_result.get("status")),
+        intake_detail={
+            k: v
+            for k, v in intake_result.items()
+            if k not in ("message_text", "body_text")
+        },
+    )
 
 
 @router.post("/runs/{evaluation_run_id}/process-delivery", response_model=ProcessDeliveryResponse)

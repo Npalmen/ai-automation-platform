@@ -15,7 +15,11 @@ def test_migration_files_exist_and_are_split():
     assert runs.exists()
     assert events.exists()
     activated = root / "migrations" / "019_live_eval_runs_activated_at.sql"
+    llm_contract = root / "migrations" / "020_live_eval_llm_contract.sql"
+    llm_operations = root / "migrations" / "021_live_eval_llm_operations.sql"
     assert activated.exists()
+    assert llm_contract.exists()
+    assert llm_operations.exists()
     runs_sql = runs.read_text(encoding="utf-8")
     events_sql = events.read_text(encoding="utf-8")
     assert "live_eval_runs" in runs_sql
@@ -26,6 +30,8 @@ def test_migration_files_exist_and_are_split():
 
 def test_runtime_schema_includes_both_migration_groups():
     from app.repositories.postgres.schema_migrations import (
+        _LIVE_EVAL_020_MIGRATION_STATEMENTS,
+        _LIVE_EVAL_021_MIGRATION_STATEMENTS,
         _LIVE_EVAL_EVENTS_MIGRATION_STATEMENTS,
         _LIVE_EVAL_RUNS_019_MIGRATION_STATEMENTS,
         _LIVE_EVAL_RUNS_MIGRATION_STATEMENTS,
@@ -41,4 +47,6 @@ def test_runtime_schema_includes_both_migration_groups():
         len(_LIVE_EVAL_RUNS_MIGRATION_STATEMENTS)
         + len(_LIVE_EVAL_RUNS_019_MIGRATION_STATEMENTS)
         + len(_LIVE_EVAL_EVENTS_MIGRATION_STATEMENTS)
+        + len(_LIVE_EVAL_020_MIGRATION_STATEMENTS)
+        + len(_LIVE_EVAL_021_MIGRATION_STATEMENTS)
     )

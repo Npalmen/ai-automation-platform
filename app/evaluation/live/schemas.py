@@ -13,10 +13,12 @@ class LiveEvalRunRegisterRequest(BaseModel):
     tenant_id: str
     scenario_id: str
     attempt_id: int = Field(ge=1)
-    transport_mode: Literal["live_gmail"] = "live_gmail"
+    transport_mode: Literal["live_gmail", "fixture_input"] = "live_gmail"
     ai_mode: Literal["fixture_ai", "live_llm"]
-    expected_sender: str
-    expected_recipient: str
+    expected_sender: str | None = None
+    expected_recipient: str | None = None
+    llm_provider: str | None = None
+    llm_requested_model: str | None = None
     expires_at: datetime | None = None
 
 
@@ -28,8 +30,11 @@ class LiveEvalRunResponse(BaseModel):
     transport_mode: str
     ai_mode: str
     fixture_bundle_id: str | None
-    expected_sender: str
-    expected_recipient: str
+    expected_sender: str | None = None
+    expected_recipient: str | None = None
+    llm_provider: str | None = None
+    llm_requested_model: str | None = None
+    llm_max_calls: int | None = None
     status: str
     created_by: str
     created_at: datetime
@@ -62,8 +67,11 @@ class TrustedLiveEvalSnapshot(BaseModel):
     transport_mode: str
     ai_mode: str
     fixture_bundle_id: str | None = None
-    expected_sender: str
-    expected_recipient: str
+    expected_sender: str | None = None
+    expected_recipient: str | None = None
+    llm_provider: str | None = None
+    llm_requested_model: str | None = None
+    llm_max_calls: int | None = None
     config_hash: str
     trusted: bool = True
 
@@ -96,6 +104,52 @@ class LiveEvalReport(BaseModel):
     latency_breakdown: dict[str, Any] = Field(default_factory=dict)
     redacted_diagnostics: dict[str, Any] = Field(default_factory=dict)
     failure_summary: dict[str, Any] | None = None
+
+
+class ProcessFixtureInputRequest(BaseModel):
+    tenant_id: str
+
+
+class ProcessFixtureInputResponse(BaseModel):
+    evaluation_run_id: str
+    root_job_id: str | None = None
+    job_status: str | None = None
+    pipeline_run_id: str | None = None
+    intake_status: str
+    intake_detail: dict[str, Any] = Field(default_factory=dict)
+
+
+class LiveEvalLlmReport(BaseModel):
+    report_schema_version: str = "2f.3.llm"
+    evaluation_run_id: str
+    scenario_id: str | None = None
+    scenario_version: int | None = None
+    scenario_content_hash: str | None = None
+    dataset_version: str | None = None
+    workflow_sha: str | None = None
+    config_hash: str | None = None
+    transport_mode: str | None = None
+    ai_mode: str | None = None
+    llm_provider: str | None = None
+    llm_requested_model: str | None = None
+    result: Literal["passed", "failed", "aborted", "preflight", "dry_run"] = "dry_run"
+    failure_category: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    operations: list[dict[str, Any]] = Field(default_factory=list)
+    token_usage: dict[str, Any] = Field(default_factory=dict)
+    latency_breakdown: dict[str, Any] = Field(default_factory=dict)
+    semantic_assertions: list[str] = Field(default_factory=list)
+    job_id: str | None = None
+    job_status: str | None = None
+    pending_approval_count: int | None = None
+    external_action_writes: int = 0
+    gmail_sends: int = 0
+    gmail_mutations: int = 0
+    app_replies: int = 0
+    run_status: str | None = None
+    issues: list[str] = Field(default_factory=list)
+    redacted_diagnostics: dict[str, Any] = Field(default_factory=dict)
 
 
 class ProcessDeliveryRequest(BaseModel):

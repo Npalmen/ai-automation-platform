@@ -24,8 +24,11 @@ class LiveEvalRunRow(Base):
     transport_mode = Column(String(32), nullable=False)
     ai_mode = Column(String(32), nullable=False)
     fixture_bundle_id = Column(String(64), nullable=True)
-    expected_sender = Column(String(320), nullable=False)
-    expected_recipient = Column(String(320), nullable=False)
+    expected_sender = Column(String(320), nullable=True)
+    expected_recipient = Column(String(320), nullable=True)
+    llm_provider = Column(String(64), nullable=True)
+    llm_requested_model = Column(String(128), nullable=True)
+    llm_max_calls = Column(Integer, nullable=True)
     status = Column(String(32), nullable=False, default="registered")
     root_gmail_message_id = Column(String(320), nullable=True)
     root_job_id = Column(String(64), nullable=True)
@@ -60,3 +63,49 @@ class LiveEvalExternalEventRow(Base):
     started_at = Column(DateTime(timezone=True), nullable=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     redacted_metadata = Column(JSON, nullable=False, default=dict)
+
+
+class LiveEvalLlmOperationRow(Base):
+    __tablename__ = "live_eval_llm_operations"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "evaluation_run_id"],
+            ["live_eval_runs.tenant_id", "live_eval_runs.evaluation_run_id"],
+        ),
+        UniqueConstraint("operation_key", name="uq_live_eval_llm_operations_operation_key"),
+        UniqueConstraint(
+            "evaluation_run_id",
+            "prompt_name",
+            name="uq_live_eval_llm_operations_run_prompt",
+        ),
+        UniqueConstraint(
+            "evaluation_run_id",
+            "request_ordinal",
+            name="uq_live_eval_llm_operations_run_ordinal",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    evaluation_run_id = Column(String(36), nullable=False, index=True)
+    scenario_id = Column(String(128), nullable=False)
+    prompt_name = Column(String(64), nullable=False)
+    request_ordinal = Column(Integer, nullable=False)
+    operation_key = Column(String(200), nullable=False)
+    prompt_version = Column(String(32), nullable=True)
+    llm_provider = Column(String(64), nullable=False)
+    requested_model = Column(String(128), nullable=False)
+    returned_model = Column(String(128), nullable=True)
+    status = Column(String(32), nullable=False)
+    provider_started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    latency_ms = Column(Integer, nullable=True)
+    input_tokens = Column(Integer, nullable=True)
+    output_tokens = Column(Integer, nullable=True)
+    total_tokens = Column(Integer, nullable=True)
+    finish_reason = Column(String(64), nullable=True)
+    schema_validation_status = Column(String(32), nullable=True)
+    output_hash = Column(String(64), nullable=True)
+    failure_reason = Column(String(128), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
