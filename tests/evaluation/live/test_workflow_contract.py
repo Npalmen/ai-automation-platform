@@ -254,6 +254,28 @@ def test_live_llm_workflow_contract():
     assert run_step.get("if") == "inputs.confirm_live_llm == 'RUN_LLM_S01'"
     assert "run-llm-s01" in (run_step.get("run") or "")
 
+    seed_step = _step_by_name(steps, "Seed eval tenant")
+    assert seed_step is not None
+    assert "--tenant-id TENANT_LIVE_EVAL" in (seed_step.get("run") or "")
+    assert "--apply" in (seed_step.get("run") or "")
+    assert transport_env.get("LIVE_EVAL_SEED_ALLOWED") in ("yes", True)
+    assert transport_env.get("LIVE_EVAL_LLM_MODEL") == "gpt-4o-mini"
+    assert transport_env.get("LLM_MODEL") == "gpt-4o-mini"
+    assert transport_env.get("LLM_API_URL") == "https://api.openai.com/v1/chat/completions"
+    assert "secrets.LIVE_EVAL_LLM_MODEL" not in str(transport)
+    assert "secrets.LIVE_EVAL_LLM_API_URL" not in str(transport)
+    secret_refs = [
+        line
+        for line in LLM_WORKFLOW_PATH.read_text(encoding="utf-8").splitlines()
+        if "secrets." in line
+    ]
+    assert secret_refs == [
+        '      ADMIN_API_KEY: ${{ secrets.LIVE_EVAL_ADMIN_API_KEY }}',
+        '      LLM_API_KEY: ${{ secrets.LIVE_EVAL_LLM_API_KEY }}',
+    ]
+    assert foundation_env.get("LIVE_EVAL_LLM_MODEL") == "gpt-4o-mini"
+    assert foundation_env.get("LLM_API_URL") == "https://api.openai.com/v1/chat/completions"
+
 
 RELEASE_GATE_PATH = (
     Path(__file__).resolve().parents[3] / ".github" / "workflows" / "release-gate.yml"
