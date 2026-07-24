@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -47,7 +48,10 @@ def _preflight_patches(runner):
         patch.object(
             runner.observer,
             "runtime_readiness",
-            return_value={"env": "test", "build_git_sha": ""},
+            return_value={
+                "env": "test",
+                "build_git_sha": os.environ.get("BUILD_GIT_SHA", "").strip(),
+            },
         ),
         patch(
             "app.evaluation.live.runner.run_sender_readiness_read_only",

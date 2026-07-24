@@ -152,6 +152,20 @@ jobs:
           python -m pytest tests/evaluation/live/test_registry_refresh_pg.py -m integration_db -q --tb=short --junitxml=live_eval_registry_refresh_pg.junit.xml
           python scripts/ci/verify_pytest_junit.py live_eval_registry_refresh_pg.junit.xml --expected 1
 
+      - name: Run live-llm operation PG contract tests
+        env:
+          ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_platform
+        run: |
+          COLLECT_LINE=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live/test_llm_operations_pg.py 2>/dev/null | awk '/ collected/ { print; exit }')
+          EXPECTED=$(echo "${COLLECT_LINE}" | awk '{ split($1, parts, "/"); print parts[1] }')
+          if [ "${EXPECTED}" != "17" ]; then
+            echo "live-llm operations gate requires exactly 17 selected tests, got ${EXPECTED}" >&2
+            exit 1
+          fi
+          python -m pytest tests/evaluation/live/test_llm_operations_pg.py -m integration_db -q --tb=short --junitxml=live_eval_llm_operations_pg.junit.xml
+          python scripts/ci/verify_pytest_junit.py live_eval_llm_operations_pg.junit.xml --expected 17
+
   frontend:
     runs-on: ubuntu-latest
 

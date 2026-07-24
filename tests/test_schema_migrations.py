@@ -32,6 +32,8 @@ class TestEnsureRuntimeSchemaHappyPath:
             _INTEGRATION_OAUTH_STATE_MIGRATION_STATEMENTS,
             _INTEGRATION_SELECTION_MIGRATION_STATEMENTS,
             _LIVE_EVAL_EVENTS_MIGRATION_STATEMENTS,
+            _LIVE_EVAL_020_MIGRATION_STATEMENTS,
+            _LIVE_EVAL_021_MIGRATION_STATEMENTS,
             _LIVE_EVAL_RUNS_019_MIGRATION_STATEMENTS,
             _LIVE_EVAL_RUNS_MIGRATION_STATEMENTS,
             _ONBOARDING_2_MIGRATION_STATEMENTS,
@@ -56,6 +58,8 @@ class TestEnsureRuntimeSchemaHappyPath:
             + len(_INTEGRATION_SELECTION_MIGRATION_STATEMENTS)
             + len(_LIVE_EVAL_RUNS_MIGRATION_STATEMENTS)
             + len(_LIVE_EVAL_RUNS_019_MIGRATION_STATEMENTS)
+            + len(_LIVE_EVAL_020_MIGRATION_STATEMENTS)
+            + len(_LIVE_EVAL_021_MIGRATION_STATEMENTS)
             + len(_LIVE_EVAL_EVENTS_MIGRATION_STATEMENTS)
         )
         assert conn.execute.call_count == expected
@@ -164,3 +168,29 @@ class TestStartupIntegration:
         assert call_rs > call_ca, (
             "ensure_runtime_schema must be called after create_all"
         )
+
+
+class TestConstraintNamesIncludesCheckConstraints:
+    def test_includes_check_constraints_for_ci_verification(self):
+        from unittest.mock import MagicMock, patch
+
+        from app.repositories.postgres.migration_runner import _constraint_names
+
+        mock_inspector = MagicMock()
+        mock_inspector.get_unique_constraints.return_value = [
+            {"name": "uq_live_eval_llm_operations_operation_key"}
+        ]
+        mock_inspector.get_foreign_keys.return_value = [
+            {"name": "fk_live_eval_llm_operations_run"}
+        ]
+        mock_inspector.get_check_constraints.return_value = [
+            {"name": "ck_live_eval_llm_operations_ordinal"}
+        ]
+
+        engine = MagicMock()
+        with patch("sqlalchemy.inspect", return_value=mock_inspector):
+            names = _constraint_names(engine, "live_eval_llm_operations")
+
+        assert "ck_live_eval_llm_operations_ordinal" in names
+        assert "uq_live_eval_llm_operations_operation_key" in names
+        assert "fk_live_eval_llm_operations_run" in names

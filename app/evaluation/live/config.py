@@ -30,6 +30,10 @@ class LiveEvalConfig:
     env_fingerprint: str
     external_side_effects_enabled: bool
     sender_eval_label: str
+    llm_provider: str
+    llm_model: str
+    llm_timeout: float
+    llm_max_tokens: int
 
 
 def _parse_csv_set(raw: str) -> frozenset[str]:
@@ -68,4 +72,8 @@ def get_live_eval_config(settings: Settings | None = None) -> LiveEvalConfig:
         external_side_effects_enabled=_env_truthy("EXTERNAL_SIDE_EFFECT_TESTS"),
         sender_eval_label=os.environ.get("LIVE_EVAL_SENDER_GMAIL_LABEL", "krowolf-live-eval-sent").strip()
         or "krowolf-live-eval-sent",
+        llm_provider=os.environ.get("LIVE_EVAL_LLM_PROVIDER", "").strip(),
+        llm_model=os.environ.get("LIVE_EVAL_LLM_MODEL", "").strip(),
+        llm_timeout=float(os.environ.get("LIVE_EVAL_LLM_TIMEOUT", "60")),
+        llm_max_tokens=int(os.environ.get("LIVE_EVAL_LLM_MAX_TOKENS", "2048")),
     )

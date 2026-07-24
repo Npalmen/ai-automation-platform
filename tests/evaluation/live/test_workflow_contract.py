@@ -207,3 +207,64 @@ def test_live_eval_workflow_contract():
 
     freeform_inputs = set(dispatch["inputs"].keys()) - {"confirm_live_gmail"}
     assert not freeform_inputs, f"unexpected workflow inputs: {freeform_inputs}"
+
+
+LLM_WORKFLOW_PATH = (
+    Path(__file__).resolve().parents[3] / ".github" / "workflows" / "live-llm-eval.yml"
+)
+
+
+def _load_llm_workflow() -> dict:
+    return yaml.safe_load(LLM_WORKFLOW_PATH.read_text(encoding="utf-8"))
+
+
+def test_live_llm_workflow_contract():
+    data = _load_llm_workflow()
+    assert data["concurrency"]["group"] == "live-llm-eval"
+    trigger = _workflow_trigger(data)
+    dispatch = trigger["workflow_dispatch"]
+    confirm = dispatch["inputs"]["confirm_live_llm"]
+    assert confirm["options"] == ["DO_NOT_RUN", "READINESS_ONLY", "RUN_LLM_S01"]
+
+    foundation = data["jobs"]["foundation"]
+    assert "environment" not in foundation
+    foundation_env = foundation.get("env") or {}
+    assert foundation_env.get("LIVE_LLM_EVAL_ALLOWED") in ("yes", True)
+    assert "LIVE_GMAIL_EVAL_ALLOWED" not in foundation_env
+    assert "secrets" not in str(foundation)
+
+    collect_step = _step_by_name(foundation["steps"], "Verify integration_db test selection")
+    assert '"30"' in (collect_step.get("run") or "")
+    assert "test_llm_operations_pg.py" in (collect_step.get("run") or "")
+    assert "test_live_eval_migration_021_pg.py" in (collect_step.get("run") or "")
+
+    transport = data["jobs"]["live_llm_transport"]
+    assert transport["environment"] == "live-llm-eval"
+    transport_env = transport.get("env") or {}
+    assert "LIVE_GMAIL" not in str(transport_env)
+    assert "GMAIL" not in str(transport_env).upper() or "LIVE_EVAL_GMAIL" not in transport_env
+    assert transport_env.get("LIVE_LLM_EVAL_ALLOWED") in ("yes", True)
+
+    steps = transport["steps"]
+    assert not any("OAuth" in (step.get("name") or "") for step in steps)
+    assert not any("cleanup" in (step.get("name") or "").lower() for step in steps)
+    readiness = _step_by_name(steps, "LLM readiness-only report")
+    assert readiness.get("if") == "inputs.confirm_live_llm == 'READINESS_ONLY'"
+    run_step = _step_by_name(steps, "Live LLM S01 scenario")
+    assert run_step.get("if") == "inputs.confirm_live_llm == 'RUN_LLM_S01'"
+    assert "run-llm-s01" in (run_step.get("run") or "")
+
+
+RELEASE_GATE_PATH = (
+    Path(__file__).resolve().parents[3] / ".github" / "workflows" / "release-gate.yml"
+)
+
+
+def test_release_gate_llm_operations_pg_contract():
+    data = yaml.safe_load(RELEASE_GATE_PATH.read_text(encoding="utf-8"))
+    pg_job = data["jobs"]["live-eval-postgres"]
+    steps = pg_job["steps"]
+    llm_step = _step_by_name(steps, "Run live-llm operation PG contract tests")
+    assert "test_llm_operations_pg.py" in (llm_step.get("run") or "")
+    assert '"17"' in (llm_step.get("run") or "")
+    assert "live_eval_llm_operations_pg.junit.xml --expected 17" in (llm_step.get("run") or "")

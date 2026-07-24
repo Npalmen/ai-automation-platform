@@ -23,8 +23,23 @@ ALLOWED_RUN_TRANSITIONS: dict[str, frozenset[str]] = {
     ),
 }
 
-ALLOWED_TRANSPORT_MODES = frozenset({"live_gmail"})
+ALLOWED_TRANSPORT_MODES = frozenset({"live_gmail", "fixture_input"})
 ALLOWED_AI_MODES = frozenset({"fixture_ai", "live_llm"})
+
+ALLOWED_2F3_SCENARIOS = frozenset({"S01_lead_laddbox_quality"})
+
+S01_LOCKED_SCENARIO_HASH = (
+    "235f96332b87d766c8fc194719a5cb5053d8443d7050e19b96249cfcdf946377"
+)
+S01_LLM_PROMPT_ORDER: tuple[str, ...] = (
+    "classification_v1",
+    "entity_extraction_v1",
+    "lead_scoring_v1",
+    "decisioning_v1",
+)
+S01_LLM_MAX_CALLS = len(S01_LLM_PROMPT_ORDER)
+
+LLM_REPORT_SCHEMA_VERSION = "2f.3.llm"
 
 EVENT_OUTCOME_BLOCKED = "blocked"
 EVENT_OUTCOME_FAILED = "failed"
@@ -77,11 +92,15 @@ INTERNAL_LIVE_EVAL_TELEMETRY_CATEGORIES = frozenset({
     TELEMETRY_APP_INTAKE_FAILED,
     TELEMETRY_APP_EXTERNAL_BLOCKED,
     TELEMETRY_APP_CLEANUP_ARCHIVED,
+    TELEMETRY_APP_LIVE_LLM,
     "testbot_gmail_send_attempt",
     TELEMETRY_TESTBOT_SEND_SUCCEEDED,
     TELEMETRY_TESTBOT_SEND_RECONCILE,
     "testbot_unexpected_sender_reply_detected",
 })
+
+LLM_OPERATION_IN_PROGRESS = "in_progress"
+LLM_OPERATION_OUTCOME_UNKNOWN = "outcome_unknown"
 
 PYTEST_MARKER_EXPR = (
     "not monday_live and not live_gmail_eval and not live_llm_eval and not live_e2e_eval"

@@ -99,7 +99,9 @@ def resolve_llm_client(*, job, db: Session | None = None):
     if snapshot.ai_mode == "live_llm":
         if not config.llm_enabled:
             raise LiveEvalSafetyError("LIVE_LLM_EVAL_ALLOWED is required for live_llm")
-        return get_llm_client()
+        from app.evaluation.live.eval_llm_client import build_eval_llm_client
+
+        return build_eval_llm_client(snapshot=snapshot, db=db)
 
     raise LiveEvalSafetyError(f"Unsupported ai_mode {snapshot.ai_mode!r}")
 

@@ -32,7 +32,7 @@ def get_run_summary(db: Session, evaluation_run_id: str, tenant_id: str) -> dict
     row = LiveEvalRunRepository.get_run(db, evaluation_run_id, tenant_id=tenant_id)
     if row is None:
         return {}
-    return {
+    summary = {
         "evaluation_run_id": row.evaluation_run_id,
         "tenant_id": row.tenant_id,
         "scenario_id": row.scenario_id,
@@ -41,14 +41,20 @@ def get_run_summary(db: Session, evaluation_run_id: str, tenant_id: str) -> dict
         "ai_mode": row.ai_mode,
         "fixture_bundle_id": row.fixture_bundle_id,
         "status": row.status,
-        "expected_sender": mask_email(row.expected_sender),
-        "expected_recipient": mask_email(row.expected_recipient),
         "root_job_id": row.root_job_id,
-        "root_gmail_message_id": row.root_gmail_message_id,
         "created_at": row.created_at.isoformat() if row.created_at else None,
         "expires_at": row.expires_at.isoformat() if row.expires_at else None,
         "config_hash": (row.config_hash or "")[:16],
     }
+    if row.transport_mode == "fixture_input":
+        summary["llm_provider"] = row.llm_provider
+        summary["llm_requested_model"] = row.llm_requested_model
+        summary["llm_max_calls"] = row.llm_max_calls
+        return summary
+    summary["expected_sender"] = mask_email(row.expected_sender or "")
+    summary["expected_recipient"] = mask_email(row.expected_recipient or "")
+    summary["root_gmail_message_id"] = row.root_gmail_message_id
+    return summary
 
 
 def list_run_events(

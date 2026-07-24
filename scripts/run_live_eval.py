@@ -294,6 +294,185 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_llm_readiness_only(args: argparse.Namespace) -> int:
+    from app.evaluation.live.llm_readiness import run_llm_readiness_checks
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.orm import sessionmaker
+
+    config = get_live_eval_config()
+    issues: list[str] = []
+    if args.tenant_id:
+        db_url = os.environ.get("DATABASE_URL", "").strip()
+        if db_url:
+            engine = create_engine(db_url)
+            Session = sessionmaker(bind=engine)
+            session = Session()
+            try:
+                report = run_llm_readiness_checks(session, args.tenant_id, config=config)
+                issues = report.issues
+                payload = {
+                    "ready": report.ready,
+                    "issues": report.issues,
+                    "checks": report.checks,
+                    "live_llm_calls": 0,
+                }
+            finally:
+                session.close()
+                engine.dispose()
+        else:
+            from app.evaluation.live.llm_readiness import run_llm_offline_readiness_checks
+
+            report = run_llm_offline_readiness_checks(config)
+            issues = report.issues
+            payload = {
+                "ready": report.ready,
+                "issues": report.issues,
+                "checks": report.checks,
+                "live_llm_calls": 0,
+            }
+    else:
+        from app.evaluation.live.llm_readiness import run_llm_offline_readiness_checks
+
+        report = run_llm_offline_readiness_checks(config)
+        issues = report.issues
+        payload = {
+            "ready": report.ready,
+            "issues": report.issues,
+            "checks": report.checks,
+            "live_llm_calls": 0,
+        }
+
+    if args.report_file:
+        Path(args.report_file).write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        Path(summary_path).write_text(
+            "\n".join(
+                [
+                    "## Live LLM readiness-only",
+                    f"- result: **{'passed' if not issues else 'failed'}**",
+                    f"- live_llm_calls: **0**",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    return 0 if not issues else 1
+
+
+def cmd_run_llm_s01(args: argparse.Namespace) -> int:
+    if not args.confirm_external:
+        print("--confirm-external is required", file=sys.stderr)
+        return 2
+
+    import httpx
+
+    from app.evaluation.live.constants import S01_LOCKED_SCENARIO_HASH
+    from app.evaluation.live.llm_assertions import assert_s01_live_llm_semantics
+    from app.evaluation.live.llm_report import build_live_eval_llm_report, write_llm_report_atomic
+    from app.evaluation.live.pipeline_poll import poll_pipeline_observation
+    from app.evaluation.live.registry import new_evaluation_run_id
+
+    config = get_live_eval_config()
+    base = (args.app_base_url or os.environ.get("LIVE_EVAL_APP_BASE_URL") or "").rstrip("/")
+    admin_key = os.environ.get("ADMIN_API_KEY", "").strip()
+    tenant_id = args.tenant_id or next(iter(config.tenant_ids), "")
+    if not base or not admin_key or not tenant_id:
+        print("LIVE_EVAL_APP_BASE_URL, ADMIN_API_KEY, and tenant required", file=sys.stderr)
+        return 2
+    if not config.llm_provider or not config.llm_model:
+        print("LIVE_EVAL_LLM_PROVIDER and LIVE_EVAL_LLM_MODEL required", file=sys.stderr)
+        return 2
+
+    run_id = args.evaluation_run_id or new_evaluation_run_id()
+    scenario_id = args.scenario_id or "S01_lead_laddbox_quality"
+    headers = {"X-Admin-API-Key": admin_key}
+
+    register = httpx.post(
+        f"{base}/admin/live-eval/runs",
+        headers=headers,
+        json={
+            "evaluation_run_id": run_id,
+            "tenant_id": tenant_id,
+            "scenario_id": scenario_id,
+            "attempt_id": args.attempt_id or 1,
+            "transport_mode": "fixture_input",
+            "ai_mode": "live_llm",
+            "llm_provider": config.llm_provider,
+            "llm_requested_model": config.llm_model,
+        },
+        timeout=30.0,
+    )
+    if register.status_code != 200:
+        print(register.text, file=sys.stderr)
+        return 1
+
+    intake = httpx.post(
+        f"{base}/admin/live-eval/runs/{run_id}/process-fixture-input",
+        headers=headers,
+        json={"tenant_id": tenant_id},
+        timeout=120.0,
+    )
+    if intake.status_code != 200:
+        print(intake.text, file=sys.stderr)
+        return 1
+
+    def _fetch_observation() -> dict:
+        response = httpx.get(
+            f"{base}/admin/live-eval/runs/{run_id}/observation",
+            headers=headers,
+            params={"tenant_id": tenant_id},
+            timeout=30.0,
+        )
+        return response.json()
+
+    try:
+        observation = poll_pipeline_observation(_fetch_observation, timeout_seconds=120)
+    except Exception as exc:
+        print(f"pipeline poll failed: {exc}", file=sys.stderr)
+        observation = _fetch_observation()
+
+    violations = assert_s01_live_llm_semantics(observation)
+    result = "passed" if not violations else "failed"
+    run_summary = observation.get("run") or {}
+    report = build_live_eval_llm_report(
+        evaluation_run_id=run_id,
+        run={
+            **run_summary,
+            "llm_provider": config.llm_provider,
+            "llm_requested_model": config.llm_model,
+            "dataset_version": "k2e-v1",
+        },
+        observation=observation,
+        semantic_assertions=violations,
+        result=result,
+        failure_category=None if not violations else "assertion_failed",
+        scenario_content_hash=S01_LOCKED_SCENARIO_HASH,
+    )
+    write_llm_report_atomic(run_id, report)
+
+    terminal = httpx.post(
+        f"{base}/admin/live-eval/runs/{run_id}/status",
+        headers=headers,
+        json={"tenant_id": tenant_id, "status": "completed" if not violations else "aborted"},
+        timeout=30.0,
+    )
+    if terminal.status_code != 200:
+        print(terminal.text, file=sys.stderr)
+
+    if args.run_id_file:
+        Path(args.run_id_file).write_text(run_id + "\n", encoding="utf-8")
+
+    print(json.dumps({"evaluation_run_id": run_id, "result": result, "violations": violations}, indent=2))
+    return 0 if not violations else 1
+
+
 def cmd_run_scenario(args: argparse.Namespace) -> int:
     if not args.confirm_external:
         print("--confirm-external is required", file=sys.stderr)
@@ -467,6 +646,21 @@ def build_parser() -> argparse.ArgumentParser:
     readiness.add_argument("--app-base-url", default=None)
     readiness.add_argument("--confirm-read-only", action="store_true")
     readiness.set_defaults(func=cmd_readiness_only)
+
+    llm_readiness = sub.add_parser("llm-readiness-only")
+    llm_readiness.add_argument("--tenant-id", default=None)
+    llm_readiness.add_argument("--report-file", default=None)
+    llm_readiness.set_defaults(func=cmd_llm_readiness_only)
+
+    run_llm = sub.add_parser("run-llm-s01")
+    run_llm.add_argument("--scenario-id", default="S01_lead_laddbox_quality")
+    run_llm.add_argument("--tenant-id", default=None)
+    run_llm.add_argument("--evaluation-run-id", default=None)
+    run_llm.add_argument("--attempt-id", type=int, default=None)
+    run_llm.add_argument("--app-base-url", default=None)
+    run_llm.add_argument("--confirm-external", action="store_true")
+    run_llm.add_argument("--run-id-file", default=None)
+    run_llm.set_defaults(func=cmd_run_llm_s01)
 
     return parser
 
