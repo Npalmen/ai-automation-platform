@@ -84,6 +84,8 @@ def test_readiness_makes_no_provider_calls(live_llm_readiness_env, readiness_db)
     assert report.ready is True
     assert report.checks["live_llm_calls"] == 0
     assert report.checks["llm_operations"] == 0
+    assert report.checks["model_identity_contract_ok"] is True
+    assert report.checks["model_identity_registry_fingerprint"]
 
 
 def test_missing_llm_api_key_fails_without_provider_calls(live_llm_readiness_env, readiness_db, monkeypatch):

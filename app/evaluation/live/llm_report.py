@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from app.evaluation.live.constants import (
@@ -174,6 +175,70 @@ def write_llm_report_atomic(evaluation_run_id: str, report: LiveEvalLlmReport):
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2, ensure_ascii=False)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_name, target)
+        os.chmod(target, 0o640)
+    finally:
+        if os.path.exists(tmp_name):
+            os.unlink(tmp_name)
+    return target
+
+
+LLM_FAILURE_REPORT_SCHEMA_VERSION = "2f.3.llm-failure"
+
+
+def build_live_eval_llm_failure_report(
+    *,
+    evaluation_run_id: str | None,
+    scenario_id: str,
+    failure_stage: str,
+    failure_category: str | None = None,
+    result: str = "failed",
+    error: str | BaseException | None = None,
+    workflow_sha: str | None = None,
+    observation: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    from app.evaluation.live.provider_redaction import sanitize_provider_error_message
+
+    events = (observation or {}).get("events") or []
+    operations, token_usage = _summarize_llm_events(events)
+    write_counts = _count_external_writes(events)
+    payload = {
+        "report_schema_version": LLM_FAILURE_REPORT_SCHEMA_VERSION,
+        "evaluation_run_id": evaluation_run_id,
+        "scenario_id": scenario_id,
+        "workflow_sha": workflow_sha or _resolve_workflow_sha(),
+        "result": result,
+        "failure_stage": failure_stage,
+        "failure_category": failure_category,
+        "redacted_error": sanitize_provider_error_message(error) or None,
+        "operations": operations,
+        "token_usage": token_usage,
+        "external_action_writes": write_counts["external_action_writes"],
+        "gmail_sends": write_counts["gmail_sends"],
+        "gmail_mutations": write_counts["gmail_mutations"],
+        "app_replies": write_counts["app_replies"],
+        "live_llm_calls": token_usage.get("attempted", 0),
+        "llm_operations": token_usage.get("attempted", 0),
+        "external_writes": write_counts["external_action_writes"],
+    }
+    return redact_sensitive(payload)
+
+
+def write_llm_failure_report_atomic(
+    path: str | os.PathLike[str],
+    payload: dict[str, Any],
+) -> Path:
+    import json
+    import tempfile
+
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(dir=target.parent, prefix=".llm_failure.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(redact_sensitive(payload), handle, indent=2, ensure_ascii=False)
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(tmp_name, target)

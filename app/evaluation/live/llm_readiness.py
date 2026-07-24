@@ -16,6 +16,11 @@ from app.evaluation.live.constants import (
     PYTEST_MARKER_EXPR,
     S01_LOCKED_SCENARIO_HASH,
 )
+from app.evaluation.live.model_identity import (
+    LIVE_EVAL_ALLOWED_RETURNED_MODELS,
+    model_identity_registry_fingerprint,
+    validate_model_identity_registry,
+)
 from app.evaluation.live.readiness import ReadinessReport
 from app.evaluation.live.reporting import _FIXTURE_WORKFLOW_SHA_MARKERS
 from app.evaluation.live.safety import require_tenant_allowed
@@ -171,6 +176,7 @@ def _base_checks(
     seed_gate: bool | None,
     database_ok: bool | None = None,
     tenant_id: str | None = None,
+    model_identity_contract_ok: bool = True,
 ) -> dict[str, object]:
     checks: dict[str, object] = {
         "report_schema_version": LIVE_LLM_READINESS_SCHEMA_VERSION,
@@ -182,6 +188,8 @@ def _base_checks(
         "tenant_id": tenant_id,
         "llm_provider": LIVE_LLM_PINNED_PROVIDER,
         "llm_requested_model": LIVE_LLM_PINNED_MODEL,
+        "model_identity_registry_fingerprint": model_identity_registry_fingerprint(),
+        "model_identity_contract_ok": model_identity_contract_ok,
         "api_endpoint": LIVE_LLM_PINNED_API_URL,
         "call_budget": LIVE_LLM_PINNED_CALL_BUDGET,
         "timeout_seconds": LIVE_LLM_PINNED_TIMEOUT_SECONDS,
@@ -219,6 +227,12 @@ def run_llm_offline_readiness_checks(
         issues.append("LIVE_EVAL_ALLOWED=yes required with ENV=test")
     issues.extend(_validate_llm_config(config))
     issues.extend(_validate_pinned_contract(config, settings))
+    registry_issues = validate_model_identity_registry()
+    issues.extend(registry_issues)
+    if (config.llm_model or "").strip() not in LIVE_EVAL_ALLOWED_RETURNED_MODELS:
+        issues.append(
+            f"requested model {config.llm_model!r} is missing from model identity registry"
+        )
     sha_issues, build_git_sha = _validate_workflow_sha()
     issues.extend(sha_issues)
     scenario_issues, scenario_ok = _validate_locked_scenario()
@@ -234,6 +248,8 @@ def run_llm_offline_readiness_checks(
         scenario_ok=scenario_ok and not scenario_issues,
         secret_flags=secret_flags,
         seed_gate=None,
+        model_identity_contract_ok=not registry_issues
+        and (config.llm_model or "").strip() in LIVE_EVAL_ALLOWED_RETURNED_MODELS,
     )
     return ReadinessReport(ready=not issues, issues=issues, checks=checks)
 

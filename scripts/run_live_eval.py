@@ -360,7 +360,12 @@ def cmd_run_llm_s01(args: argparse.Namespace) -> int:
 
     from app.evaluation.live.constants import S01_LOCKED_SCENARIO_HASH
     from app.evaluation.live.llm_assertions import assert_s01_live_llm_semantics
-    from app.evaluation.live.llm_report import build_live_eval_llm_report, write_llm_report_atomic
+    from app.evaluation.live.llm_report import (
+        build_live_eval_llm_failure_report,
+        build_live_eval_llm_report,
+        write_llm_failure_report_atomic,
+        write_llm_report_atomic,
+    )
     from app.evaluation.live.pipeline_poll import poll_pipeline_observation
     from app.evaluation.live.registry import new_evaluation_run_id
 
@@ -378,84 +383,139 @@ def cmd_run_llm_s01(args: argparse.Namespace) -> int:
     run_id = args.evaluation_run_id or new_evaluation_run_id()
     scenario_id = args.scenario_id or "S01_lead_laddbox_quality"
     headers = {"X-Admin-API-Key": admin_key}
-
-    register = httpx.post(
-        f"{base}/admin/live-eval/runs",
-        headers=headers,
-        json={
-            "evaluation_run_id": run_id,
-            "tenant_id": tenant_id,
-            "scenario_id": scenario_id,
-            "attempt_id": args.attempt_id or 1,
-            "transport_mode": "fixture_input",
-            "ai_mode": "live_llm",
-            "llm_provider": config.llm_provider,
-            "llm_requested_model": config.llm_model,
-        },
-        timeout=30.0,
-    )
-    if register.status_code != 200:
-        print(register.text, file=sys.stderr)
-        return 1
-
-    intake = httpx.post(
-        f"{base}/admin/live-eval/runs/{run_id}/process-fixture-input",
-        headers=headers,
-        json={"tenant_id": tenant_id},
-        timeout=120.0,
-    )
-    if intake.status_code != 200:
-        print(intake.text, file=sys.stderr)
-        return 1
-
-    def _fetch_observation() -> dict:
-        response = httpx.get(
-            f"{base}/admin/live-eval/runs/{run_id}/observation",
-            headers=headers,
-            params={"tenant_id": tenant_id},
-            timeout=30.0,
-        )
-        return response.json()
-
-    try:
-        observation = poll_pipeline_observation(_fetch_observation, timeout_seconds=120)
-    except Exception as exc:
-        print(f"pipeline poll failed: {exc}", file=sys.stderr)
-        observation = _fetch_observation()
-
-    violations = assert_s01_live_llm_semantics(observation)
-    result = "passed" if not violations else "failed"
-    run_summary = observation.get("run") or {}
-    report = build_live_eval_llm_report(
-        evaluation_run_id=run_id,
-        run={
-            **run_summary,
-            "llm_provider": config.llm_provider,
-            "llm_requested_model": config.llm_model,
-            "dataset_version": "k2e-v1",
-        },
-        observation=observation,
-        semantic_assertions=violations,
-        result=result,
-        failure_category=None if not violations else "assertion_failed",
-        scenario_content_hash=S01_LOCKED_SCENARIO_HASH,
-    )
-    write_llm_report_atomic(run_id, report)
-
-    terminal = httpx.post(
-        f"{base}/admin/live-eval/runs/{run_id}/status",
-        headers=headers,
-        json={"tenant_id": tenant_id, "status": "completed" if not violations else "aborted"},
-        timeout=30.0,
-    )
-    if terminal.status_code != 200:
-        print(terminal.text, file=sys.stderr)
+    failure_stage = "initialization"
+    failure_category: str | None = None
+    observation: dict = {}
+    workflow_sha = os.environ.get("BUILD_GIT_SHA") or os.environ.get("GITHUB_SHA")
 
     if args.run_id_file:
         Path(args.run_id_file).write_text(run_id + "\n", encoding="utf-8")
 
-    print(json.dumps({"evaluation_run_id": run_id, "result": result, "violations": violations}, indent=2))
-    return 0 if not violations else 1
+    def _write_failure(
+        *,
+        stage: str,
+        category: str | None,
+        error: str | BaseException | None = None,
+        obs: dict | None = None,
+    ) -> None:
+        payload = build_live_eval_llm_failure_report(
+            evaluation_run_id=run_id,
+            scenario_id=scenario_id,
+            failure_stage=stage,
+            failure_category=category,
+            error=error,
+            workflow_sha=workflow_sha,
+            observation=obs or observation,
+        )
+        if args.failure_artifact_file:
+            write_llm_failure_report_atomic(args.failure_artifact_file, payload)
+        else:
+            write_llm_failure_report_atomic(
+                Path(os.environ.get("RUNNER_TEMP", ".")) / "llm_failure_report.json",
+                payload,
+            )
+
+    try:
+        failure_stage = "registration"
+        register = httpx.post(
+            f"{base}/admin/live-eval/runs",
+            headers=headers,
+            json={
+                "evaluation_run_id": run_id,
+                "tenant_id": tenant_id,
+                "scenario_id": scenario_id,
+                "attempt_id": args.attempt_id or 1,
+                "transport_mode": "fixture_input",
+                "ai_mode": "live_llm",
+                "llm_provider": config.llm_provider,
+                "llm_requested_model": config.llm_model,
+            },
+            timeout=30.0,
+        )
+        if register.status_code != 200:
+            failure_category = "registration_failed"
+            _write_failure(stage=failure_stage, category=failure_category, error=register.text)
+            print(register.text, file=sys.stderr)
+            return 1
+
+        failure_stage = "fixture_intake"
+        intake = httpx.post(
+            f"{base}/admin/live-eval/runs/{run_id}/process-fixture-input",
+            headers=headers,
+            json={"tenant_id": tenant_id},
+            timeout=120.0,
+        )
+        if intake.status_code != 200:
+            failure_category = "provider_failure"
+            _write_failure(stage=failure_stage, category=failure_category, error=intake.text)
+            print(intake.text, file=sys.stderr)
+            return 1
+
+        failure_stage = "pipeline_poll"
+
+        def _fetch_observation() -> dict:
+            response = httpx.get(
+                f"{base}/admin/live-eval/runs/{run_id}/observation",
+                headers=headers,
+                params={"tenant_id": tenant_id},
+                timeout=30.0,
+            )
+            return response.json()
+
+        try:
+            observation = poll_pipeline_observation(_fetch_observation, timeout_seconds=120)
+        except Exception as exc:
+            print(f"pipeline poll failed: {exc}", file=sys.stderr)
+            observation = _fetch_observation()
+
+        failure_stage = "assertions"
+        violations = assert_s01_live_llm_semantics(observation)
+        result = "passed" if not violations else "failed"
+        run_summary = observation.get("run") or {}
+
+        failure_stage = "report"
+        report = build_live_eval_llm_report(
+            evaluation_run_id=run_id,
+            run={
+                **run_summary,
+                "llm_provider": config.llm_provider,
+                "llm_requested_model": config.llm_model,
+                "dataset_version": "k2e-v1",
+            },
+            observation=observation,
+            semantic_assertions=violations,
+            result=result,
+            failure_category=None if not violations else "assertion_failed",
+            scenario_content_hash=S01_LOCKED_SCENARIO_HASH,
+        )
+        write_llm_report_atomic(run_id, report)
+
+        if violations:
+            failure_category = "assertion_failed"
+            _write_failure(
+                stage=failure_stage,
+                category=failure_category,
+                error="; ".join(violations),
+                obs=observation,
+            )
+
+        terminal = httpx.post(
+            f"{base}/admin/live-eval/runs/{run_id}/status",
+            headers=headers,
+            json={"tenant_id": tenant_id, "status": "completed" if not violations else "aborted"},
+            timeout=30.0,
+        )
+        if terminal.status_code != 200:
+            print(terminal.text, file=sys.stderr)
+
+        print(json.dumps({"evaluation_run_id": run_id, "result": result, "violations": violations}, indent=2))
+        return 0 if not violations else 1
+    except Exception as exc:
+        if failure_category is None:
+            failure_category = "report_failure"
+        _write_failure(stage=failure_stage, category=failure_category, error=exc, obs=observation)
+        print(str(exc), file=sys.stderr)
+        return 1
 
 
 def cmd_run_scenario(args: argparse.Namespace) -> int:
@@ -645,6 +705,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_llm.add_argument("--app-base-url", default=None)
     run_llm.add_argument("--confirm-external", action="store_true")
     run_llm.add_argument("--run-id-file", default=None)
+    run_llm.add_argument("--failure-artifact-file", default=None)
     run_llm.set_defaults(func=cmd_run_llm_s01)
 
     return parser

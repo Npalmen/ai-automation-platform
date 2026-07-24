@@ -67,9 +67,7 @@ class LLMClient:
         try:
             parsed = json.loads(raw_body)
         except json.JSONDecodeError as exc:
-            raise LLMResponseError(
-                f"LLM raw response is not valid JSON: {raw_body}"
-            ) from exc
+            raise LLMResponseError("LLM raw response is not valid JSON") from exc
 
         choices = parsed.get("choices") or []
         if not choices:
@@ -84,9 +82,7 @@ class LLMClient:
         try:
             output = json.loads(content)
         except json.JSONDecodeError as exc:
-            raise LLMResponseError(
-                f"LLM returned invalid JSON content: {content}"
-            ) from exc
+            raise LLMResponseError("LLM returned invalid JSON content") from exc
 
         if not isinstance(output, dict):
             raise LLMResponseError("LLM output must be a JSON object")
@@ -150,8 +146,8 @@ class LLMClient:
                 )
 
             except error.HTTPError as exc:
-                body = exc.read().decode("utf-8", errors="replace")
-                last_error = LLMRequestError(f"LLM HTTPError {exc.code}: {body}")
+                exc.read()
+                last_error = LLMRequestError(f"LLM HTTPError {exc.code}")
 
                 if exc.code not in {408, 409, 429, 500, 502, 503, 504}:
                     raise last_error from exc
@@ -193,8 +189,8 @@ class LLMClient:
                 return self._parse_response(raw_body)
 
             except error.HTTPError as exc:
-                body = exc.read().decode("utf-8", errors="replace")
-                last_error = LLMRequestError(f"LLM HTTPError {exc.code}: {body}")
+                exc.read()
+                last_error = LLMRequestError(f"LLM HTTPError {exc.code}")
 
                 # retry only on transient server/rate-limit style errors
                 if exc.code not in {408, 409, 429, 500, 502, 503, 504}:

@@ -239,6 +239,16 @@ def reserve_live_llm_operation(
                 f"LLM ordinal {ordinal} blocked while ordinal {other.request_ordinal} is in progress"
             )
 
+    prior_blocker = _prior_operation_blocks_next(
+        db,
+        evaluation_run_id=snapshot.evaluation_run_id,
+        ordinal=ordinal,
+    )
+    if prior_blocker is not None:
+        raise LiveEvalSafetyError(
+            f"LLM ordinal {ordinal} blocked while prior step is {prior_blocker.status!r}"
+        )
+
     if ordinal != succeeded + 1:
         _record_blocked_telemetry(
             db,
@@ -253,16 +263,6 @@ def reserve_live_llm_operation(
         )
         raise LiveEvalSafetyError(
             f"LLM prompt order violation: expected ordinal {succeeded + 1}, got {ordinal}"
-        )
-
-    prior_blocker = _prior_operation_blocks_next(
-        db,
-        evaluation_run_id=snapshot.evaluation_run_id,
-        ordinal=ordinal,
-    )
-    if prior_blocker is not None:
-        raise LiveEvalSafetyError(
-            f"LLM ordinal {ordinal} blocked while prior step is {prior_blocker.status!r}"
         )
 
     started_at = datetime.now(timezone.utc)

@@ -21,6 +21,8 @@ class FakeEvalLLMDelegate:
       fixtures: dict[str, dict[str, Any]] | None = None,
       missing_usage: bool = False,
       wrong_model: bool = False,
+      returned_model: str | None = None,
+      finish_reason: str | None = "stop",
       malformed_json: bool = False,
       raise_timeout: bool = False,
       raise_rate_limit: bool = False,
@@ -29,6 +31,8 @@ class FakeEvalLLMDelegate:
     self._fixtures = fixtures or _S01_FIXTURES
     self.missing_usage = missing_usage
     self.wrong_model = wrong_model
+    self.returned_model = returned_model
+    self.finish_reason = finish_reason
     self.malformed_json = malformed_json
     self.raise_timeout = raise_timeout
     self.raise_rate_limit = raise_rate_limit
@@ -69,7 +73,12 @@ class FakeEvalLLMDelegate:
           usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
       )
 
-    returned_model = "other-model" if self.wrong_model else (model or self.model)
+    if self.wrong_model:
+      resolved_model = "other-model"
+    elif self.returned_model is not None:
+      resolved_model = self.returned_model
+    else:
+      resolved_model = model or self.model
     usage = (
         {}
         if self.missing_usage
@@ -77,9 +86,9 @@ class FakeEvalLLMDelegate:
     )
     return LLMGenerationResult(
         output=dict(self._fixtures[prompt_name]),
-        returned_model=returned_model,
+        returned_model=resolved_model,
         usage=usage,
-        finish_reason="stop",
+        finish_reason=self.finish_reason,
     )
 
   def generate_json(self, prompt: str) -> dict[str, Any]:
