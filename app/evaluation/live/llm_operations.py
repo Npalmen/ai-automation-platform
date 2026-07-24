@@ -213,17 +213,8 @@ def reserve_live_llm_operation(
         raise LiveEvalSafetyError("LLM outcome_unknown blocks further operations")
 
     existing = LiveEvalLlmOperationRepository.get_by_operation_key(db, operation_key)
-    if existing is not None:
-        if existing.status == LLM_OPERATION_IN_PROGRESS:
-            raise LiveEvalSafetyError(f"LLM operation already in progress for {prompt_name!r}")
-        if existing.status in _TERMINAL_OPERATION_STATUSES:
-            raise LiveEvalSafetyError(f"retry blocked for LLM operation {prompt_name!r}")
-
-    for other in LiveEvalLlmOperationRepository.list_for_run(db, snapshot.evaluation_run_id):
-        if other.status == LLM_OPERATION_IN_PROGRESS and other.request_ordinal != ordinal:
-            raise LiveEvalSafetyError(
-                f"LLM ordinal {ordinal} blocked while ordinal {other.request_ordinal} is in progress"
-            )
+    if existing is not None and existing.status == LLM_OPERATION_IN_PROGRESS:
+        raise LiveEvalSafetyError(f"LLM operation already in progress for {prompt_name!r}")
 
     succeeded = count_succeeded_llm_operations(db, snapshot.evaluation_run_id)
     if succeeded >= call_budget:
@@ -238,6 +229,15 @@ def reserve_live_llm_operation(
             pipeline_run_id=pipeline_run_id,
         )
         raise LiveEvalSafetyError("LLM call budget exhausted")
+
+    if existing is not None and existing.status in _TERMINAL_OPERATION_STATUSES:
+        raise LiveEvalSafetyError(f"retry blocked for LLM operation {prompt_name!r}")
+
+    for other in LiveEvalLlmOperationRepository.list_for_run(db, snapshot.evaluation_run_id):
+        if other.status == LLM_OPERATION_IN_PROGRESS and other.request_ordinal != ordinal:
+            raise LiveEvalSafetyError(
+                f"LLM ordinal {ordinal} blocked while ordinal {other.request_ordinal} is in progress"
+            )
 
     if ordinal != succeeded + 1:
         _record_blocked_telemetry(
