@@ -1,0 +1,249 @@
+{
+  "source_descriptor_version": "evidence-sources-v1",
+  "baseline_git_sha": "b344701b4bdc06207a2273e1f82fcd15fa2760cd",
+  "chapters": {
+    "2F.1": {
+      "status": "closed",
+      "authoritative_evidence": ["30133568883"]
+    },
+    "2F.2": {
+      "status": "closed",
+      "authoritative_evidence": ["30050565974"]
+    },
+    "2F.3": {
+      "status": "closed",
+      "authoritative_evidence": ["30131333378"],
+      "report_semantics_fixed_by_sha": "b344701b4bdc06207a2273e1f82fcd15fa2760cd"
+    }
+  },
+  "runs": [
+    {
+      "workflow_run_id": "30133568883",
+      "workflow_run_number": null,
+      "workflow_name": "release-gate.yml",
+      "head_sha": "b344701b4bdc06207a2273e1f82fcd15fa2760cd",
+      "classification": "release_gate_support",
+      "chapter": "2F.1",
+      "evaluation_run_id": null,
+      "scenario_id": null,
+      "transport_mode": null,
+      "ai_mode": null,
+      "provider": null,
+      "requested_model": null,
+      "artifact_name": null,
+      "artifact_schema": null,
+      "artifact_file_sha256": null,
+      "artifact_hash_provenance": null,
+      "redaction_status": "clean",
+      "final_status": "success",
+      "external_side_effects": {
+        "gmail_sends": {"value": 0, "known": true},
+        "gmail_reads": {"value": 0, "known": true},
+        "gmail_mutations": {"value": 0, "known": true},
+        "llm_provider_calls": {"value": 0, "known": true},
+        "app_replies": {"value": 0, "known": true},
+        "approval_resolutions": {"value": 0, "known": true},
+        "external_action_writes": {"value": 0, "known": true}
+      },
+      "limitations": []
+    },
+    {
+      "workflow_run_id": "30050565974",
+      "workflow_run_number": 16,
+      "workflow_name": "live-eval.yml",
+      "head_sha": "ff6f1d734b847f088892eb801458037e7f74e691",
+      "classification": "authoritative_success",
+      "chapter": "2F.2",
+      "evaluation_run_id": "77d87e8f-d6a3-427c-a2cc-e25c5995968a",
+      "scenario_id": "S01_lead_laddbox_quality",
+      "transport_mode": "live_gmail",
+      "ai_mode": "fixture_ai",
+      "provider": null,
+      "requested_model": null,
+      "artifact_name": "live-eval-report-77d87e8f-d6a3-427c-a2cc-e25c5995968a",
+      "artifact_schema": "2f.2",
+      "artifact_file_sha256": "f110730cb53724ac1a6ac8154069f2f7cc9e7d92b1d5da853cf91348c627bf03",
+      "artifact_hash_provenance": "verified_from_local_artifact",
+      "redaction_status": "clean",
+      "final_status": "passed",
+      "external_side_effects": {
+        "gmail_sends": {"value": 1, "known": true},
+        "gmail_reads": {"value": 0, "known": true},
+        "gmail_mutations": {"value": 1, "known": true},
+        "llm_provider_calls": {"value": 0, "known": true},
+        "app_replies": {"value": 0, "known": true},
+        "approval_resolutions": {"value": 0, "known": true},
+        "external_action_writes": {"value": 0, "known": true}
+      },
+      "limitations": []
+    },
+    {
+      "workflow_run_id": "30084777398",
+      "workflow_run_number": 1,
+      "workflow_name": "live-llm-eval.yml",
+      "head_sha": "2710d610961efd6fb8bae33fd4e3cdb7976e3246",
+      "classification": "readiness_support",
+      "chapter": "2F.3",
+      "evaluation_run_id": null,
+      "scenario_id": null,
+      "transport_mode": null,
+      "ai_mode": null,
+      "provider": "openai",
+      "requested_model": "gpt-4o-mini",
+      "artifact_name": "live-llm-readiness-2710d610961efd6fb8bae33fd4e3cdb7976e3246",
+      "artifact_schema": "2f.3c.llm-readiness",
+      "artifact_file_sha256": "6669a4a838c3b71d830af8f7e71dc3b631f6dd80eaef42cd9d7662bcb5767c97",
+      "artifact_hash_provenance": "verified_from_local_artifact",
+      "redaction_status": "clean",
+      "final_status": "success",
+      "external_side_effects": {
+        "gmail_sends": {"value": 0, "known": true},
+        "gmail_reads": {"value": 0, "known": true},
+        "gmail_mutations": {"value": 0, "known": true},
+        "llm_provider_calls": {"value": 0, "known": true},
+        "app_replies": {"value": 0, "known": true},
+        "approval_resolutions": {"value": 0, "known": true},
+        "external_action_writes": {"value": 0, "known": true}
+      },
+      "limitations": ["superseded by later readiness runs"]
+    },
+    {
+      "workflow_run_id": "30121471611",
+      "workflow_run_number": 2,
+      "workflow_name": "live-llm-eval.yml",
+      "head_sha": "f91fa1986856af488d43aa9a555af9b224dd85ad",
+      "classification": "readiness_support",
+      "chapter": "2F.3",
+      "evaluation_run_id": null,
+      "scenario_id": null,
+      "transport_mode": null,
+      "ai_mode": null,
+      "provider": "openai",
+      "requested_model": "gpt-4o-mini",
+      "artifact_name": "live-llm-readiness-f91fa1986856af488d43aa9a555af9b224dd85ad",
+      "artifact_schema": "2f.3c.llm-readiness",
+      "artifact_file_sha256": "5fd2d2b505b1c901ff18b7259a03bb58a2636c3a85e9d81706bf20a89f54a916",
+      "artifact_hash_provenance": "verified_from_local_artifact",
+      "redaction_status": "clean",
+      "final_status": "success",
+      "external_side_effects": {
+        "gmail_sends": {"value": 0, "known": true},
+        "gmail_reads": {"value": 0, "known": true},
+        "gmail_mutations": {"value": 0, "known": true},
+        "llm_provider_calls": {"value": 0, "known": true},
+        "app_replies": {"value": 0, "known": true},
+        "approval_resolutions": {"value": 0, "known": true},
+        "external_action_writes": {"value": 0, "known": true}
+      },
+      "limitations": ["superseded by later readiness runs"]
+    },
+    {
+      "workflow_run_id": "30130421434",
+      "workflow_run_number": 4,
+      "workflow_name": "live-llm-eval.yml",
+      "head_sha": "5af00210833e9d78cd7a5033ddd5c796408c8378",
+      "classification": "readiness_support",
+      "chapter": "2F.3",
+      "evaluation_run_id": null,
+      "scenario_id": null,
+      "transport_mode": null,
+      "ai_mode": null,
+      "provider": "openai",
+      "requested_model": "gpt-4o-mini",
+      "artifact_name": "live-llm-readiness-5af00210833e9d78cd7a5033ddd5c796408c8378",
+      "artifact_schema": "2f.3c.llm-readiness",
+      "artifact_file_sha256": "9755dd2f8836a368cb6ee1065f1d55a883701b70c5b4d645d97bd539b4047805",
+      "artifact_hash_provenance": "verified_from_local_artifact",
+      "redaction_status": "clean",
+      "final_status": "success",
+      "external_side_effects": {
+        "gmail_sends": {"value": 0, "known": true},
+        "gmail_reads": {"value": 0, "known": true},
+        "gmail_mutations": {"value": 0, "known": true},
+        "llm_provider_calls": {"value": 0, "known": true},
+        "app_replies": {"value": 0, "known": true},
+        "approval_resolutions": {"value": 0, "known": true},
+        "external_action_writes": {"value": 0, "known": true}
+      },
+      "limitations": ["latest valid readiness evidence for live llm configuration"]
+    },
+    {
+      "workflow_run_id": "30131333378",
+      "workflow_run_number": 5,
+      "workflow_name": "live-llm-eval.yml",
+      "head_sha": "5af00210833e9d78cd7a5033ddd5c796408c8378",
+      "classification": "authoritative_success",
+      "chapter": "2F.3",
+      "evaluation_run_id": "ed492673-bcca-4fb2-be3d-3e4653dcb709",
+      "scenario_id": "S01_lead_laddbox_quality",
+      "transport_mode": "fixture_input",
+      "ai_mode": "live_llm",
+      "provider": "openai",
+      "requested_model": "gpt-4o-mini",
+      "artifact_name": "live-llm-report-ed492673-bcca-4fb2-be3d-3e4653dcb709",
+      "artifact_schema": "2f.3.llm",
+      "artifact_file_sha256": "8b771845d20eda74bf00216b1995122a781cc5c40d3555e8d1bd4c1e6791c63f",
+      "artifact_hash_provenance": "verified_from_local_artifact",
+      "redaction_status": "clean",
+      "final_status": "passed",
+      "external_side_effects": {
+        "gmail_sends": {"value": 0, "known": true},
+        "gmail_reads": {"value": 0, "known": true},
+        "gmail_mutations": {"value": 0, "known": true},
+        "llm_provider_calls": {"value": 4, "known": true},
+        "app_replies": {"value": 0, "known": true},
+        "approval_resolutions": {"value": 0, "known": true},
+        "external_action_writes": {"value": 0, "known": true}
+      },
+      "limitations": [
+        "success artifact produced before report semantics fix on b344701",
+        "observation replay pending in 2F.4C"
+      ]
+    }
+  ],
+  "historical_failures": [
+    {
+      "workflow_run_id": "30125105087",
+      "workflow_run_number": 3,
+      "workflow_name": "live-llm-eval.yml",
+      "head_sha": "f91fa1986856af488d43aa9a555af9b224dd85ad",
+      "classification": "historical_harness_failure",
+      "chapter": "2F.3",
+      "evaluation_run_id": "94e17d29-c159-4ead-890b-d6553ebdab59",
+      "scenario_id": "S01_lead_laddbox_quality",
+      "transport_mode": "fixture_input",
+      "ai_mode": "live_llm",
+      "provider": "openai",
+      "requested_model": "gpt-4o-mini",
+      "artifact_name": "live-llm-report-94e17d29-c159-4ead-890b-d6553ebdab59",
+      "artifact_schema": null,
+      "artifact_file_sha256": "6314e522484d87b1766108ce9e4c8bd93e7426bcdd60bafc666fdaa4af082fee",
+      "artifact_hash_provenance": "verified_from_local_artifact",
+      "redaction_status": "clean",
+      "final_status": "failure",
+      "provider_outcome": "unknown",
+      "root_cause": "PipelinePollResult observation unwrap",
+      "fixed_by_sha": "5af00210833e9d78cd7a5033ddd5c796408c8378",
+      "never_rerun": true,
+      "never_resume": true,
+      "never_valid_as_success": true,
+      "external_side_effects": {
+        "gmail_sends": {"value": 0, "known": true},
+        "gmail_reads": {"value": 0, "known": true},
+        "gmail_mutations": {"value": 0, "known": true},
+        "llm_provider_calls": {"value": "unknown", "known": false},
+        "app_replies": {"value": 0, "known": true},
+        "approval_resolutions": {"value": 0, "known": true},
+        "external_action_writes": {"value": 0, "known": true}
+      },
+      "limitations": [
+        "provider outcome remains unknown",
+        "never valid as success evidence"
+      ]
+    }
+  ],
+  "limitations": [
+    "historical harness failure 30125105087 provider outcome unknown",
+    "live llm success artifact predates report semantics fix on b344701"
+  ]
+}
