@@ -166,6 +166,7 @@ def _constraint_names(engine: Engine, table_name: str) -> set[str]:
     inspector = inspect(engine)
     names = {constraint.get("name") for constraint in inspector.get_unique_constraints(table_name)}
     names.update(constraint.get("name") for constraint in inspector.get_foreign_keys(table_name))
+    names.update(constraint.get("name") for constraint in inspector.get_check_constraints(table_name))
     return {name for name in names if name}
 
 
