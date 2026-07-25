@@ -9,6 +9,7 @@ from typing import Any, Callable
 from app.evaluation.live.errors import LiveEvalPipelinePollError
 
 _PIPELINE_SUCCESS_STATUS = "awaiting_approval"
+_DEFAULT_SUCCESS_STATUSES = frozenset({_PIPELINE_SUCCESS_STATUS})
 _UNEXPECTED_TERMINAL_STATUSES = frozenset(
     {"completed", "manual_review", "cancelled", "rejected"}
 )
@@ -66,11 +67,13 @@ def classify_poll_outcome(
     *,
     poll_attempts: int,
     previous_status: str | None,
+    success_statuses: frozenset[str] | None = None,
 ) -> str | None:
     """Return a typed timeout/failure reason, or None when polling should continue."""
     run = observation.get("run") or {}
     job = observation.get("job") or {}
     status = job.get("job_status")
+    allowed_success = success_statuses or _DEFAULT_SUCCESS_STATUSES
 
     if not run.get("root_job_id"):
         return "pipeline_not_started"
@@ -78,13 +81,15 @@ def classify_poll_outcome(
     if not job:
         return "observer_consistency_failure"
 
-    if status == _PIPELINE_SUCCESS_STATUS:
+    if status in allowed_success:
         return None
 
     if status == "failed":
         return "pipeline_failed"
 
-    if status in _UNEXPECTED_TERMINAL_STATUSES:
+    unexpected = set(_UNEXPECTED_TERMINAL_STATUSES)
+    unexpected -= allowed_success
+    if status in unexpected:
         return "unexpected_terminal_status"
 
     if status == "processing" and poll_attempts > 1 and status == previous_status:
@@ -101,14 +106,16 @@ def poll_pipeline_observation(
     *,
     timeout_seconds: float,
     on_poll: Callable[[dict[str, Any]], None] | None = None,
+    success_statuses: frozenset[str] | None = None,
 ) -> PipelinePollResult:
-    """Poll until awaiting_approval, a typed terminal failure, or timeout."""
+    """Poll until a success terminal status, a typed terminal failure, or timeout."""
     started = time.monotonic()
     deadline = started + timeout_seconds
     delay = 2.0
     poll_attempts = 0
     previous_status: str | None = None
     last: dict[str, Any] = {}
+    allowed_success = success_statuses or _DEFAULT_SUCCESS_STATUSES
 
     while time.monotonic() < deadline:
         poll_attempts += 1
@@ -118,7 +125,7 @@ def poll_pipeline_observation(
 
         job = last.get("job") or {}
         status = job.get("job_status")
-        if status == _PIPELINE_SUCCESS_STATUS:
+        if status in allowed_success:
             return PipelinePollResult(
                 observation=last,
                 poll_attempts=poll_attempts,
@@ -129,6 +136,7 @@ def poll_pipeline_observation(
             last,
             poll_attempts=poll_attempts,
             previous_status=previous_status,
+            success_statuses=allowed_success,
         )
         if reason in _FAIL_FAST_REASONS:
             raise _raise_poll_error(reason, last, poll_attempts, started)

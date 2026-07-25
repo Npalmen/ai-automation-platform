@@ -20,6 +20,13 @@ email:
 expected_classification:
   job_type: lead
 
+expected_routing:
+  job_status: awaiting_approval
+  policy_authorization: approval_required
+
+expected_approval:
+  expected: true
+
 budgets:
   gmail_sends: 1
   gmail_replies: 0

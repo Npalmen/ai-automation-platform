@@ -127,11 +127,13 @@ class LiveEvalObserver:
         *,
         timeout_seconds: float = 600,
         on_poll: Callable[[dict[str, Any]], None] | None = None,
+        success_statuses: frozenset[str] | None = None,
     ) -> dict[str, Any]:
         result = poll_pipeline_observation(
             lambda: self.get_observation(evaluation_run_id),
             timeout_seconds=timeout_seconds,
             on_poll=on_poll,
+            success_statuses=success_statuses,
         )
         return result.observation
 

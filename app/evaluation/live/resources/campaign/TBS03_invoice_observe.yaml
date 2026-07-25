@@ -19,6 +19,13 @@ email:
 expected_classification:
   job_type: invoice
 
+expected_routing:
+  job_status: manual_review
+  policy_authorization: hold_for_review
+
+expected_approval:
+  expected: false
+
 budgets:
   gmail_sends: 1
   gmail_replies: 0

@@ -18,6 +18,7 @@ from app.evaluation.live.assertions import (
     assert_safety_invariants,
     assert_telemetry_summary,
 )
+from app.evaluation.live.campaign.expected_outcomes import ObserveExpectedOutcome
 from app.evaluation.live.cleanup import cleanup_recipient_message, cleanup_unexpected_reply
 from app.evaluation.live.cleanup_phase import resolve_cleanup_phase
 from app.evaluation.live.cleanup_resolver import resolve_recipient_from_journal
@@ -105,6 +106,7 @@ class LiveEvalRunner:
         base_subject: str | None = None,
         expected_job_type: str | None = None,
         use_observe_assertions: bool = False,
+        observe_expected_outcome: ObserveExpectedOutcome | None = None,
     ):
         self.config = get_live_eval_config()
         self.base_url = base_url.rstrip("/")
@@ -121,6 +123,7 @@ class LiveEvalRunner:
         self.base_subject = base_subject
         self.expected_job_type = expected_job_type
         self.use_observe_assertions = use_observe_assertions
+        self.observe_expected_outcome = observe_expected_outcome
         self.observer = LiveEvalObserver(
             base_url=self.base_url,
             admin_api_key=admin_api_key,
@@ -721,19 +724,33 @@ class LiveEvalRunner:
 
     def _wait_for_pipeline(self) -> dict[str, Any]:
         self._transition("job_detected")
+        success_statuses = None
+        if self.observe_expected_outcome is not None:
+            success_statuses = self.observe_expected_outcome.success_terminal_statuses
         return self.observer.poll_pipeline(
             self.evaluation_run_id,
             timeout_seconds=min(600, self.config.max_runtime_minutes * 60),
+            success_statuses=success_statuses,
         )
 
     def _assert_all(self, observation: dict[str, Any], ctx: _RunContext) -> list[str]:
         violations: list[str] = []
         violations.extend(assert_no_unexpected_reply(ctx.unexpected_reply))
         if self.use_observe_assertions:
+            outcome = self.observe_expected_outcome
             violations.extend(
                 assert_observe_campaign_pipeline(
                     observation,
                     expected_job_type=self.expected_job_type,
+                    expected_job_status=(
+                        outcome.job_status if outcome else "awaiting_approval"
+                    ),
+                    expected_policy_authorization=(
+                        outcome.policy_authorization if outcome else "approval_required"
+                    ),
+                    expect_pending_approval=(
+                        outcome.expect_pending_approval if outcome else True
+                    ),
                 )
             )
         else:

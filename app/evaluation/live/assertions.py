@@ -54,16 +54,27 @@ def assert_observe_campaign_pipeline(
     observation: dict[str, Any],
     *,
     expected_job_type: str | None = None,
+    expected_job_status: str = "awaiting_approval",
+    expected_policy_authorization: str = "approval_required",
+    expect_pending_approval: bool = True,
 ) -> list[str]:
-    """Observe-mode campaign assertions: pipeline ran, approval-first, no outbound."""
+    """Observe-mode campaign assertions: pipeline ran, no outbound, contract terminal state."""
     violations: list[str] = []
     job = observation.get("job") or {}
     if not job.get("job_id"):
         violations.append("expected job_id in observation")
-    if job.get("job_status") != "awaiting_approval":
-        violations.append(f"expected awaiting_approval, got {job.get('job_status')!r}")
-    if not job.get("has_pending_approvals"):
-        violations.append("expected pending approval")
+
+    observed_status = job.get("job_status")
+    if observed_status != expected_job_status:
+        violations.append(
+            f"expected job_status {expected_job_status!r}, got {observed_status!r}"
+        )
+
+    if expect_pending_approval:
+        if not job.get("has_pending_approvals"):
+            violations.append("expected pending approval")
+    elif job.get("has_pending_approvals"):
+        violations.append("unexpected pending approval")
 
     if expected_job_type:
         classification = job.get("classification") or {}
@@ -74,9 +85,11 @@ def assert_observe_campaign_pipeline(
             )
 
     policy = job.get("policy") or {}
-    if policy.get("policy_authorization") != "approval_required":
+    observed_auth = policy.get("policy_authorization")
+    if observed_auth != expected_policy_authorization:
         violations.append(
-            f"expected policy_authorization approval_required, got {policy.get('policy_authorization')!r}"
+            f"expected policy_authorization {expected_policy_authorization!r}, "
+            f"got {observed_auth!r}"
         )
 
     records = job.get("decision_records") or []
