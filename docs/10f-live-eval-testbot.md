@@ -181,11 +181,32 @@ Never commit tokens. Report schema version: `2f.2`.
 | Security review (F-01–F-07) | Closed |
 | Manual `live_gmail_transport` workflow | Built (`workflow_dispatch` only; not auto-run on merge) |
 | Real Gmail send verified | **No** |
-| Live Gmail E2E verified | **Pending operator verification** |
-| Live LLM enabled | **No** |
-| Operator secrets/config | **Required — not configured** |
-| 2F.2 slice complete | **No** |
-| 2F.3 started | **No** |
+| Live Gmail E2E verified | **Yes — authoritative run `30050565974`** |
+| Live LLM enabled | **Yes — authoritative run `30131333378`** |
+| Operator secrets/config | Configured for live-eval environments |
+| 2F.2 slice complete | **Yes** |
+| 2F.3 slice complete | **Yes** |
+| 2F.4 evidence/replay/closure | **Closure candidate — implementation complete** |
+| 2G started | **No — next chapter** |
+
+**Closure declaration:** `Kapitel 2F — PASS och stängt`. Official chapter closure occurs only when post-merge `final-2f-evidence` succeeds on the same `main` SHA and uploads `2f-final-evidence-<main-sha>` with `overall_status=passed`.
+
+### Authoritative external evidence
+
+| Chapter | Workflow run ID | evaluation_run_id | Notes |
+|---------|-----------------|-------------------|-------|
+| 2F.2 Live Gmail | `30050565974` | `77d87e8f-d6a3-427c-a2cc-e25c5995968a` | Authoritative Gmail success |
+| 2F.3 Live LLM | `30131333378` | `ed492673-bcca-4fb2-be3d-3e4653dcb709` | Authoritative LLM success |
+| Historical harness failure | `30125105087` | `94e17d29-c159-4ead-890b-d6553ebdab59` | `provider_outcome=unknown`; never valid as success; excluded from authoritative totals; do not rerun |
+
+Gmail transport and Live LLM were verified in separate external runs, not one combined run. Volume, fuzzing, and generated scenarios belong to **2G**.
+
+### 2F.4 offline replay and closure
+
+- Stable source descriptor hash is merge-independent; runtime manifest and replay hashes bind to the active `baseline_git_sha`.
+- Release Gate job `final-2f-evidence` publishes `2f-final-evidence-<main-sha>` only after all ordinary required jobs pass and only on push to `main`.
+- Final report transitions from `pending_closure` to `passed` only with valid push-to-main CI context, actual upstream `needs.*.result` values, and verified documentation closure.
+- **Closure declaration:** `Kapitel 2F — PASS och stängt`. The declaration becomes authoritative only when the post-merge artifact exists for the same `main` SHA with `overall_status=passed`.
 
 ### Resume / no-resend
 
