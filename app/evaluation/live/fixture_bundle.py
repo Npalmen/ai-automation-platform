@@ -9,6 +9,11 @@ from app.evaluation.live.errors import LiveEvalSafetyError
 # scenario_id -> bundle_id (server resolved at registration; not client supplied)
 SCENARIO_BUNDLE_MAP: dict[str, str] = {
     "S01_lead_laddbox_quality": "k2f_bundle_s01",
+    "TBS01_lead_observe": "k2f_bundle_tbs01",
+    "TBS02_support_observe": "k2f_bundle_tbs02",
+    "TBS03_invoice_observe": "k2f_bundle_tbs03",
+    "TBS04_unknown_observe": "k2f_bundle_tbs04",
+    "TBS05_noisy_observe": "k2f_bundle_tbs05",
 }
 
 ALLOWLISTED_BUNDLE_IDS = frozenset(SCENARIO_BUNDLE_MAP.values())
@@ -43,6 +48,36 @@ BUNDLE_FIXTURES: dict[str, dict[str, dict[str, Any]]] = {
             "reasons": [],
             "confidence": 0.85,
         },
+    },
+    "k2f_bundle_tbs01": {
+        "classification_v1": {"detected_job_type": "lead", "confidence": 0.9, "reasons": ["campaign"]},
+        "entity_extraction_v1": {"entities": {"customer_name": "Testbot Anna"}, "confidence": 0.85},
+        "lead_scoring_v1": {"lead_score": 70, "priority": "medium", "routing": "crm_update", "reasons": [], "confidence": 0.85},
+        "decisioning_v1": {"decision": "auto_route", "target_queue": "sales_queue", "action_flags": {"create_crm_lead": False, "notify_human": False, "request_missing_data": True}, "reasons": [], "confidence": 0.85},
+    },
+    "k2f_bundle_tbs02": {
+        "classification_v1": {"detected_job_type": "customer_inquiry", "confidence": 0.88, "reasons": ["campaign"]},
+        "entity_extraction_v1": {"entities": {"customer_name": "Testbot Erik"}, "confidence": 0.85},
+        "lead_scoring_v1": {"lead_score": 40, "priority": "low", "routing": "support_queue", "reasons": [], "confidence": 0.8},
+        "decisioning_v1": {"decision": "auto_route", "target_queue": "support_queue", "action_flags": {"create_crm_lead": False, "notify_human": True, "request_missing_data": False}, "reasons": [], "confidence": 0.85},
+    },
+    "k2f_bundle_tbs03": {
+        "classification_v1": {"detected_job_type": "invoice", "confidence": 0.9, "reasons": ["campaign"]},
+        "entity_extraction_v1": {"entities": {"customer_name": "Testbot Maria"}, "confidence": 0.85},
+        "lead_scoring_v1": {"lead_score": 30, "priority": "low", "routing": "accounting_queue", "reasons": [], "confidence": 0.8},
+        "decisioning_v1": {"decision": "auto_route", "target_queue": "accounting_queue", "action_flags": {"create_crm_lead": False, "notify_human": True, "request_missing_data": False}, "reasons": [], "confidence": 0.85},
+    },
+    "k2f_bundle_tbs04": {
+        "classification_v1": {"detected_job_type": "unknown", "confidence": 0.5, "reasons": ["campaign"]},
+        "entity_extraction_v1": {"entities": {}, "confidence": 0.4},
+        "lead_scoring_v1": {"lead_score": 10, "priority": "low", "routing": "manual_review", "reasons": [], "confidence": 0.5},
+        "decisioning_v1": {"decision": "send_for_approval", "target_queue": "manual_review", "action_flags": {"create_crm_lead": False, "notify_human": True, "request_missing_data": True}, "reasons": [], "confidence": 0.5},
+    },
+    "k2f_bundle_tbs05": {
+        "classification_v1": {"detected_job_type": "lead", "confidence": 0.75, "reasons": ["campaign", "noisy"]},
+        "entity_extraction_v1": {"entities": {"customer_name": "Testbot Noisy", "phone": "070-9998877"}, "confidence": 0.7},
+        "lead_scoring_v1": {"lead_score": 55, "priority": "medium", "routing": "sales_queue", "reasons": [], "confidence": 0.75},
+        "decisioning_v1": {"decision": "auto_route", "target_queue": "sales_queue", "action_flags": {"create_crm_lead": False, "notify_human": False, "request_missing_data": True}, "reasons": [], "confidence": 0.75},
     },
 }
 

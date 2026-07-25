@@ -13,6 +13,7 @@ import httpx
 
 from app.evaluation.live.assertions import (
     assert_no_unexpected_reply,
+    assert_observe_campaign_pipeline,
     assert_s01_pipeline,
     assert_safety_invariants,
     assert_telemetry_summary,
@@ -100,6 +101,10 @@ class LiveEvalRunner:
         resume: bool = False,
         force_unlock: bool = False,
         run_id_file: str | None = None,
+        message_body: str | None = None,
+        base_subject: str | None = None,
+        expected_job_type: str | None = None,
+        use_observe_assertions: bool = False,
     ):
         self.config = get_live_eval_config()
         self.base_url = base_url.rstrip("/")
@@ -112,6 +117,10 @@ class LiveEvalRunner:
         self.resume = resume
         self.force_unlock = force_unlock
         self.run_id_file = run_id_file
+        self.message_body = message_body
+        self.base_subject = base_subject
+        self.expected_job_type = expected_job_type
+        self.use_observe_assertions = use_observe_assertions
         self.observer = LiveEvalObserver(
             base_url=self.base_url,
             admin_api_key=admin_api_key,
@@ -635,6 +644,8 @@ class LiveEvalRunner:
                 expected_sender=self.expected_sender,
                 expected_recipient=self.expected_recipient,
                 checkpoint=checkpoint,
+                base_subject=self.base_subject or "Laddbox offert villa",
+                message_body=self.message_body,
             )
             self.testbot_events.extend(events)
             self._reconciliation_result = "not_run"
@@ -718,7 +729,15 @@ class LiveEvalRunner:
     def _assert_all(self, observation: dict[str, Any], ctx: _RunContext) -> list[str]:
         violations: list[str] = []
         violations.extend(assert_no_unexpected_reply(ctx.unexpected_reply))
-        violations.extend(assert_s01_pipeline(observation))
+        if self.use_observe_assertions:
+            violations.extend(
+                assert_observe_campaign_pipeline(
+                    observation,
+                    expected_job_type=self.expected_job_type,
+                )
+            )
+        else:
+            violations.extend(assert_s01_pipeline(observation))
         events = observation.get("events") or []
         violations.extend(
             assert_telemetry_summary(

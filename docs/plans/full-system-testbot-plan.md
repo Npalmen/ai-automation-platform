@@ -10,7 +10,7 @@ todos:
     status: completed
   - id: testbot-c-observe-campaign
     content: Kör testbotgenererade Gmail-scenarier i observe/approval-first-läge och verifiera intake, klassificering, extraction, routing, jobs, cockpit och approvals
-    status: pending
+    status: in_progress
   - id: testbot-d-semi-automatic-campaign
     content: Testa semi-automatiskt läge där testbotens operatörsdel godkänner eller avslår förväntade actions och verifierar idempotens och outbound-resultat
     status: pending

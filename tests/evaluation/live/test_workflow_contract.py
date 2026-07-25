@@ -140,13 +140,18 @@ def test_live_eval_workflow_contract():
     assert confirm_input["required"] is True
     assert confirm_input["type"] == "choice"
     assert confirm_input["default"] == "DO_NOT_RUN"
-    assert confirm_input["options"] == ["DO_NOT_RUN", "READINESS_ONLY", "RUN_S01"]
+    assert confirm_input["options"] == [
+        "DO_NOT_RUN",
+        "READINESS_ONLY",
+        "RUN_S01",
+        "RUN_TRANSPORT_SMOKE",
+    ]
 
     operator_gate = data["jobs"]["operator-gate"]
     assert "environment" not in operator_gate
     gate_run = operator_gate["steps"][0]["run"]
     assert 'test "${GITHUB_REF}" = "refs/heads/main"' in gate_run
-    assert "READINESS_ONLY|RUN_S01" in gate_run
+    assert "READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE" in gate_run
     assert 'test "${{ inputs.confirm_live_gmail }}" = "RUN_S01"' not in gate_run
 
     steps = transport["steps"]
@@ -171,6 +176,9 @@ def test_live_eval_workflow_contract():
 
     readiness_artifact = _step_by_name(steps, "Upload readiness artifact")
     assert readiness_artifact.get("if") == "always() && inputs.confirm_live_gmail == 'READINESS_ONLY'"
+
+    transport_step = _step_by_name(steps, "Transport-smoke observe campaign (TBS01-TBS05)")
+    assert transport_step.get("if") == "inputs.confirm_live_gmail == 'RUN_TRANSPORT_SMOKE'"
 
     run_step = _step_by_name(steps, "Live Gmail S01 scenario")
     assert run_step.get("if") == "inputs.confirm_live_gmail == 'RUN_S01'"
@@ -204,6 +212,7 @@ def test_live_eval_workflow_contract():
 
     transport_env = transport.get("env") or {}
     assert transport_env.get("STORAGE_PATH") == "${{ github.workspace }}/storage/ci-live-eval"
+    assert transport_env.get("FULL_SYSTEM_TESTBOT_CAMPAIGN_ALLOWED") == "yes"
 
     freeform_inputs = set(dispatch["inputs"].keys()) - {"confirm_live_gmail"}
     assert not freeform_inputs, f"unexpected workflow inputs: {freeform_inputs}"

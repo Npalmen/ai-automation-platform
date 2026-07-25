@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm_live_gmail:
-        description: "Select READINESS_ONLY or RUN_S01"
+        description: "Select READINESS_ONLY, RUN_S01, or RUN_TRANSPORT_SMOKE"
         required: true
         type: choice
         default: DO_NOT_RUN
@@ -12,6 +12,7 @@ on:
           - DO_NOT_RUN
           - READINESS_ONLY
           - RUN_S01
+          - RUN_TRANSPORT_SMOKE
 
 permissions:
   contents: read
@@ -129,8 +130,8 @@ jobs:
         run: |
           test "${GITHUB_REF}" = "refs/heads/main"
           case "${{ inputs.confirm_live_gmail }}" in
-            READINESS_ONLY|RUN_S01) ;;
-            *) echo "confirm_live_gmail must be READINESS_ONLY or RUN_S01"; exit 1 ;;
+            READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE) ;;
+            *) echo "confirm_live_gmail must be READINESS_ONLY, RUN_S01, or RUN_TRANSPORT_SMOKE"; exit 1 ;;
           esac
 
   live_gmail_transport:
@@ -171,6 +172,7 @@ jobs:
       LIVE_EVAL_MAX_SCENARIOS_PER_RUN: "1"
       LIVE_EVAL_MAX_GMAIL_SENDS: "1"
       LIVE_EVAL_MAX_GMAIL_REPLIES: "0"
+      FULL_SYSTEM_TESTBOT_CAMPAIGN_ALLOWED: "yes"
       ADMIN_API_KEY: ${{ secrets.LIVE_EVAL_ADMIN_API_KEY }}
       LIVE_EVAL_APP_BASE_URL: http://127.0.0.1:8010
       BUILD_GIT_SHA: ${{ github.sha }}
@@ -261,6 +263,34 @@ jobs:
         with:
           name: live-eval-readiness-${{ github.sha }}
           path: ${{ runner.temp }}/readiness_report.json
+
+      - name: Full-system testbot readiness
+        if: inputs.confirm_live_gmail == 'RUN_TRANSPORT_SMOKE'
+        run: |
+          python scripts/full_system_testbot_readiness.py \
+            --campaign-type transport-smoke \
+            --tenant-id TENANT_LIVE_EVAL \
+            --app-base-url "$LIVE_EVAL_APP_BASE_URL" \
+            --server-sha "$BUILD_GIT_SHA" \
+            --json
+
+      - name: Transport-smoke observe campaign (TBS01-TBS05)
+        id: run_transport_smoke
+        if: inputs.confirm_live_gmail == 'RUN_TRANSPORT_SMOKE'
+        run: |
+          python scripts/run_full_system_testbot_campaign.py run \
+            --campaign-type transport-smoke \
+            --tenant-id TENANT_LIVE_EVAL \
+            --app-base-url "$LIVE_EVAL_APP_BASE_URL" \
+            --confirm-external
+
+      - name: Upload transport-smoke report
+        if: always() && inputs.confirm_live_gmail == 'RUN_TRANSPORT_SMOKE'
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-system-testbot-report-${{ github.sha }}
+          path: storage/status/full_system_testbot_report.json
+          if-no-files-found: warn
 
       - name: Live Gmail S01 scenario
         id: run_scenario
