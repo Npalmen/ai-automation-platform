@@ -1,0 +1,35 @@
+scenario_id: TBSM05_support_reject
+scenario_version: v1
+mode: semi_automatic
+job_type: customer_inquiry
+service_profile: support
+synthetic_customer_id: family-support-semi-reject-001
+thread_id: thread-support-semi-reject-001
+label: krowolf-live-eval
+
+email:
+  subject: Supportfråga reject semi-auto
+  message_text: |
+    Hej, jag undrar när teknikern kan komma för att kolla min befintliga laddbox.
+    Den laddar inte längre som den ska. Mitt namn är Testkund.
+  sender:
+    name: Testbot Erik
+    email: testbot-erik@eval.test
+
+expected_classification:
+  job_type: customer_inquiry
+
+expected_routing:
+  job_status: awaiting_approval
+  policy_authorization: approval_required
+  final_job_status: manual_review
+
+expected_approval:
+  operator_action: reject
+  expected_reply: false
+  test_variant: normal
+
+budgets:
+  gmail_sends: 1
+  gmail_replies: 0
+  external_writes: 0

@@ -64,6 +64,14 @@ class UnexpectedReplyEvidence:
     internal_date_ms: int | None
 
 
+@dataclass(frozen=True)
+class ExpectedReplyEvidence:
+    message_id: str
+    subject_truncated: str
+    from_masked: str
+    internal_date_ms: int | None
+
+
 def load_sender_credentials() -> SenderCredentials:
     refresh = os.environ.get("LIVE_EVAL_SENDER_GMAIL_REFRESH_TOKEN", "").strip()
     client_id = os.environ.get("LIVE_EVAL_SENDER_GMAIL_CLIENT_ID", "").strip()
@@ -480,6 +488,87 @@ def observe_unexpected_sender_reply(
         )
     if len(matches) > 1:
         raise LiveEvalSafetyError("correlation_failure: multiple unexpected replies")
+    return matches[0] if matches else None
+
+
+def observe_expected_sender_reply(
+    *,
+    evaluation_run_id: str,
+    scenario_id: str,
+    attempt_id: int,
+    expected_recipient: str,
+    send_window_start: datetime,
+    expires_at: datetime | None = None,
+    timeout_seconds: float = 120.0,
+    poll_interval_seconds: float = 3.0,
+) -> ExpectedReplyEvidence | None:
+    """Poll sender inbox for required app reply correlated to evaluation run."""
+    import time
+
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        evidence = _find_expected_sender_reply(
+            evaluation_run_id=evaluation_run_id,
+            scenario_id=scenario_id,
+            attempt_id=attempt_id,
+            expected_recipient=expected_recipient,
+            send_window_start=send_window_start,
+            expires_at=expires_at,
+        )
+        if evidence is not None:
+            return evidence
+        time.sleep(poll_interval_seconds)
+    return None
+
+
+def _find_expected_sender_reply(
+    *,
+    evaluation_run_id: str,
+    scenario_id: str,
+    attempt_id: int,
+    expected_recipient: str,
+    send_window_start: datetime,
+    expires_at: datetime | None = None,
+) -> ExpectedReplyEvidence | None:
+    client = build_sender_client()
+    after_epoch = int(send_window_start.astimezone(timezone.utc).timestamp()) - 60
+    query = f'in:inbox from:{expected_recipient} after:{after_epoch}'
+    ids = client.list_message_ids(max_results=_RECONCILE_CANDIDATE_CAP, query=query)
+    window_end = expires_at or datetime.now(timezone.utc)
+    matches: list[ExpectedReplyEvidence] = []
+    for message_id in ids:
+        detail = client.get_message(message_id)
+        parsed = parse_subject_token(str(detail.get("subject") or ""))
+        if parsed is None:
+            continue
+        if (
+            parsed.evaluation_run_id != evaluation_run_id
+            or parsed.scenario_id != scenario_id
+            or parsed.attempt_id != attempt_id
+        ):
+            continue
+        if _parse_from_email(str(detail.get("from") or "")) != expected_recipient.strip().lower():
+            continue
+        if not _message_in_send_window(
+            detail,
+            window_start=send_window_start,
+            window_end=window_end,
+        ):
+            continue
+        subject = str(detail.get("subject") or "")
+        from_email = _parse_from_email(str(detail.get("from") or ""))
+        local, _, domain = from_email.partition("@")
+        masked_from = f"{local[:1]}***@{domain}" if local else "***"
+        matches.append(
+            ExpectedReplyEvidence(
+                message_id=str(detail.get("message_id") or message_id),
+                subject_truncated=subject[:120],
+                from_masked=masked_from,
+                internal_date_ms=_internal_date_ms(detail),
+            )
+        )
+    if len(matches) > 1:
+        raise LiveEvalSafetyError("correlation_failure: multiple expected replies")
     return matches[0] if matches else None
 
 

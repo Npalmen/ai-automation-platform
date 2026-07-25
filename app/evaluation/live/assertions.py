@@ -228,6 +228,130 @@ def assert_no_unexpected_reply(unexpected_reply: dict[str, Any] | None) -> list[
     return []
 
 
+def assert_semi_automatic_telemetry(
+    testbot_events: list[dict[str, Any]],
+    app_events: list[dict[str, Any]],
+    *,
+    expected_reply_count: int,
+    app_summary: dict[str, int] | None = None,
+) -> list[str]:
+    """Semi-auto telemetry: allow bounded app Gmail replies to testbot sender."""
+    violations: list[str] = []
+
+    def count_testbot(category: str) -> int:
+        return sum(1 for e in testbot_events if e.get("category") == category)
+
+    if count_testbot(TELEMETRY_TESTBOT_SEND_SUCCEEDED) != 1:
+        violations.append("testbot_gmail_send_succeeded must be 1")
+
+    delivery = _count_unique_succeeded_operation_keys(app_events, TELEMETRY_APP_DELIVERY_OBSERVED)
+    if delivery != 1:
+        violations.append("app_live_eval_delivery_observed succeeded must be 1")
+
+    intake = _count_unique_succeeded_operation_keys(app_events, TELEMETRY_APP_INTAKE_SUCCEEDED)
+    if intake != 1:
+        violations.append("app_live_eval_intake_succeeded must be 1")
+
+    reply = _count_unique_succeeded_operation_keys(app_events, TELEMETRY_APP_GMAIL_REPLY)
+    if reply != expected_reply_count:
+        violations.append(
+            f"app_gmail_reply succeeded must be {expected_reply_count}, got {reply}"
+        )
+
+    llm = _count_unique_succeeded_operation_keys(app_events, TELEMETRY_APP_LIVE_LLM)
+    if llm != 0:
+        violations.append("app_live_llm succeeded must be 0")
+
+    violations.extend(assert_no_forbidden_external_writes(app_events))
+
+    if app_summary:
+        summary_reply = app_summary.get(f"{TELEMETRY_APP_GMAIL_REPLY}:succeeded", 0)
+        if summary_reply != expected_reply_count:
+            violations.append(
+                f"app_gmail_reply summary must be {expected_reply_count}, got {summary_reply}"
+            )
+        if app_summary.get(f"{TELEMETRY_APP_LIVE_LLM}:succeeded", 0) != 0:
+            violations.append("app_live_llm summary must be 0")
+
+    return violations
+
+
+def assert_semi_automatic_campaign_pipeline(
+    observation: dict[str, Any],
+    *,
+    expected_job_type: str | None,
+    expected_job_status: str,
+    expected_policy_authorization: str,
+    expect_pending_approval: bool,
+    decision_subsequence: tuple[str, ...] | None = None,
+    expect_approval_resolution_record: bool = False,
+) -> list[str]:
+    """Semi-auto assertions: terminal state plus optional approval resolution record."""
+    violations: list[str] = []
+    job = observation.get("job") or {}
+    if not job.get("job_id"):
+        violations.append("expected job_id in observation")
+
+    observed_status = job.get("job_status")
+    if observed_status != expected_job_status:
+        violations.append(
+            f"expected job_status {expected_job_status!r}, got {observed_status!r}"
+        )
+
+    if expect_pending_approval:
+        if not job.get("has_pending_approvals"):
+            violations.append("expected pending approval")
+    elif job.get("has_pending_approvals"):
+        violations.append("unexpected pending approval")
+
+    if expected_job_type:
+        classification = job.get("classification") or {}
+        detected = classification.get("detected_job_type")
+        if detected != expected_job_type:
+            violations.append(
+                f"expected classification {expected_job_type!r}, got {detected!r}"
+            )
+
+    policy = job.get("policy") or {}
+    observed_auth = policy.get("policy_authorization")
+    if observed_auth != expected_policy_authorization:
+        violations.append(
+            f"expected policy_authorization {expected_policy_authorization!r}, "
+            f"got {observed_auth!r}"
+        )
+
+    records = job.get("decision_records") or []
+    types = [r.get("record_type") for r in sorted(records, key=lambda x: int(x.get("event_sequence") or 0))]
+    violations.extend(
+        _assert_decision_subsequence(
+            types,
+            required=decision_subsequence or REQUIRED_DECISION_SUBSEQUENCE,
+        )
+    )
+
+    if expect_approval_resolution_record:
+        if "action_approval_resolution" not in types:
+            violations.append("expected action_approval_resolution decision record")
+    for forbidden in FORBIDDEN_DECISION_TYPES:
+        if forbidden in types:
+            if forbidden == "action_approval_resolution" and expect_approval_resolution_record:
+                continue
+            violations.append(f"forbidden decision record {forbidden}")
+
+    return violations
+
+
+def assert_expected_sender_reply(
+    expected_reply: dict[str, Any] | None,
+    *,
+    required: bool,
+) -> list[str]:
+    if required and not expected_reply:
+        return ["expected app reply in sender inbox not observed"]
+    if not required and expected_reply:
+        return ["unexpected app reply in sender inbox"]
+    return []
+
 def assert_safety_invariants(
     *,
     run: dict[str, Any],

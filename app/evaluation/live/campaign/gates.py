@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import re
 
-from app.evaluation.live.campaign.modes import CAMPAIGN_TYPE_SEND_BUDGET
+from app.evaluation.live.campaign.modes import CAMPAIGN_TYPE_REPLY_BUDGET, CAMPAIGN_TYPE_SEND_BUDGET
 from app.evaluation.live.campaign.registry import get_campaign_scenario, get_campaign_scenario_ids
 from app.evaluation.live.config import LiveEvalConfig, get_live_eval_config
 from app.evaluation.live.constants import ALLOWED_2F2_SCENARIOS
@@ -130,6 +130,12 @@ def validate_campaign_scenario_mode(
         issues.append(f"observe scenario {scenario_id!r} must not budget gmail_replies > 0")
     if scenario.budgets.external_writes > 0 and scenario.mode == "observe":
         issues.append(f"observe scenario {scenario_id!r} must not budget external_writes > 0")
+    if scenario.mode == "semi_automatic":
+        reply_ceiling = CAMPAIGN_TYPE_REPLY_BUDGET.get(scenario.campaign_type, 0)
+        if scenario.budgets.gmail_replies > reply_ceiling and reply_ceiling:
+            issues.append(
+                f"semi_automatic scenario {scenario_id!r} gmail_replies exceeds campaign ceiling"
+            )
     return issues
 
 

@@ -56,7 +56,11 @@ def test_s01_still_allowed_without_campaign_flag(live_eval_env):
     require_scenario_allowed_for_live_gmail("S01_lead_laddbox_quality")
 
 
-def test_campaign_scenario_requires_campaign_flag(live_eval_env):
+def test_campaign_scenario_requires_campaign_flag(live_eval_env, monkeypatch):
+    monkeypatch.delenv("FULL_SYSTEM_TESTBOT_CAMPAIGN_ALLOWED", raising=False)
+    from app.evaluation.live.config import get_live_eval_config
+
+    get_live_eval_config.cache_clear()
     with pytest.raises(LiveEvalSafetyError, match="FULL_SYSTEM_TESTBOT_CAMPAIGN_ALLOWED"):
         require_scenario_allowed_for_live_gmail("TBS01_lead_observe")
 

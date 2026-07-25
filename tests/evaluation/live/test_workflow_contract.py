@@ -147,13 +147,14 @@ def test_live_eval_workflow_contract():
         "READINESS_ONLY",
         "RUN_S01",
         "RUN_TRANSPORT_SMOKE",
+        "RUN_SEMI_AUTO_CORE",
     ]
 
     operator_gate = data["jobs"]["operator-gate"]
     assert "environment" not in operator_gate
     gate_run = operator_gate["steps"][0]["run"]
     assert 'test "${GITHUB_REF}" = "refs/heads/main"' in gate_run
-    assert "READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE" in gate_run
+    assert "READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_SEMI_AUTO_CORE" in gate_run
     assert 'test "${{ inputs.confirm_live_gmail }}" = "RUN_S01"' not in gate_run
 
     steps = transport["steps"]
@@ -181,6 +182,9 @@ def test_live_eval_workflow_contract():
 
     transport_step = _step_by_name(steps, "Transport-smoke observe campaign (TBS01-TBS05)")
     assert transport_step.get("if") == "inputs.confirm_live_gmail == 'RUN_TRANSPORT_SMOKE'"
+
+    semi_auto_step = _step_by_name(steps, "Semi-auto campaign (TBSM01-TBSM08)")
+    assert semi_auto_step.get("if") == "inputs.confirm_live_gmail == 'RUN_SEMI_AUTO_CORE'"
 
     run_step = _step_by_name(steps, "Live Gmail S01 scenario")
     assert run_step.get("if") == "inputs.confirm_live_gmail == 'RUN_S01'"
