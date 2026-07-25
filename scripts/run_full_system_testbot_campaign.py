@@ -18,10 +18,10 @@ from app.evaluation.live.campaign.gates import (
     validate_campaign_budget_config,
     validate_no_production_resources,
 )
-from app.evaluation.live.campaign.modes import CAMPAIGN_TYPE_DEFAULT_MODE, CAMPAIGN_TYPES
+from app.evaluation.live.campaign.modes import CAMPAIGN_TYPE_DEFAULT_MODE
 from app.evaluation.live.campaign.readiness import build_full_system_testbot_readiness
-from app.evaluation.live.campaign.registry import get_campaign_scenario, list_campaign_scenarios
-from app.evaluation.live.campaign.report import CampaignReport, write_campaign_report
+from app.evaluation.live.campaign.registry import list_campaign_scenarios
+from app.evaluation.live.campaign.runner import run_observe_campaign
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.live.registry import new_evaluation_run_id
@@ -56,7 +56,8 @@ def _dry_run_campaign(campaign_type: str, tenant_id: str) -> int:
         print(f"\n--- {scenario.scenario_id} ---")
         print(f"subject: {payload['subject']}")
         print(f"sender: {payload['sender_name']} <{payload['sender_email']}>")
-        print(f"body preview: {payload['body'][:120]}...")
+        preview = payload["body"][:120].encode("ascii", errors="replace").decode("ascii")
+        print(f"body preview: {preview}...")
     print("\nNo Gmail send performed (dry-run).")
     return 0
 
@@ -79,14 +80,18 @@ def _run_campaign(
 ) -> int:
     if not confirm_external:
         print("ERROR: live campaign requires --confirm-external")
-        print("OPERATOR ACTION REQUIRED — Deploy och aktivera testbotmiljö")
         return 2
 
     if not campaign_enabled():
         raise SystemExit("FULL_SYSTEM_TESTBOT_CAMPAIGN_ALLOWED=yes required")
 
+    base_url = (app_base_url or os.environ.get("LIVE_EVAL_APP_BASE_URL") or "").rstrip("/")
+    admin_key = os.environ.get("ADMIN_API_KEY", "").strip()
+    if not base_url or not admin_key:
+        raise SystemExit("LIVE_EVAL_APP_BASE_URL and ADMIN_API_KEY are required")
+
     prod_issues = validate_no_production_resources(
-        app_base_url=app_base_url or os.environ.get("LIVE_EVAL_APP_BASE_URL", ""),
+        app_base_url=base_url,
         tenant_id=tenant_id,
     )
     if prod_issues:
@@ -94,19 +99,21 @@ def _run_campaign(
             print(f"BLOCKED: {issue}")
         return 2
 
-    scenarios = list_campaign_scenarios(campaign_type=campaign_type)
-    report = CampaignReport(
+    report_path = Path("storage/status/full_system_testbot_report.json")
+    result = run_observe_campaign(
         campaign_type=campaign_type,
-        mode=CAMPAIGN_TYPE_DEFAULT_MODE.get(campaign_type, "observe"),
-        scenario_versions=[s.scenario_version for s in scenarios],
-        overall_status="blocked_pending_operator",
+        tenant_id=tenant_id,
+        base_url=base_url,
+        admin_api_key=admin_key,
+        report_path=report_path,
     )
-    out_path = Path("storage/status/full_system_testbot_report.json")
-    write_campaign_report(out_path, report)
-    print(f"Campaign scaffold written to {out_path}")
-    print("OPERATOR ACTION REQUIRED — Deploy och aktivera testbotmiljö")
-    print("Live Gmail send not executed in this build; operator must approve deployment first.")
-    return 2
+    print(json.dumps(result.to_dict(), indent=2, ensure_ascii=False))
+
+    if result.safety_violations:
+        print("SAFETY VIOLATIONS:", result.safety_violations, file=sys.stderr)
+        return 2
+
+    return 0 if result.overall_status == "passed" else 1
 
 
 def main() -> int:
@@ -134,7 +141,11 @@ def main() -> int:
     if args.command == "list-scenarios":
         return _list_scenarios(args.campaign_type)
     if args.command == "validate":
-        return _validate_campaign(args.campaign_type if hasattr(args, "campaign_type") else "transport-smoke", args.tenant_id, args.app_base_url)
+        return _validate_campaign(
+            getattr(args, "campaign_type", "transport-smoke"),
+            args.tenant_id,
+            args.app_base_url,
+        )
     if args.command == "dry-run":
         return _dry_run_campaign(args.campaign_type, args.tenant_id)
     if args.command == "run":

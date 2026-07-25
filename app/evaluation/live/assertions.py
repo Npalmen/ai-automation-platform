@@ -50,6 +50,45 @@ def _assert_decision_subsequence(types: list[str]) -> list[str]:
     return violations
 
 
+def assert_observe_campaign_pipeline(
+    observation: dict[str, Any],
+    *,
+    expected_job_type: str | None = None,
+) -> list[str]:
+    """Observe-mode campaign assertions: pipeline ran, approval-first, no outbound."""
+    violations: list[str] = []
+    job = observation.get("job") or {}
+    if not job.get("job_id"):
+        violations.append("expected job_id in observation")
+    if job.get("job_status") != "awaiting_approval":
+        violations.append(f"expected awaiting_approval, got {job.get('job_status')!r}")
+    if not job.get("has_pending_approvals"):
+        violations.append("expected pending approval")
+
+    if expected_job_type:
+        classification = job.get("classification") or {}
+        detected = classification.get("detected_job_type")
+        if detected != expected_job_type:
+            violations.append(
+                f"expected classification {expected_job_type!r}, got {detected!r}"
+            )
+
+    policy = job.get("policy") or {}
+    if policy.get("policy_authorization") != "approval_required":
+        violations.append(
+            f"expected policy_authorization approval_required, got {policy.get('policy_authorization')!r}"
+        )
+
+    records = job.get("decision_records") or []
+    types = [r.get("record_type") for r in sorted(records, key=lambda x: int(x.get("event_sequence") or 0))]
+    violations.extend(_assert_decision_subsequence(types))
+    for forbidden in FORBIDDEN_DECISION_TYPES:
+        if forbidden in types:
+            violations.append(f"forbidden decision record {forbidden}")
+
+    return violations
+
+
 def assert_s01_pipeline(observation: dict[str, Any]) -> list[str]:
     violations: list[str] = []
     job = observation.get("job") or {}
