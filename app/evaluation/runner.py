@@ -132,9 +132,9 @@ class EvalHarnessRunner:
         )
 
     def _validate_scenario_contract(self, scenario: ScenarioContract) -> None:
-        if scenario.source_mode != "fixture":
+        if scenario.source_mode not in ("fixture", "generated"):
             raise HarnessError(
-                f"2E runner is fixture-only; got source_mode={scenario.source_mode!r}"
+                f"2E runner supports fixture/generated only; got source_mode={scenario.source_mode!r}"
             )
         if scenario.pipeline.pre_seed and "contract_edge" not in scenario.tags and "legacy" not in scenario.tags:
             raise HarnessError(
