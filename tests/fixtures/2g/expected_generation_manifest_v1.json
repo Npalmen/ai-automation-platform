@@ -1,0 +1,8 @@
+{
+  "fixture_version": "2g-generation-manifest-v1",
+  "templates_per_parent": 2,
+  "base_seed": 0,
+  "canonical_parent_count": 20,
+  "generated_scenario_count": 40,
+  "generation_payload_hash": "4b9f52e08fa0544fce274e6e920de5062324a7b6bb32807dcc4be58c83873c56"
+}
