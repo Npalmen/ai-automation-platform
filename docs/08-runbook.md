@@ -726,6 +726,43 @@ sudo bash /opt/krowolf/scripts/k12_pilot_rc_deploy.sh <COMMIT_SHA>
 
 Preserves: `.env.production`, `.env.offsite`, `.env.browser-test`, `storage/`, `backups/`, tenant key files.
 
+---
+
+## Internal live AI-receptionist pilot (controlled activation)
+
+**Tenant:** `T_NIKLAS_DEMO_001` only  
+**Mailbox scope:** `label:krowolf-demo-niklas is:unread`  
+**Norm:** approval-first, `automatic_gmail_replies=false`, `external_action_writes=0`, scheduler `manual`/`paused` until operator enables live scan gate.
+
+### Readiness (no Gmail activity)
+
+```bash
+python scripts/internal_pilot_readiness.py --baseline-git-sha <GIT_SHA> \
+  --output storage/status/internal-live-pilot-readiness.json
+```
+
+### Pause / rollback
+
+```bash
+python scripts/internal_pilot_pause.py --execute
+```
+
+Also available via API: `POST /admin/support/T_NIKLAS_DEMO_001/disable-scheduler`, `POST /admin/support/T_NIKLAS_DEMO_001/pause-automation`.
+
+### Operator activation (explicit approval required)
+
+```bash
+python scripts/internal_pilot_activate.py --enable-live --confirm-operator
+```
+
+Then first scoped batch (3–5 unread labeled messages prepared by operator):
+
+```bash
+python scripts/ops/pilot_gmail_soak_first_scan.py 3
+```
+
+**Stop immediately** if cross-tenant findings, approval bypass, or external writes occur. Re-pause with `internal_pilot_pause.py --execute`.
+
 ### Deploy model A (canonical)
 
 Server Git HEAD **must** match `origin/main` canonical commit. Product code is deployed via:

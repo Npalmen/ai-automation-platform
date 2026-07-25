@@ -1481,6 +1481,25 @@ def _run_gmail_inbox_sync(
 
     query_used = query if query is not None else "is:unread"
 
+    from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+
+    ctrl_settings = TenantConfigRepository.get_settings(db, tenant_id)
+    from app.internal_pilot.gates import (
+        PilotGateViolation,
+        enforce_pilot_inbox_gates,
+    )
+
+    try:
+        query_used = enforce_pilot_inbox_gates(
+            tenant_id=tenant_id,
+            query=query_used,
+            max_results=max_results,
+            dry_run=dry_run,
+            settings=ctrl_settings,
+        ) or query_used
+    except PilotGateViolation as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
     connection_config = get_integration_connection_config(
         tenant_id=tenant_id,
         integration_type=IntegrationType.GOOGLE_MAIL,
@@ -3255,7 +3274,20 @@ def _run_scheduler_pass(tenant_id: str, db: "Session", now_utc: "datetime") -> d
         if demo_mode:
             inbox_sync_result = {"skipped": True, "reason": "demo_mode"}
         elif run_mode == "scheduled":
-            if not s.GOOGLE_MAIL_ACCESS_TOKEN:
+            from app.internal_pilot.gates import (
+                PilotGateViolation,
+                enforce_pilot_scheduler_sync,
+                is_pilot_tenant,
+            )
+
+            if is_pilot_tenant(tenant_id):
+                try:
+                    enforce_pilot_scheduler_sync(tenant_id=tenant_id, settings=ctrl)
+                except PilotGateViolation as exc:
+                    inbox_sync_result = {"skipped": True, "reason": str(exc)}
+                else:
+                    inbox_sync_result = {"skipped": True, "reason": "pilot_scheduler_forbidden"}
+            elif not s.GOOGLE_MAIL_ACCESS_TOKEN:
                 inbox_sync_result = {"skipped": True, "reason": "gmail_not_configured"}
             else:
                 raw = _run_gmail_inbox_sync(
