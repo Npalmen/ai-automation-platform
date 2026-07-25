@@ -1,0 +1,827 @@
+﻿foundation	Set up job	锘?026-07-24T19:43:56.9162360Z Current runner version: '2.336.0'
+foundation	Set up job	2026-07-24T19:43:56.9182263Z ##[group]Runner Image Provisioner
+foundation	Set up job	2026-07-24T19:43:56.9183035Z Hosted Compute Agent
+foundation	Set up job	2026-07-24T19:43:56.9183627Z Version: 20260707.563
+foundation	Set up job	2026-07-24T19:43:56.9184141Z Commit: 02667638d2b423fbc733a8e32a88b44996a3ba6e
+foundation	Set up job	2026-07-24T19:43:56.9185022Z Build Date: 2026-07-07T19:33:50Z
+foundation	Set up job	2026-07-24T19:43:56.9185678Z Worker ID: {5a5a72d3-a0de-4f4e-8c93-5a73e14ff22a}
+foundation	Set up job	2026-07-24T19:43:56.9186291Z Azure Region: centralus
+foundation	Set up job	2026-07-24T19:43:56.9186826Z ##[endgroup]
+foundation	Set up job	2026-07-24T19:43:56.9187935Z ##[group]Operating System
+foundation	Set up job	2026-07-24T19:43:56.9188421Z Ubuntu
+foundation	Set up job	2026-07-24T19:43:56.9189073Z 24.04.4
+foundation	Set up job	2026-07-24T19:43:56.9189541Z LTS
+foundation	Set up job	2026-07-24T19:43:56.9189986Z ##[endgroup]
+foundation	Set up job	2026-07-24T19:43:56.9190448Z ##[group]Runner Image
+foundation	Set up job	2026-07-24T19:43:56.9190939Z Image: ubuntu-24.04
+foundation	Set up job	2026-07-24T19:43:56.9191429Z Version: 20260720.247.2
+foundation	Set up job	2026-07-24T19:43:56.9192295Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260720.247/images/ubuntu/Ubuntu2404-Readme.md
+foundation	Set up job	2026-07-24T19:43:56.9193752Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260720.247
+foundation	Set up job	2026-07-24T19:43:56.9194523Z ##[endgroup]
+foundation	Set up job	2026-07-24T19:43:56.9195470Z ##[group]GITHUB_TOKEN Permissions
+foundation	Set up job	2026-07-24T19:43:56.9197442Z Contents: read
+foundation	Set up job	2026-07-24T19:43:56.9197963Z Metadata: read
+foundation	Set up job	2026-07-24T19:43:56.9198416Z ##[endgroup]
+foundation	Set up job	2026-07-24T19:43:56.9200537Z Secret source: Actions
+foundation	Set up job	2026-07-24T19:43:56.9201448Z Prepare workflow directory
+foundation	Set up job	2026-07-24T19:43:56.9686627Z Prepare all required actions
+foundation	Set up job	2026-07-24T19:43:56.9723552Z Getting action download info
+foundation	Set up job	2026-07-24T19:43:57.1930397Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+foundation	Set up job	2026-07-24T19:43:57.6815432Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+foundation	Set up job	2026-07-24T19:43:57.8413770Z Complete job name: foundation
+foundation	Initialize containers	锘?026-07-24T19:43:57.8842748Z ##[group]Checking docker version
+foundation	Initialize containers	2026-07-24T19:43:57.8854911Z ##[command]/usr/bin/docker version --format '{{.Server.APIVersion}}'
+foundation	Initialize containers	2026-07-24T19:43:58.0166941Z '1.48'
+foundation	Initialize containers	2026-07-24T19:43:58.0178417Z Docker daemon API version: '1.48'
+foundation	Initialize containers	2026-07-24T19:43:58.0179540Z ##[command]/usr/bin/docker version --format '{{.Client.APIVersion}}'
+foundation	Initialize containers	2026-07-24T19:43:58.0323194Z '1.48'
+foundation	Initialize containers	2026-07-24T19:43:58.0331973Z Docker client API version: '1.48'
+foundation	Initialize containers	2026-07-24T19:43:58.0336099Z ##[endgroup]
+foundation	Initialize containers	2026-07-24T19:43:58.0338290Z ##[group]Clean up resources from previous jobs
+foundation	Initialize containers	2026-07-24T19:43:58.0342993Z ##[command]/usr/bin/docker ps --all --quiet --no-trunc --filter "label=622e8b"
+foundation	Initialize containers	2026-07-24T19:43:58.0466602Z ##[command]/usr/bin/docker network prune --force --filter "label=622e8b"
+foundation	Initialize containers	2026-07-24T19:43:58.0581703Z ##[endgroup]
+foundation	Initialize containers	2026-07-24T19:43:58.0582327Z ##[group]Create local container network
+foundation	Initialize containers	2026-07-24T19:43:58.0590246Z ##[command]/usr/bin/docker network create --label 622e8b github_network_650767de55ff403387110203f01cd09f
+foundation	Initialize containers	2026-07-24T19:43:58.1922052Z 5d95b00ccdf92b6efc6b9a2f064f980a7325a43eef7a7a726137280fe3348fce
+foundation	Initialize containers	2026-07-24T19:43:58.1933631Z ##[endgroup]
+foundation	Initialize containers	2026-07-24T19:43:58.1955779Z ##[group]Starting postgres service container
+foundation	Initialize containers	2026-07-24T19:43:58.1973421Z ##[command]/usr/bin/docker pull postgres:15
+foundation	Initialize containers	2026-07-24T19:43:58.8022184Z 15: Pulling from library/postgres
+foundation	Initialize containers	2026-07-24T19:43:58.9616650Z 062e450697fa: Pulling fs layer
+foundation	Initialize containers	2026-07-24T19:43:58.9618079Z a3fa325953d3: Pulling fs layer
+foundation	Initialize containers	2026-07-24T19:43:58.9619489Z 85e291df2b0c: Pulling fs layer
+foundation	Initialize containers	2026-07-24T19:43:58.9620914Z 917f393d78ad: Pulling fs layer
+foundation	Initialize containers	2026-07-24T19:43:58.9622621Z 8bf473d6c1d8: Pulling fs layer
+foundation	Initialize containers	2026-07-24T19:43:58.9623752Z 4c8260904ed6: Pulling fs layer
+foundation	Initialize containers	2026-07-24T19:43:58.9624760Z b2a10d459416: Pulling fs layer
+foundation	Initialize containers	2026-07-24T19:43:58.9625706Z d6db1dccda5c: Pulling fs layer
+foundation	Initialize containers	2026-07-24T19:43:58.9626907Z 0062ea3f2dce: Pulling fs layer
+foundation	Initialize containers	2026-07-24T19:43:58.9627849Z 10316a63e71a: Pulling fs layer
+foundation	Initialize containers	2026-07-24T19:43:58.9629115Z 35b060784592: Pulling fs layer
+foundation	Initialize containers	2026-07-24T19:43:58.9630277Z 1957aab81dc6: Pulling fs layer
+foundation	Initialize containers	2026-07-24T19:43:58.9631491Z 99a2a1f42a28: Pulling fs layer
+foundation	Initialize containers	2026-07-24T19:43:58.9632858Z 5c19c71a6265: Pulling fs layer
+foundation	Initialize containers	2026-07-24T19:43:58.9634224Z 8bf473d6c1d8: Waiting
+foundation	Initialize containers	2026-07-24T19:43:58.9635244Z 4c8260904ed6: Waiting
+foundation	Initialize containers	2026-07-24T19:43:58.9636168Z b2a10d459416: Waiting
+foundation	Initialize containers	2026-07-24T19:43:58.9637050Z d6db1dccda5c: Waiting
+foundation	Initialize containers	2026-07-24T19:43:58.9638044Z 0062ea3f2dce: Waiting
+foundation	Initialize containers	2026-07-24T19:43:58.9639063Z 10316a63e71a: Waiting
+foundation	Initialize containers	2026-07-24T19:43:58.9639933Z 35b060784592: Waiting
+foundation	Initialize containers	2026-07-24T19:43:58.9641139Z 1957aab81dc6: Waiting
+foundation	Initialize containers	2026-07-24T19:43:58.9642369Z 917f393d78ad: Waiting
+foundation	Initialize containers	2026-07-24T19:43:58.9643478Z 99a2a1f42a28: Waiting
+foundation	Initialize containers	2026-07-24T19:43:58.9644767Z 5c19c71a6265: Waiting
+foundation	Initialize containers	2026-07-24T19:43:59.1773288Z a3fa325953d3: Verifying Checksum
+foundation	Initialize containers	2026-07-24T19:43:59.1774892Z a3fa325953d3: Download complete
+foundation	Initialize containers	2026-07-24T19:43:59.3023289Z 85e291df2b0c: Verifying Checksum
+foundation	Initialize containers	2026-07-24T19:43:59.3025515Z 85e291df2b0c: Download complete
+foundation	Initialize containers	2026-07-24T19:43:59.3544808Z 062e450697fa: Verifying Checksum
+foundation	Initialize containers	2026-07-24T19:43:59.3546162Z 062e450697fa: Download complete
+foundation	Initialize containers	2026-07-24T19:43:59.3819237Z 917f393d78ad: Verifying Checksum
+foundation	Initialize containers	2026-07-24T19:43:59.3820162Z 917f393d78ad: Download complete
+foundation	Initialize containers	2026-07-24T19:43:59.5164994Z b2a10d459416: Verifying Checksum
+foundation	Initialize containers	2026-07-24T19:43:59.5166249Z b2a10d459416: Download complete
+foundation	Initialize containers	2026-07-24T19:43:59.5773347Z 4c8260904ed6: Verifying Checksum
+foundation	Initialize containers	2026-07-24T19:43:59.5774492Z 4c8260904ed6: Download complete
+foundation	Initialize containers	2026-07-24T19:43:59.5896653Z 8bf473d6c1d8: Verifying Checksum
+foundation	Initialize containers	2026-07-24T19:43:59.5899623Z 8bf473d6c1d8: Download complete
+foundation	Initialize containers	2026-07-24T19:43:59.6555919Z d6db1dccda5c: Verifying Checksum
+foundation	Initialize containers	2026-07-24T19:43:59.6559913Z d6db1dccda5c: Download complete
+foundation	Initialize containers	2026-07-24T19:43:59.7299872Z 10316a63e71a: Verifying Checksum
+foundation	Initialize containers	2026-07-24T19:43:59.7300384Z 10316a63e71a: Download complete
+foundation	Initialize containers	2026-07-24T19:43:59.8086703Z 35b060784592: Download complete
+foundation	Initialize containers	2026-07-24T19:43:59.8802909Z 1957aab81dc6: Verifying Checksum
+foundation	Initialize containers	2026-07-24T19:43:59.8803678Z 1957aab81dc6: Download complete
+foundation	Initialize containers	2026-07-24T19:43:59.9670729Z 99a2a1f42a28: Verifying Checksum
+foundation	Initialize containers	2026-07-24T19:43:59.9671578Z 99a2a1f42a28: Download complete
+foundation	Initialize containers	2026-07-24T19:44:00.0241038Z 5c19c71a6265: Download complete
+foundation	Initialize containers	2026-07-24T19:44:00.1339560Z 0062ea3f2dce: Verifying Checksum
+foundation	Initialize containers	2026-07-24T19:44:00.1340124Z 0062ea3f2dce: Download complete
+foundation	Initialize containers	2026-07-24T19:44:00.1498564Z 062e450697fa: Pull complete
+foundation	Initialize containers	2026-07-24T19:44:07.1404478Z a3fa325953d3: Pull complete
+foundation	Initialize containers	2026-07-24T19:44:07.4201505Z 85e291df2b0c: Pull complete
+foundation	Initialize containers	2026-07-24T19:44:07.4800102Z 917f393d78ad: Pull complete
+foundation	Initialize containers	2026-07-24T19:44:07.9237227Z 8bf473d6c1d8: Pull complete
+foundation	Initialize containers	2026-07-24T19:44:08.1898132Z 4c8260904ed6: Pull complete
+foundation	Initialize containers	2026-07-24T19:44:08.2152198Z b2a10d459416: Pull complete
+foundation	Initialize containers	2026-07-24T19:44:08.2323643Z d6db1dccda5c: Pull complete
+foundation	Initialize containers	2026-07-24T19:44:12.4765986Z 0062ea3f2dce: Pull complete
+foundation	Initialize containers	2026-07-24T19:44:12.4894581Z 10316a63e71a: Pull complete
+foundation	Initialize containers	2026-07-24T19:44:12.6972435Z 35b060784592: Pull complete
+foundation	Initialize containers	2026-07-24T19:44:12.7061179Z 1957aab81dc6: Pull complete
+foundation	Initialize containers	2026-07-24T19:44:12.7161324Z 99a2a1f42a28: Pull complete
+foundation	Initialize containers	2026-07-24T19:44:12.7252505Z 5c19c71a6265: Pull complete
+foundation	Initialize containers	2026-07-24T19:44:12.7294571Z Digest: sha256:74e110c41804365e3915fcc09d5e7a1eff50161aaa94d5da0e58e0cd75ae509c
+foundation	Initialize containers	2026-07-24T19:44:12.7308269Z Status: Downloaded newer image for postgres:15
+foundation	Initialize containers	2026-07-24T19:44:12.7319150Z docker.io/library/postgres:15
+foundation	Initialize containers	2026-07-24T19:44:12.7367316Z ##[command]/usr/bin/docker create --name b28310dce63e425daeeb2c59cd874aa4_postgres15_fbe1f7 --label 622e8b --network github_network_650767de55ff403387110203f01cd09f --network-alias postgres -p 5432:5432 --health-cmd "pg_isready -U postgres -d ai_platform" --health-interval 10s --health-timeout 5s --health-retries 5 -e "POSTGRES_USER=postgres" -e "POSTGRES_PASSWORD=postgres" -e "POSTGRES_DB=ai_platform" -e GITHUB_ACTIONS=true -e CI=true postgres:15
+foundation	Initialize containers	2026-07-24T19:44:12.9432178Z 99237d53a9c1c26312f2b5e40151adf79d99a9fbbc1fc901632938c74b0617b0
+foundation	Initialize containers	2026-07-24T19:44:12.9453994Z ##[command]/usr/bin/docker start 99237d53a9c1c26312f2b5e40151adf79d99a9fbbc1fc901632938c74b0617b0
+foundation	Initialize containers	2026-07-24T19:44:13.0865597Z 99237d53a9c1c26312f2b5e40151adf79d99a9fbbc1fc901632938c74b0617b0
+foundation	Initialize containers	2026-07-24T19:44:13.0880968Z ##[command]/usr/bin/docker ps --all --filter id=99237d53a9c1c26312f2b5e40151adf79d99a9fbbc1fc901632938c74b0617b0 --filter status=running --no-trunc --format "{{.ID}} {{.Status}}"
+foundation	Initialize containers	2026-07-24T19:44:13.1008114Z 99237d53a9c1c26312f2b5e40151adf79d99a9fbbc1fc901632938c74b0617b0 Up Less than a second (health: starting)
+foundation	Initialize containers	2026-07-24T19:44:13.1025994Z ##[command]/usr/bin/docker port 99237d53a9c1c26312f2b5e40151adf79d99a9fbbc1fc901632938c74b0617b0
+foundation	Initialize containers	2026-07-24T19:44:13.1136971Z 5432/tcp -> 0.0.0.0:5432
+foundation	Initialize containers	2026-07-24T19:44:13.1137799Z 5432/tcp -> [::]:5432
+foundation	Initialize containers	2026-07-24T19:44:13.1189755Z ##[endgroup]
+foundation	Initialize containers	2026-07-24T19:44:13.1200313Z ##[group]Waiting for all services to be ready
+foundation	Initialize containers	2026-07-24T19:44:13.1212854Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 99237d53a9c1c26312f2b5e40151adf79d99a9fbbc1fc901632938c74b0617b0
+foundation	Initialize containers	2026-07-24T19:44:13.1328405Z starting
+foundation	Initialize containers	2026-07-24T19:44:13.1342606Z postgres service is starting, waiting 2 seconds before checking again.
+foundation	Initialize containers	2026-07-24T19:44:15.1342810Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 99237d53a9c1c26312f2b5e40151adf79d99a9fbbc1fc901632938c74b0617b0
+foundation	Initialize containers	2026-07-24T19:44:15.1467287Z starting
+foundation	Initialize containers	2026-07-24T19:44:15.1476030Z postgres service is starting, waiting 3 seconds before checking again.
+foundation	Initialize containers	2026-07-24T19:44:19.0600740Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 99237d53a9c1c26312f2b5e40151adf79d99a9fbbc1fc901632938c74b0617b0
+foundation	Initialize containers	2026-07-24T19:44:19.0739045Z starting
+foundation	Initialize containers	2026-07-24T19:44:19.0751208Z postgres service is starting, waiting 7 seconds before checking again.
+foundation	Initialize containers	2026-07-24T19:44:27.0669140Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 99237d53a9c1c26312f2b5e40151adf79d99a9fbbc1fc901632938c74b0617b0
+foundation	Initialize containers	2026-07-24T19:44:27.0792905Z healthy
+foundation	Initialize containers	2026-07-24T19:44:27.0805134Z postgres service is healthy.
+foundation	Initialize containers	2026-07-24T19:44:27.0806199Z ##[endgroup]
+foundation	Run actions/checkout@v4	锘?026-07-24T19:44:27.1036933Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1043547Z ##[group]Run actions/checkout@v4
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1044051Z with:
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1044374Z   repository: Npalmen/ai-automation-platform
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1046531Z   token: ***
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1046793Z   ssh-strict: true
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1047182Z   ssh-user: git
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1047483Z   persist-credentials: true
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1047785Z   clean: true
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1048036Z   sparse-checkout-cone-mode: true
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1048372Z   fetch-depth: 1
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1048620Z   fetch-tags: false
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1049050Z   show-progress: true
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1049326Z   lfs: false
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1049588Z   submodules: false
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1049995Z   set-safe-directory: true
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1050280Z   allow-unsafe-pr-checkout: false
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1050780Z env:
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1051043Z   LIVE_EVAL_ALLOWED: yes
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1051302Z   LIVE_LLM_EVAL_ALLOWED: yes
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1051645Z   LIVE_EVAL_TENANT_IDS: TENANT_LIVE_EVAL
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1051953Z   LIVE_EVAL_LLM_PROVIDER: openai
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1052289Z   LIVE_EVAL_LLM_MODEL: gpt-4o-mini
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1052607Z   LIVE_EVAL_LLM_TIMEOUT: 60
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1052883Z   LIVE_EVAL_LLM_MAX_TOKENS: 2048
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1053189Z   LIVE_EVAL_MAX_LLM_CALLS: 4
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1053668Z   LLM_API_URL: https://api.openai.com/v1/chat/completions
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1054012Z   LLM_MODEL: gpt-4o-mini
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1054337Z   LLM_RETRY_ATTEMPTS: 0
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1054713Z   LLM_TEMPERATURE: 0.0
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1055040Z   ADMIN_API_KEY: ci-admin-key
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1055356Z   BUILD_GIT_SHA: f91fa1986856af488d43aa9a555af9b224dd85ad
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1055834Z ##[endgroup]
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1912480Z Syncing repository: Npalmen/ai-automation-platform
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1913625Z ##[group]Getting Git version info
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1914127Z Working directory is '/home/runner/work/ai-automation-platform/ai-automation-platform'
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1914773Z [command]/usr/bin/git version
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1969908Z git version 2.54.0
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1986919Z ##[endgroup]
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1995916Z Temporarily overriding HOME='/home/runner/work/_temp/573ffee7-ab2a-4aa6-b509-b0aee3343c4d' before making global git config changes
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.1996751Z Adding repository directory to the temporary git global config as a safe directory
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2002106Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/ai-automation-platform/ai-automation-platform
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2031645Z Deleting the contents of '/home/runner/work/ai-automation-platform/ai-automation-platform'
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2034992Z ##[group]Initializing the repository
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2038791Z [command]/usr/bin/git init /home/runner/work/ai-automation-platform/ai-automation-platform
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2109781Z hint: Using 'master' as the name for the initial branch. This default branch name
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2110996Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2112042Z hint: to use in all of your new repositories, which will suppress this warning,
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2112934Z hint: call:
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2113457Z hint:
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2114362Z hint: 	git config --global init.defaultBranch <name>
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2115037Z hint:
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2115517Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2116233Z hint: 'development'. The just-created branch can be renamed via this command:
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2116887Z hint:
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2117210Z hint: 	git branch -m <name>
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2117569Z hint:
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2118318Z hint: Disable this message with "git config set advice.defaultBranchName false"
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2119368Z Initialized empty Git repository in /home/runner/work/ai-automation-platform/ai-automation-platform/.git/
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2121111Z [command]/usr/bin/git remote add origin https://github.com/Npalmen/ai-automation-platform
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2151884Z ##[endgroup]
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2152685Z ##[group]Disabling automatic garbage collection
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2153235Z [command]/usr/bin/git config --local gc.auto 0
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2178118Z ##[endgroup]
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2179246Z ##[group]Setting up auth
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2183332Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2207967Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2565753Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2596643Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2778355Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2804221Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2967194Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2994801Z ##[endgroup]
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.2995751Z ##[group]Fetching the repository
+foundation	Run actions/checkout@v4	2026-07-24T19:44:27.3003685Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +f91fa1986856af488d43aa9a555af9b224dd85ad:refs/remotes/origin/main
+foundation	Run actions/checkout@v4	2026-07-24T19:44:28.2483039Z From https://github.com/Npalmen/ai-automation-platform
+foundation	Run actions/checkout@v4	2026-07-24T19:44:28.2483989Z  * [new ref]         f91fa1986856af488d43aa9a555af9b224dd85ad -> origin/main
+foundation	Run actions/checkout@v4	2026-07-24T19:44:28.2503527Z ##[endgroup]
+foundation	Run actions/checkout@v4	2026-07-24T19:44:28.2504200Z ##[group]Determining the checkout info
+foundation	Run actions/checkout@v4	2026-07-24T19:44:28.2506204Z ##[endgroup]
+foundation	Run actions/checkout@v4	2026-07-24T19:44:28.2511920Z [command]/usr/bin/git sparse-checkout disable
+foundation	Run actions/checkout@v4	2026-07-24T19:44:28.2547258Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+foundation	Run actions/checkout@v4	2026-07-24T19:44:28.2572017Z ##[group]Checking out the ref
+foundation	Run actions/checkout@v4	2026-07-24T19:44:28.2601692Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+foundation	Run actions/checkout@v4	2026-07-24T19:44:28.3113391Z Switched to a new branch 'main'
+foundation	Run actions/checkout@v4	2026-07-24T19:44:28.3114368Z branch 'main' set up to track 'origin/main'.
+foundation	Run actions/checkout@v4	2026-07-24T19:44:28.3119091Z ##[endgroup]
+foundation	Run actions/checkout@v4	2026-07-24T19:44:28.3148602Z [command]/usr/bin/git log -1 --format=%H
+foundation	Run actions/checkout@v4	2026-07-24T19:44:28.3167752Z f91fa1986856af488d43aa9a555af9b224dd85ad
+foundation	Run actions/setup-python@v5	锘?026-07-24T19:44:28.3381318Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3382667Z ##[group]Run actions/setup-python@v5
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3382997Z with:
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3383258Z   python-version: 3.10
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3383541Z   cache: pip
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3383818Z   check-latest: false
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3385835Z   token: ***
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3386103Z   update-environment: true
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3386396Z   allow-prereleases: false
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3386689Z   freethreaded: false
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3386961Z env:
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3387205Z   LIVE_EVAL_ALLOWED: yes
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3387467Z   LIVE_LLM_EVAL_ALLOWED: yes
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3387789Z   LIVE_EVAL_TENANT_IDS: TENANT_LIVE_EVAL
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3388113Z   LIVE_EVAL_LLM_PROVIDER: openai
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3388525Z   LIVE_EVAL_LLM_MODEL: gpt-4o-mini
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3388808Z   LIVE_EVAL_LLM_TIMEOUT: 60
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3389214Z   LIVE_EVAL_LLM_MAX_TOKENS: 2048
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3389528Z   LIVE_EVAL_MAX_LLM_CALLS: 4
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3389854Z   LLM_API_URL: https://api.openai.com/v1/chat/completions
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3390220Z   LLM_MODEL: gpt-4o-mini
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3390493Z   LLM_RETRY_ATTEMPTS: 0
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3390746Z   LLM_TEMPERATURE: 0.0
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3391058Z   ADMIN_API_KEY: ci-admin-key
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3391394Z   BUILD_GIT_SHA: f91fa1986856af488d43aa9a555af9b224dd85ad
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.3391724Z ##[endgroup]
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.4505777Z ##[group]Installed versions
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.4596823Z (node:2456) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.4597566Z (Use `node --trace-deprecation ...` to show where the warning was created)
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.4598208Z Successfully set up CPython (3.10.20)
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.4599017Z ##[endgroup]
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:28.5928214Z [command]/opt/hostedtoolcache/Python/3.10.20/x64/bin/pip cache dir
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:30.2943525Z /home/runner/.cache/pip
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:30.4624652Z Cache hit for: setup-python-Linux-x64-24.04-Ubuntu-python-3.10.20-pip-6141c141c0e771ef0edddaa2f40115bd93f63be7102a7ee2942359e39f0742d4
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:30.4715774Z (node:2456) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:31.1917287Z Received 18157920 of 18157920 (100.0%), 30.3 MBs/sec
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:31.1917971Z Cache Size: ~17 MB (18157920 B)
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:31.1940519Z [command]/usr/bin/tar -xf /home/runner/work/_temp/45b23655-1a65-4ea1-91f4-6fd06c1262e0/cache.tzst -P -C /home/runner/work/ai-automation-platform/ai-automation-platform --use-compress-program unzstd
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:31.2237744Z Cache restored successfully
+foundation	Run actions/setup-python@v5	2026-07-24T19:44:31.2248803Z Cache restored from key: setup-python-Linux-x64-24.04-Ubuntu-python-3.10.20-pip-6141c141c0e771ef0edddaa2f40115bd93f63be7102a7ee2942359e39f0742d4
+foundation	Install dependencies	锘?026-07-24T19:44:31.2371766Z ##[group]Run python -m pip install -r requirements.txt
+foundation	Install dependencies	2026-07-24T19:44:31.2372282Z ^[[36;1mpython -m pip install -r requirements.txt^[[0m
+foundation	Install dependencies	2026-07-24T19:44:31.2404804Z shell: /usr/bin/bash -e {0}
+foundation	Install dependencies	2026-07-24T19:44:31.2405263Z env:
+foundation	Install dependencies	2026-07-24T19:44:31.2405535Z   LIVE_EVAL_ALLOWED: yes
+foundation	Install dependencies	2026-07-24T19:44:31.2405817Z   LIVE_LLM_EVAL_ALLOWED: yes
+foundation	Install dependencies	2026-07-24T19:44:31.2406210Z   LIVE_EVAL_TENANT_IDS: TENANT_LIVE_EVAL
+foundation	Install dependencies	2026-07-24T19:44:31.2406517Z   LIVE_EVAL_LLM_PROVIDER: openai
+foundation	Install dependencies	2026-07-24T19:44:31.2406841Z   LIVE_EVAL_LLM_MODEL: gpt-4o-mini
+foundation	Install dependencies	2026-07-24T19:44:31.2407136Z   LIVE_EVAL_LLM_TIMEOUT: 60
+foundation	Install dependencies	2026-07-24T19:44:31.2407399Z   LIVE_EVAL_LLM_MAX_TOKENS: 2048
+foundation	Install dependencies	2026-07-24T19:44:31.2407749Z   LIVE_EVAL_MAX_LLM_CALLS: 4
+foundation	Install dependencies	2026-07-24T19:44:31.2408235Z   LLM_API_URL: https://api.openai.com/v1/chat/completions
+foundation	Install dependencies	2026-07-24T19:44:31.2408619Z   LLM_MODEL: gpt-4o-mini
+foundation	Install dependencies	2026-07-24T19:44:31.2409240Z   LLM_RETRY_ATTEMPTS: 0
+foundation	Install dependencies	2026-07-24T19:44:31.2409512Z   LLM_TEMPERATURE: 0.0
+foundation	Install dependencies	2026-07-24T19:44:31.2409852Z   ADMIN_API_KEY: ci-admin-key
+foundation	Install dependencies	2026-07-24T19:44:31.2410253Z   BUILD_GIT_SHA: f91fa1986856af488d43aa9a555af9b224dd85ad
+foundation	Install dependencies	2026-07-24T19:44:31.2410685Z   pythonLocation: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Install dependencies	2026-07-24T19:44:31.2411106Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib/pkgconfig
+foundation	Install dependencies	2026-07-24T19:44:31.2411592Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Install dependencies	2026-07-24T19:44:31.2411976Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Install dependencies	2026-07-24T19:44:31.2412332Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Install dependencies	2026-07-24T19:44:31.2412756Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib
+foundation	Install dependencies	2026-07-24T19:44:31.2413120Z ##[endgroup]
+foundation	Install dependencies	2026-07-24T19:44:32.7062797Z Collecting fastapi==0.135.3 (from -r requirements.txt (line 2))
+foundation	Install dependencies	2026-07-24T19:44:32.7073027Z   Using cached fastapi-0.135.3-py3-none-any.whl.metadata (28 kB)
+foundation	Install dependencies	2026-07-24T19:44:32.7343289Z Collecting uvicorn==0.44.0 (from -r requirements.txt (line 3))
+foundation	Install dependencies	2026-07-24T19:44:32.7354912Z   Using cached uvicorn-0.44.0-py3-none-any.whl.metadata (6.7 kB)
+foundation	Install dependencies	2026-07-24T19:44:32.9476632Z Collecting sqlalchemy==2.0.49 (from -r requirements.txt (line 4))
+foundation	Install dependencies	2026-07-24T19:44:32.9488334Z   Using cached sqlalchemy-2.0.49-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (9.5 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.0078347Z Collecting psycopg2-binary==2.9.11 (from -r requirements.txt (line 5))
+foundation	Install dependencies	2026-07-24T19:44:33.0089594Z   Using cached psycopg2_binary-2.9.11-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (4.9 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.1039476Z Collecting pydantic==2.12.5 (from -r requirements.txt (line 6))
+foundation	Install dependencies	2026-07-24T19:44:33.1048763Z   Using cached pydantic-2.12.5-py3-none-any.whl.metadata (90 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.1233977Z Collecting pydantic-settings==2.13.1 (from -r requirements.txt (line 7))
+foundation	Install dependencies	2026-07-24T19:44:33.1244498Z   Using cached pydantic_settings-2.13.1-py3-none-any.whl.metadata (3.4 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.1419523Z Collecting python-dotenv==1.2.2 (from -r requirements.txt (line 8))
+foundation	Install dependencies	2026-07-24T19:44:33.1430214Z   Using cached python_dotenv-1.2.2-py3-none-any.whl.metadata (27 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.1664330Z Collecting requests==2.33.1 (from -r requirements.txt (line 9))
+foundation	Install dependencies	2026-07-24T19:44:33.1675026Z   Using cached requests-2.33.1-py3-none-any.whl.metadata (4.8 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.2031568Z Collecting PyYAML==6.0.2 (from -r requirements.txt (line 10))
+foundation	Install dependencies	2026-07-24T19:44:33.2043241Z   Using cached PyYAML-6.0.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (2.1 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.2326008Z Collecting anyio==4.13.0 (from -r requirements.txt (line 11))
+foundation	Install dependencies	2026-07-24T19:44:33.2338527Z   Using cached anyio-4.13.0-py3-none-any.whl.metadata (4.5 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.2588129Z Collecting starlette==1.0.0 (from -r requirements.txt (line 12))
+foundation	Install dependencies	2026-07-24T19:44:33.2599760Z   Using cached starlette-1.0.0-py3-none-any.whl.metadata (6.3 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.2864416Z Collecting pytest==9.0.3 (from -r requirements.txt (line 15))
+foundation	Install dependencies	2026-07-24T19:44:33.2875204Z   Using cached pytest-9.0.3-py3-none-any.whl.metadata (7.6 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.3058683Z Collecting pytest-mock==3.15.1 (from -r requirements.txt (line 16))
+foundation	Install dependencies	2026-07-24T19:44:33.3070525Z   Using cached pytest_mock-3.15.1-py3-none-any.whl.metadata (3.9 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.3274527Z Collecting httpx (from -r requirements.txt (line 17))
+foundation	Install dependencies	2026-07-24T19:44:33.3285269Z   Using cached httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.3524222Z Collecting typing-extensions>=4.8.0 (from fastapi==0.135.3->-r requirements.txt (line 2))
+foundation	Install dependencies	2026-07-24T19:44:33.3535948Z   Using cached typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.3779851Z Collecting typing-inspection>=0.4.2 (from fastapi==0.135.3->-r requirements.txt (line 2))
+foundation	Install dependencies	2026-07-24T19:44:33.3791108Z   Using cached typing_inspection-0.4.2-py3-none-any.whl.metadata (2.6 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.3931955Z Collecting annotated-doc>=0.0.2 (from fastapi==0.135.3->-r requirements.txt (line 2))
+foundation	Install dependencies	2026-07-24T19:44:33.3942741Z   Using cached annotated_doc-0.0.4-py3-none-any.whl.metadata (6.6 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.4134494Z Collecting click>=7.0 (from uvicorn==0.44.0->-r requirements.txt (line 3))
+foundation	Install dependencies	2026-07-24T19:44:33.4145208Z   Using cached click-8.4.2-py3-none-any.whl.metadata (2.6 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.4289957Z Collecting h11>=0.8 (from uvicorn==0.44.0->-r requirements.txt (line 3))
+foundation	Install dependencies	2026-07-24T19:44:33.4300669Z   Using cached h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.5852764Z Collecting greenlet>=1 (from sqlalchemy==2.0.49->-r requirements.txt (line 4))
+foundation	Install dependencies	2026-07-24T19:44:33.6833659Z   Downloading greenlet-3.5.4-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (3.8 kB)
+foundation	Install dependencies	2026-07-24T19:44:33.8240277Z Collecting annotated-types>=0.6.0 (from pydantic==2.12.5->-r requirements.txt (line 6))
+foundation	Install dependencies	2026-07-24T19:44:33.8396836Z   Downloading annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.3903254Z Collecting pydantic-core==2.41.5 (from pydantic==2.12.5->-r requirements.txt (line 6))
+foundation	Install dependencies	2026-07-24T19:44:34.3917600Z   Using cached pydantic_core-2.41.5-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (7.3 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.4832141Z Collecting charset_normalizer<4,>=2 (from requests==2.33.1->-r requirements.txt (line 9))
+foundation	Install dependencies	2026-07-24T19:44:34.4844996Z   Using cached charset_normalizer-3.4.9-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (41 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.5255058Z Collecting idna<4,>=2.5 (from requests==2.33.1->-r requirements.txt (line 9))
+foundation	Install dependencies	2026-07-24T19:44:34.5266518Z   Using cached idna-3.18-py3-none-any.whl.metadata (6.1 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.5501915Z Collecting urllib3<3,>=1.26 (from requests==2.33.1->-r requirements.txt (line 9))
+foundation	Install dependencies	2026-07-24T19:44:34.5513163Z   Using cached urllib3-2.7.0-py3-none-any.whl.metadata (6.9 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.5728361Z Collecting certifi>=2023.5.7 (from requests==2.33.1->-r requirements.txt (line 9))
+foundation	Install dependencies	2026-07-24T19:44:34.5884274Z   Downloading certifi-2026.7.22-py3-none-any.whl.metadata (2.5 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.6071222Z Collecting exceptiongroup>=1.0.2 (from anyio==4.13.0->-r requirements.txt (line 11))
+foundation	Install dependencies	2026-07-24T19:44:34.6082768Z   Using cached exceptiongroup-1.3.1-py3-none-any.whl.metadata (6.7 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.6301299Z Collecting iniconfig>=1.0.1 (from pytest==9.0.3->-r requirements.txt (line 15))
+foundation	Install dependencies	2026-07-24T19:44:34.6312824Z   Using cached iniconfig-2.3.0-py3-none-any.whl.metadata (2.5 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.6486605Z Collecting packaging>=22 (from pytest==9.0.3->-r requirements.txt (line 15))
+foundation	Install dependencies	2026-07-24T19:44:34.6497800Z   Using cached packaging-26.2-py3-none-any.whl.metadata (3.5 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.6703776Z Collecting pluggy<2,>=1.5 (from pytest==9.0.3->-r requirements.txt (line 15))
+foundation	Install dependencies	2026-07-24T19:44:34.6714294Z   Using cached pluggy-1.6.0-py3-none-any.whl.metadata (4.8 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.6925313Z Collecting pygments>=2.7.2 (from pytest==9.0.3->-r requirements.txt (line 15))
+foundation	Install dependencies	2026-07-24T19:44:34.6936248Z   Using cached pygments-2.20.0-py3-none-any.whl.metadata (2.5 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7175718Z Collecting tomli>=1 (from pytest==9.0.3->-r requirements.txt (line 15))
+foundation	Install dependencies	2026-07-24T19:44:34.7189068Z   Using cached tomli-2.4.1-py3-none-any.whl.metadata (10 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7420821Z Collecting httpcore==1.* (from httpx->-r requirements.txt (line 17))
+foundation	Install dependencies	2026-07-24T19:44:34.7432281Z   Using cached httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7531656Z Using cached fastapi-0.135.3-py3-none-any.whl (117 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7543253Z Using cached uvicorn-0.44.0-py3-none-any.whl (69 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7554136Z Using cached sqlalchemy-2.0.49-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (3.2 MB)
+foundation	Install dependencies	2026-07-24T19:44:34.7576555Z Using cached psycopg2_binary-2.9.11-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (4.2 MB)
+foundation	Install dependencies	2026-07-24T19:44:34.7601497Z Using cached pydantic-2.12.5-py3-none-any.whl (463 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7614711Z Using cached pydantic_settings-2.13.1-py3-none-any.whl (58 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7625748Z Using cached python_dotenv-1.2.2-py3-none-any.whl (22 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7636593Z Using cached requests-2.33.1-py3-none-any.whl (64 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7648010Z Using cached PyYAML-6.0.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (751 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7662539Z Using cached anyio-4.13.0-py3-none-any.whl (114 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7673864Z Using cached starlette-1.0.0-py3-none-any.whl (72 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7685268Z Using cached pytest-9.0.3-py3-none-any.whl (375 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7697691Z Using cached pytest_mock-3.15.1-py3-none-any.whl (10 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7709157Z Using cached pydantic_core-2.41.5-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.1 MB)
+foundation	Install dependencies	2026-07-24T19:44:34.7727609Z Using cached charset_normalizer-3.4.9-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (223 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7740513Z Using cached idna-3.18-py3-none-any.whl (65 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7751656Z Using cached pluggy-1.6.0-py3-none-any.whl (20 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7761820Z Using cached urllib3-2.7.0-py3-none-any.whl (131 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7772477Z Using cached httpx-0.28.1-py3-none-any.whl (73 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7782311Z Using cached httpcore-1.0.9-py3-none-any.whl (78 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7792625Z Using cached annotated_doc-0.0.4-py3-none-any.whl (5.3 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.7947868Z Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.8233723Z Downloading certifi-2026.7.22-py3-none-any.whl (136 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.8554221Z Using cached click-8.4.2-py3-none-any.whl (119 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.8564508Z Using cached exceptiongroup-1.3.1-py3-none-any.whl (16 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.8719056Z Downloading greenlet-3.5.4-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (622 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.9199961Z    鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣 622.9/622.9 kB 19.8 MB/s  0:00:00
+foundation	Install dependencies	2026-07-24T19:44:34.9211779Z Using cached h11-0.16.0-py3-none-any.whl (37 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.9222277Z Using cached iniconfig-2.3.0-py3-none-any.whl (7.5 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.9232011Z Using cached packaging-26.2-py3-none-any.whl (100 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.9242316Z Using cached pygments-2.20.0-py3-none-any.whl (1.2 MB)
+foundation	Install dependencies	2026-07-24T19:44:34.9257243Z Using cached tomli-2.4.1-py3-none-any.whl (14 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.9267255Z Using cached typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+foundation	Install dependencies	2026-07-24T19:44:34.9277203Z Using cached typing_inspection-0.4.2-py3-none-any.whl (14 kB)
+foundation	Install dependencies	2026-07-24T19:44:35.1232821Z Installing collected packages: urllib3, typing-extensions, tomli, PyYAML, python-dotenv, pygments, psycopg2-binary, pluggy, packaging, iniconfig, idna, h11, greenlet, click, charset_normalizer, certifi, annotated-types, annotated-doc, uvicorn, typing-inspection, sqlalchemy, requests, pydantic-core, httpcore, exceptiongroup, pytest, pydantic, anyio, starlette, pytest-mock, pydantic-settings, httpx, fastapi
+foundation	Install dependencies	2026-07-24T19:44:37.4329447Z 
+foundation	Install dependencies	2026-07-24T19:44:37.4349032Z Successfully installed PyYAML-6.0.2 annotated-doc-0.0.4 annotated-types-0.8.0 anyio-4.13.0 certifi-2026.7.22 charset_normalizer-3.4.9 click-8.4.2 exceptiongroup-1.3.1 fastapi-0.135.3 greenlet-3.5.4 h11-0.16.0 httpcore-1.0.9 httpx-0.28.1 idna-3.18 iniconfig-2.3.0 packaging-26.2 pluggy-1.6.0 psycopg2-binary-2.9.11 pydantic-2.12.5 pydantic-core-2.41.5 pydantic-settings-2.13.1 pygments-2.20.0 pytest-9.0.3 pytest-mock-3.15.1 python-dotenv-1.2.2 requests-2.33.1 sqlalchemy-2.0.49 starlette-1.0.0 tomli-2.4.1 typing-extensions-4.16.0 typing-inspection-0.4.2 urllib3-2.7.0 uvicorn-0.44.0
+foundation	PostgreSQL service healthy	锘?026-07-24T19:44:37.5339742Z ##[group]Run for i in $(seq 1 30); do
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5340094Z ^[[36;1mfor i in $(seq 1 30); do^[[0m
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5340488Z ^[[36;1m  pg_isready -h localhost -p 5432 -U postgres && break^[[0m
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5340854Z ^[[36;1m  sleep 2^[[0m
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5341144Z ^[[36;1mdone^[[0m
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5367875Z shell: /usr/bin/bash -e {0}
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5368272Z env:
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5368555Z   LIVE_EVAL_ALLOWED: yes
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5368949Z   LIVE_LLM_EVAL_ALLOWED: yes
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5369262Z   LIVE_EVAL_TENANT_IDS: TENANT_LIVE_EVAL
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5369585Z   LIVE_EVAL_LLM_PROVIDER: openai
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5369945Z   LIVE_EVAL_LLM_MODEL: gpt-4o-mini
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5370227Z   LIVE_EVAL_LLM_TIMEOUT: 60
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5370517Z   LIVE_EVAL_LLM_MAX_TOKENS: 2048
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5370789Z   LIVE_EVAL_MAX_LLM_CALLS: 4
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5371118Z   LLM_API_URL: https://api.openai.com/v1/chat/completions
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5371485Z   LLM_MODEL: gpt-4o-mini
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5371883Z   LLM_RETRY_ATTEMPTS: 0
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5372205Z   LLM_TEMPERATURE: 0.0
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5372462Z   ADMIN_API_KEY: ci-admin-key
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5372790Z   BUILD_GIT_SHA: f91fa1986856af488d43aa9a555af9b224dd85ad
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5373204Z   pythonLocation: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5373600Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib/pkgconfig
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5374033Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5374436Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5374842Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5375260Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5375589Z ##[endgroup]
+foundation	PostgreSQL service healthy	2026-07-24T19:44:37.5855813Z localhost:5432 - accepting connections
+foundation	Bootstrap PostgreSQL schema	锘?026-07-24T19:44:37.5885742Z ##[group]Run python -m scripts.ci.bootstrap_postgres_schema
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5886158Z ^[[36;1mpython -m scripts.ci.bootstrap_postgres_schema^[[0m
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5908312Z shell: /usr/bin/bash -e {0}
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5908605Z env:
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5909177Z   LIVE_EVAL_ALLOWED: yes
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5909490Z   LIVE_LLM_EVAL_ALLOWED: yes
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5909801Z   LIVE_EVAL_TENANT_IDS: TENANT_LIVE_EVAL
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5910136Z   LIVE_EVAL_LLM_PROVIDER: openai
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5910422Z   LIVE_EVAL_LLM_MODEL: gpt-4o-mini
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5910727Z   LIVE_EVAL_LLM_TIMEOUT: 60
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5910995Z   LIVE_EVAL_LLM_MAX_TOKENS: 2048
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5911326Z   LIVE_EVAL_MAX_LLM_CALLS: 4
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5911703Z   LLM_API_URL: https://api.openai.com/v1/chat/completions
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5912059Z   LLM_MODEL: gpt-4o-mini
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5912364Z   LLM_RETRY_ATTEMPTS: 0
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5912633Z   LLM_TEMPERATURE: 0.0
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5912893Z   ADMIN_API_KEY: ci-admin-key
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5913390Z   BUILD_GIT_SHA: f91fa1986856af488d43aa9a555af9b224dd85ad
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5913768Z   pythonLocation: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5914256Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib/pkgconfig
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5914824Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5915277Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5915665Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5916038Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5916456Z   ENV: test
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5916942Z   DATABASE_URL: ***localhost:5432/ai_platform
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:37.5917299Z ##[endgroup]
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:38.3334966Z bootstrap complete: latest_migration=021
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:38.3336108Z   applied: 009_onboarding_sessions.sql
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:38.3336777Z   applied: 010_slice2b_integrations.sql
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:38.3337428Z   applied: 011_operator_alerts.sql
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:38.3338177Z   applied: 012_tenant_lifecycle.sql
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:38.3338805Z   applied: 013_integration_invitations.sql
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:38.3339831Z   applied: 014_tenant_activation_snapshots.sql
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:38.3340543Z   applied: 015_decision_records.sql
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:38.3341099Z   applied: 016_integration_selections.sql
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:38.3341761Z   applied: 017_live_eval_runs.sql
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:38.3342336Z   applied: 018_live_eval_external_events.sql
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:38.3342996Z   applied: 019_live_eval_runs_activated_at.sql
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:38.3343617Z   applied: 020_live_eval_llm_contract.sql
+foundation	Bootstrap PostgreSQL schema	2026-07-24T19:44:38.3344247Z   applied: 021_live_eval_llm_operations.sql
+foundation	Verify integration_db test selection	锘?026-07-24T19:44:38.3994730Z ##[group]Run COLLECT_LINE=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live 2>/dev/null | awk '/ collected/ { print; exit }')
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.3995714Z ^[[36;1mCOLLECT_LINE=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live 2>/dev/null | awk '/ collected/ { print; exit }')^[[0m
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.3996413Z ^[[36;1mEXPECTED_INTEGRATION_DB=$(echo "${COLLECT_LINE}" | awk '{ split($1, parts, "/"); print parts[1] }')^[[0m
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.3996904Z ^[[36;1mif [ "${EXPECTED_INTEGRATION_DB}" != "30" ]; then^[[0m
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.3997466Z ^[[36;1m  echo "foundation integration_db gate requires exactly 30 selected tests, got ${EXPECTED_INTEGRATION_DB}" >&2^[[0m
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.3997942Z ^[[36;1m  exit 1^[[0m
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.3998244Z ^[[36;1mfi^[[0m
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.3998989Z ^[[36;1mROOT_JOB=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live/test_root_job_atomic_pg.py 2>/dev/null | awk '/ collected/ { print; exit }' | awk '{ split($1, parts, "/"); print parts[1] }')^[[0m
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4000244Z ^[[36;1mTELEMETRY=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live/test_telemetry_idempotency_pg.py 2>/dev/null | awk '/ collected/ { print; exit }' | awk '{ split($1, parts, "/"); print parts[1] }')^[[0m
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4001345Z ^[[36;1mREGISTRY=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live/test_registry_refresh_pg.py 2>/dev/null | awk '/ collected/ { print; exit }' | awk '{ split($1, parts, "/"); print parts[1] }')^[[0m
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4002456Z ^[[36;1mCLEANUP=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live/test_cleanup_persistence_pg.py 2>/dev/null | awk '/ collected/ { print; exit }' | awk '{ split($1, parts, "/"); print parts[1] }')^[[0m
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4003678Z ^[[36;1mLLM_OPS=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live/test_llm_operations_pg.py 2>/dev/null | awk '/ collected/ { print; exit }' | awk '{ split($1, parts, "/"); print parts[1] }')^[[0m
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4004817Z ^[[36;1mMIGRATION_021=$(python -m pytest --collect-only -q -m integration_db tests/evaluation/live/test_live_eval_migration_021_pg.py 2>/dev/null | awk '/ collected/ { print; exit }' | awk '{ split($1, parts, "/"); print parts[1] }')^[[0m
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4005793Z ^[[36;1mif [ "${ROOT_JOB}" != "5" ] || [ "${TELEMETRY}" != "2" ] || [ "${REGISTRY}" != "1" ] || [ "${CLEANUP}" != "3" ] || [ "${LLM_OPS}" != "17" ] || [ "${MIGRATION_021}" != "2" ]; then^[[0m
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4006710Z ^[[36;1m  echo "foundation integration_db composition must be 5+2+1+3+17+2, got ${ROOT_JOB}+${TELEMETRY}+${REGISTRY}+${CLEANUP}+${LLM_OPS}+${MIGRATION_021}" >&2^[[0m
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4007289Z ^[[36;1m  exit 1^[[0m
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4007546Z ^[[36;1mfi^[[0m
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4033457Z shell: /usr/bin/bash -e {0}
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4033768Z env:
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4034061Z   LIVE_EVAL_ALLOWED: yes
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4034356Z   LIVE_LLM_EVAL_ALLOWED: yes
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4034645Z   LIVE_EVAL_TENANT_IDS: TENANT_LIVE_EVAL
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4034992Z   LIVE_EVAL_LLM_PROVIDER: openai
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4035310Z   LIVE_EVAL_LLM_MODEL: gpt-4o-mini
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4035621Z   LIVE_EVAL_LLM_TIMEOUT: 60
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4035906Z   LIVE_EVAL_LLM_MAX_TOKENS: 2048
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4036167Z   LIVE_EVAL_MAX_LLM_CALLS: 4
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4036541Z   LLM_API_URL: https://api.openai.com/v1/chat/completions
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4036882Z   LLM_MODEL: gpt-4o-mini
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4037206Z   LLM_RETRY_ATTEMPTS: 0
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4037491Z   LLM_TEMPERATURE: 0.0
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4037738Z   ADMIN_API_KEY: ci-admin-key
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4038094Z   BUILD_GIT_SHA: f91fa1986856af488d43aa9a555af9b224dd85ad
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4038459Z   pythonLocation: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4038975Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib/pkgconfig
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4039442Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4039923Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4040323Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4040693Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4041049Z   ENV: test
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4041632Z   DATABASE_URL: ***localhost:5432/ai_platform
+foundation	Verify integration_db test selection	2026-07-24T19:44:38.4041915Z ##[endgroup]
+foundation	Run live-llm PostgreSQL integration_db tests	锘?026-07-24T19:44:45.3259250Z ##[group]Run python -m pytest tests/evaluation/live \
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3259692Z ^[[36;1mpython -m pytest tests/evaluation/live \^[[0m
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3260084Z ^[[36;1m  -m integration_db \^[[0m
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3260388Z ^[[36;1m  -q \^[[0m
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3260701Z ^[[36;1m  --tb=short \^[[0m
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3261051Z ^[[36;1m  --junitxml=foundation_integration_db.junit.xml^[[0m
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3287547Z shell: /usr/bin/bash -e {0}
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3287927Z env:
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3288278Z   LIVE_EVAL_ALLOWED: yes
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3288567Z   LIVE_LLM_EVAL_ALLOWED: yes
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3289118Z   LIVE_EVAL_TENANT_IDS: TENANT_LIVE_EVAL
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3289486Z   LIVE_EVAL_LLM_PROVIDER: openai
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3289798Z   LIVE_EVAL_LLM_MODEL: gpt-4o-mini
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3290130Z   LIVE_EVAL_LLM_TIMEOUT: 60
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3290418Z   LIVE_EVAL_LLM_MAX_TOKENS: 2048
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3290702Z   LIVE_EVAL_MAX_LLM_CALLS: 4
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3291154Z   LLM_API_URL: https://api.openai.com/v1/chat/completions
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3291568Z   LLM_MODEL: gpt-4o-mini
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3291940Z   LLM_RETRY_ATTEMPTS: 0
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3292217Z   LLM_TEMPERATURE: 0.0
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3292532Z   ADMIN_API_KEY: ci-admin-key
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3292884Z   BUILD_GIT_SHA: f91fa1986856af488d43aa9a555af9b224dd85ad
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3293272Z   pythonLocation: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3293753Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib/pkgconfig
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3294223Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3294646Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3295070Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3295461Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3295854Z   ENV: test
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3296476Z   DATABASE_URL: ***localhost:5432/ai_platform
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:45.3296836Z ##[endgroup]
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5100518Z ..............................                                           [100%]
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5101657Z =============================== warnings summary ===============================
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5102394Z app/main.py:157
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5102924Z   /home/runner/work/ai-automation-platform/ai-automation-platform/app/main.py:157: DeprecationWarning: 
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5103711Z           on_event is deprecated, use lifespan event handlers instead.
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5104182Z   
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5104477Z           Read more about it in the
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5105060Z           [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5105490Z           
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5105777Z     @app.on_event("startup")
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5106019Z 
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5106348Z ../../../../../opt/hostedtoolcache/Python/3.10.20/x64/lib/python3.10/site-packages/fastapi/applications.py:4656
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5107064Z   /opt/hostedtoolcache/Python/3.10.20/x64/lib/python3.10/site-packages/fastapi/applications.py:4656: DeprecationWarning: 
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5107747Z           on_event is deprecated, use lifespan event handlers instead.
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5108111Z   
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5108422Z           Read more about it in the
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5109482Z           [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5110058Z           
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5110640Z     return self.router.on_event(event_type)  # ty: ignore[deprecated]
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5111001Z 
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5111261Z -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+foundation	Run live-llm PostgreSQL integration_db tests	2026-07-24T19:44:48.5111821Z 30 passed, 314 deselected, 2 warnings in 2.56s
+foundation	Verify integration_db JUnit gate	锘?026-07-24T19:44:48.7256059Z ##[group]Run python scripts/ci/verify_pytest_junit.py foundation_integration_db.junit.xml --expected 30
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7256781Z ^[[36;1mpython scripts/ci/verify_pytest_junit.py foundation_integration_db.junit.xml --expected 30^[[0m
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7282846Z shell: /usr/bin/bash -e {0}
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7283195Z env:
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7283531Z   LIVE_EVAL_ALLOWED: yes
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7283830Z   LIVE_LLM_EVAL_ALLOWED: yes
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7284124Z   LIVE_EVAL_TENANT_IDS: TENANT_LIVE_EVAL
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7284495Z   LIVE_EVAL_LLM_PROVIDER: openai
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7284794Z   LIVE_EVAL_LLM_MODEL: gpt-4o-mini
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7285076Z   LIVE_EVAL_LLM_TIMEOUT: 60
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7285397Z   LIVE_EVAL_LLM_MAX_TOKENS: 2048
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7285715Z   LIVE_EVAL_MAX_LLM_CALLS: 4
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7286122Z   LLM_API_URL: https://api.openai.com/v1/chat/completions
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7286483Z   LLM_MODEL: gpt-4o-mini
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7286747Z   LLM_RETRY_ATTEMPTS: 0
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7287179Z   LLM_TEMPERATURE: 0.0
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7287462Z   ADMIN_API_KEY: ci-admin-key
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7287839Z   BUILD_GIT_SHA: f91fa1986856af488d43aa9a555af9b224dd85ad
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7288258Z   pythonLocation: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7288766Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib/pkgconfig
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7289310Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7290077Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7290538Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7290933Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7291337Z ##[endgroup]
+foundation	Verify integration_db JUnit gate	2026-07-24T19:44:48.7541239Z JUnit gate passed: tests=30 failures=0 errors=0 skipped=0
+foundation	Run live-llm hermetic tests	锘?026-07-24T19:44:48.7602502Z ##[group]Run python -m pytest tests/evaluation/live -m "not integration_db and not live_gmail_eval" -q --tb=short
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7603238Z ^[[36;1mpython -m pytest tests/evaluation/live -m "not integration_db and not live_gmail_eval" -q --tb=short^[[0m
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7624967Z shell: /usr/bin/bash -e {0}
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7625398Z env:
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7625656Z   LIVE_EVAL_ALLOWED: yes
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7626243Z   LIVE_LLM_EVAL_ALLOWED: yes
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7626586Z   LIVE_EVAL_TENANT_IDS: TENANT_LIVE_EVAL
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7626917Z   LIVE_EVAL_LLM_PROVIDER: openai
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7627273Z   LIVE_EVAL_LLM_MODEL: gpt-4o-mini
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7627574Z   LIVE_EVAL_LLM_TIMEOUT: 60
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7627876Z   LIVE_EVAL_LLM_MAX_TOKENS: 2048
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7628172Z   LIVE_EVAL_MAX_LLM_CALLS: 4
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7628544Z   LLM_API_URL: https://api.openai.com/v1/chat/completions
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7629046Z   LLM_MODEL: gpt-4o-mini
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7629328Z   LLM_RETRY_ATTEMPTS: 0
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7629736Z   LLM_TEMPERATURE: 0.0
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7630032Z   ADMIN_API_KEY: ci-admin-key
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7630402Z   BUILD_GIT_SHA: f91fa1986856af488d43aa9a555af9b224dd85ad
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7630809Z   pythonLocation: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7631220Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib/pkgconfig
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7631700Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7632110Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7632511Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7632902Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7633297Z   ENV: test
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:48.7633609Z ##[endgroup]
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:52.0423066Z ........................................................................ [ 22%]
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:52.9435525Z ........................................................................ [ 45%]
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:54.7637436Z ........................................................................ [ 68%]
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:56.6998360Z ........................................................................ [ 91%]
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2181274Z ..........................                                               [100%]
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2182065Z =============================== warnings summary ===============================
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2182810Z app/main.py:157
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2183288Z   /home/runner/work/ai-automation-platform/ai-automation-platform/app/main.py:157: DeprecationWarning: 
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2183848Z           on_event is deprecated, use lifespan event handlers instead.
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2184270Z   
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2184518Z           Read more about it in the
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2185004Z           [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2185500Z           
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2185757Z     @app.on_event("startup")
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2185955Z 
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2186280Z ../../../../../opt/hostedtoolcache/Python/3.10.20/x64/lib/python3.10/site-packages/fastapi/applications.py:4656
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2186938Z   /opt/hostedtoolcache/Python/3.10.20/x64/lib/python3.10/site-packages/fastapi/applications.py:4656: DeprecationWarning: 
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2187545Z           on_event is deprecated, use lifespan event handlers instead.
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2187944Z   
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2188250Z           Read more about it in the
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2188716Z           [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2189371Z           
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2189751Z     return self.router.on_event(event_type)  # ty: ignore[deprecated]
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2190029Z 
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2190447Z tests/evaluation/live/test_repository_session_safety.py::test_register_run_duplicate_preserves_sibling_and_commits
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2191813Z   /home/runner/work/ai-automation-platform/ai-automation-platform/app/repositories/postgres/live_eval_repository.py:38: SAWarning: New instance <LiveEvalRunRow at 0x7f98cd182ef0> with identity key (<class 'app.repositories.postgres.live_eval_models.LiveEvalRunRow'>, ('run-001-aaaa',), None) conflicts with persistent instance <LiveEvalRunRow at 0x7f98cd182c50>
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2193301Z     db.flush()
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2193458Z 
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2193878Z tests/evaluation/live/test_repository_session_safety.py::test_record_event_duplicate_returns_false
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2195832Z   /home/runner/work/ai-automation-platform/ai-automation-platform/app/repositories/postgres/live_eval_repository.py:273: SAWarning: New instance <LiveEvalExternalEventRow at 0x7f98cd1825f0> with identity key (<class 'app.repositories.postgres.live_eval_models.LiveEvalExternalEventRow'>, ('run-dup-event:cat:op:1:blocked:1',), None) conflicts with persistent instance <LiveEvalExternalEventRow at 0x7f98cab36ad0>
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2197226Z     db.flush()
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2197354Z 
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2197566Z -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+foundation	Run live-llm hermetic tests	2026-07-24T19:44:57.2198045Z 314 passed, 30 deselected, 4 warnings in 7.81s
+foundation	Validate LLM config (offline)	锘?026-07-24T19:44:57.4533831Z ##[group]Run python scripts/run_live_eval.py llm-readiness-only --tenant-id TENANT_LIVE_EVAL
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4534866Z ^[[36;1mpython scripts/run_live_eval.py llm-readiness-only --tenant-id TENANT_LIVE_EVAL^[[0m
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4571288Z shell: /usr/bin/bash -e {0}
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4571871Z env:
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4572250Z   LIVE_EVAL_ALLOWED: yes
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4572669Z   LIVE_LLM_EVAL_ALLOWED: yes
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4573159Z   LIVE_EVAL_TENANT_IDS: TENANT_LIVE_EVAL
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4573700Z   LIVE_EVAL_LLM_PROVIDER: openai
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4574219Z   LIVE_EVAL_LLM_MODEL: gpt-4o-mini
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4574648Z   LIVE_EVAL_LLM_TIMEOUT: 60
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4575048Z   LIVE_EVAL_LLM_MAX_TOKENS: 2048
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4575539Z   LIVE_EVAL_MAX_LLM_CALLS: 4
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4576071Z   LLM_API_URL: https://api.openai.com/v1/chat/completions
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4576689Z   LLM_MODEL: gpt-4o-mini
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4577091Z   LLM_RETRY_ATTEMPTS: 0
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4577474Z   LLM_TEMPERATURE: 0.0
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4578045Z   ADMIN_API_KEY: ci-admin-key
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4578511Z   BUILD_GIT_SHA: f91fa1986856af488d43aa9a555af9b224dd85ad
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4579377Z   pythonLocation: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4579989Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib/pkgconfig
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4580644Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4581275Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4581816Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4582450Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4582949Z   ENV: test
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.4583297Z ##[endgroup]
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8930938Z {
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8931714Z   "ready": true,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8932322Z   "issues": [],
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8932776Z   "live_llm_calls": 0,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8933347Z   "llm_operations": 0,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8933869Z   "external_writes": 0,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8934476Z   "report_schema_version": "2f.3c.llm-readiness",
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8935139Z   "mode": "llm_offline",
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8936098Z   "pytest_marker_expr": "not monday_live and not live_gmail_eval and not live_llm_eval and not live_e2e_eval",
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8937196Z   "env_fingerprint": "test@ai_platform",
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8937877Z   "build_git_sha": "f91fa1986856af488d43aa9a555af9b224dd85ad",
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8939232Z   "config_fingerprint": "ef4fd9d5e9e48f3f55ab51de63d33ae58892b796cc4f20e8e897daae35fb4620",
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8940222Z   "tenant_id": null,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8940695Z   "llm_provider": "openai",
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8941296Z   "llm_requested_model": "gpt-4o-mini",
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8942323Z   "model_identity_registry_fingerprint": "91af5957c0f09c4130da98292d3237e79ea6f4d76130dc880ed71773783fc406",
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8943360Z   "model_identity_contract_ok": true,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8944130Z   "api_endpoint": "https://api.openai.com/v1/chat/completions",
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8944851Z   "call_budget": 4,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8945365Z   "timeout_seconds": 60,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8946168Z   "max_tokens": 2048,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8946715Z   "retry_count": 0,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8947229Z   "temperature": 0.0,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8947702Z   "allowed_scenarios": [
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8948317Z     "S01_lead_laddbox_quality"
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8948821Z   ],
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8949610Z   "scenario_hash_ok": true,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8950147Z   "gmail_required": false,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8950798Z   "seed_gate": null,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8951282Z   "llm_api_key_configured": false,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8951915Z   "admin_api_key_configured": false,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8952702Z   "write_policy": "fixture_input blocks all external adapter writes",
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8953483Z   "write_policy_ok": true,
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8954022Z   "gmail_secrets_required": false
+foundation	Validate LLM config (offline)	2026-07-24T19:44:57.8954656Z }
+foundation	Post Run actions/setup-python@v5	锘?026-07-24T19:44:57.9659528Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+foundation	Post Run actions/setup-python@v5	2026-07-24T19:44:57.9660529Z Post job cleanup.
+foundation	Post Run actions/setup-python@v5	2026-07-24T19:44:58.0704666Z Cache hit occurred on the primary key setup-python-Linux-x64-24.04-Ubuntu-python-3.10.20-pip-6141c141c0e771ef0edddaa2f40115bd93f63be7102a7ee2942359e39f0742d4, not saving cache.
+foundation	Post Run actions/setup-python@v5	2026-07-24T19:44:58.0705817Z (node:2716) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+foundation	Post Run actions/setup-python@v5	2026-07-24T19:44:58.0706889Z (Use `node --trace-deprecation ...` to show where the warning was created)
+foundation	Post Run actions/checkout@v4	锘?026-07-24T19:44:58.0810824Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+foundation	Post Run actions/checkout@v4	2026-07-24T19:44:58.0811842Z Post job cleanup.
+foundation	Post Run actions/checkout@v4	2026-07-24T19:44:58.1591971Z [command]/usr/bin/git version
+foundation	Post Run actions/checkout@v4	2026-07-24T19:44:58.1629875Z git version 2.54.0
+foundation	Post Run actions/checkout@v4	2026-07-24T19:44:58.1664534Z Temporarily overriding HOME='/home/runner/work/_temp/53a5a89a-388d-43d8-817c-6f0b9ecc6169' before making global git config changes
+foundation	Post Run actions/checkout@v4	2026-07-24T19:44:58.1665319Z Adding repository directory to the temporary git global config as a safe directory
+foundation	Post Run actions/checkout@v4	2026-07-24T19:44:58.1670291Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/ai-automation-platform/ai-automation-platform
+foundation	Post Run actions/checkout@v4	2026-07-24T19:44:58.1704258Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+foundation	Post Run actions/checkout@v4	2026-07-24T19:44:58.1735049Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+foundation	Post Run actions/checkout@v4	2026-07-24T19:44:58.1924957Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+foundation	Post Run actions/checkout@v4	2026-07-24T19:44:58.1941535Z http.https://github.com/.extraheader
+foundation	Post Run actions/checkout@v4	2026-07-24T19:44:58.1950651Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+foundation	Post Run actions/checkout@v4	2026-07-24T19:44:58.1977337Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+foundation	Post Run actions/checkout@v4	2026-07-24T19:44:58.2171215Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+foundation	Post Run actions/checkout@v4	2026-07-24T19:44:58.2198413Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+foundation	Stop containers	锘?026-07-24T19:44:58.2458215Z Print service container logs: b28310dce63e425daeeb2c59cd874aa4_postgres15_fbe1f7
+foundation	Stop containers	2026-07-24T19:44:58.2463092Z ##[command]/usr/bin/docker logs --details 99237d53a9c1c26312f2b5e40151adf79d99a9fbbc1fc901632938c74b0617b0
+foundation	Stop containers	2026-07-24T19:44:58.2592893Z  The files belonging to this database system will be owned by user "postgres".
+foundation	Stop containers	2026-07-24T19:44:58.2595425Z  initdb: warning: enabling "trust" authentication for local connections
+foundation	Stop containers	2026-07-24T19:44:58.2596402Z  initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+foundation	Stop containers	2026-07-24T19:44:58.2597638Z  2026-07-24 19:44:14.339 UTC [1] LOG:  starting PostgreSQL 15.18 (Debian 15.18-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+foundation	Stop containers	2026-07-24T19:44:58.2598409Z  2026-07-24 19:44:14.339 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+foundation	Stop containers	2026-07-24T19:44:58.2599123Z  2026-07-24 19:44:14.339 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+foundation	Stop containers	2026-07-24T19:44:58.2599995Z  2026-07-24 19:44:14.340 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+foundation	Stop containers	2026-07-24T19:44:58.2600701Z  2026-07-24 19:44:14.342 UTC [64] LOG:  database system was shut down at 2026-07-24 19:44:14 UTC
+foundation	Stop containers	2026-07-24T19:44:58.2601415Z  2026-07-24 19:44:14.345 UTC [1] LOG:  database system is ready to accept connections
+foundation	Stop containers	2026-07-24T19:44:58.2602289Z  2026-07-24 19:44:47.872 UTC [98] ERROR:  duplicate key value violates unique constraint "uq_live_eval_llm_operations_run_ordinal"
+foundation	Stop containers	2026-07-24T19:44:58.2603348Z  2026-07-24 19:44:47.872 UTC [98] DETAIL:  Key (evaluation_run_id, request_ordinal)=(f41481ae-86a0-4ee7-9654-0edb5839f522, 1) already exists.
+foundation	Stop containers	2026-07-24T19:44:58.2604088Z  2026-07-24 19:44:47.872 UTC [98] STATEMENT:  
+foundation	Stop containers	2026-07-24T19:44:58.2604544Z  	                INSERT INTO live_eval_llm_operations (
+foundation	Stop containers	2026-07-24T19:44:58.2605317Z  	                    tenant_id, evaluation_run_id, scenario_id, prompt_name, request_ordinal,
+foundation	Stop containers	2026-07-24T19:44:58.2606137Z  	                    operation_key, llm_provider, requested_model, status, created_at, updated_at
+foundation	Stop containers	2026-07-24T19:44:58.2606787Z  	                ) VALUES (
+foundation	Stop containers	2026-07-24T19:44:58.2607365Z  	                    'TENANT_LIVE_EVAL', 'f41481ae-86a0-4ee7-9654-0edb5839f522', 'S01_lead_laddbox_quality',
+foundation	Stop containers	2026-07-24T19:44:58.2608430Z  	                    'entity_extraction_v1', 1, 'f41481ae-86a0-4ee7-9654-0edb5839f522:app_live_llm:entity_extraction_v1:1',
+foundation	Stop containers	2026-07-24T19:44:58.2609517Z  	                    'openai', 'fake-model', 'in_progress', '2026-07-24T19:44:47.871367+00:00'::timestamptz, '2026-07-24T19:44:47.871367+00:00'::timestamptz
+foundation	Stop containers	2026-07-24T19:44:58.2610086Z  	                )
+foundation	Stop containers	2026-07-24T19:44:58.2610339Z  	                
+foundation	Stop containers	2026-07-24T19:44:58.2610874Z  2026-07-24 19:44:47.875 UTC [99] ERROR:  new row for relation "live_eval_llm_operations" violates check constraint "ck_live_eval_llm_operations_ordinal"
+foundation	Stop containers	2026-07-24T19:44:58.2612245Z  2026-07-24 19:44:47.875 UTC [99] DETAIL:  Failing row contains (17, TENANT_LIVE_EVAL, f180645b-4d58-4e4f-b83f-f869a7cf4e77, S01_lead_laddbox_quality, classification_v1, 5, f180645b-4d58-4e4f-b83f-f869a7cf4e77:app_live_llm:classification..., null, openai, fake-model, null, in_progress, null, null, null, null, null, null, null, null, null, null, 2026-07-24 19:44:47.874657+00, 2026-07-24 19:44:47.874657+00).
+foundation	Stop containers	2026-07-24T19:44:58.2613409Z  2026-07-24 19:44:47.875 UTC [99] STATEMENT:  
+foundation	Stop containers	2026-07-24T19:44:58.2613801Z  	                INSERT INTO live_eval_llm_operations (
+foundation	Stop containers	2026-07-24T19:44:58.2614211Z  	                    tenant_id, evaluation_run_id, scenario_id, prompt_name, request_ordinal,
+foundation	Stop containers	2026-07-24T19:44:58.2614722Z  	                    operation_key, llm_provider, requested_model, status, created_at, updated_at
+foundation	Stop containers	2026-07-24T19:44:58.2615149Z  This user must also own the server process.
+foundation	Stop containers	2026-07-24T19:44:58.2615476Z  
+foundation	Stop containers	2026-07-24T19:44:58.2615818Z  The database cluster will be initialized with locale "en_US.utf8".
+foundation	Stop containers	2026-07-24T19:44:58.2616234Z  The default database encoding has accordingly been set to "UTF8".
+foundation	Stop containers	2026-07-24T19:44:58.2616849Z  The default text search configuration will be set to "english".
+foundation	Stop containers	2026-07-24T19:44:58.2617240Z  
+foundation	Stop containers	2026-07-24T19:44:58.2617472Z  Data page checksums are disabled.
+foundation	Stop containers	2026-07-24T19:44:58.2617781Z  
+foundation	Stop containers	2026-07-24T19:44:58.2618095Z  fixing permissions on existing directory /var/lib/postgresql/data ... ok
+foundation	Stop containers	2026-07-24T19:44:58.2618588Z  creating subdirectories ... ok
+foundation	Stop containers	2026-07-24T19:44:58.2619131Z  selecting dynamic shared memory implementation ... posix
+foundation	Stop containers	2026-07-24T19:44:58.2619476Z  selecting default max_connections ... 100
+foundation	Stop containers	2026-07-24T19:44:58.2619831Z  selecting default shared_buffers ... 128MB
+foundation	Stop containers	2026-07-24T19:44:58.2620140Z  selecting default time zone ... Etc/UTC
+foundation	Stop containers	2026-07-24T19:44:58.2620461Z  creating configuration files ... ok
+foundation	Stop containers	2026-07-24T19:44:58.2620819Z  running bootstrap script ... ok
+foundation	Stop containers	2026-07-24T19:44:58.2621225Z  performing post-bootstrap initialization ... ok
+foundation	Stop containers	2026-07-24T19:44:58.2621597Z  syncing data to disk ... ok
+foundation	Stop containers	2026-07-24T19:44:58.2621892Z  
+foundation	Stop containers	2026-07-24T19:44:58.2622159Z  
+foundation	Stop containers	2026-07-24T19:44:58.2622423Z  Success. You can now start the database server using:
+foundation	Stop containers	2026-07-24T19:44:58.2622720Z  
+foundation	Stop containers	2026-07-24T19:44:58.2623026Z      pg_ctl -D /var/lib/postgresql/data -l logfile start
+foundation	Stop containers	2026-07-24T19:44:58.2623361Z  
+foundation	Stop containers	2026-07-24T19:44:58.2623959Z  waiting for server to start....2026-07-24 19:44:13.944 UTC [48] LOG:  starting PostgreSQL 15.18 (Debian 15.18-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+foundation	Stop containers	2026-07-24T19:44:58.2624693Z  2026-07-24 19:44:13.961 UTC [48] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+foundation	Stop containers	2026-07-24T19:44:58.2625498Z  2026-07-24 19:44:13.963 UTC [51] LOG:  database system was shut down at 2026-07-24 19:44:13 UTC
+foundation	Stop containers	2026-07-24T19:44:58.2626072Z  2026-07-24 19:44:13.965 UTC [48] LOG:  database system is ready to accept connections
+foundation	Stop containers	2026-07-24T19:44:58.2626437Z   done
+foundation	Stop containers	2026-07-24T19:44:58.2626719Z  server started
+foundation	Stop containers	2026-07-24T19:44:58.2626964Z  CREATE DATABASE
+foundation	Stop containers	2026-07-24T19:44:58.2627248Z  
+foundation	Stop containers	2026-07-24T19:44:58.2627471Z  
+foundation	Stop containers	2026-07-24T19:44:58.2627807Z  /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+foundation	Stop containers	2026-07-24T19:44:58.2628231Z  
+foundation	Stop containers	2026-07-24T19:44:58.2628581Z  waiting for server to shut down...2026-07-24 19:44:14.124 UTC [48] LOG:  received fast shutdown request
+foundation	Stop containers	2026-07-24T19:44:58.2629234Z  .2026-07-24 19:44:14.124 UTC [48] LOG:  aborting any active transactions
+foundation	Stop containers	2026-07-24T19:44:58.2629769Z  2026-07-24 19:44:14.125 UTC [48] LOG:  background worker "logical replication launcher" (PID 54) exited with exit code 1
+foundation	Stop containers	2026-07-24T19:44:58.2630254Z  2026-07-24 19:44:14.127 UTC [49] LOG:  shutting down
+foundation	Stop containers	2026-07-24T19:44:58.2630679Z  2026-07-24 19:44:14.127 UTC [49] LOG:  checkpoint starting: shutdown immediate
+foundation	Stop containers	2026-07-24T19:44:58.2631520Z  2026-07-24 19:44:14.295 UTC [49] LOG:  checkpoint complete: wrote 922 buffers (5.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.059 s, sync=0.072 s, total=0.169 s; sync files=301, longest=0.041 s, average=0.001 s; distance=4239 kB, estimate=4239 kB
+foundation	Stop containers	2026-07-24T19:44:58.2632338Z  2026-07-24 19:44:14.298 UTC [48] LOG:  database system is shut down
+foundation	Stop containers	2026-07-24T19:44:58.2632682Z   done
+foundation	Stop containers	2026-07-24T19:44:58.2632914Z  server stopped
+foundation	Stop containers	2026-07-24T19:44:58.2633236Z  
+foundation	Stop containers	2026-07-24T19:44:58.2633503Z  PostgreSQL init process complete; ready for start up.
+foundation	Stop containers	2026-07-24T19:44:58.2633832Z  
+foundation	Stop containers	2026-07-24T19:44:58.2634093Z  	                ) VALUES (
+foundation	Stop containers	2026-07-24T19:44:58.2634528Z  	                    'TENANT_LIVE_EVAL', 'f180645b-4d58-4e4f-b83f-f869a7cf4e77', 'S01_lead_laddbox_quality',
+foundation	Stop containers	2026-07-24T19:44:58.2635132Z  	                    'classification_v1', 5, 'f180645b-4d58-4e4f-b83f-f869a7cf4e77:app_live_llm:classification_v1:5',
+foundation	Stop containers	2026-07-24T19:44:58.2635784Z  	                    'openai', 'fake-model', 'in_progress', '2026-07-24T19:44:47.874657+00:00'::timestamptz, '2026-07-24T19:44:47.874657+00:00'::timestamptz
+foundation	Stop containers	2026-07-24T19:44:58.2636292Z  	                )
+foundation	Stop containers	2026-07-24T19:44:58.2636579Z  	                
+foundation	Stop containers	2026-07-24T19:44:58.2637047Z  2026-07-24 19:44:48.291 UTC [103] ERROR:  duplicate key value violates unique constraint "uq_live_eval_external_events_operation_succeeded"
+foundation	Stop containers	2026-07-24T19:44:58.2637979Z  2026-07-24 19:44:48.291 UTC [103] DETAIL:  Key (operation_key)=(60c00572-3ef0-4bd3-9b05-4bc99dfa3ec0:app_gmail_reply:send_customer_auto_reply:pg-op-1) already exists.
+foundation	Stop containers	2026-07-24T19:44:58.2640280Z  2026-07-24 19:44:48.291 UTC [103] STATEMENT:  INSERT INTO live_eval_external_events (event_key, operation_key, tenant_id, evaluation_run_id, job_id, pipeline_run_id, action_operation_id, integration_type, category, operation, target, outcome, started_at, completed_at, redacted_metadata) VALUES ('60c00572-3ef0-4bd3-9b05-4bc99dfa3ec0:app_gmail_reply:send_customer_auto_reply:pg-op-1:succeeded:alt', '60c00572-3ef0-4bd3-9b05-4bc99dfa3ec0:app_gmail_reply:send_customer_auto_reply:pg-op-1', 'TENANT_LIVE_EVAL', '60c00572-3ef0-4bd3-9b05-4bc99dfa3ec0', NULL, NULL, NULL, 'google_mail', 'app_gmail_reply', 'send_customer_auto_reply', NULL, 'succeeded', '2026-07-24T19:44:48.290452+00:00'::timestamptz, NULL, '{}'::JSON)
+foundation	Stop containers	2026-07-24T19:44:58.2642452Z  2026-07-24 19:44:48.296 UTC [103] ERROR:  duplicate key value violates unique constraint "live_eval_external_events_pkey"
+foundation	Stop containers	2026-07-24T19:44:58.2643219Z  2026-07-24 19:44:48.296 UTC [103] DETAIL:  Key (event_key)=(70aa99c6-4144-4a4f-b384-ee5207269a69:app_external_write_blocked:send_email:pg-op-2:blocked:1) already exists.
+foundation	Stop containers	2026-07-24T19:44:58.2645313Z  2026-07-24 19:44:48.296 UTC [103] STATEMENT:  INSERT INTO live_eval_external_events (event_key, operation_key, tenant_id, evaluation_run_id, job_id, pipeline_run_id, action_operation_id, integration_type, category, operation, target, outcome, started_at, completed_at, redacted_metadata) VALUES ('70aa99c6-4144-4a4f-b384-ee5207269a69:app_external_write_blocked:send_email:pg-op-2:blocked:1', '70aa99c6-4144-4a4f-b384-ee5207269a69:app_external_write_blocked:send_email:pg-op-2', 'TENANT_LIVE_EVAL', '70aa99c6-4144-4a4f-b384-ee5207269a69', NULL, NULL, NULL, 'google_mail', 'app_external_write_blocked', 'send_email', NULL, 'blocked', '2026-07-24T19:44:48.296352+00:00'::timestamptz, NULL, '{}'::JSON)
+foundation	Stop containers	2026-07-24T19:44:58.2651445Z Stop and remove container: b28310dce63e425daeeb2c59cd874aa4_postgres15_fbe1f7
+foundation	Stop containers	2026-07-24T19:44:58.2655371Z ##[command]/usr/bin/docker rm --force 99237d53a9c1c26312f2b5e40151adf79d99a9fbbc1fc901632938c74b0617b0
+foundation	Stop containers	2026-07-24T19:44:59.1030331Z 99237d53a9c1c26312f2b5e40151adf79d99a9fbbc1fc901632938c74b0617b0
+foundation	Stop containers	2026-07-24T19:44:59.1049779Z Remove container network: github_network_650767de55ff403387110203f01cd09f
+foundation	Stop containers	2026-07-24T19:44:59.1053350Z ##[command]/usr/bin/docker network rm github_network_650767de55ff403387110203f01cd09f
+foundation	Stop containers	2026-07-24T19:44:59.2010309Z github_network_650767de55ff403387110203f01cd09f
+foundation	Complete job	锘?026-07-24T19:44:59.2074186Z Cleaning up orphan processes
+foundation	Complete job	2026-07-24T19:44:59.2385586Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-python@v5. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

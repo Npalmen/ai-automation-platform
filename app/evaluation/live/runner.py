@@ -751,6 +751,9 @@ class LiveEvalRunner:
                     expect_pending_approval=(
                         outcome.expect_pending_approval if outcome else True
                     ),
+                    decision_subsequence=(
+                        outcome.decision_subsequence if outcome else None
+                    ),
                 )
             )
         else:

@@ -1,0 +1,19 @@
+{"state": "created", "recorded_at": "2026-07-23T18:56:49.385898+00:00"}
+{"state": "config_validated", "recorded_at": "2026-07-23T18:56:49.388233+00:00"}
+{"state": "sender_profile_ready", "recorded_at": "2026-07-23T18:56:49.755892+00:00"}
+{"state": "sender_scope_ready", "recorded_at": "2026-07-23T18:56:49.837406+00:00"}
+{"state": "app_ready", "recorded_at": "2026-07-23T18:56:49.898043+00:00"}
+{"state": "run_registered", "recorded_at": "2026-07-23T18:56:49.959384+00:00"}
+{"state": "sender_ready", "recorded_at": "2026-07-23T18:56:49.959925+00:00"}
+{"state": "sending", "recorded_at": "2026-07-23T18:56:49.960418+00:00"}
+{"state": "send_response_received", "sender_gmail_message_id": "19f90566a4b647a9", "sender_gmail_thread_id": "19f90566a4b647a9", "rfc_message_id": "<CAFBf1sZMXKmSJY5NGoB=N_QNiesLki+kv8AYFmjn2ZLaF=hn0g@mail.gmail.com>", "reconciled": false, "recorded_at": "2026-07-23T18:56:50.888689+00:00"}
+{"state": "sent", "sender_gmail_message_id": "19f90566a4b647a9", "sender_gmail_thread_id": "19f90566a4b647a9", "rfc_message_id": "<CAFBf1sZMXKmSJY5NGoB=N_QNiesLki+kv8AYFmjn2ZLaF=hn0g@mail.gmail.com>", "recorded_at": "2026-07-23T18:56:50.889641+00:00"}
+{"state": "waiting_for_delivery", "recorded_at": "2026-07-23T18:56:50.890137+00:00"}
+{"state": "delivery_confirmed", "recipient_gmail_message_id": "19f90567257b4fbe", "recipient_gmail_thread_id": "19f90567257b4fbe", "recorded_at": "2026-07-23T18:56:57.912899+00:00"}
+{"state": "triggering_intake", "recipient_gmail_message_id": "19f90567257b4fbe", "recorded_at": "2026-07-23T18:56:57.936338+00:00"}
+{"state": "intake_completed", "job_id": "2e5c27a0-bb93-49f5-9f2e-603fa840533b", "pipeline_run_id": null, "job_status": "awaiting_approval", "recorded_at": "2026-07-23T18:56:59.415308+00:00"}
+{"state": "job_detected", "recorded_at": "2026-07-23T18:56:59.416003+00:00"}
+{"state": "pipeline_completed", "recorded_at": "2026-07-23T18:56:59.446177+00:00"}
+{"state": "asserting", "violations": [], "recorded_at": "2026-07-23T18:56:59.692823+00:00"}
+{"state": "cleaning_up", "cleanup_ok": true, "recorded_at": "2026-07-23T18:57:00.748003+00:00"}
+{"state": "passed", "recorded_at": "2026-07-23T18:57:00.776943+00:00"}

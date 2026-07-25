@@ -1,0 +1,13 @@
+{"state": "created", "recorded_at": "2026-07-23T00:14:23.665104+00:00"}
+{"state": "config_validated", "recorded_at": "2026-07-23T00:14:23.667213+00:00"}
+{"state": "sender_profile_ready", "recorded_at": "2026-07-23T00:14:24.037774+00:00"}
+{"state": "sender_scope_ready", "recorded_at": "2026-07-23T00:14:24.167743+00:00"}
+{"state": "app_ready", "recorded_at": "2026-07-23T00:14:24.228892+00:00"}
+{"state": "run_registered", "recorded_at": "2026-07-23T00:14:24.290450+00:00"}
+{"state": "sender_ready", "recorded_at": "2026-07-23T00:14:24.290963+00:00"}
+{"state": "sending", "recorded_at": "2026-07-23T00:14:24.291471+00:00"}
+{"state": "send_response_received", "sender_gmail_message_id": "19f8c52cf334a8b1", "sender_gmail_thread_id": "19f8c52cf334a8b1", "rfc_message_id": "<CAFBf1sa_Pzyk7xK7NYqg_P9Lucgs933xpm_97HpK+82RuxOtwA@mail.gmail.com>", "reconciled": false, "recorded_at": "2026-07-23T00:14:25.283017+00:00"}
+{"state": "sent", "sender_gmail_message_id": "19f8c52cf334a8b1", "sender_gmail_thread_id": "19f8c52cf334a8b1", "rfc_message_id": "<CAFBf1sa_Pzyk7xK7NYqg_P9Lucgs933xpm_97HpK+82RuxOtwA@mail.gmail.com>", "recorded_at": "2026-07-23T00:14:25.283897+00:00"}
+{"state": "waiting_for_delivery", "recorded_at": "2026-07-23T00:14:25.284417+00:00"}
+{"state": "delivery_confirmed", "recipient_gmail_message_id": "19f8c52d299cae11", "recipient_gmail_thread_id": "19f8c52d299cae11", "recorded_at": "2026-07-23T00:14:28.661582+00:00"}
+{"state": "triggering_intake", "recipient_gmail_message_id": "19f8c52d299cae11", "recorded_at": "2026-07-23T00:14:28.662194+00:00"}

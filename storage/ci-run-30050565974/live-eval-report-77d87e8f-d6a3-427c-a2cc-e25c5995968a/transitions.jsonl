@@ -1,0 +1,18 @@
+{"state": "created", "recorded_at": "2026-07-23T23:16:26.474275+00:00"}
+{"state": "config_validated", "recorded_at": "2026-07-23T23:16:26.476267+00:00"}
+{"state": "sender_profile_ready", "recorded_at": "2026-07-23T23:16:26.835948+00:00"}
+{"state": "sender_scope_ready", "recorded_at": "2026-07-23T23:16:26.914294+00:00"}
+{"state": "app_ready", "recorded_at": "2026-07-23T23:16:26.975451+00:00"}
+{"state": "run_registered", "recorded_at": "2026-07-23T23:16:27.037152+00:00"}
+{"state": "sender_ready", "recorded_at": "2026-07-23T23:16:27.037640+00:00"}
+{"state": "sending", "recorded_at": "2026-07-23T23:16:27.038093+00:00"}
+{"state": "send_response_received", "sender_gmail_message_id": "19f91441da004025", "sender_gmail_thread_id": "19f91441da004025", "rfc_message_id": "<CAFBf1sbbb3TgbkfH06bNJwZRUHsQF7sUkasM8BVsFQMW+oQyXA@mail.gmail.com>", "reconciled": false, "recorded_at": "2026-07-23T23:16:28.042543+00:00"}
+{"state": "sent", "sender_gmail_message_id": "19f91441da004025", "sender_gmail_thread_id": "19f91441da004025", "rfc_message_id": "<CAFBf1sbbb3TgbkfH06bNJwZRUHsQF7sUkasM8BVsFQMW+oQyXA@mail.gmail.com>", "recorded_at": "2026-07-23T23:16:28.043561+00:00"}
+{"state": "waiting_for_delivery", "recorded_at": "2026-07-23T23:16:28.044055+00:00"}
+{"state": "delivery_confirmed", "recipient_gmail_message_id": "19f91442bd6b9051", "recipient_gmail_thread_id": "19f91442bd6b9051", "recorded_at": "2026-07-23T23:16:35.135555+00:00"}
+{"state": "triggering_intake", "recipient_gmail_message_id": "19f91442bd6b9051", "recorded_at": "2026-07-23T23:16:35.159047+00:00"}
+{"state": "intake_completed", "job_id": "e4c99891-5d11-410a-a7ba-847e461c68fa", "pipeline_run_id": null, "job_status": "awaiting_approval", "recorded_at": "2026-07-23T23:16:36.653210+00:00"}
+{"state": "job_detected", "recorded_at": "2026-07-23T23:16:36.654021+00:00"}
+{"state": "pipeline_completed", "recorded_at": "2026-07-23T23:16:36.683272+00:00"}
+{"state": "asserting", "violations": [], "recorded_at": "2026-07-23T23:16:36.943636+00:00"}
+{"state": "passed", "recorded_at": "2026-07-23T23:16:36.944597+00:00"}

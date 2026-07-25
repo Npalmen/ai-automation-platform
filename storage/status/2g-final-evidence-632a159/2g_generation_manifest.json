@@ -1,0 +1,3033 @@
+{
+  "baseline_git_sha": "632a15955c82b62a17b26f5b87d1c36b0d329ef4",
+  "canonical_parent_count": 20,
+  "canonical_parent_hashes": {
+    "S01_lead_laddbox_quality": "235f96332b87d766c8fc194719a5cb5053d8443d7050e19b96249cfcdf946377",
+    "S08_sensitive_inkasso": "41abea242dd5a93516186818a40bb13c393cbb9fec09bf145e06b3af780d57ae",
+    "S10_urgent_electrical_safety": "0459cbe022dd5b3f74409b36f84745461b54cc81e98b7d0d56974a3aba1cc6ad",
+    "S14_approval_gated_default": "dc9d41acab30100f6bc74503386f6c822fac2427eba6288d67da5d403238e78d",
+    "S15_full_auto_execution_trace": "f21b5ecdadb638879a58fe3eb27b693b6eb137e20eace24a997273709007b113",
+    "S16_policy_legacy_fail_closed": "785df16cb875f7fda8a305d821ca0200ff325f4ab4bd4253c845f18fc466717e",
+    "S17_unknown_action_blocked": "5f3f83b29b28dc300a19732263ee72020bccad659f6d485f1e804de9af82e117",
+    "S18_approval_resume_operation_id": "74ff04da550efd2289b70d50ac98b753657b6825328bca55cca53ce3a7046194",
+    "S19_invoice_no_dispatch": "1319b662e13dc3d457246eb7b309819f0b5f7d3cb64c6dcd6ff748364d4f07ff",
+    "S20_data_deletion_request": "ec2c9c4f54a2cb3f31677d55a30fae1c815d9deddc7715e4832a963ba1f06abf",
+    "S21_pending_blocks_retry": "305bdd6a332f9ae3f6596e1c02d43ced21cf9cb147eb87ed3a158ddaa8d68441",
+    "S22_cross_tenant_isolation": "d046d7b54dd7ade329bd5ee5f2e16d84fb6e6888432134afc6b813702de8f6f3",
+    "S23_incomplete_lead_clarification": "6bce3ba75b0431f18e4fdd40937f941b9f14f312b2eb3c13c160b3339a91a4b4",
+    "S24_existing_customer_service": "7bdc10dd16db4916d26463018cf3d812a264d070e0c586f1abc9fea3b75bf5cd",
+    "S26_status_inquiry_general": "cfef07164494c945c1b7ff64ec074056c048ae7442bf1ba16d8d5b4bef6d05f0",
+    "S27_mixed_job_and_complaint": "202908c1e1e381ca5315732a0606ee83afa8bca28a07757672d4afb8ec564762",
+    "S30_forwarded_thread_mixed_context": "7b8af999d33ed3d63d6674868f32e27d85e381e188285a870851c2dd4def0c19",
+    "S31_prompt_injection_customer_text": "676098d718cdaefe66a5ef59b3ced6501ced53b31e06ee5aeb13138c53024536",
+    "S33_legal_threat_complaint": "a6ee659d92fc45e715a44c14729f2565dc1fa0ca28649f3619ee218cc630da66",
+    "S34_spam_phishing_link": "ee8457035893542ef78b2d645d6494670bddb271b5062f7a1a5bd797fd25ed8a"
+  },
+  "canonicalization_version": "semantic-json-v2",
+  "generated_scenario_count": 160,
+  "generation_payload_hash": "0475eb8950baf6788b5c13f580512934d85e1b12ed485cad6da2bdeb26b7b4de",
+  "generator_version": "2g-generator-v1",
+  "manifest_schema_version": "2g.generation-manifest.v1",
+  "scenarios": [
+    {
+      "expected_outcome_hash": "de986cd48b7ff0e16a2a8e15ba743998744b07c9d461a6a84db9dfb2a82eabb5",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unknown_service"
+      ],
+      "parent_scenario_id": "S01_lead_laddbox_quality",
+      "scenario_hash": "ea490eb7002b76540c88ecf230951d1de32b4d845c1f3373bb372fb71c665099",
+      "scenario_id": "2g_S01_tpl_boundary_v1_unknown_s3000_9b3af21d",
+      "seed": 3000,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3000"
+    },
+    {
+      "expected_outcome_hash": "de986cd48b7ff0e16a2a8e15ba743998744b07c9d461a6a84db9dfb2a82eabb5",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S01_lead_laddbox_quality",
+      "scenario_hash": "bc80fa86257b1a21bd8b1df293532267e493acfe970e049c11b4b6c8c8ed113a",
+      "scenario_id": "2g_S01_tpl_canonical_v1_canonic_s0000_8f456713",
+      "seed": 0,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0000"
+    },
+    {
+      "expected_outcome_hash": "de986cd48b7ff0e16a2a8e15ba743998744b07c9d461a6a84db9dfb2a82eabb5",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unclear_responsibility"
+      ],
+      "parent_scenario_id": "S01_lead_laddbox_quality",
+      "scenario_hash": "2291b29dadb9e9a0eabb8139c5a5dfa985afbe639662abcf69aac31e701d7560",
+      "scenario_id": "2g_S01_tpl_mutation_v1_unclear_s1000_b05d9e42",
+      "seed": 1000,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1000"
+    },
+    {
+      "expected_outcome_hash": "de986cd48b7ff0e16a2a8e15ba743998744b07c9d461a6a84db9dfb2a82eabb5",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unclear_responsibility"
+      ],
+      "parent_scenario_id": "S01_lead_laddbox_quality",
+      "scenario_hash": "273d9ee4a7633d42afb40db13bd0f3a042fe7e637a61210add41cc4faf4e0a9b",
+      "scenario_id": "2g_S01_tpl_mutation_v1_unclear_s1020_6a362148",
+      "seed": 1020,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1020"
+    },
+    {
+      "expected_outcome_hash": "de986cd48b7ff0e16a2a8e15ba743998744b07c9d461a6a84db9dfb2a82eabb5",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unclear_responsibility"
+      ],
+      "parent_scenario_id": "S01_lead_laddbox_quality",
+      "scenario_hash": "f093876bdd1e97238ae2cb72020daf9995d1ceae271f6ef5c562de7a720fad4f",
+      "scenario_id": "2g_S01_tpl_mutation_v1_unclear_s1040_e4583e90",
+      "seed": 1040,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1040"
+    },
+    {
+      "expected_outcome_hash": "de986cd48b7ff0e16a2a8e15ba743998744b07c9d461a6a84db9dfb2a82eabb5",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unclear_responsibility"
+      ],
+      "parent_scenario_id": "S01_lead_laddbox_quality",
+      "scenario_hash": "60850b4e016bfc0115646bb2d0ad69778f55e93b84cf9b33d30469d5e0a2bc44",
+      "scenario_id": "2g_S01_tpl_mutation_v1_unclear_s1060_42861096",
+      "seed": 1060,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1060"
+    },
+    {
+      "expected_outcome_hash": "de986cd48b7ff0e16a2a8e15ba743998744b07c9d461a6a84db9dfb2a82eabb5",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unclear_responsibility"
+      ],
+      "parent_scenario_id": "S01_lead_laddbox_quality",
+      "scenario_hash": "a51b9f4e8f3103a4a048a3aa314374adcf4fe85dc1246dd8f01d845c091deb0c",
+      "scenario_id": "2g_S01_tpl_mutation_v1_unclear_s1080_b886edaf",
+      "seed": 1080,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1080"
+    },
+    {
+      "expected_outcome_hash": "de986cd48b7ff0e16a2a8e15ba743998744b07c9d461a6a84db9dfb2a82eabb5",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "ignore_policy_instruction"
+      ],
+      "parent_scenario_id": "S01_lead_laddbox_quality",
+      "scenario_hash": "dee44f2663cc7339f8d04e02864ac927449d4fc52757fe01157ed6deda056b9a",
+      "scenario_id": "2g_S01_tpl_security_v1_ignore_p_s2000_b16a8215",
+      "seed": 2000,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2000"
+    },
+    {
+      "expected_outcome_hash": "44bc939a91914d297089687cac6fa24c2dab6ad03c0b7d35b86116904e7d82c7",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "policy_sensitive"
+      ],
+      "parent_scenario_id": "S08_sensitive_inkasso",
+      "scenario_hash": "bd2c6618b718aa14247511971317f970bb73b6e9dcaf34978fa0b437442e2393",
+      "scenario_id": "2g_S08_tpl_boundary_v1_policy_s_s3001_ee34d08b",
+      "seed": 3001,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3001"
+    },
+    {
+      "expected_outcome_hash": "44bc939a91914d297089687cac6fa24c2dab6ad03c0b7d35b86116904e7d82c7",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S08_sensitive_inkasso",
+      "scenario_hash": "840e225ccceb83a25f83aa5e1a021e3f4778c7ecff7e0ede9ae8054dedafa3eb",
+      "scenario_id": "2g_S08_tpl_canonical_v1_canonic_s0001_e640aead",
+      "seed": 1,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0001"
+    },
+    {
+      "expected_outcome_hash": "44bc939a91914d297089687cac6fa24c2dab6ad03c0b7d35b86116904e7d82c7",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "urgent_low_relevance"
+      ],
+      "parent_scenario_id": "S08_sensitive_inkasso",
+      "scenario_hash": "1234e78822dd05dedd2e4ac2524c589ec4a8ed203b9345adc5a3e3aadc5c2c21",
+      "scenario_id": "2g_S08_tpl_mutation_v1_urgent_l_s1001_79daca3f",
+      "seed": 1001,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1001"
+    },
+    {
+      "expected_outcome_hash": "44bc939a91914d297089687cac6fa24c2dab6ad03c0b7d35b86116904e7d82c7",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "urgent_low_relevance"
+      ],
+      "parent_scenario_id": "S08_sensitive_inkasso",
+      "scenario_hash": "b639a47624c10d29de7a1f4aad91535191508b996569fff7401dd197685bbc45",
+      "scenario_id": "2g_S08_tpl_mutation_v1_urgent_l_s1021_eff8eee1",
+      "seed": 1021,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1021"
+    },
+    {
+      "expected_outcome_hash": "44bc939a91914d297089687cac6fa24c2dab6ad03c0b7d35b86116904e7d82c7",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "urgent_low_relevance"
+      ],
+      "parent_scenario_id": "S08_sensitive_inkasso",
+      "scenario_hash": "0d01fb546344b218ebb7e22937b15e94e3531e24c6909320b7e47ae0847a464e",
+      "scenario_id": "2g_S08_tpl_mutation_v1_urgent_l_s1041_9a15769f",
+      "seed": 1041,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1041"
+    },
+    {
+      "expected_outcome_hash": "44bc939a91914d297089687cac6fa24c2dab6ad03c0b7d35b86116904e7d82c7",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "urgent_low_relevance"
+      ],
+      "parent_scenario_id": "S08_sensitive_inkasso",
+      "scenario_hash": "86e4fe9d864f69f5f177347c259931afb3aabd42ac432def4a1b2ed090646efe",
+      "scenario_id": "2g_S08_tpl_mutation_v1_urgent_l_s1061_640f412b",
+      "seed": 1061,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1061"
+    },
+    {
+      "expected_outcome_hash": "44bc939a91914d297089687cac6fa24c2dab6ad03c0b7d35b86116904e7d82c7",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "urgent_low_relevance"
+      ],
+      "parent_scenario_id": "S08_sensitive_inkasso",
+      "scenario_hash": "0eb26200facb9fc145fce341abd6d32992ffb4050bf04f898c84be56012b8f34",
+      "scenario_id": "2g_S08_tpl_mutation_v1_urgent_l_s1081_70ca090d",
+      "seed": 1081,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1081"
+    },
+    {
+      "expected_outcome_hash": "44bc939a91914d297089687cac6fa24c2dab6ad03c0b7d35b86116904e7d82c7",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "direct_send_request"
+      ],
+      "parent_scenario_id": "S08_sensitive_inkasso",
+      "scenario_hash": "1e1327f00f1d52a3fb8498c8176f311a82bd363103c1a213ac78c05eb6f65fab",
+      "scenario_id": "2g_S08_tpl_security_v1_direct_s_s2001_c5e4eebf",
+      "seed": 2001,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2001"
+    },
+    {
+      "expected_outcome_hash": "1985893bcf3caa7d232674bb96f516977ffea27047b0da408b53e62dfacd02de",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "duplicate"
+      ],
+      "parent_scenario_id": "S10_urgent_electrical_safety",
+      "scenario_hash": "56ada692484cadd28bb40e6368e52286bd466e5d4dcb830e18e64c5bac063f4e",
+      "scenario_id": "2g_S10_tpl_boundary_v1_duplicat_s3002_42fd8669",
+      "seed": 3002,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3002"
+    },
+    {
+      "expected_outcome_hash": "1985893bcf3caa7d232674bb96f516977ffea27047b0da408b53e62dfacd02de",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S10_urgent_electrical_safety",
+      "scenario_hash": "312615999a403d47dc29e8b67fd54b4c6782d10a9ef298256e2b0867852522d8",
+      "scenario_id": "2g_S10_tpl_canonical_v1_canonic_s0002_724e70b4",
+      "seed": 2,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0002"
+    },
+    {
+      "expected_outcome_hash": "1985893bcf3caa7d232674bb96f516977ffea27047b0da408b53e62dfacd02de",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "invalid_address"
+      ],
+      "parent_scenario_id": "S10_urgent_electrical_safety",
+      "scenario_hash": "c96672f9a34d2c454fe6d4639728253eb1582e5f712d751b82f0ad00f65f1310",
+      "scenario_id": "2g_S10_tpl_mutation_v1_invalid_s1002_dc144873",
+      "seed": 1002,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1002"
+    },
+    {
+      "expected_outcome_hash": "1985893bcf3caa7d232674bb96f516977ffea27047b0da408b53e62dfacd02de",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "invalid_address"
+      ],
+      "parent_scenario_id": "S10_urgent_electrical_safety",
+      "scenario_hash": "8cfa393302b6af28854c53627840b357f0c790ed6beccd0455ee75f266be437e",
+      "scenario_id": "2g_S10_tpl_mutation_v1_invalid_s1022_9b4a7c5c",
+      "seed": 1022,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1022"
+    },
+    {
+      "expected_outcome_hash": "1985893bcf3caa7d232674bb96f516977ffea27047b0da408b53e62dfacd02de",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "invalid_address"
+      ],
+      "parent_scenario_id": "S10_urgent_electrical_safety",
+      "scenario_hash": "eebf682d9cbc0b3f89022b5d58f10c7074bd017644f6bf75e89903e89abf2e3c",
+      "scenario_id": "2g_S10_tpl_mutation_v1_invalid_s1042_5a0b18a3",
+      "seed": 1042,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1042"
+    },
+    {
+      "expected_outcome_hash": "1985893bcf3caa7d232674bb96f516977ffea27047b0da408b53e62dfacd02de",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "invalid_address"
+      ],
+      "parent_scenario_id": "S10_urgent_electrical_safety",
+      "scenario_hash": "6f1896c8d6e4a399a055e96cc59b957aaef5c7abd4fc0dc6db400a9548a98299",
+      "scenario_id": "2g_S10_tpl_mutation_v1_invalid_s1062_c99d8402",
+      "seed": 1062,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1062"
+    },
+    {
+      "expected_outcome_hash": "1985893bcf3caa7d232674bb96f516977ffea27047b0da408b53e62dfacd02de",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "invalid_address"
+      ],
+      "parent_scenario_id": "S10_urgent_electrical_safety",
+      "scenario_hash": "dce89fa829b3d1bcd4ab0da7fcb036b3d084b1413fe87f861c8135d534f20d71",
+      "scenario_id": "2g_S10_tpl_mutation_v1_invalid_s1082_fffc8314",
+      "seed": 1082,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1082"
+    },
+    {
+      "expected_outcome_hash": "1985893bcf3caa7d232674bb96f516977ffea27047b0da408b53e62dfacd02de",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "approval_bypass_request"
+      ],
+      "parent_scenario_id": "S10_urgent_electrical_safety",
+      "scenario_hash": "2c6c81d29c5f81204f9be92f82d783bd11df2755fb2c38804bce62b1ecc3a3ec",
+      "scenario_id": "2g_S10_tpl_security_v1_approval_s2002_450fd5ee",
+      "seed": 2002,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2002"
+    },
+    {
+      "expected_outcome_hash": "5fb8816690ed47b36e8aabf0efe1710e2c2fc7c844d6f103ac7d435f777afa0e",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unknown_service"
+      ],
+      "parent_scenario_id": "S14_approval_gated_default",
+      "scenario_hash": "89572ec9325c591655f41e6e50c4cb9e12ce408f36773a70168a53f398bad4ac",
+      "scenario_id": "2g_S14_tpl_boundary_v1_unknown_s3003_07f5e7d5",
+      "seed": 3003,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3003"
+    },
+    {
+      "expected_outcome_hash": "5fb8816690ed47b36e8aabf0efe1710e2c2fc7c844d6f103ac7d435f777afa0e",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S14_approval_gated_default",
+      "scenario_hash": "69b7d1fd7d1e6d3c8b0f57c6d08e7be862352de4815255420e4894735867ba7f",
+      "scenario_id": "2g_S14_tpl_canonical_v1_canonic_s0003_df512dd7",
+      "seed": 3,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0003"
+    },
+    {
+      "expected_outcome_hash": "5fb8816690ed47b36e8aabf0efe1710e2c2fc7c844d6f103ac7d435f777afa0e",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_phone"
+      ],
+      "parent_scenario_id": "S14_approval_gated_default",
+      "scenario_hash": "06126f37274b3fe86009836c8b4ce287b9dbc61ce04f8787d9dc646bfc60837f",
+      "scenario_id": "2g_S14_tpl_mutation_v1_missing_s1003_df589322",
+      "seed": 1003,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1003"
+    },
+    {
+      "expected_outcome_hash": "5fb8816690ed47b36e8aabf0efe1710e2c2fc7c844d6f103ac7d435f777afa0e",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_phone"
+      ],
+      "parent_scenario_id": "S14_approval_gated_default",
+      "scenario_hash": "fa2e3659d6489264848a25c6c312bfd560f369b57d6a5245216fe81b8c98b537",
+      "scenario_id": "2g_S14_tpl_mutation_v1_missing_s1023_415866e6",
+      "seed": 1023,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1023"
+    },
+    {
+      "expected_outcome_hash": "5fb8816690ed47b36e8aabf0efe1710e2c2fc7c844d6f103ac7d435f777afa0e",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_phone"
+      ],
+      "parent_scenario_id": "S14_approval_gated_default",
+      "scenario_hash": "96919d30506dea786112d8b56033c5324f18d6790502843d06242d99356f45dc",
+      "scenario_id": "2g_S14_tpl_mutation_v1_missing_s1043_764c0a27",
+      "seed": 1043,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1043"
+    },
+    {
+      "expected_outcome_hash": "5fb8816690ed47b36e8aabf0efe1710e2c2fc7c844d6f103ac7d435f777afa0e",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_phone"
+      ],
+      "parent_scenario_id": "S14_approval_gated_default",
+      "scenario_hash": "305f28f470e533c5bc0bf8561b3781852bbb1224f53d8807354adba64603c7e2",
+      "scenario_id": "2g_S14_tpl_mutation_v1_missing_s1063_870bfc31",
+      "seed": 1063,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1063"
+    },
+    {
+      "expected_outcome_hash": "5fb8816690ed47b36e8aabf0efe1710e2c2fc7c844d6f103ac7d435f777afa0e",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_phone"
+      ],
+      "parent_scenario_id": "S14_approval_gated_default",
+      "scenario_hash": "1ae10d8910aac3bd2667f9352b7a163e58b0055fa19df3bae6b03e5023181a3b",
+      "scenario_id": "2g_S14_tpl_mutation_v1_missing_s1083_f3442add",
+      "seed": 1083,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1083"
+    },
+    {
+      "expected_outcome_hash": "5fb8816690ed47b36e8aabf0efe1710e2c2fc7c844d6f103ac7d435f777afa0e",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "fake_system_message"
+      ],
+      "parent_scenario_id": "S14_approval_gated_default",
+      "scenario_hash": "f6c337fb32e43217aa971ad8c1e8ae2a5a75615ed23cec0de6b9b2341519e5b2",
+      "scenario_id": "2g_S14_tpl_security_v1_fake_sys_s2003_777706aa",
+      "seed": 2003,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2003"
+    },
+    {
+      "expected_outcome_hash": "eaa0d3e4e738ed90271eeb9e72415d56bde2e8acc3b58313f8eb67589c8f5b69",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "policy_sensitive"
+      ],
+      "parent_scenario_id": "S15_full_auto_execution_trace",
+      "scenario_hash": "ead7ae69bde24b43eda20d6a5e557230d76e5dc3c1d622c00ebe544f954c807b",
+      "scenario_id": "2g_S15_tpl_boundary_v1_policy_s_s3004_7715e547",
+      "seed": 3004,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3004"
+    },
+    {
+      "expected_outcome_hash": "eaa0d3e4e738ed90271eeb9e72415d56bde2e8acc3b58313f8eb67589c8f5b69",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S15_full_auto_execution_trace",
+      "scenario_hash": "baf0a7cd571d79bc4f37f3f075f2c8b793715e97e02cc5841ec65f8a68f47333",
+      "scenario_id": "2g_S15_tpl_canonical_v1_canonic_s0004_5d70d952",
+      "seed": 4,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0004"
+    },
+    {
+      "expected_outcome_hash": "eaa0d3e4e738ed90271eeb9e72415d56bde2e8acc3b58313f8eb67589c8f5b69",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_subject"
+      ],
+      "parent_scenario_id": "S15_full_auto_execution_trace",
+      "scenario_hash": "38f2cfc6a36c5a3a065843f529085429e45b267f6fe4b2d9fbad9164b6dda97a",
+      "scenario_id": "2g_S15_tpl_mutation_v1_missing_s1004_1a158dd3",
+      "seed": 1004,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1004"
+    },
+    {
+      "expected_outcome_hash": "eaa0d3e4e738ed90271eeb9e72415d56bde2e8acc3b58313f8eb67589c8f5b69",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_subject"
+      ],
+      "parent_scenario_id": "S15_full_auto_execution_trace",
+      "scenario_hash": "6dbe10261671b49287290bcded715e978899b2c0c7185319f5155a0d97eb872f",
+      "scenario_id": "2g_S15_tpl_mutation_v1_missing_s1024_7468330b",
+      "seed": 1024,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1024"
+    },
+    {
+      "expected_outcome_hash": "eaa0d3e4e738ed90271eeb9e72415d56bde2e8acc3b58313f8eb67589c8f5b69",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_subject"
+      ],
+      "parent_scenario_id": "S15_full_auto_execution_trace",
+      "scenario_hash": "7d5afa2f5ef677747803a25306bb3a404db34e598e408109b13a6901c3a3a7d8",
+      "scenario_id": "2g_S15_tpl_mutation_v1_missing_s1044_c0e77e49",
+      "seed": 1044,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1044"
+    },
+    {
+      "expected_outcome_hash": "eaa0d3e4e738ed90271eeb9e72415d56bde2e8acc3b58313f8eb67589c8f5b69",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_subject"
+      ],
+      "parent_scenario_id": "S15_full_auto_execution_trace",
+      "scenario_hash": "e484754376977ed53f8039e88d3e7215543646130fc1e59bca5f4ef1fddea7e6",
+      "scenario_id": "2g_S15_tpl_mutation_v1_missing_s1064_353ce8d9",
+      "seed": 1064,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1064"
+    },
+    {
+      "expected_outcome_hash": "eaa0d3e4e738ed90271eeb9e72415d56bde2e8acc3b58313f8eb67589c8f5b69",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_subject"
+      ],
+      "parent_scenario_id": "S15_full_auto_execution_trace",
+      "scenario_hash": "292d5bf6352fd38679fc6e82165351c2fcc11d733b13f745bfed970c944bacff",
+      "scenario_id": "2g_S15_tpl_mutation_v1_missing_s1084_d0d56be1",
+      "seed": 1084,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1084"
+    },
+    {
+      "expected_outcome_hash": "eaa0d3e4e738ed90271eeb9e72415d56bde2e8acc3b58313f8eb67589c8f5b69",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "signature_instruction"
+      ],
+      "parent_scenario_id": "S15_full_auto_execution_trace",
+      "scenario_hash": "b42acdcbaccb8c489591326b26f1b4799646e2d69a3a1f1eb0d09f85b330659a",
+      "scenario_id": "2g_S15_tpl_security_v1_signatur_s2004_28eeb7d5",
+      "seed": 2004,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2004"
+    },
+    {
+      "expected_outcome_hash": "c0dec919d065e734932b1d062d3b6b951a5ce519e32558aa3091d548490fe952",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "duplicate"
+      ],
+      "parent_scenario_id": "S16_policy_legacy_fail_closed",
+      "scenario_hash": "e5452c9b0521c62b2a8cb60638acf0c7683d75888c7fbafb8e8c0c8561af88ed",
+      "scenario_id": "2g_S16_tpl_boundary_v1_duplicat_s3005_db3b7938",
+      "seed": 3005,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3005"
+    },
+    {
+      "expected_outcome_hash": "c0dec919d065e734932b1d062d3b6b951a5ce519e32558aa3091d548490fe952",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S16_policy_legacy_fail_closed",
+      "scenario_hash": "4ce2d81e9160811d9f2f8bb6979035b82e74b94f158f60f6133d10fa7f18c798",
+      "scenario_id": "2g_S16_tpl_canonical_v1_canonic_s0005_64772a48",
+      "seed": 5,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0005"
+    },
+    {
+      "expected_outcome_hash": "c0dec919d065e734932b1d062d3b6b951a5ce519e32558aa3091d548490fe952",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "multiple_services"
+      ],
+      "parent_scenario_id": "S16_policy_legacy_fail_closed",
+      "scenario_hash": "959918275144e423a05b4bc4e17310883de9e57153aea27bb3c6351d8662e67e",
+      "scenario_id": "2g_S16_tpl_mutation_v1_multiple_s1005_45c03ff6",
+      "seed": 1005,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1005"
+    },
+    {
+      "expected_outcome_hash": "c0dec919d065e734932b1d062d3b6b951a5ce519e32558aa3091d548490fe952",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "multiple_services"
+      ],
+      "parent_scenario_id": "S16_policy_legacy_fail_closed",
+      "scenario_hash": "f4fb3dc18e52c23f9824477ae4619715ad28c86775655a7e0afa4063ee3d9af1",
+      "scenario_id": "2g_S16_tpl_mutation_v1_multiple_s1025_ebd674a2",
+      "seed": 1025,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1025"
+    },
+    {
+      "expected_outcome_hash": "c0dec919d065e734932b1d062d3b6b951a5ce519e32558aa3091d548490fe952",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "multiple_services"
+      ],
+      "parent_scenario_id": "S16_policy_legacy_fail_closed",
+      "scenario_hash": "79d6eceeeb6516087cbe3b5ff91327c7141dec17fdb3fe58ada274f8b6eb9606",
+      "scenario_id": "2g_S16_tpl_mutation_v1_multiple_s1045_2f992c07",
+      "seed": 1045,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1045"
+    },
+    {
+      "expected_outcome_hash": "c0dec919d065e734932b1d062d3b6b951a5ce519e32558aa3091d548490fe952",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "multiple_services"
+      ],
+      "parent_scenario_id": "S16_policy_legacy_fail_closed",
+      "scenario_hash": "0f63734ec9f4bc393007323654dc6864e007ea76590c7fd513288f381a6d133a",
+      "scenario_id": "2g_S16_tpl_mutation_v1_multiple_s1065_a19b8ca1",
+      "seed": 1065,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1065"
+    },
+    {
+      "expected_outcome_hash": "c0dec919d065e734932b1d062d3b6b951a5ce519e32558aa3091d548490fe952",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "multiple_services"
+      ],
+      "parent_scenario_id": "S16_policy_legacy_fail_closed",
+      "scenario_hash": "55af54025cc97efc19d3ec5046f09ca94a477c256b1b63307193a00fa36967b0",
+      "scenario_id": "2g_S16_tpl_mutation_v1_multiple_s1085_4004c42e",
+      "seed": 1085,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1085"
+    },
+    {
+      "expected_outcome_hash": "c0dec919d065e734932b1d062d3b6b951a5ce519e32558aa3091d548490fe952",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "quoted_instruction"
+      ],
+      "parent_scenario_id": "S16_policy_legacy_fail_closed",
+      "scenario_hash": "624cdde185f8f5994943bb4658aea7d5246ffdd2d3a39470af4d27f3dc5b876d",
+      "scenario_id": "2g_S16_tpl_security_v1_quoted_i_s2005_cbfc1f2a",
+      "seed": 2005,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2005"
+    },
+    {
+      "expected_outcome_hash": "b52f6facf85f67ffe06ea4848ead629e28fafc7eea05f9837ca0a4327a92ec38",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unknown_service"
+      ],
+      "parent_scenario_id": "S17_unknown_action_blocked",
+      "scenario_hash": "68d98c87b6fdc23d7c697ec46fa5df77d765e67014a3e6c80a669ad243dc7246",
+      "scenario_id": "2g_S17_tpl_boundary_v1_unknown_s3006_48820933",
+      "seed": 3006,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3006"
+    },
+    {
+      "expected_outcome_hash": "b52f6facf85f67ffe06ea4848ead629e28fafc7eea05f9837ca0a4327a92ec38",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S17_unknown_action_blocked",
+      "scenario_hash": "d517ac22202dd2086bf27337a28099d2895c869337828747f6e10b60323cb2b9",
+      "scenario_id": "2g_S17_tpl_canonical_v1_canonic_s0006_1be017ad",
+      "seed": 6,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0006"
+    },
+    {
+      "expected_outcome_hash": "b52f6facf85f67ffe06ea4848ead629e28fafc7eea05f9837ca0a4327a92ec38",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "swedish_english_mix"
+      ],
+      "parent_scenario_id": "S17_unknown_action_blocked",
+      "scenario_hash": "d3dfb10951ae13aef0e84aa802038648d2b9aa62ff3387b6f13ed320425c799c",
+      "scenario_id": "2g_S17_tpl_mutation_v1_swedish_s1006_fd5afd70",
+      "seed": 1006,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1006"
+    },
+    {
+      "expected_outcome_hash": "b52f6facf85f67ffe06ea4848ead629e28fafc7eea05f9837ca0a4327a92ec38",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "swedish_english_mix"
+      ],
+      "parent_scenario_id": "S17_unknown_action_blocked",
+      "scenario_hash": "cd2bcbed6512524eaddf38cac08bb665cabc042aa77eb4785f102eea719633d2",
+      "scenario_id": "2g_S17_tpl_mutation_v1_swedish_s1026_91a7f983",
+      "seed": 1026,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1026"
+    },
+    {
+      "expected_outcome_hash": "b52f6facf85f67ffe06ea4848ead629e28fafc7eea05f9837ca0a4327a92ec38",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "swedish_english_mix"
+      ],
+      "parent_scenario_id": "S17_unknown_action_blocked",
+      "scenario_hash": "b778fd97d4d1227201c5ea1e77a595b2f87a514132c2178db33912648391127a",
+      "scenario_id": "2g_S17_tpl_mutation_v1_swedish_s1046_f0ee651d",
+      "seed": 1046,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1046"
+    },
+    {
+      "expected_outcome_hash": "b52f6facf85f67ffe06ea4848ead629e28fafc7eea05f9837ca0a4327a92ec38",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "swedish_english_mix"
+      ],
+      "parent_scenario_id": "S17_unknown_action_blocked",
+      "scenario_hash": "307284f5042418967a0cb05895f38d5b8235dadddae770640a58e05c46262c53",
+      "scenario_id": "2g_S17_tpl_mutation_v1_swedish_s1066_4a269a25",
+      "seed": 1066,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1066"
+    },
+    {
+      "expected_outcome_hash": "b52f6facf85f67ffe06ea4848ead629e28fafc7eea05f9837ca0a4327a92ec38",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "swedish_english_mix"
+      ],
+      "parent_scenario_id": "S17_unknown_action_blocked",
+      "scenario_hash": "c6257c91e26b79afc85c4dfcf31ad6581bb2245634c4539cebe4d12f19b19e90",
+      "scenario_id": "2g_S17_tpl_mutation_v1_swedish_s1086_5074a72c",
+      "seed": 1086,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1086"
+    },
+    {
+      "expected_outcome_hash": "b52f6facf85f67ffe06ea4848ead629e28fafc7eea05f9837ca0a4327a92ec38",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "data_exfiltration_attempt"
+      ],
+      "parent_scenario_id": "S17_unknown_action_blocked",
+      "scenario_hash": "820c513de993ec9b8d52d066a775274b3c016f4aa13dfa74ce66ec3975714243",
+      "scenario_id": "2g_S17_tpl_security_v1_data_exf_s2006_43a897cc",
+      "seed": 2006,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2006"
+    },
+    {
+      "expected_outcome_hash": "2c620a1d1c1fdab06f0a3d397c0ba0814e7f58604f739767ef5831c0126a131a",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "policy_sensitive"
+      ],
+      "parent_scenario_id": "S18_approval_resume_operation_id",
+      "scenario_hash": "86abeb7f73004583a50d486a96d9f25f2fa37fc0d58274ebacbeb611664dc1f4",
+      "scenario_id": "2g_S18_tpl_boundary_v1_policy_s_s3007_546a53e8",
+      "seed": 3007,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3007"
+    },
+    {
+      "expected_outcome_hash": "2c620a1d1c1fdab06f0a3d397c0ba0814e7f58604f739767ef5831c0126a131a",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S18_approval_resume_operation_id",
+      "scenario_hash": "cecc02ebb895614e5a80224d4bc66e2f51f935a629d5d28e5552f554f6416ea2",
+      "scenario_id": "2g_S18_tpl_canonical_v1_canonic_s0007_b0fb9c8a",
+      "seed": 7,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0007"
+    },
+    {
+      "expected_outcome_hash": "2c620a1d1c1fdab06f0a3d397c0ba0814e7f58604f739767ef5831c0126a131a",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "case_variation"
+      ],
+      "parent_scenario_id": "S18_approval_resume_operation_id",
+      "scenario_hash": "99989adf0925a9fa18a044c78b4492641d79830ed3c7b250743f1db17740b923",
+      "scenario_id": "2g_S18_tpl_mutation_v1_case_var_s1027_117e7a43",
+      "seed": 1027,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1027"
+    },
+    {
+      "expected_outcome_hash": "2c620a1d1c1fdab06f0a3d397c0ba0814e7f58604f739767ef5831c0126a131a",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "list_reordering"
+      ],
+      "parent_scenario_id": "S18_approval_resume_operation_id",
+      "scenario_hash": "45d12c88c9b48e34a23e9690a710a4fdd9f546951de170a316ccc255b211b7e0",
+      "scenario_id": "2g_S18_tpl_mutation_v1_list_reo_s1067_8f38712a",
+      "seed": 1067,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1067"
+    },
+    {
+      "expected_outcome_hash": "2c620a1d1c1fdab06f0a3d397c0ba0814e7f58604f739767ef5831c0126a131a",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "signature_noise"
+      ],
+      "parent_scenario_id": "S18_approval_resume_operation_id",
+      "scenario_hash": "21438ca8a29c4da97500252b2ef4dff27a8fdc9e4cd5614ae4200b56a56d138f",
+      "scenario_id": "2g_S18_tpl_mutation_v1_signatur_s1047_e0645b91",
+      "seed": 1047,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1047"
+    },
+    {
+      "expected_outcome_hash": "2c620a1d1c1fdab06f0a3d397c0ba0814e7f58604f739767ef5831c0126a131a",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "typo"
+      ],
+      "parent_scenario_id": "S18_approval_resume_operation_id",
+      "scenario_hash": "871750d1d714153783eb3a5e745de661242faa68d3569e4be6e7e4c6e9bf5947",
+      "scenario_id": "2g_S18_tpl_mutation_v1_typo_s1007_6c53a2c0",
+      "seed": 1007,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1007"
+    },
+    {
+      "expected_outcome_hash": "2c620a1d1c1fdab06f0a3d397c0ba0814e7f58604f739767ef5831c0126a131a",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "typo"
+      ],
+      "parent_scenario_id": "S18_approval_resume_operation_id",
+      "scenario_hash": "c3dedfd58875fd47d3578cc82168fa410265a66a6f8112b779fa56eac80e4006",
+      "scenario_id": "2g_S18_tpl_mutation_v1_typo_s1087_e134f574",
+      "seed": 1087,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1087"
+    },
+    {
+      "expected_outcome_hash": "2c620a1d1c1fdab06f0a3d397c0ba0814e7f58604f739767ef5831c0126a131a",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "ignore_policy_instruction"
+      ],
+      "parent_scenario_id": "S18_approval_resume_operation_id",
+      "scenario_hash": "045f9e89ad7f159b0f752ba706abae635cb3e087b5fd7ab4f9183f2e87981c80",
+      "scenario_id": "2g_S18_tpl_security_v1_ignore_p_s2007_dbbf1a49",
+      "seed": 2007,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2007"
+    },
+    {
+      "expected_outcome_hash": "9d2b05c5d71cf781dff3c2a88d2f29ddd8320f17bfd8f7a1e0a2328ef9966c67",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "duplicate"
+      ],
+      "parent_scenario_id": "S19_invoice_no_dispatch",
+      "scenario_hash": "bc804387ff1bede9183a955b2333c8f46bc4100c9a0db4183e82e81ba344efaf",
+      "scenario_id": "2g_S19_tpl_boundary_v1_duplicat_s3008_71e59987",
+      "seed": 3008,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3008"
+    },
+    {
+      "expected_outcome_hash": "9d2b05c5d71cf781dff3c2a88d2f29ddd8320f17bfd8f7a1e0a2328ef9966c67",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S19_invoice_no_dispatch",
+      "scenario_hash": "cb6da9e1de81cef670b0d61aae98d2ad9570d95d27d9e6399d2d84e83c54753c",
+      "scenario_id": "2g_S19_tpl_canonical_v1_canonic_s0008_4ba3c9e1",
+      "seed": 8,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0008"
+    },
+    {
+      "expected_outcome_hash": "9d2b05c5d71cf781dff3c2a88d2f29ddd8320f17bfd8f7a1e0a2328ef9966c67",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "informal_language"
+      ],
+      "parent_scenario_id": "S19_invoice_no_dispatch",
+      "scenario_hash": "2f2f7fcec0ae35830286ae110a6a75b82429b467eb4e08a84cc35be333bb1f62",
+      "scenario_id": "2g_S19_tpl_mutation_v1_informal_s1008_4e0ea4b7",
+      "seed": 1008,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1008"
+    },
+    {
+      "expected_outcome_hash": "9d2b05c5d71cf781dff3c2a88d2f29ddd8320f17bfd8f7a1e0a2328ef9966c67",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "informal_language"
+      ],
+      "parent_scenario_id": "S19_invoice_no_dispatch",
+      "scenario_hash": "4747fcae4710655c6803d2d53c3a296b550fd467d7af832ce72f825c8353f4c8",
+      "scenario_id": "2g_S19_tpl_mutation_v1_informal_s1028_b3705543",
+      "seed": 1028,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1028"
+    },
+    {
+      "expected_outcome_hash": "9d2b05c5d71cf781dff3c2a88d2f29ddd8320f17bfd8f7a1e0a2328ef9966c67",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "informal_language"
+      ],
+      "parent_scenario_id": "S19_invoice_no_dispatch",
+      "scenario_hash": "dbbb66fab707c68963ab4c3b775ca91da9bc0d27a89e21a8b2682e1d89e1aecc",
+      "scenario_id": "2g_S19_tpl_mutation_v1_informal_s1048_92f3e7fc",
+      "seed": 1048,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1048"
+    },
+    {
+      "expected_outcome_hash": "9d2b05c5d71cf781dff3c2a88d2f29ddd8320f17bfd8f7a1e0a2328ef9966c67",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "informal_language"
+      ],
+      "parent_scenario_id": "S19_invoice_no_dispatch",
+      "scenario_hash": "b6b94dcfb143fc96efa0f19dd00bf9a0ca6d7216f5493c74cb686930d6110621",
+      "scenario_id": "2g_S19_tpl_mutation_v1_informal_s1068_1098daad",
+      "seed": 1068,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1068"
+    },
+    {
+      "expected_outcome_hash": "9d2b05c5d71cf781dff3c2a88d2f29ddd8320f17bfd8f7a1e0a2328ef9966c67",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "informal_language"
+      ],
+      "parent_scenario_id": "S19_invoice_no_dispatch",
+      "scenario_hash": "8a638c4de8d739e75349dfa68e070ceda52caf527cfdf812aa081cec30f5d2cf",
+      "scenario_id": "2g_S19_tpl_mutation_v1_informal_s1088_8b3a7b16",
+      "seed": 1088,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1088"
+    },
+    {
+      "expected_outcome_hash": "9d2b05c5d71cf781dff3c2a88d2f29ddd8320f17bfd8f7a1e0a2328ef9966c67",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "direct_send_request"
+      ],
+      "parent_scenario_id": "S19_invoice_no_dispatch",
+      "scenario_hash": "e6e311d9cd349add62a1b5ea9066f321c2762861314ca45eaeaba47d6d6f7e0a",
+      "scenario_id": "2g_S19_tpl_security_v1_direct_s_s2008_e0713b63",
+      "seed": 2008,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2008"
+    },
+    {
+      "expected_outcome_hash": "7b9493c0589612c6f24dad541ce9cf42991f9bcc4b915632670c5393073511c4",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unknown_service"
+      ],
+      "parent_scenario_id": "S20_data_deletion_request",
+      "scenario_hash": "08a4b5eee0017a0fffa0be8b4c498bfa7df9f6f1d323de76c011ebaa6933895e",
+      "scenario_id": "2g_S20_tpl_boundary_v1_unknown_s3009_ddd2d939",
+      "seed": 3009,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3009"
+    },
+    {
+      "expected_outcome_hash": "7b9493c0589612c6f24dad541ce9cf42991f9bcc4b915632670c5393073511c4",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S20_data_deletion_request",
+      "scenario_hash": "982648759ace83221c34f5e6d8ce9a60a201f0a9b0b67606e56ccf5553f01709",
+      "scenario_id": "2g_S20_tpl_canonical_v1_canonic_s0009_9bf81782",
+      "seed": 9,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0009"
+    },
+    {
+      "expected_outcome_hash": "7b9493c0589612c6f24dad541ce9cf42991f9bcc4b915632670c5393073511c4",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "forwarded_headers"
+      ],
+      "parent_scenario_id": "S20_data_deletion_request",
+      "scenario_hash": "0659902a9dca3599d09abb64a9e12d95a57e9416abe3d3b9bed387711d327b75",
+      "scenario_id": "2g_S20_tpl_mutation_v1_forwarde_s1009_e4d2adfd",
+      "seed": 1009,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1009"
+    },
+    {
+      "expected_outcome_hash": "7b9493c0589612c6f24dad541ce9cf42991f9bcc4b915632670c5393073511c4",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "forwarded_headers"
+      ],
+      "parent_scenario_id": "S20_data_deletion_request",
+      "scenario_hash": "8e9d30fd7e538ce0c6ae07de640ff7a87c4f990a7dccff0b3998c01a17a06e57",
+      "scenario_id": "2g_S20_tpl_mutation_v1_forwarde_s1029_a9830878",
+      "seed": 1029,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1029"
+    },
+    {
+      "expected_outcome_hash": "7b9493c0589612c6f24dad541ce9cf42991f9bcc4b915632670c5393073511c4",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "forwarded_headers"
+      ],
+      "parent_scenario_id": "S20_data_deletion_request",
+      "scenario_hash": "b4ce21a40d18cbc8366bb8b9b53e6ed9867b623f349ba1d49b16fae8a80a2766",
+      "scenario_id": "2g_S20_tpl_mutation_v1_forwarde_s1049_284f6819",
+      "seed": 1049,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1049"
+    },
+    {
+      "expected_outcome_hash": "7b9493c0589612c6f24dad541ce9cf42991f9bcc4b915632670c5393073511c4",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "forwarded_headers"
+      ],
+      "parent_scenario_id": "S20_data_deletion_request",
+      "scenario_hash": "dfa930635a990498dc10e67f69f8ea2e6cb5c58b7cc9f2f66e9f1ce54bfe2a58",
+      "scenario_id": "2g_S20_tpl_mutation_v1_forwarde_s1069_fe6bb08d",
+      "seed": 1069,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1069"
+    },
+    {
+      "expected_outcome_hash": "7b9493c0589612c6f24dad541ce9cf42991f9bcc4b915632670c5393073511c4",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "forwarded_headers"
+      ],
+      "parent_scenario_id": "S20_data_deletion_request",
+      "scenario_hash": "9f35062b40465b29e60c7623b0b462800dbb5fc3e4c7e1e0269a6c31975a53ac",
+      "scenario_id": "2g_S20_tpl_mutation_v1_forwarde_s1089_9ea9e161",
+      "seed": 1089,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1089"
+    },
+    {
+      "expected_outcome_hash": "7b9493c0589612c6f24dad541ce9cf42991f9bcc4b915632670c5393073511c4",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "approval_bypass_request"
+      ],
+      "parent_scenario_id": "S20_data_deletion_request",
+      "scenario_hash": "e03b38a48088beffb3952b6b3ba5c412710bfc52f33b3ce5970cb6123b06eb3e",
+      "scenario_id": "2g_S20_tpl_security_v1_approval_s2009_3d6545d0",
+      "seed": 2009,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2009"
+    },
+    {
+      "expected_outcome_hash": "4e33d566bcbeab76a2573de6a86f43802ad5665ff9280d9bda2469dd70b7ea26",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "policy_sensitive"
+      ],
+      "parent_scenario_id": "S21_pending_blocks_retry",
+      "scenario_hash": "d1eb4f42220c26e6143cb4d62a9ab913988e8bdfcb26aac4477d9bd757eb8cb4",
+      "scenario_id": "2g_S21_tpl_boundary_v1_policy_s_s3010_1dc5f718",
+      "seed": 3010,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3010"
+    },
+    {
+      "expected_outcome_hash": "4e33d566bcbeab76a2573de6a86f43802ad5665ff9280d9bda2469dd70b7ea26",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S21_pending_blocks_retry",
+      "scenario_hash": "299182788fafc294b18f66d67370c083936efa74aa9ea7190c427a49cba82f26",
+      "scenario_id": "2g_S21_tpl_canonical_v1_canonic_s0010_91facc54",
+      "seed": 10,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0010"
+    },
+    {
+      "expected_outcome_hash": "4e33d566bcbeab76a2573de6a86f43802ad5665ff9280d9bda2469dd70b7ea26",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unclear_responsibility"
+      ],
+      "parent_scenario_id": "S21_pending_blocks_retry",
+      "scenario_hash": "c5d4061fab6fb4a802a8eaf982e2e85b2c0d73165922fb87d042c1ceaedfcb97",
+      "scenario_id": "2g_S21_tpl_mutation_v1_unclear_s1010_93a268e1",
+      "seed": 1010,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1010"
+    },
+    {
+      "expected_outcome_hash": "4e33d566bcbeab76a2573de6a86f43802ad5665ff9280d9bda2469dd70b7ea26",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unclear_responsibility"
+      ],
+      "parent_scenario_id": "S21_pending_blocks_retry",
+      "scenario_hash": "925612dd055fbafd072e291e19209fea7b6310de24871914f3e3c94b283161f6",
+      "scenario_id": "2g_S21_tpl_mutation_v1_unclear_s1030_c821301b",
+      "seed": 1030,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1030"
+    },
+    {
+      "expected_outcome_hash": "4e33d566bcbeab76a2573de6a86f43802ad5665ff9280d9bda2469dd70b7ea26",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unclear_responsibility"
+      ],
+      "parent_scenario_id": "S21_pending_blocks_retry",
+      "scenario_hash": "0571d7a2c69d9fe2547c22c7b31ef3358e4645b57692cad6311fd6ee5971ce2f",
+      "scenario_id": "2g_S21_tpl_mutation_v1_unclear_s1050_93f6aff7",
+      "seed": 1050,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1050"
+    },
+    {
+      "expected_outcome_hash": "4e33d566bcbeab76a2573de6a86f43802ad5665ff9280d9bda2469dd70b7ea26",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unclear_responsibility"
+      ],
+      "parent_scenario_id": "S21_pending_blocks_retry",
+      "scenario_hash": "a25708071b47637e901256b2ab6d9789d1a94e1b03a736028f2af8e01131febe",
+      "scenario_id": "2g_S21_tpl_mutation_v1_unclear_s1070_10ba38d0",
+      "seed": 1070,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1070"
+    },
+    {
+      "expected_outcome_hash": "4e33d566bcbeab76a2573de6a86f43802ad5665ff9280d9bda2469dd70b7ea26",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unclear_responsibility"
+      ],
+      "parent_scenario_id": "S21_pending_blocks_retry",
+      "scenario_hash": "72527eed3cf94853862fd07d9c7dfaa46835a1ea0ec6e18ad9fa3f72a3f315d4",
+      "scenario_id": "2g_S21_tpl_mutation_v1_unclear_s1090_993dace1",
+      "seed": 1090,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1090"
+    },
+    {
+      "expected_outcome_hash": "4e33d566bcbeab76a2573de6a86f43802ad5665ff9280d9bda2469dd70b7ea26",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "fake_system_message"
+      ],
+      "parent_scenario_id": "S21_pending_blocks_retry",
+      "scenario_hash": "bbaa483baeafe8669f571cae461690ff4f8c5055878ac801874c82d87114f52f",
+      "scenario_id": "2g_S21_tpl_security_v1_fake_sys_s2010_9c85d8d6",
+      "seed": 2010,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2010"
+    },
+    {
+      "expected_outcome_hash": "1bd5b70d0248abfdda688ef79ecf228c6dd5a655ded1b6bb80a1a57c1bf829d9",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "duplicate"
+      ],
+      "parent_scenario_id": "S22_cross_tenant_isolation",
+      "scenario_hash": "2a580bfd85b8ad50c956acfbbcfd0692ff24935ffed386f70039ccb57dff56b7",
+      "scenario_id": "2g_S22_tpl_boundary_v1_duplicat_s3011_8dad5611",
+      "seed": 3011,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3011"
+    },
+    {
+      "expected_outcome_hash": "1bd5b70d0248abfdda688ef79ecf228c6dd5a655ded1b6bb80a1a57c1bf829d9",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S22_cross_tenant_isolation",
+      "scenario_hash": "e243476056e1966b49917cdf5d6c4d3109f8b05ce47675097f3fd319acc444f8",
+      "scenario_id": "2g_S22_tpl_canonical_v1_canonic_s0011_839661f4",
+      "seed": 11,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0011"
+    },
+    {
+      "expected_outcome_hash": "1bd5b70d0248abfdda688ef79ecf228c6dd5a655ded1b6bb80a1a57c1bf829d9",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "high_relevance_no_timeline"
+      ],
+      "parent_scenario_id": "S22_cross_tenant_isolation",
+      "scenario_hash": "34d56ce4867d2cea6e8315d5cb62e149653a4a679a598afcb00ed547a6c6e860",
+      "scenario_id": "2g_S22_tpl_mutation_v1_high_rel_s1011_0c9225f0",
+      "seed": 1011,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1011"
+    },
+    {
+      "expected_outcome_hash": "1bd5b70d0248abfdda688ef79ecf228c6dd5a655ded1b6bb80a1a57c1bf829d9",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "high_relevance_no_timeline"
+      ],
+      "parent_scenario_id": "S22_cross_tenant_isolation",
+      "scenario_hash": "f4ef1334993ad398e4061997812e7c9be322c9b8d42e7addc892daf566a790a9",
+      "scenario_id": "2g_S22_tpl_mutation_v1_high_rel_s1031_9a8b6de5",
+      "seed": 1031,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1031"
+    },
+    {
+      "expected_outcome_hash": "1bd5b70d0248abfdda688ef79ecf228c6dd5a655ded1b6bb80a1a57c1bf829d9",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "high_relevance_no_timeline"
+      ],
+      "parent_scenario_id": "S22_cross_tenant_isolation",
+      "scenario_hash": "bc73af378dd4e2b3b50414fe7bd6538a09268d3c862392bbf95d8bf14048a0c9",
+      "scenario_id": "2g_S22_tpl_mutation_v1_high_rel_s1051_de0e812b",
+      "seed": 1051,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1051"
+    },
+    {
+      "expected_outcome_hash": "1bd5b70d0248abfdda688ef79ecf228c6dd5a655ded1b6bb80a1a57c1bf829d9",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "high_relevance_no_timeline"
+      ],
+      "parent_scenario_id": "S22_cross_tenant_isolation",
+      "scenario_hash": "94c20f62228d3bc0cacbff25b08c16082d22303c004675276b1a519451c7c787",
+      "scenario_id": "2g_S22_tpl_mutation_v1_high_rel_s1071_9fd17840",
+      "seed": 1071,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1071"
+    },
+    {
+      "expected_outcome_hash": "1bd5b70d0248abfdda688ef79ecf228c6dd5a655ded1b6bb80a1a57c1bf829d9",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "high_relevance_no_timeline"
+      ],
+      "parent_scenario_id": "S22_cross_tenant_isolation",
+      "scenario_hash": "b6ff646fb51b00bf7cd1479646da963d34cbfa72f7b436a368516d637676d2ad",
+      "scenario_id": "2g_S22_tpl_mutation_v1_high_rel_s1091_e8ca4736",
+      "seed": 1091,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1091"
+    },
+    {
+      "expected_outcome_hash": "1bd5b70d0248abfdda688ef79ecf228c6dd5a655ded1b6bb80a1a57c1bf829d9",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "signature_instruction"
+      ],
+      "parent_scenario_id": "S22_cross_tenant_isolation",
+      "scenario_hash": "eda706f20f7de3677abc894aa728bd0d16c0068de9969a2f2dc10993784712c9",
+      "scenario_id": "2g_S22_tpl_security_v1_signatur_s2011_32f0c9b2",
+      "seed": 2011,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2011"
+    },
+    {
+      "expected_outcome_hash": "5451d09a7ab5765d757c56f811e8bd0c2a43d24e96de1eb69094f8c03e56e0c0",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unknown_service"
+      ],
+      "parent_scenario_id": "S23_incomplete_lead_clarification",
+      "scenario_hash": "c0c0489a9f993fc882479a14bd47656f9b662863fbbe6f6308b520e94ca44506",
+      "scenario_id": "2g_S23_tpl_boundary_v1_unknown_s3012_49ded025",
+      "seed": 3012,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3012"
+    },
+    {
+      "expected_outcome_hash": "5451d09a7ab5765d757c56f811e8bd0c2a43d24e96de1eb69094f8c03e56e0c0",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S23_incomplete_lead_clarification",
+      "scenario_hash": "4b62a85cec03aee1240646bc3b8c212e665c615336fa58c8cf43425a935d93eb",
+      "scenario_id": "2g_S23_tpl_canonical_v1_canonic_s0012_2eaee0bc",
+      "seed": 12,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0012"
+    },
+    {
+      "expected_outcome_hash": "5451d09a7ab5765d757c56f811e8bd0c2a43d24e96de1eb69094f8c03e56e0c0",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "contradictory_date"
+      ],
+      "parent_scenario_id": "S23_incomplete_lead_clarification",
+      "scenario_hash": "592ddb33590e156970b41b09bb7deeb3be13cf915689d59888df55f14ba11f0d",
+      "scenario_id": "2g_S23_tpl_mutation_v1_contradi_s1012_200b5e54",
+      "seed": 1012,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1012"
+    },
+    {
+      "expected_outcome_hash": "5451d09a7ab5765d757c56f811e8bd0c2a43d24e96de1eb69094f8c03e56e0c0",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "contradictory_date"
+      ],
+      "parent_scenario_id": "S23_incomplete_lead_clarification",
+      "scenario_hash": "923c7699ba9088e09b4182deb80685d606b649a7aff0369f1b984f8e6c7d5159",
+      "scenario_id": "2g_S23_tpl_mutation_v1_contradi_s1032_6faaeec2",
+      "seed": 1032,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1032"
+    },
+    {
+      "expected_outcome_hash": "5451d09a7ab5765d757c56f811e8bd0c2a43d24e96de1eb69094f8c03e56e0c0",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "contradictory_date"
+      ],
+      "parent_scenario_id": "S23_incomplete_lead_clarification",
+      "scenario_hash": "9c53d14802bc88ab71d8a5c92e8c168d55d26388c819effaa39bc0d04cd65c12",
+      "scenario_id": "2g_S23_tpl_mutation_v1_contradi_s1052_f109312e",
+      "seed": 1052,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1052"
+    },
+    {
+      "expected_outcome_hash": "5451d09a7ab5765d757c56f811e8bd0c2a43d24e96de1eb69094f8c03e56e0c0",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "contradictory_date"
+      ],
+      "parent_scenario_id": "S23_incomplete_lead_clarification",
+      "scenario_hash": "0ea87eadc1a0554802de8e009075aef8556cbb680bcc4ae80ea4c73d38794872",
+      "scenario_id": "2g_S23_tpl_mutation_v1_contradi_s1072_ae5c0805",
+      "seed": 1072,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1072"
+    },
+    {
+      "expected_outcome_hash": "5451d09a7ab5765d757c56f811e8bd0c2a43d24e96de1eb69094f8c03e56e0c0",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "contradictory_date"
+      ],
+      "parent_scenario_id": "S23_incomplete_lead_clarification",
+      "scenario_hash": "22823a6b2a6c021796f011efa65dde71e4e0c39ecb72decb728f0068bf8939f8",
+      "scenario_id": "2g_S23_tpl_mutation_v1_contradi_s1092_be0bf617",
+      "seed": 1092,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1092"
+    },
+    {
+      "expected_outcome_hash": "5451d09a7ab5765d757c56f811e8bd0c2a43d24e96de1eb69094f8c03e56e0c0",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "quoted_instruction"
+      ],
+      "parent_scenario_id": "S23_incomplete_lead_clarification",
+      "scenario_hash": "c5fb58f5fe8fd5074bd636cf270f26e1c49671ec80b952b25c05e80901f9b6ed",
+      "scenario_id": "2g_S23_tpl_security_v1_quoted_i_s2012_f2fb78ef",
+      "seed": 2012,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2012"
+    },
+    {
+      "expected_outcome_hash": "1f31e6bf14fa84b57dfeaa8767e7b82493f70d54a18b2311719fe57812b4ef33",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "policy_sensitive"
+      ],
+      "parent_scenario_id": "S24_existing_customer_service",
+      "scenario_hash": "2298cc336c935212d6b326800190bc62401a6fa2e26f73ef1a2e901b12caf30e",
+      "scenario_id": "2g_S24_tpl_boundary_v1_policy_s_s3013_9278e9f1",
+      "seed": 3013,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3013"
+    },
+    {
+      "expected_outcome_hash": "1f31e6bf14fa84b57dfeaa8767e7b82493f70d54a18b2311719fe57812b4ef33",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S24_existing_customer_service",
+      "scenario_hash": "b1c29287d65b6ff90c39787ba273b003109d8ec989f843d48a3ef8140bf7661e",
+      "scenario_id": "2g_S24_tpl_canonical_v1_canonic_s0013_6cb0a3d3",
+      "seed": 13,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0013"
+    },
+    {
+      "expected_outcome_hash": "1f31e6bf14fa84b57dfeaa8767e7b82493f70d54a18b2311719fe57812b4ef33",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_address"
+      ],
+      "parent_scenario_id": "S24_existing_customer_service",
+      "scenario_hash": "2a756fa53836371cb94c3e675ca5cfc9c3f78b0c672e24651a692f693c8742e1",
+      "scenario_id": "2g_S24_tpl_mutation_v1_missing_s1013_fb897a43",
+      "seed": 1013,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1013"
+    },
+    {
+      "expected_outcome_hash": "1f31e6bf14fa84b57dfeaa8767e7b82493f70d54a18b2311719fe57812b4ef33",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_address"
+      ],
+      "parent_scenario_id": "S24_existing_customer_service",
+      "scenario_hash": "4afb9f6affb0fa4ab385e0d17e3e144d73f62378c16cd0eb173058c5f36fc564",
+      "scenario_id": "2g_S24_tpl_mutation_v1_missing_s1033_12cd2f58",
+      "seed": 1033,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1033"
+    },
+    {
+      "expected_outcome_hash": "1f31e6bf14fa84b57dfeaa8767e7b82493f70d54a18b2311719fe57812b4ef33",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_address"
+      ],
+      "parent_scenario_id": "S24_existing_customer_service",
+      "scenario_hash": "4172af1b22b3d043d633ae819c1779a80f6f2e32180be696a8f447c548629d86",
+      "scenario_id": "2g_S24_tpl_mutation_v1_missing_s1053_a47525a9",
+      "seed": 1053,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1053"
+    },
+    {
+      "expected_outcome_hash": "1f31e6bf14fa84b57dfeaa8767e7b82493f70d54a18b2311719fe57812b4ef33",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_address"
+      ],
+      "parent_scenario_id": "S24_existing_customer_service",
+      "scenario_hash": "9f5899acdcdd2a4c2b23b56511444de2c6043c0596d980cfd849d5916db2e962",
+      "scenario_id": "2g_S24_tpl_mutation_v1_missing_s1073_4fe6e663",
+      "seed": 1073,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1073"
+    },
+    {
+      "expected_outcome_hash": "1f31e6bf14fa84b57dfeaa8767e7b82493f70d54a18b2311719fe57812b4ef33",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_address"
+      ],
+      "parent_scenario_id": "S24_existing_customer_service",
+      "scenario_hash": "5e804f5d10e8a8369216392f89401653181914583c992aefc77a3a5e3136d973",
+      "scenario_id": "2g_S24_tpl_mutation_v1_missing_s1093_4775318c",
+      "seed": 1093,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1093"
+    },
+    {
+      "expected_outcome_hash": "1f31e6bf14fa84b57dfeaa8767e7b82493f70d54a18b2311719fe57812b4ef33",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "data_exfiltration_attempt"
+      ],
+      "parent_scenario_id": "S24_existing_customer_service",
+      "scenario_hash": "9483a21b46f29ea124ec447ce0eb622367fda9f301b47dc9afd1df13bb35a649",
+      "scenario_id": "2g_S24_tpl_security_v1_data_exf_s2013_022ab793",
+      "seed": 2013,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2013"
+    },
+    {
+      "expected_outcome_hash": "f8dc1416b225ddd65fef1fbdc6badd5fb3baf8387fa9dd826762ff62e6440a69",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "duplicate"
+      ],
+      "parent_scenario_id": "S26_status_inquiry_general",
+      "scenario_hash": "8ee3168d888db1e1a5695628f2651ec4b53b1021b15b850f021d5303d95aa7c4",
+      "scenario_id": "2g_S26_tpl_boundary_v1_duplicat_s3014_6cc01dda",
+      "seed": 3014,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3014"
+    },
+    {
+      "expected_outcome_hash": "f8dc1416b225ddd65fef1fbdc6badd5fb3baf8387fa9dd826762ff62e6440a69",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S26_status_inquiry_general",
+      "scenario_hash": "1dcef17b4b5a376cf75215fc1d2d89f82023be00c20d2af8706b67244a1f177a",
+      "scenario_id": "2g_S26_tpl_canonical_v1_canonic_s0014_a9b5d2ae",
+      "seed": 14,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0014"
+    },
+    {
+      "expected_outcome_hash": "f8dc1416b225ddd65fef1fbdc6badd5fb3baf8387fa9dd826762ff62e6440a69",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_subject"
+      ],
+      "parent_scenario_id": "S26_status_inquiry_general",
+      "scenario_hash": "a231dd250ab19e31bcc881f17ff88648a3da19de0c1b23f10010a6dfb527519c",
+      "scenario_id": "2g_S26_tpl_mutation_v1_missing_s1014_954057f5",
+      "seed": 1014,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1014"
+    },
+    {
+      "expected_outcome_hash": "f8dc1416b225ddd65fef1fbdc6badd5fb3baf8387fa9dd826762ff62e6440a69",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_subject"
+      ],
+      "parent_scenario_id": "S26_status_inquiry_general",
+      "scenario_hash": "9fed95c03e830d496728e4717947431fbe8b9fa86cfbbee84d7fb1e781a48516",
+      "scenario_id": "2g_S26_tpl_mutation_v1_missing_s1034_72487124",
+      "seed": 1034,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1034"
+    },
+    {
+      "expected_outcome_hash": "f8dc1416b225ddd65fef1fbdc6badd5fb3baf8387fa9dd826762ff62e6440a69",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_subject"
+      ],
+      "parent_scenario_id": "S26_status_inquiry_general",
+      "scenario_hash": "a4b2129a8ef92cea7ffa153522eb4c8872c2d64ea20c9a37908f5b9fda579c4f",
+      "scenario_id": "2g_S26_tpl_mutation_v1_missing_s1054_0c4e7ec6",
+      "seed": 1054,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1054"
+    },
+    {
+      "expected_outcome_hash": "f8dc1416b225ddd65fef1fbdc6badd5fb3baf8387fa9dd826762ff62e6440a69",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_subject"
+      ],
+      "parent_scenario_id": "S26_status_inquiry_general",
+      "scenario_hash": "5881c5f8f4088af12688d606638a92d51eee06c1de07ffc50b4f743d536befe0",
+      "scenario_id": "2g_S26_tpl_mutation_v1_missing_s1074_a011d68d",
+      "seed": 1074,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1074"
+    },
+    {
+      "expected_outcome_hash": "f8dc1416b225ddd65fef1fbdc6badd5fb3baf8387fa9dd826762ff62e6440a69",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_subject"
+      ],
+      "parent_scenario_id": "S26_status_inquiry_general",
+      "scenario_hash": "08b266d291b5f23b27c2b5044044877beb0ba551de1820e83bed63344ae14ce7",
+      "scenario_id": "2g_S26_tpl_mutation_v1_missing_s1094_12e4b992",
+      "seed": 1094,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1094"
+    },
+    {
+      "expected_outcome_hash": "f8dc1416b225ddd65fef1fbdc6badd5fb3baf8387fa9dd826762ff62e6440a69",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "ignore_policy_instruction"
+      ],
+      "parent_scenario_id": "S26_status_inquiry_general",
+      "scenario_hash": "9f6ffa06ed37e88b080ab9da45357a7927782a3ef8abd70013dbc9f2f0132ac6",
+      "scenario_id": "2g_S26_tpl_security_v1_ignore_p_s2014_9ac062ed",
+      "seed": 2014,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2014"
+    },
+    {
+      "expected_outcome_hash": "67495fa38d582e7cc6a71d14eb56a0ef595746278dcb200177df11e0d575b40d",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unknown_service"
+      ],
+      "parent_scenario_id": "S27_mixed_job_and_complaint",
+      "scenario_hash": "8a92e780565da3a8b9d90cb26caf9449a26ff691d0c6a34d2db740e94cd2370c",
+      "scenario_id": "2g_S27_tpl_boundary_v1_unknown_s3015_3ad01a9f",
+      "seed": 3015,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3015"
+    },
+    {
+      "expected_outcome_hash": "67495fa38d582e7cc6a71d14eb56a0ef595746278dcb200177df11e0d575b40d",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S27_mixed_job_and_complaint",
+      "scenario_hash": "7e3935a538de2dba3c2f52e41c0bd7b2025e94014a34771cfbb87cc9e957a903",
+      "scenario_id": "2g_S27_tpl_canonical_v1_canonic_s0015_55b63d31",
+      "seed": 15,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0015"
+    },
+    {
+      "expected_outcome_hash": "67495fa38d582e7cc6a71d14eb56a0ef595746278dcb200177df11e0d575b40d",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "multiple_services"
+      ],
+      "parent_scenario_id": "S27_mixed_job_and_complaint",
+      "scenario_hash": "6fea95a03e64bdad2d84be5ee81a2156abcd86318e8ad93990adc2a61c6f9f5d",
+      "scenario_id": "2g_S27_tpl_mutation_v1_multiple_s1015_71487bc1",
+      "seed": 1015,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1015"
+    },
+    {
+      "expected_outcome_hash": "67495fa38d582e7cc6a71d14eb56a0ef595746278dcb200177df11e0d575b40d",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "multiple_services"
+      ],
+      "parent_scenario_id": "S27_mixed_job_and_complaint",
+      "scenario_hash": "f5dc249b32cca41611755a9e0ff7529b9acfe23556684ee272c0a1ad62f6a127",
+      "scenario_id": "2g_S27_tpl_mutation_v1_multiple_s1035_d2443240",
+      "seed": 1035,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1035"
+    },
+    {
+      "expected_outcome_hash": "67495fa38d582e7cc6a71d14eb56a0ef595746278dcb200177df11e0d575b40d",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "multiple_services"
+      ],
+      "parent_scenario_id": "S27_mixed_job_and_complaint",
+      "scenario_hash": "4e848f516a92f5d48b912eb2eba0a47ead3c29f16eac94aac0970b99fea2e7df",
+      "scenario_id": "2g_S27_tpl_mutation_v1_multiple_s1055_1f9312f3",
+      "seed": 1055,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1055"
+    },
+    {
+      "expected_outcome_hash": "67495fa38d582e7cc6a71d14eb56a0ef595746278dcb200177df11e0d575b40d",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "multiple_services"
+      ],
+      "parent_scenario_id": "S27_mixed_job_and_complaint",
+      "scenario_hash": "e8e6617d2eb9fb15cabe312f79a93ccda81fa2f1da6d8d29bf0bfde778aa43e5",
+      "scenario_id": "2g_S27_tpl_mutation_v1_multiple_s1075_f6c88677",
+      "seed": 1075,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1075"
+    },
+    {
+      "expected_outcome_hash": "67495fa38d582e7cc6a71d14eb56a0ef595746278dcb200177df11e0d575b40d",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "multiple_services"
+      ],
+      "parent_scenario_id": "S27_mixed_job_and_complaint",
+      "scenario_hash": "997d5b5bb2f4402282860a0da0110ac0ea917c3cbff95a08bb4b7b1edd7fd172",
+      "scenario_id": "2g_S27_tpl_mutation_v1_multiple_s1095_a5cbb145",
+      "seed": 1095,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1095"
+    },
+    {
+      "expected_outcome_hash": "67495fa38d582e7cc6a71d14eb56a0ef595746278dcb200177df11e0d575b40d",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "direct_send_request"
+      ],
+      "parent_scenario_id": "S27_mixed_job_and_complaint",
+      "scenario_hash": "bd22c11e380ae4b6be439251e3faa375609fc35dfa6798e348702e99b2b7949f",
+      "scenario_id": "2g_S27_tpl_security_v1_direct_s_s2015_7598b9e9",
+      "seed": 2015,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2015"
+    },
+    {
+      "expected_outcome_hash": "742a5a8d30a215f21f060297203506625a4dfdaf523720312d537f46e6b835e1",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "policy_sensitive"
+      ],
+      "parent_scenario_id": "S30_forwarded_thread_mixed_context",
+      "scenario_hash": "46381d3e6dd3591bf416410a969d8ba812ec74b37902e25335925cfd6308f349",
+      "scenario_id": "2g_S30_tpl_boundary_v1_policy_s_s3016_5f00bc05",
+      "seed": 3016,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3016"
+    },
+    {
+      "expected_outcome_hash": "742a5a8d30a215f21f060297203506625a4dfdaf523720312d537f46e6b835e1",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S30_forwarded_thread_mixed_context",
+      "scenario_hash": "017b1451b96f83392ef28780d86d38458eed34c4a2e1e396fab0c5cd23743783",
+      "scenario_id": "2g_S30_tpl_canonical_v1_canonic_s0016_8f72b1df",
+      "seed": 16,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0016"
+    },
+    {
+      "expected_outcome_hash": "742a5a8d30a215f21f060297203506625a4dfdaf523720312d537f46e6b835e1",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "swedish_english_mix"
+      ],
+      "parent_scenario_id": "S30_forwarded_thread_mixed_context",
+      "scenario_hash": "afb73928b45a074f127dad934fb2804c18790d2e2e854a92e0decc74cea9aca2",
+      "scenario_id": "2g_S30_tpl_mutation_v1_swedish_s1016_f72eedf9",
+      "seed": 1016,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1016"
+    },
+    {
+      "expected_outcome_hash": "742a5a8d30a215f21f060297203506625a4dfdaf523720312d537f46e6b835e1",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "swedish_english_mix"
+      ],
+      "parent_scenario_id": "S30_forwarded_thread_mixed_context",
+      "scenario_hash": "b1a0835668028606f7e0fe27cbb21be54cc42a058a6a07c8032d2f940748b29a",
+      "scenario_id": "2g_S30_tpl_mutation_v1_swedish_s1036_77954666",
+      "seed": 1036,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1036"
+    },
+    {
+      "expected_outcome_hash": "742a5a8d30a215f21f060297203506625a4dfdaf523720312d537f46e6b835e1",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "swedish_english_mix"
+      ],
+      "parent_scenario_id": "S30_forwarded_thread_mixed_context",
+      "scenario_hash": "c62bb815c2ed57d22e7a22af0f23be9226e9b6e1e227d328aeff4d4997addc57",
+      "scenario_id": "2g_S30_tpl_mutation_v1_swedish_s1056_34b168de",
+      "seed": 1056,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1056"
+    },
+    {
+      "expected_outcome_hash": "742a5a8d30a215f21f060297203506625a4dfdaf523720312d537f46e6b835e1",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "swedish_english_mix"
+      ],
+      "parent_scenario_id": "S30_forwarded_thread_mixed_context",
+      "scenario_hash": "4d7919d0a6b39f0b539ccd4741604a8fd3da8c3461185b228d8a674aca963a74",
+      "scenario_id": "2g_S30_tpl_mutation_v1_swedish_s1076_e98134f3",
+      "seed": 1076,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1076"
+    },
+    {
+      "expected_outcome_hash": "742a5a8d30a215f21f060297203506625a4dfdaf523720312d537f46e6b835e1",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "swedish_english_mix"
+      ],
+      "parent_scenario_id": "S30_forwarded_thread_mixed_context",
+      "scenario_hash": "a5f8d5ce9ba86189e7f99f5ed7c29a7d6982266fa41b9e8e48d4018e8e28bc55",
+      "scenario_id": "2g_S30_tpl_mutation_v1_swedish_s1096_d937711c",
+      "seed": 1096,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1096"
+    },
+    {
+      "expected_outcome_hash": "742a5a8d30a215f21f060297203506625a4dfdaf523720312d537f46e6b835e1",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "approval_bypass_request"
+      ],
+      "parent_scenario_id": "S30_forwarded_thread_mixed_context",
+      "scenario_hash": "8908864800a4c67569996d7e6189701950a8913697c938df9fa9323c839fe739",
+      "scenario_id": "2g_S30_tpl_security_v1_approval_s2016_73e82f2e",
+      "seed": 2016,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2016"
+    },
+    {
+      "expected_outcome_hash": "0debaa6331e378f079dfe882048534db982f5b1f86cd7e7e1b8eb23cae47ee26",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "duplicate"
+      ],
+      "parent_scenario_id": "S31_prompt_injection_customer_text",
+      "scenario_hash": "1b71cdc068a95af05f6cd35a3a268fe113dffcb3ab47354a2dabbdeceb34358a",
+      "scenario_id": "2g_S31_tpl_boundary_v1_duplicat_s3017_eb6bce7a",
+      "seed": 3017,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3017"
+    },
+    {
+      "expected_outcome_hash": "0debaa6331e378f079dfe882048534db982f5b1f86cd7e7e1b8eb23cae47ee26",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S31_prompt_injection_customer_text",
+      "scenario_hash": "6423fc2e22145f09a8236fce3695e2f95242f695b3f50579796341279dbda93c",
+      "scenario_id": "2g_S31_tpl_canonical_v1_canonic_s0017_6aab69d9",
+      "seed": 17,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0017"
+    },
+    {
+      "expected_outcome_hash": "0debaa6331e378f079dfe882048534db982f5b1f86cd7e7e1b8eb23cae47ee26",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "diacritic_error"
+      ],
+      "parent_scenario_id": "S31_prompt_injection_customer_text",
+      "scenario_hash": "b4c2f1f458d4a15905395d55781c73dd23acff7fffa7ea576a0708189dcbd240",
+      "scenario_id": "2g_S31_tpl_mutation_v1_diacriti_s1037_ebef9f7d",
+      "seed": 1037,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1037"
+    },
+    {
+      "expected_outcome_hash": "0debaa6331e378f079dfe882048534db982f5b1f86cd7e7e1b8eb23cae47ee26",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "html_noise"
+      ],
+      "parent_scenario_id": "S31_prompt_injection_customer_text",
+      "scenario_hash": "d350e3f041b110b9f50c23152f79843e2ef55f8332c1a435e4196b6307ad9714",
+      "scenario_id": "2g_S31_tpl_mutation_v1_html_noi_s1057_a8c73be7",
+      "seed": 1057,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1057"
+    },
+    {
+      "expected_outcome_hash": "0debaa6331e378f079dfe882048534db982f5b1f86cd7e7e1b8eb23cae47ee26",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_punctuation"
+      ],
+      "parent_scenario_id": "S31_prompt_injection_customer_text",
+      "scenario_hash": "8c34a1c9462f7ec96db47723849df2039ad5b42f703acc7db26db46f5a9a5975",
+      "scenario_id": "2g_S31_tpl_mutation_v1_missing_s1017_d9dd4ed3",
+      "seed": 1017,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1017"
+    },
+    {
+      "expected_outcome_hash": "0debaa6331e378f079dfe882048534db982f5b1f86cd7e7e1b8eb23cae47ee26",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "missing_punctuation"
+      ],
+      "parent_scenario_id": "S31_prompt_injection_customer_text",
+      "scenario_hash": "900d86b1e73160e769d12567079d81136709fd794753b9bc303c926e4de2477a",
+      "scenario_id": "2g_S31_tpl_mutation_v1_missing_s1097_ed6ef727",
+      "seed": 1097,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1097"
+    },
+    {
+      "expected_outcome_hash": "0debaa6331e378f079dfe882048534db982f5b1f86cd7e7e1b8eb23cae47ee26",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "paragraph_reordering"
+      ],
+      "parent_scenario_id": "S31_prompt_injection_customer_text",
+      "scenario_hash": "fb88eb032e39920478360fe20e37dd4b27b121e1cd1e7c91180d543a103609c4",
+      "scenario_id": "2g_S31_tpl_mutation_v1_paragrap_s1077_512c7626",
+      "seed": 1077,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1077"
+    },
+    {
+      "expected_outcome_hash": "0debaa6331e378f079dfe882048534db982f5b1f86cd7e7e1b8eb23cae47ee26",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "fake_system_message"
+      ],
+      "parent_scenario_id": "S31_prompt_injection_customer_text",
+      "scenario_hash": "3fd069d1b1bd011791c5c5e7066c7181120f99f960fd4006958ecd1952ba6836",
+      "scenario_id": "2g_S31_tpl_security_v1_fake_sys_s2017_dedadf57",
+      "seed": 2017,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2017"
+    },
+    {
+      "expected_outcome_hash": "b70f4e14eb4ecd6e8b67b30763f87a0f9bd578601db1780a227ea4be6dc04692",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "unknown_service"
+      ],
+      "parent_scenario_id": "S33_legal_threat_complaint",
+      "scenario_hash": "9e89fb50b686bfc7253762fb2ef6bd04518f02f83bbc303f9a8b313498eb9704",
+      "scenario_id": "2g_S33_tpl_boundary_v1_unknown_s3018_381a6021",
+      "seed": 3018,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3018"
+    },
+    {
+      "expected_outcome_hash": "b70f4e14eb4ecd6e8b67b30763f87a0f9bd578601db1780a227ea4be6dc04692",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S33_legal_threat_complaint",
+      "scenario_hash": "9ae301978e3c40da89e5851ae3d0ba07fc8b0cd962bf0c5ccb8f5f6909059a4b",
+      "scenario_id": "2g_S33_tpl_canonical_v1_canonic_s0018_ab3799fc",
+      "seed": 18,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0018"
+    },
+    {
+      "expected_outcome_hash": "b70f4e14eb4ecd6e8b67b30763f87a0f9bd578601db1780a227ea4be6dc04692",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "abbreviation"
+      ],
+      "parent_scenario_id": "S33_legal_threat_complaint",
+      "scenario_hash": "bf34821acb0bb88e30b58fea7e1ab411fb66da9f102b2bd1b4a1082e3ba82352",
+      "scenario_id": "2g_S33_tpl_mutation_v1_abbrevia_s1018_9c4b21ff",
+      "seed": 1018,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1018"
+    },
+    {
+      "expected_outcome_hash": "b70f4e14eb4ecd6e8b67b30763f87a0f9bd578601db1780a227ea4be6dc04692",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "abbreviation"
+      ],
+      "parent_scenario_id": "S33_legal_threat_complaint",
+      "scenario_hash": "b270518958d577580e15350e5c729a1fa77c99fdfcaa0d15ccd004a634777e2b",
+      "scenario_id": "2g_S33_tpl_mutation_v1_abbrevia_s1038_06c38fa2",
+      "seed": 1038,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1038"
+    },
+    {
+      "expected_outcome_hash": "b70f4e14eb4ecd6e8b67b30763f87a0f9bd578601db1780a227ea4be6dc04692",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "abbreviation"
+      ],
+      "parent_scenario_id": "S33_legal_threat_complaint",
+      "scenario_hash": "b44810d65eb46acc355c86a629375de974abcb2ff510273e86a3da0804da06b2",
+      "scenario_id": "2g_S33_tpl_mutation_v1_abbrevia_s1058_388d292a",
+      "seed": 1058,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1058"
+    },
+    {
+      "expected_outcome_hash": "b70f4e14eb4ecd6e8b67b30763f87a0f9bd578601db1780a227ea4be6dc04692",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "abbreviation"
+      ],
+      "parent_scenario_id": "S33_legal_threat_complaint",
+      "scenario_hash": "511fd195b404ae8eaf24a5ced9669333274394c29dae7eb8d05606690596a5cd",
+      "scenario_id": "2g_S33_tpl_mutation_v1_abbrevia_s1078_93bfe455",
+      "seed": 1078,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1078"
+    },
+    {
+      "expected_outcome_hash": "b70f4e14eb4ecd6e8b67b30763f87a0f9bd578601db1780a227ea4be6dc04692",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "abbreviation"
+      ],
+      "parent_scenario_id": "S33_legal_threat_complaint",
+      "scenario_hash": "eae01cd7a125c70add635347a8fc9e7d3aa76e02a4ba4daae2d5db83dfe51e2b",
+      "scenario_id": "2g_S33_tpl_mutation_v1_abbrevia_s1098_9a3c843a",
+      "seed": 1098,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1098"
+    },
+    {
+      "expected_outcome_hash": "b70f4e14eb4ecd6e8b67b30763f87a0f9bd578601db1780a227ea4be6dc04692",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "signature_instruction"
+      ],
+      "parent_scenario_id": "S33_legal_threat_complaint",
+      "scenario_hash": "da9e9a2e5bb07087fa71a2809ead642e8469ee0af67e105dd925c9f9ccb61829",
+      "scenario_id": "2g_S33_tpl_security_v1_signatur_s2018_41800ddd",
+      "seed": 2018,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2018"
+    },
+    {
+      "expected_outcome_hash": "ceefbb3c77d2c1f7787bdff44dc6608820a87e7cd5c63e270a9714320c15c96c",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "policy_sensitive"
+      ],
+      "parent_scenario_id": "S34_spam_phishing_link",
+      "scenario_hash": "0d37143749d815958d6c7e63ff89fc72f844915c8ba1ee6bb7efbc14ae1873c5",
+      "scenario_id": "2g_S34_tpl_boundary_v1_policy_s_s3019_dd3f7add",
+      "seed": 3019,
+      "source_mode": "generated",
+      "template_id": "tpl_boundary_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_boundary_v1__s3019"
+    },
+    {
+      "expected_outcome_hash": "ceefbb3c77d2c1f7787bdff44dc6608820a87e7cd5c63e270a9714320c15c96c",
+      "generator_type": "template",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [],
+      "parent_scenario_id": "S34_spam_phishing_link",
+      "scenario_hash": "2904d97d130442313343a72ca0de0dacb6dc2821a7de8852cde3bd5edba36874",
+      "scenario_id": "2g_S34_tpl_canonical_v1_canonic_s0019_aef743b8",
+      "seed": 19,
+      "source_mode": "generated",
+      "template_id": "tpl_canonical_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_canonical_v1__s0019"
+    },
+    {
+      "expected_outcome_hash": "ceefbb3c77d2c1f7787bdff44dc6608820a87e7cd5c63e270a9714320c15c96c",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "reply_history"
+      ],
+      "parent_scenario_id": "S34_spam_phishing_link",
+      "scenario_hash": "caaa75cd9c870775b44f28ef329c99814ae29445f75b150c75903b123e8074c1",
+      "scenario_id": "2g_S34_tpl_mutation_v1_reply_hi_s1019_52615ef5",
+      "seed": 1019,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1019"
+    },
+    {
+      "expected_outcome_hash": "ceefbb3c77d2c1f7787bdff44dc6608820a87e7cd5c63e270a9714320c15c96c",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "reply_history"
+      ],
+      "parent_scenario_id": "S34_spam_phishing_link",
+      "scenario_hash": "f8017893a7e5621f2ddc5eaa5a5be165c1c8e1b3b1b6d579c185ee738fab0a55",
+      "scenario_id": "2g_S34_tpl_mutation_v1_reply_hi_s1039_4becb52a",
+      "seed": 1039,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1039"
+    },
+    {
+      "expected_outcome_hash": "ceefbb3c77d2c1f7787bdff44dc6608820a87e7cd5c63e270a9714320c15c96c",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "reply_history"
+      ],
+      "parent_scenario_id": "S34_spam_phishing_link",
+      "scenario_hash": "d793cf815d936806852010216813dcf5901cbce0b6fd747078d6eb7ce4e152b0",
+      "scenario_id": "2g_S34_tpl_mutation_v1_reply_hi_s1059_f27d92c8",
+      "seed": 1059,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1059"
+    },
+    {
+      "expected_outcome_hash": "ceefbb3c77d2c1f7787bdff44dc6608820a87e7cd5c63e270a9714320c15c96c",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "reply_history"
+      ],
+      "parent_scenario_id": "S34_spam_phishing_link",
+      "scenario_hash": "969e85610a116bf408783d8775a0223f2cccdfb52a0221c042cc3f1c58500318",
+      "scenario_id": "2g_S34_tpl_mutation_v1_reply_hi_s1079_07b6a49c",
+      "seed": 1079,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1079"
+    },
+    {
+      "expected_outcome_hash": "ceefbb3c77d2c1f7787bdff44dc6608820a87e7cd5c63e270a9714320c15c96c",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "reply_history"
+      ],
+      "parent_scenario_id": "S34_spam_phishing_link",
+      "scenario_hash": "fa8951c8a014cb67fcd0e330affd7e16788a4618f733b8ecfbc8d1e862abe76b",
+      "scenario_id": "2g_S34_tpl_mutation_v1_reply_hi_s1099_1a60d751",
+      "seed": 1099,
+      "source_mode": "generated",
+      "template_id": "tpl_mutation_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_mutation_v1__s1099"
+    },
+    {
+      "expected_outcome_hash": "ceefbb3c77d2c1f7787bdff44dc6608820a87e7cd5c63e270a9714320c15c96c",
+      "generator_type": "mutation",
+      "generator_version": "2g-generator-v1",
+      "mutation_parameters": {
+        "mutation_version": "2g-mutation-v1"
+      },
+      "mutation_types": [
+        "quoted_instruction"
+      ],
+      "parent_scenario_id": "S34_spam_phishing_link",
+      "scenario_hash": "dd529ebf1f39b16fa05dc84a8aba91d7a9b3526b526bbe482bd8be92bf5f1e6e",
+      "scenario_id": "2g_S34_tpl_security_v1_quoted_i_s2019_17e6a001",
+      "seed": 2019,
+      "source_mode": "generated",
+      "template_id": "tpl_security_v1",
+      "template_version": "v1",
+      "variation_id": "tpl_security_v1__s2019"
+    }
+  ]
+}

@@ -28,24 +28,34 @@ REQUIRED_DECISION_SUBSEQUENCE = (
     "policy_authorization",
 )
 
+OBSERVE_DECISION_SUBSEQUENCE_NO_DECISIONING = (
+    "pipeline_run_started",
+    "classification",
+    "policy_authorization",
+)
+
 ALLOWED_INTERLEAVED_DECISION_TYPES: frozenset[str] = frozenset()
 
 
-def _assert_decision_subsequence(types: list[str]) -> list[str]:
+def _assert_decision_subsequence(
+    types: list[str],
+    *,
+    required: tuple[str, ...] = REQUIRED_DECISION_SUBSEQUENCE,
+) -> list[str]:
     violations: list[str] = []
     cursor = 0
     for record_type in types:
         if record_type in ALLOWED_INTERLEAVED_DECISION_TYPES:
             continue
-        if cursor < len(REQUIRED_DECISION_SUBSEQUENCE) and record_type == REQUIRED_DECISION_SUBSEQUENCE[cursor]:
+        if cursor < len(required) and record_type == required[cursor]:
             cursor += 1
             continue
-        if record_type in REQUIRED_DECISION_SUBSEQUENCE:
+        if record_type in required:
             violations.append(f"decision record out of order: {record_type}")
             return violations
         violations.append(f"unknown decision record type: {record_type}")
         return violations
-    if cursor != len(REQUIRED_DECISION_SUBSEQUENCE):
+    if cursor != len(required):
         violations.append(f"decision record subsequence incomplete: {types}")
     return violations
 
@@ -57,6 +67,7 @@ def assert_observe_campaign_pipeline(
     expected_job_status: str = "awaiting_approval",
     expected_policy_authorization: str = "approval_required",
     expect_pending_approval: bool = True,
+    decision_subsequence: tuple[str, ...] | None = None,
 ) -> list[str]:
     """Observe-mode campaign assertions: pipeline ran, no outbound, contract terminal state."""
     violations: list[str] = []
@@ -94,7 +105,12 @@ def assert_observe_campaign_pipeline(
 
     records = job.get("decision_records") or []
     types = [r.get("record_type") for r in sorted(records, key=lambda x: int(x.get("event_sequence") or 0))]
-    violations.extend(_assert_decision_subsequence(types))
+    violations.extend(
+        _assert_decision_subsequence(
+            types,
+            required=decision_subsequence or REQUIRED_DECISION_SUBSEQUENCE,
+        )
+    )
     for forbidden in FORBIDDEN_DECISION_TYPES:
         if forbidden in types:
             violations.append(f"forbidden decision record {forbidden}")

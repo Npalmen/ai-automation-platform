@@ -1,0 +1,156 @@
+{
+  "report_schema_version": "2f.2",
+  "evaluation_run_id": "77d87e8f-d6a3-427c-a2cc-e25c5995968a",
+  "scenario_id": "S01_lead_laddbox_quality",
+  "attempt_id": 1,
+  "transport_mode": "live_gmail",
+  "ai_mode": "fixture_ai",
+  "result": "passed",
+  "failure_category": null,
+  "started_at": "2026-07-23T23:16:26.472143Z",
+  "completed_at": "2026-07-23T23:16:36.944978Z",
+  "state_transitions": [
+    {
+      "state": "created",
+      "recorded_at": "2026-07-23T23:16:26.474275+00:00"
+    },
+    {
+      "state": "config_validated",
+      "recorded_at": "2026-07-23T23:16:26.476267+00:00"
+    },
+    {
+      "state": "sender_profile_ready",
+      "recorded_at": "2026-07-23T23:16:26.835948+00:00"
+    },
+    {
+      "state": "sender_scope_ready",
+      "recorded_at": "2026-07-23T23:16:26.914294+00:00"
+    },
+    {
+      "state": "app_ready",
+      "recorded_at": "2026-07-23T23:16:26.975451+00:00"
+    },
+    {
+      "state": "run_registered",
+      "recorded_at": "2026-07-23T23:16:27.037152+00:00"
+    },
+    {
+      "state": "sender_ready",
+      "recorded_at": "2026-07-23T23:16:27.037640+00:00"
+    },
+    {
+      "state": "sending",
+      "recorded_at": "2026-07-23T23:16:27.038093+00:00"
+    },
+    {
+      "state": "send_response_received",
+      "sender_gmail_message_id": "19f91441da004025",
+      "sender_gmail_thread_id": "19f91441da004025",
+      "rfc_message_id": "<CAFBf1sbbb3TgbkfH06bNJwZRUHsQF7sUkasM8BVsFQMW+oQyXA@mail.gmail.com>",
+      "reconciled": false,
+      "recorded_at": "2026-07-23T23:16:28.042543+00:00"
+    },
+    {
+      "state": "sent",
+      "sender_gmail_message_id": "19f91441da004025",
+      "sender_gmail_thread_id": "19f91441da004025",
+      "rfc_message_id": "<CAFBf1sbbb3TgbkfH06bNJwZRUHsQF7sUkasM8BVsFQMW+oQyXA@mail.gmail.com>",
+      "recorded_at": "2026-07-23T23:16:28.043561+00:00"
+    },
+    {
+      "state": "waiting_for_delivery",
+      "recorded_at": "2026-07-23T23:16:28.044055+00:00"
+    },
+    {
+      "state": "delivery_confirmed",
+      "recipient_gmail_message_id": "19f91442bd6b9051",
+      "recipient_gmail_thread_id": "19f91442bd6b9051",
+      "recorded_at": "2026-07-23T23:16:35.135555+00:00"
+    },
+    {
+      "state": "triggering_intake",
+      "recipient_gmail_message_id": "19f91442bd6b9051",
+      "recorded_at": "2026-07-23T23:16:35.159047+00:00"
+    },
+    {
+      "state": "intake_completed",
+      "job_id": "e4c99891-5d11-410a-a7ba-847e461c68fa",
+      "pipeline_run_id": null,
+      "job_status": "awaiting_approval",
+      "recorded_at": "2026-07-23T23:16:36.653210+00:00"
+    },
+    {
+      "state": "job_detected",
+      "recorded_at": "2026-07-23T23:16:36.654021+00:00"
+    },
+    {
+      "state": "pipeline_completed",
+      "recorded_at": "2026-07-23T23:16:36.683272+00:00"
+    },
+    {
+      "state": "asserting",
+      "violations": [],
+      "recorded_at": "2026-07-23T23:16:36.943636+00:00"
+    },
+    {
+      "state": "passed",
+      "recorded_at": "2026-07-23T23:16:36.944597+00:00"
+    }
+  ],
+  "cleanup_result": null,
+  "sender_gmail_message_id": "19f91441da004025",
+  "recipient_gmail_message_id": "19f91442bd6b9051",
+  "sender_gmail_thread_id": null,
+  "recipient_gmail_thread_id": null,
+  "rfc_message_id": null,
+  "job_id": null,
+  "pipeline_run_id": null,
+  "action_operation_id": null,
+  "sender_account_fingerprint": "6b7a900e01ae",
+  "recipient_account_fingerprint": "32b8ba3bb1e7",
+  "assertion_results": [],
+  "external_telemetry": {
+    "testbot_events": [
+      {
+        "category": "testbot_gmail_send_attempt",
+        "at": "2026-07-23T23:16:27.381413+00:00"
+      },
+      {
+        "category": "testbot_gmail_send_succeeded",
+        "sender_gmail_message_id": "19f91441da004025",
+        "at": "2026-07-23T23:16:28.042293+00:00"
+      }
+    ]
+  },
+  "latency_breakdown": {},
+  "redacted_diagnostics": {},
+  "failure_summary": {
+    "summary_schema_version": "2f.2-recovery",
+    "evaluation_run_id": "77d87e8f-d6a3-427c-a2cc-e25c5995968a",
+    "scenario_id": "S01_lead_laddbox_quality",
+    "attempt_id": 1,
+    "failure_category": null,
+    "failed_stage": "passed",
+    "primary_exit_code": 0,
+    "cleanup_exit_code": 0,
+    "artifact_status": "present",
+    "final_exit_code": 0,
+    "send_state": "confirmed",
+    "send_attempted": true,
+    "send_confirmed": true,
+    "reconciliation_result": "not_run",
+    "recipient_delivery_observed": true,
+    "root_job_bound": true,
+    "cleanup_state": "success",
+    "gmail_mutations": 1,
+    "scenario_cleanup_mutations": 0,
+    "workflow_cleanup_mutations": 1,
+    "total_gmail_mutations": 1,
+    "cleanup_adapter_called": true,
+    "cleanup_adapter_result": "archived",
+    "redacted_error": null,
+    "intake_skip_reason": null,
+    "safety_reason": null,
+    "workflow_sha": "ff6f1d734b847f088892eb801458037e7f74e691"
+  }
+}

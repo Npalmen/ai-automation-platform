@@ -56,18 +56,31 @@ def test_tbs03_invoice_expects_manual_review_without_approval():
 def test_manual_review_assertion_passes_without_approval():
     scenario = get_campaign_scenario("TBS04_unknown_observe")
     outcome = resolve_observe_expected_outcome(scenario)
-    observation = _observation(
-        status=outcome.job_status,
-        policy_auth=outcome.policy_authorization,
-        pending=False,
-        job_type="unknown",
-    )
+    observation = {
+        "job": {
+            "job_id": "job-1",
+            "job_status": outcome.job_status,
+            "has_pending_approvals": False,
+            "policy": {
+                "policy_authorization": outcome.policy_authorization,
+                "decision": outcome.policy_authorization,
+            },
+            "classification": {"detected_job_type": "unknown"},
+            "decision_records": [
+                {"record_type": "pipeline_run_started", "event_sequence": 1},
+                {"record_type": "classification", "event_sequence": 2},
+                {"record_type": "policy_authorization", "event_sequence": 3},
+            ],
+        },
+        "events": [],
+    }
     violations = assert_observe_campaign_pipeline(
         observation,
         expected_job_type="unknown",
         expected_job_status=outcome.job_status,
         expected_policy_authorization=outcome.policy_authorization,
         expect_pending_approval=False,
+        decision_subsequence=outcome.decision_subsequence,
     )
     assert violations == []
 
@@ -88,6 +101,45 @@ def test_manual_review_poll_succeeds_when_expected():
     assert result.observation["job"]["job_status"] == "manual_review"
 
 
+def test_invoice_unknown_use_short_decision_subsequence():
+    scenario = get_campaign_scenario("TBS03_invoice_observe")
+    outcome = resolve_observe_expected_outcome(scenario)
+    assert outcome.decision_subsequence == (
+        "pipeline_run_started",
+        "classification",
+        "policy_authorization",
+    )
+
+
+def test_invoice_decision_subsequence_assertion_passes():
+    observation = {
+        "job": {
+            "job_id": "job-001",
+            "job_status": "manual_review",
+            "has_pending_approvals": False,
+            "classification": {"detected_job_type": "invoice"},
+            "policy": {"policy_authorization": "hold_for_review"},
+            "decision_records": [
+                {"record_type": "pipeline_run_started", "event_sequence": 1},
+                {"record_type": "classification", "event_sequence": 2},
+                {"record_type": "policy_authorization", "event_sequence": 3},
+            ],
+        },
+        "events": [],
+    }
+    scenario = get_campaign_scenario("TBS03_invoice_observe")
+    outcome = resolve_observe_expected_outcome(scenario)
+    violations = assert_observe_campaign_pipeline(
+        observation,
+        expected_job_type="invoice",
+        expected_job_status=outcome.job_status,
+        expected_policy_authorization=outcome.policy_authorization,
+        expect_pending_approval=False,
+        decision_subsequence=outcome.decision_subsequence,
+    )
+    assert violations == []
+
+
 def test_unexpected_approval_on_safe_hold_fails():
     observation = _observation(
         status="manual_review",
@@ -95,12 +147,15 @@ def test_unexpected_approval_on_safe_hold_fails():
         pending=True,
         job_type="unknown",
     )
+    scenario = get_campaign_scenario("TBS04_unknown_observe")
+    outcome = resolve_observe_expected_outcome(scenario)
     violations = assert_observe_campaign_pipeline(
         observation,
         expected_job_type="unknown",
         expected_job_status="manual_review",
         expected_policy_authorization="hold_for_review",
         expect_pending_approval=False,
+        decision_subsequence=outcome.decision_subsequence,
     )
     assert any("unexpected pending approval" in v for v in violations)
 

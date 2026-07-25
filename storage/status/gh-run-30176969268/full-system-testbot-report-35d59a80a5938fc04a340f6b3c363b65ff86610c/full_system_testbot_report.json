@@ -1,0 +1,25 @@
+{
+  "schema_version": "full-system-testbot.v1",
+  "main_sha": "35d59a80a5938fc04a340f6b3c363b65ff86610c",
+  "server_sha": "35d59a80a5938fc04a340f6b3c363b65ff86610c",
+  "campaign_type": "transport-smoke",
+  "mode": "observe",
+  "scenario_versions": [
+    "v1",
+    "v1",
+    "v1",
+    "v1",
+    "v1"
+  ],
+  "sends": 5,
+  "replies": 0,
+  "approvals": 0,
+  "auto_actions": 0,
+  "writes_per_integration": {},
+  "customer_card_outcomes": [],
+  "failures": [],
+  "safety_violations": [],
+  "cleanup": {},
+  "overall_status": "failed",
+  "generated_at": "2026-07-25T22:12:01.035734+00:00"
+}
