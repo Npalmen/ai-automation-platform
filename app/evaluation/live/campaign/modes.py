@@ -38,9 +38,14 @@ CAMPAIGN_TYPE_DEFAULT_MODE: dict[str, str] = {
 CAMPAIGN_TYPE_SEND_BUDGET: dict[str, int] = {
     "transport-smoke": 5,
     "observe-core": 5,
-    "semi-auto-core": 12,
+    "semi-auto-core": 8,
     "auto-safe-actions": 10,
     "customer-card-stateful": 30,
     "integration-sandbox": 10,
     "full-regression": 30,
+}
+
+# Reply budget ceilings per campaign type (app Gmail replies to testbot sender)
+CAMPAIGN_TYPE_REPLY_BUDGET: dict[str, int] = {
+    "semi-auto-core": 3,
 }

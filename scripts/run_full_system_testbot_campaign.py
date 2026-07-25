@@ -21,7 +21,7 @@ from app.evaluation.live.campaign.gates import (
 from app.evaluation.live.campaign.modes import CAMPAIGN_TYPE_DEFAULT_MODE
 from app.evaluation.live.campaign.readiness import build_full_system_testbot_readiness
 from app.evaluation.live.campaign.registry import list_campaign_scenarios
-from app.evaluation.live.campaign.runner import run_observe_campaign
+from app.evaluation.live.campaign.runner import run_observe_campaign, run_semi_automatic_campaign
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.live.registry import new_evaluation_run_id
@@ -100,13 +100,22 @@ def _run_campaign(
         return 2
 
     report_path = Path("storage/status/full_system_testbot_report.json")
-    result = run_observe_campaign(
-        campaign_type=campaign_type,
-        tenant_id=tenant_id,
-        base_url=base_url,
-        admin_api_key=admin_key,
-        report_path=report_path,
-    )
+    if campaign_type == "semi-auto-core":
+        result = run_semi_automatic_campaign(
+            campaign_type=campaign_type,
+            tenant_id=tenant_id,
+            base_url=base_url,
+            admin_api_key=admin_key,
+            report_path=report_path,
+        )
+    else:
+        result = run_observe_campaign(
+            campaign_type=campaign_type,
+            tenant_id=tenant_id,
+            base_url=base_url,
+            admin_api_key=admin_key,
+            report_path=report_path,
+        )
     print(json.dumps(result.to_dict(), indent=2, ensure_ascii=False))
 
     if result.safety_violations:

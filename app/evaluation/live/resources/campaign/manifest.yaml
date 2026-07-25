@@ -19,3 +19,15 @@ campaigns:
       - TBS03_invoice_observe.yaml
       - TBS04_unknown_observe.yaml
       - TBS05_noisy_observe.yaml
+
+  semi-auto-core:
+    default_mode: semi_automatic
+    scenarios:
+      - TBSM01_lead_approve_reply.yaml
+      - TBSM02_support_approve_reply.yaml
+      - TBSM03_noisy_approve_reply.yaml
+      - TBSM04_lead_reject.yaml
+      - TBSM05_support_reject.yaml
+      - TBSM06_duplicate_approve.yaml
+      - TBSM07_stale_approve.yaml
+      - TBSM08_unknown_negative_hold.yaml

@@ -12,13 +12,20 @@ from typing import Any
 import httpx
 
 from app.evaluation.live.assertions import (
+    assert_expected_sender_reply,
     assert_no_unexpected_reply,
     assert_observe_campaign_pipeline,
     assert_s01_pipeline,
     assert_safety_invariants,
+    assert_semi_automatic_campaign_pipeline,
+    assert_semi_automatic_telemetry,
     assert_telemetry_summary,
 )
 from app.evaluation.live.campaign.expected_outcomes import ObserveExpectedOutcome
+from app.evaluation.live.campaign.semi_automatic_expected_outcomes import (
+    SemiAutomaticExpectedOutcome,
+)
+from app.evaluation.live.campaign.test_operator import execute_test_operator_actions
 from app.evaluation.live.cleanup import cleanup_recipient_message, cleanup_unexpected_reply
 from app.evaluation.live.cleanup_phase import resolve_cleanup_phase
 from app.evaluation.live.cleanup_resolver import resolve_recipient_from_journal
@@ -29,6 +36,7 @@ from app.evaluation.live.constants import (
     CLEANUP_STATE_FAILED,
     CLEANUP_STATE_IN_PROGRESS,
     CLEANUP_STATE_SUCCESS,
+    TELEMETRY_APP_GMAIL_REPLY,
     TELEMETRY_TESTBOT_SEND_RECONCILE,
     TERMINAL_CLEANUP_STATES,
 )
@@ -51,6 +59,7 @@ from app.evaluation.live.exit_codes import (
 from app.evaluation.live.gmail_transport import (
     SendOutcome,
     _TRANSPORT_ERRORS,
+    observe_expected_sender_reply,
     observe_unexpected_sender_reply,
     reconcile_sent_message,
     run_sender_readiness_read_only,
@@ -85,6 +94,8 @@ class _RunContext:
     send_outcome: SendOutcome | None = None
     confirmed: dict[str, Any] | None = None
     unexpected_reply: dict[str, Any] | None = None
+    expected_reply: dict[str, Any] | None = None
+    operator_results: list[dict[str, Any]] | None = None
 
 
 class LiveEvalRunner:
@@ -107,6 +118,10 @@ class LiveEvalRunner:
         expected_job_type: str | None = None,
         use_observe_assertions: bool = False,
         observe_expected_outcome: ObserveExpectedOutcome | None = None,
+        use_semi_automatic_assertions: bool = False,
+        semi_automatic_expected_outcome: SemiAutomaticExpectedOutcome | None = None,
+        reply_budget_remaining: int = 0,
+        campaign_scenario: Any | None = None,
     ):
         self.config = get_live_eval_config()
         self.base_url = base_url.rstrip("/")
@@ -124,6 +139,10 @@ class LiveEvalRunner:
         self.expected_job_type = expected_job_type
         self.use_observe_assertions = use_observe_assertions
         self.observe_expected_outcome = observe_expected_outcome
+        self.use_semi_automatic_assertions = use_semi_automatic_assertions
+        self.semi_automatic_expected_outcome = semi_automatic_expected_outcome
+        self.reply_budget_remaining = reply_budget_remaining
+        self.campaign_scenario = campaign_scenario
         self.observer = LiveEvalObserver(
             base_url=self.base_url,
             admin_api_key=admin_api_key,
@@ -540,6 +559,8 @@ class LiveEvalRunner:
                 )
 
         observation = self._wait_for_pipeline()
+        if self.use_semi_automatic_assertions and self.semi_automatic_expected_outcome:
+            observation = self._run_semi_automatic_operator_phase(observation, ctx)
         self._transition("pipeline_completed")
 
         registry = self._load_registry_run()
@@ -548,14 +569,20 @@ class LiveEvalRunner:
         if expires_raw:
             expires_at = datetime.fromisoformat(str(expires_raw).replace("Z", "+00:00"))
 
-        reply_evidence = observe_unexpected_sender_reply(
-            evaluation_run_id=self.evaluation_run_id,
-            scenario_id=self.scenario_id,
-            attempt_id=self.attempt_id,
-            expected_recipient=self.expected_recipient,
-            send_window_start=self.send_window_start,
-            expires_at=expires_at,
-        )
+        reply_evidence = None
+        if not (
+            self.use_semi_automatic_assertions
+            and self.semi_automatic_expected_outcome
+            and self.semi_automatic_expected_outcome.expected_reply
+        ):
+            reply_evidence = observe_unexpected_sender_reply(
+                evaluation_run_id=self.evaluation_run_id,
+                scenario_id=self.scenario_id,
+                attempt_id=self.attempt_id,
+                expected_recipient=self.expected_recipient,
+                send_window_start=self.send_window_start,
+                expires_at=expires_at,
+            )
         if reply_evidence:
             ctx.unexpected_reply = {
                 "message_id": reply_evidence.message_id,
@@ -569,6 +596,27 @@ class LiveEvalRunner:
                     "message_id": reply_evidence.message_id,
                 }
             )
+
+        if (
+            self.use_semi_automatic_assertions
+            and self.semi_automatic_expected_outcome
+            and self.semi_automatic_expected_outcome.expected_reply
+        ):
+            expected = observe_expected_sender_reply(
+                evaluation_run_id=self.evaluation_run_id,
+                scenario_id=self.scenario_id,
+                attempt_id=self.attempt_id,
+                expected_recipient=self.expected_recipient,
+                send_window_start=self.send_window_start,
+                expires_at=expires_at,
+            )
+            if expected:
+                ctx.expected_reply = {
+                    "message_id": expected.message_id,
+                    "subject_truncated": expected.subject_truncated,
+                    "from_masked": expected.from_masked,
+                    "internal_date_ms": expected.internal_date_ms,
+                }
 
         violations = self._assert_all(observation, ctx)
         self._transition("asserting", violations=violations)
@@ -722,20 +770,131 @@ class LiveEvalRunner:
         self._transition("triggering_intake", recipient_gmail_message_id=recipient_id)
         return self.observer.process_delivery(self.evaluation_run_id, recipient_id)
 
-    def _wait_for_pipeline(self) -> dict[str, Any]:
+    def _wait_for_pipeline(
+        self,
+        *,
+        success_statuses: frozenset[str] | None = None,
+    ) -> dict[str, Any]:
         self._transition("job_detected")
-        success_statuses = None
-        if self.observe_expected_outcome is not None:
-            success_statuses = self.observe_expected_outcome.success_terminal_statuses
+        if success_statuses is None:
+            if self.semi_automatic_expected_outcome is not None:
+                success_statuses = self.semi_automatic_expected_outcome.pre_action_success_statuses
+            elif self.observe_expected_outcome is not None:
+                success_statuses = self.observe_expected_outcome.success_terminal_statuses
         return self.observer.poll_pipeline(
             self.evaluation_run_id,
             timeout_seconds=min(600, self.config.max_runtime_minutes * 60),
             success_statuses=success_statuses,
         )
 
+    def _run_semi_automatic_operator_phase(
+        self,
+        observation: dict[str, Any],
+        ctx: _RunContext,
+    ) -> dict[str, Any]:
+        outcome = self.semi_automatic_expected_outcome
+        if outcome is None:
+            return observation
+
+        if outcome.is_negative_hold:
+            return observation
+
+        job = observation.get("job") or {}
+        job_id = job.get("job_id")
+        if not job_id:
+            raise LiveEvalSafetyError("semi-auto operator phase requires job_id")
+
+        if self.campaign_scenario is None:
+            raise LiveEvalSafetyError("semi-auto operator phase requires campaign scenario")
+
+        operator_results = execute_test_operator_actions(
+            base_url=self.base_url,
+            admin_api_key=self.observer.admin_api_key,
+            tenant_id=self.tenant_id,
+            scenario=self.campaign_scenario,
+            evaluation_run_id=self.evaluation_run_id,
+            job_id=str(job_id),
+            outcome=outcome,
+            expected_sender=self.expected_sender,
+            reply_budget_remaining=self.reply_budget_remaining,
+        )
+        ctx.operator_results = [
+            {
+                "action": result.action,
+                "approval_id": result.approval_id,
+                "http_status": result.http_status,
+                "idempotent": result.idempotent,
+                "conflict": result.conflict,
+            }
+            for result in operator_results
+        ]
+
+        return self.observer.poll_pipeline(
+            self.evaluation_run_id,
+            timeout_seconds=min(600, self.config.max_runtime_minutes * 60),
+            success_statuses=outcome.final_success_statuses,
+        )
+
     def _assert_all(self, observation: dict[str, Any], ctx: _RunContext) -> list[str]:
         violations: list[str] = []
-        violations.extend(assert_no_unexpected_reply(ctx.unexpected_reply))
+        if self.use_semi_automatic_assertions and self.semi_automatic_expected_outcome:
+            outcome = self.semi_automatic_expected_outcome
+            violations.extend(
+                assert_semi_automatic_campaign_pipeline(
+                    observation,
+                    expected_job_type=self.expected_job_type,
+                    expected_job_status=outcome.final_job_status,
+                    expected_policy_authorization=outcome.policy_authorization,
+                    expect_pending_approval=False,
+                    decision_subsequence=outcome.decision_subsequence,
+                    expect_approval_resolution_record=outcome.expect_approval_resolution,
+                )
+            )
+            expected_reply_count = 1 if outcome.expected_reply else 0
+            if outcome.expect_duplicate_idempotent:
+                events = observation.get("events") or []
+                reply = _count_unique_succeeded_operation_keys(
+                    events, TELEMETRY_APP_GMAIL_REPLY
+                )
+                if reply > 1:
+                    violations.append(
+                        f"duplicate approve must produce at most one reply, got {reply}"
+                    )
+                violations.extend(
+                    assert_semi_automatic_telemetry(
+                        self.testbot_events,
+                        events,
+                        expected_reply_count=reply,
+                        app_summary=observation.get("telemetry_summary") or {},
+                    )
+                )
+            else:
+                violations.extend(
+                    assert_semi_automatic_telemetry(
+                        self.testbot_events,
+                        observation.get("events") or [],
+                        expected_reply_count=expected_reply_count,
+                        app_summary=observation.get("telemetry_summary") or {},
+                    )
+                )
+            violations.extend(
+                assert_expected_sender_reply(
+                    ctx.expected_reply,
+                    required=outcome.expected_reply,
+                )
+            )
+            if outcome.expect_duplicate_idempotent and ctx.operator_results:
+                dup = [r for r in ctx.operator_results if r.get("action") == "approve"]
+                if len(dup) < 2:
+                    violations.append("duplicate approve scenario missing second operator call")
+                elif not dup[1].get("idempotent") and dup[1].get("http_status") not in (200, 201, 409):
+                    violations.append("duplicate approve did not return idempotent/conflict-safe result")
+            if outcome.expect_stale_conflict and ctx.operator_results:
+                stale = ctx.operator_results[-1]
+                if not stale.get("conflict"):
+                    violations.append("stale operator action must be denied with conflict")
+        elif not ctx.unexpected_reply:
+            violations.extend(assert_no_unexpected_reply(ctx.unexpected_reply))
         if self.use_observe_assertions:
             outcome = self.observe_expected_outcome
             violations.extend(
@@ -758,14 +917,15 @@ class LiveEvalRunner:
             )
         else:
             violations.extend(assert_s01_pipeline(observation))
-        events = observation.get("events") or []
-        violations.extend(
-            assert_telemetry_summary(
-                self.testbot_events,
-                events,
-                observation.get("telemetry_summary") or {},
+        if not self.use_semi_automatic_assertions:
+            events = observation.get("events") or []
+            violations.extend(
+                assert_telemetry_summary(
+                    self.testbot_events,
+                    events,
+                    observation.get("telemetry_summary") or {},
+                )
             )
-        )
         send_id = ctx.send_outcome.sender_gmail_message_id if ctx.send_outcome else None
         recipient_id = (ctx.confirmed or {}).get("message_id")
         violations.extend(

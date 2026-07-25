@@ -1,0 +1,36 @@
+scenario_id: TBSM06_duplicate_approve
+scenario_version: v1
+mode: semi_automatic
+job_type: lead
+service_profile: electrical
+synthetic_customer_id: family-lead-semi-dup-001
+thread_id: thread-lead-semi-dup-001
+label: krowolf-live-eval
+
+email:
+  subject: Offert laddbox duplicate approve
+  message_text: |
+    Hej, jag vill installera en laddbox i garaget.
+    Adress: Testgatan 3, 12345 Teststad.
+    Telefon: 070-3234567
+  sender:
+    name: Testbot Anna
+    email: testbot-anna@eval.test
+
+expected_classification:
+  job_type: lead
+
+expected_routing:
+  job_status: awaiting_approval
+  policy_authorization: approval_required
+  final_job_status: completed
+
+expected_approval:
+  operator_action: approve
+  expected_reply: false
+  test_variant: duplicate_approve
+
+budgets:
+  gmail_sends: 1
+  gmail_replies: 1
+  external_writes: 0

@@ -1,0 +1,35 @@
+scenario_id: TBSM02_support_approve_reply
+scenario_version: v1
+mode: semi_automatic
+job_type: customer_inquiry
+service_profile: support
+synthetic_customer_id: family-support-semi-001
+thread_id: thread-support-semi-001
+label: krowolf-live-eval
+
+email:
+  subject: Fråga om befintlig installation semi-auto
+  message_text: |
+    Hej, jag undrar när teknikern kan komma för att kolla min befintliga laddbox.
+    Den laddar inte längre som den ska.
+  sender:
+    name: Testbot Erik
+    email: testbot-erik@eval.test
+
+expected_classification:
+  job_type: customer_inquiry
+
+expected_routing:
+  job_status: awaiting_approval
+  policy_authorization: approval_required
+  final_job_status: completed
+
+expected_approval:
+  operator_action: approve
+  expected_reply: true
+  test_variant: normal
+
+budgets:
+  gmail_sends: 1
+  gmail_replies: 1
+  external_writes: 0
