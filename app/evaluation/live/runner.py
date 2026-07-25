@@ -74,7 +74,7 @@ from app.evaluation.live.reporting import (
     emit_run_summary_stdout,
     write_github_step_summary,
 )
-from app.evaluation.live.safety import require_scenario_allowed_for_2f2, validate_config_readiness
+from app.evaluation.live.safety import require_scenario_allowed_for_live_gmail, validate_config_readiness
 from app.evaluation.live.schemas import LiveEvalReport
 
 
@@ -373,7 +373,7 @@ class LiveEvalRunner:
     def run(self) -> int:
         writer_lock: RunWriterLock | None = None
         try:
-            require_scenario_allowed_for_2f2(self.scenario_id)
+            require_scenario_allowed_for_live_gmail(self.scenario_id)
             ensure_run_directory(self.evaluation_run_id)
             writer_lock = acquire_run_writer_lock(
                 self.evaluation_run_id,

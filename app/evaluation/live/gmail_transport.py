@@ -20,7 +20,7 @@ from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.live.journal import RunCheckpoint, assert_journal_send_budget
 from app.evaluation.live.safety import (
     require_live_eval_external_mutation_enabled,
-    require_scenario_allowed_for_2f2,
+    require_scenario_allowed_for_live_gmail,
 )
 from app.evaluation.live.subject_parser import build_subject_with_token, parse_subject_token
 from app.integrations.google.mail_client import GoogleMailClient
@@ -107,6 +107,15 @@ def build_sender_client(credentials: SenderCredentials | None = None) -> GoogleM
 
 def _validate_send_budget_config(config: LiveEvalConfig) -> list[str]:
     issues: list[str] = []
+    from app.evaluation.live.campaign.gates import campaign_enabled
+
+    if campaign_enabled(config):
+        if config.max_scenarios_per_run < 1:
+            issues.append("max_scenarios_per_run must be >= 1")
+        if config.max_gmail_sends_per_run < 1:
+            issues.append("max_gmail_sends_per_run must be >= 1")
+        return issues
+
     if config.max_scenarios_per_run != 1:
         issues.append("max_scenarios_per_run must be 1")
     if config.max_gmail_sends_per_run != 1:
@@ -301,12 +310,13 @@ def send_scenario_email(
     expected_recipient: str,
     checkpoint: RunCheckpoint | None = None,
     base_subject: str = "Laddbox offert villa",
+    message_body: str | None = None,
     config: LiveEvalConfig | None = None,
 ) -> tuple[SendOutcome, list[dict[str, Any]]]:
     """Send exactly one synthetic email. Returns outcome and telemetry events."""
     config = config or get_live_eval_config()
     require_live_eval_external_mutation_enabled(config)
-    require_scenario_allowed_for_2f2(scenario_id)
+    require_scenario_allowed_for_live_gmail(scenario_id)
 
     if checkpoint is not None:
         assert_journal_send_budget(checkpoint)
@@ -332,7 +342,7 @@ def send_scenario_email(
         attempt_id=attempt_id,
         base_subject=base_subject,
     )
-    body = build_s01_message_body(evaluation_run_id=evaluation_run_id)
+    body = message_body or build_s01_message_body(evaluation_run_id=evaluation_run_id)
     client = build_sender_client()
     result = client.send_message(
         to=expected_recipient,

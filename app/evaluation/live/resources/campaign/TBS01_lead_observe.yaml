@@ -1,0 +1,26 @@
+scenario_id: TBS01_lead_observe
+scenario_version: v1
+mode: observe
+job_type: lead
+service_profile: electrical
+synthetic_customer_id: family-lead-001
+thread_id: thread-lead-001
+label: krowolf-live-eval
+
+email:
+  subject: Offert laddbox villa
+  message_text: |
+    Hej, jag vill installera en laddbox i garaget.
+    Adress: Testgatan 1, 12345 Teststad.
+    Telefon: 070-1234567
+  sender:
+    name: Testbot Anna
+    email: testbot-anna@eval.test
+
+expected_classification:
+  job_type: lead
+
+budgets:
+  gmail_sends: 1
+  gmail_replies: 0
+  external_writes: 0

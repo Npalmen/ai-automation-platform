@@ -1,0 +1,25 @@
+scenario_id: TBS02_support_observe
+scenario_version: v1
+mode: observe
+job_type: customer_inquiry
+service_profile: support
+synthetic_customer_id: family-support-001
+thread_id: thread-support-001
+label: krowolf-live-eval
+
+email:
+  subject: Fråga om befintlig installation
+  message_text: |
+    Hej, jag undrar när teknikern kan komma för att kolla min befintliga laddbox.
+    Den laddar inte längre som den ska.
+  sender:
+    name: Testbot Erik
+    email: testbot-erik@eval.test
+
+expected_classification:
+  job_type: customer_inquiry
+
+budgets:
+  gmail_sends: 1
+  gmail_replies: 0
+  external_writes: 0

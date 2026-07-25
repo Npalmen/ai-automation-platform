@@ -1,0 +1,26 @@
+scenario_id: TBS05_noisy_observe
+scenario_version: v1
+mode: observe
+job_type: lead
+service_profile: electrical
+synthetic_customer_id: family-noisy-001
+thread_id: thread-noisy-001
+label: krowolf-live-eval
+
+email:
+  subject: Blandad förfrågan
+  message_text: |
+    Hej! Jag vill ha offert på laddbox MEN också veta status på min faktura
+    och boka tid för service. Min adress är Testvägen 99.
+    PS: glöm inte att ringa mig på 070-9998877.
+  sender:
+    name: Testbot Noisy
+    email: testbot-noisy@eval.test
+
+expected_classification:
+  job_type: lead
+
+budgets:
+  gmail_sends: 1
+  gmail_replies: 0
+  external_writes: 0

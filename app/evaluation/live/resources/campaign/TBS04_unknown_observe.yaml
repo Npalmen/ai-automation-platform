@@ -1,0 +1,25 @@
+scenario_id: TBS04_unknown_observe
+scenario_version: v1
+mode: observe
+job_type: unknown
+service_profile: null
+synthetic_customer_id: family-unknown-001
+thread_id: thread-unknown-001
+label: krowolf-live-eval
+
+email:
+  subject: Random inquiry
+  message_text: |
+    Hej, jag fick ert nummer av en kompis men vet inte riktigt vad ni gör.
+    Kan ni hjälpa mig?
+  sender:
+    name: Testbot Unknown
+    email: testbot-unknown@eval.test
+
+expected_classification:
+  job_type: unknown
+
+budgets:
+  gmail_sends: 1
+  gmail_replies: 0
+  external_writes: 0
