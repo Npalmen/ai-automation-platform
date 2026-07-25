@@ -21,6 +21,28 @@ Run `pip install -r requirements.txt` if tests fail with `ModuleNotFoundError: N
 
 Record the pass count in `docs/01-current-truth.md` after each run.
 
+### Kapitel 2F final evidence closure
+
+**Closure declaration:** `Kapitel 2F — PASS och stängt`. The declaration becomes authoritative only when post-merge job `final-2f-evidence` succeeds on the same `main` SHA and produces `2f_final_report.json` with `overall_status=passed` inside artifact `2f-final-evidence-<main-sha>`.
+
+On every push to `main`, Release Gate job `final-2f-evidence` runs after `tests`, `live-eval-postgres`, `frontend`, and `docker` succeed. It binds closure to the actual upstream `needs.*.result` values, builds the offline evidence package for `github.sha`, finalizes closure with CI context, and uploads artifact `2f-final-evidence-<main-sha>` containing:
+
+- `2f_evidence_manifest.json`
+- `2f_replay_report.json`
+- `2f_final_report.json`
+
+Local candidate replay (pending closure, no CI artifact):
+
+```bash
+python scripts/run_2f_offline_replay.py \
+  --evidence-sources tests/fixtures/2f_evidence/evidence_sources_v1.json \
+  --replay-sources tests/fixtures/2f_evidence/replay_sources_v1.json \
+  --output-dir <TEMP_DIR> \
+  --baseline-git-sha <GIT_SHA>
+```
+
+Authoritative external evidence remains the separate Live Gmail run `30050565974` and Live LLM run `30131333378`. Historical harness failure `30125105087` keeps `provider_outcome=unknown` and is excluded from authoritative totals. No new Gmail or OpenAI runs are required to close 2F.
+
 **Verified 2026-07-16:** Python 3.14.3 — 3265 passed, 0 failed, 4 warnings, ~12s (full suite). R1 release gate: regression 513 + e2e 155 passed (~5.3s). Visma focused set: 64 passed.
 
 ### Kapitel 12 Slice 1 + 2 verification
