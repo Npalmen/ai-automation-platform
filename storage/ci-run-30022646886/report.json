@@ -1,0 +1,139 @@
+{
+  "report_schema_version": "2f.2",
+  "evaluation_run_id": "7fb77347-2088-440b-b921-d412bcded0e9",
+  "scenario_id": "S01_lead_laddbox_quality",
+  "attempt_id": 1,
+  "transport_mode": "live_gmail",
+  "ai_mode": "fixture_ai",
+  "result": "failed",
+  "failure_category": "job_timeout",
+  "started_at": "2026-07-23T15:58:24.799773Z",
+  "completed_at": "2026-07-23T16:08:36.710939Z",
+  "state_transitions": [
+    {
+      "state": "created",
+      "recorded_at": "2026-07-23T15:58:24.801804+00:00"
+    },
+    {
+      "state": "config_validated",
+      "recorded_at": "2026-07-23T15:58:24.804157+00:00"
+    },
+    {
+      "state": "sender_profile_ready",
+      "recorded_at": "2026-07-23T15:58:25.134196+00:00"
+    },
+    {
+      "state": "sender_scope_ready",
+      "recorded_at": "2026-07-23T15:58:25.285047+00:00"
+    },
+    {
+      "state": "app_ready",
+      "recorded_at": "2026-07-23T15:58:25.344394+00:00"
+    },
+    {
+      "state": "run_registered",
+      "recorded_at": "2026-07-23T15:58:25.404264+00:00"
+    },
+    {
+      "state": "sender_ready",
+      "recorded_at": "2026-07-23T15:58:25.404680+00:00"
+    },
+    {
+      "state": "sending",
+      "recorded_at": "2026-07-23T15:58:25.405079+00:00"
+    },
+    {
+      "state": "send_response_received",
+      "sender_gmail_message_id": "19f8fb31557b894e",
+      "sender_gmail_thread_id": "19f8fb31557b894e",
+      "rfc_message_id": "<CAFBf1sYR1NW2XXyOqAnj0bbkO7RDGextGthqDKMz2RGVTcYNsQ@mail.gmail.com>",
+      "reconciled": false,
+      "recorded_at": "2026-07-23T15:58:26.263011+00:00"
+    },
+    {
+      "state": "sent",
+      "sender_gmail_message_id": "19f8fb31557b894e",
+      "sender_gmail_thread_id": "19f8fb31557b894e",
+      "rfc_message_id": "<CAFBf1sYR1NW2XXyOqAnj0bbkO7RDGextGthqDKMz2RGVTcYNsQ@mail.gmail.com>",
+      "recorded_at": "2026-07-23T15:58:26.263865+00:00"
+    },
+    {
+      "state": "waiting_for_delivery",
+      "recorded_at": "2026-07-23T15:58:26.264276+00:00"
+    },
+    {
+      "state": "delivery_confirmed",
+      "recipient_gmail_message_id": "19f8fb31bb3674c0",
+      "recipient_gmail_thread_id": "19f8fb31bb3674c0",
+      "recorded_at": "2026-07-23T15:58:29.546135+00:00"
+    },
+    {
+      "state": "triggering_intake",
+      "recipient_gmail_message_id": "19f8fb31bb3674c0",
+      "recorded_at": "2026-07-23T15:58:29.546714+00:00"
+    },
+    {
+      "state": "intake_completed",
+      "job_id": "271f1402-9b22-4d8b-9105-d9024fb25c61",
+      "pipeline_run_id": null,
+      "recorded_at": "2026-07-23T15:58:31.112349+00:00"
+    },
+    {
+      "state": "job_detected",
+      "recorded_at": "2026-07-23T15:58:31.113048+00:00"
+    }
+  ],
+  "cleanup_result": null,
+  "sender_gmail_message_id": null,
+  "recipient_gmail_message_id": null,
+  "sender_gmail_thread_id": null,
+  "recipient_gmail_thread_id": null,
+  "rfc_message_id": null,
+  "job_id": null,
+  "pipeline_run_id": null,
+  "action_operation_id": null,
+  "sender_account_fingerprint": "6b7a900e01ae",
+  "recipient_account_fingerprint": "32b8ba3bb1e7",
+  "assertion_results": [
+    "job_timeout"
+  ],
+  "external_telemetry": {
+    "testbot_events": [
+      {
+        "category": "testbot_gmail_send_attempt",
+        "at": "2026-07-23T15:58:25.741271+00:00"
+      },
+      {
+        "category": "testbot_gmail_send_succeeded",
+        "sender_gmail_message_id": "19f8fb31557b894e",
+        "at": "2026-07-23T15:58:26.262745+00:00"
+      }
+    ]
+  },
+  "latency_breakdown": {},
+  "redacted_diagnostics": {},
+  "failure_summary": {
+    "summary_schema_version": "2f.2-recovery",
+    "evaluation_run_id": "7fb77347-2088-440b-b921-d412bcded0e9",
+    "scenario_id": "S01_lead_laddbox_quality",
+    "attempt_id": 1,
+    "failure_category": "job_timeout",
+    "failed_stage": "job_detected",
+    "primary_exit_code": 5,
+    "cleanup_exit_code": null,
+    "artifact_status": "present",
+    "final_exit_code": 5,
+    "send_state": "confirmed",
+    "send_attempted": true,
+    "send_confirmed": true,
+    "reconciliation_result": "not_run",
+    "recipient_delivery_observed": true,
+    "root_job_bound": false,
+    "cleanup_state": "not_run",
+    "gmail_mutations": 0,
+    "redacted_error": "job_timeout",
+    "intake_skip_reason": null,
+    "safety_reason": null,
+    "workflow_sha": "ec29e40e5d605cb72c2941347b880fa68b85b604"
+  }
+}

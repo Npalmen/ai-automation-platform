@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.evaluation.live.assertions import (
+    OBSERVE_DECISION_SUBSEQUENCE_NO_DECISIONING,
+    REQUIRED_DECISION_SUBSEQUENCE,
+)
 from app.evaluation.live.campaign.schemas import CampaignScenario
 
 _APPROVAL_FIRST_TERMINAL = frozenset({"awaiting_approval"})
@@ -16,6 +20,7 @@ class ObserveExpectedOutcome:
     policy_authorization: str
     expect_pending_approval: bool
     success_terminal_statuses: frozenset[str]
+    decision_subsequence: tuple[str, ...]
 
     @property
     def is_safe_hold(self) -> bool:
@@ -60,9 +65,15 @@ def resolve_observe_expected_outcome(scenario: CampaignScenario) -> ObserveExpec
         _SAFE_HOLD_TERMINAL if job_status == "manual_review" else _APPROVAL_FIRST_TERMINAL
     )
 
+    if scenario.job_type in ("invoice", "unknown"):
+        decision_subsequence = OBSERVE_DECISION_SUBSEQUENCE_NO_DECISIONING
+    else:
+        decision_subsequence = REQUIRED_DECISION_SUBSEQUENCE
+
     return ObserveExpectedOutcome(
         job_status=job_status,
         policy_authorization=policy_authorization,
         expect_pending_approval=expect_pending_approval,
         success_terminal_statuses=success_statuses,
+        decision_subsequence=decision_subsequence,
     )

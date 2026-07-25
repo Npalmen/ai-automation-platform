@@ -1,0 +1,12 @@
+{
+  "evaluation_run_id": "36ef38a5-79d2-41fd-bb3c-3f8c00d9c5d0",
+  "scenario_id": "S01_lead_laddbox_quality",
+  "attempt_id": 1,
+  "tenant_id": "TENANT_LIVE_EVAL",
+  "transport_mode": "live_gmail",
+  "ai_mode": "fixture_ai",
+  "config_hash": "996e782fea251c48",
+  "send_window_start": "2026-07-23T00:14:23.663051+00:00",
+  "sender_account_fingerprint": "6b7a900e01ae",
+  "recipient_account_fingerprint": "32b8ba3bb1e7"
+}

@@ -1,0 +1,21 @@
+{
+  "report_schema_version": "2f.2.readiness",
+  "workflow_sha": "b0839e823238525164b0b0f4c48eae4311b6f3eb",
+  "tenant_id": "TENANT_LIVE_EVAL",
+  "environment_status": "live-gmail-eval",
+  "sender_profile_match": true,
+  "recipient_profile_match": false,
+  "recipient_label_found": true,
+  "intake_query_valid": true,
+  "sender_account_fingerprint": "6b7a900e01ae",
+  "recipient_account_fingerprint": "32b8ba3bb1e7",
+  "external_sends": 0,
+  "gmail_mutations": 0,
+  "live_llm_calls": 0,
+  "result": "failed",
+  "failure_category": "readiness_failed",
+  "issues": [
+    "Gmail profile email does not match configured connection user_id"
+  ],
+  "intake_label": "krowolf-live-eval"
+}
