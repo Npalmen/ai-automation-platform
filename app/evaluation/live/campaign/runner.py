@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.evaluation.live.campaign.expected_outcomes import resolve_observe_expected_outcome
+from app.evaluation.live.campaign.generator import build_campaign_send_payload
 from app.evaluation.live.campaign.gates import (
     campaign_enabled,
     validate_campaign_budget_config,
