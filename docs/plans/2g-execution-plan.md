@@ -16,7 +16,7 @@ todos:
     status: completed
   - id: 2g-e-ci-closure
     content: Integrera 2G i befintlig Release Gate, publicera slutartifact, verifiera post-merge-baseline och formellt stäng Kapitel 2G
-    status: in_progress
+    status: completed
 isProject: true
 ---
 
