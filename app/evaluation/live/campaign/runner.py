@@ -7,7 +7,7 @@ import subprocess
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.evaluation.live.campaign.generator import build_campaign_send_payload
+from app.evaluation.live.campaign.expected_outcomes import resolve_observe_expected_outcome
 from app.evaluation.live.campaign.gates import (
     campaign_enabled,
     validate_campaign_budget_config,
@@ -149,6 +149,7 @@ def run_observe_campaign(
 
         run_id = new_evaluation_run_id()
         payload = build_campaign_send_payload(scenario=scenario, evaluation_run_id=run_id)
+        expected_outcome = resolve_observe_expected_outcome(scenario)
         runner = LiveEvalRunner(
             base_url=base_url,
             admin_api_key=admin_api_key,
@@ -161,6 +162,7 @@ def run_observe_campaign(
             base_subject=scenario.email.subject,
             expected_job_type=_expected_job_type(scenario),
             use_observe_assertions=True,
+            observe_expected_outcome=expected_outcome,
         )
         exit_code = runner.run()
         sends += 1 if exit_code == 0 else 0

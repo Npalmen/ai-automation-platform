@@ -35,7 +35,39 @@ def test_observe_assertion_passes_awaiting_approval():
         },
         "events": [],
     }
-    assert assert_observe_campaign_pipeline(observation, expected_job_type="lead") == []
+    assert assert_observe_campaign_pipeline(
+        observation,
+        expected_job_type="lead",
+        expected_job_status="awaiting_approval",
+        expected_policy_authorization="approval_required",
+        expect_pending_approval=True,
+    ) == []
+
+
+def test_observe_assertion_passes_manual_review_hold():
+    observation = {
+        "job": {
+            "job_id": "job-001",
+            "job_status": "manual_review",
+            "has_pending_approvals": False,
+            "classification": {"detected_job_type": "unknown"},
+            "policy": {"policy_authorization": "hold_for_review"},
+            "decision_records": [
+                {"record_type": "pipeline_run_started", "event_sequence": 1},
+                {"record_type": "classification", "event_sequence": 2},
+                {"record_type": "decisioning_recommendation", "event_sequence": 3},
+                {"record_type": "policy_authorization", "event_sequence": 4},
+            ],
+        },
+        "events": [],
+    }
+    assert assert_observe_campaign_pipeline(
+        observation,
+        expected_job_type="unknown",
+        expected_job_status="manual_review",
+        expected_policy_authorization="hold_for_review",
+        expect_pending_approval=False,
+    ) == []
 
 
 def test_observe_assertion_fails_wrong_classification():
