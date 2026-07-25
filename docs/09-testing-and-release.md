@@ -43,6 +43,27 @@ python scripts/run_2f_offline_replay.py \
 
 Authoritative external evidence remains the separate Live Gmail run `30050565974` and Live LLM run `30131333378`. Historical harness failure `30125105087` keeps `provider_outcome=unknown` and is excluded from authoritative totals. No new Gmail or OpenAI runs are required to close 2F.
 
+### Kapitel 2G generated scenario evaluation closure
+
+**Closure declaration:** `Kapitel 2G — PASS och stängt`. The declaration becomes authoritative only when post-merge job `final-2g-evidence` succeeds on the same `main` SHA and produces `2g_final_report.json` with `overall_status=passed` inside artifact `2g-final-evidence-<main-sha>`.
+
+On pull requests, Release Gate job `2g-pr-eval` runs the 60-scenario PR batch. On every push to `main`, job `2g-main-eval` runs the 160-scenario main batch after `tests`, `live-eval-postgres`, `frontend`, and `docker` succeed. Job `final-2g-evidence` then runs after those jobs and `2g-main-eval`, binds closure to actual `needs.*.result` values, and uploads artifact `2g-final-evidence-<main-sha>` containing:
+
+- `2g_generation_manifest.json`
+- `2g_batch_report.json`
+- `2g_failures.json`
+- `2g_coverage_report.json`
+- `2g_final_report.json`
+
+Local batch smoke:
+
+```bash
+python scripts/run_2g_batch.py --mode pr --output-dir <TEMP_DIR> --baseline-git-sha <GIT_SHA>
+python scripts/run_2g_batch.py --mode main --output-dir <TEMP_DIR> --baseline-git-sha <GIT_SHA>
+```
+
+No new Gmail or OpenAI runs are required to close 2G. See `docs/10g-generated-scenario-eval.md`.
+
 **Verified 2026-07-16:** Python 3.14.3 — 3265 passed, 0 failed, 4 warnings, ~12s (full suite). R1 release gate: regression 513 + e2e 155 passed (~5.3s). Visma focused set: 64 passed.
 
 ### Kapitel 12 Slice 1 + 2 verification

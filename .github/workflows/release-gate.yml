@@ -303,3 +303,102 @@ jobs:
             ${{ runner.temp }}/2f-final-evidence/2f_replay_report.json
             ${{ runner.temp }}/2f-final-evidence/2f_final_report.json
           if-no-files-found: error
+
+  eval-2g-pr:
+    name: 2G PR batch eval
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run 2G PR batch evaluation
+        env:
+          OUTPUT_DIR: ${{ runner.temp }}/2g-pr-batch
+        run: |
+          python scripts/run_2g_batch.py \
+            --mode pr \
+            --output-dir "${OUTPUT_DIR}" \
+            --baseline-git-sha "${GITHUB_SHA}"
+
+  eval-2g-main:
+    name: 2G main batch eval
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [tests, live-eval-postgres, frontend, docker]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run 2G main batch evaluation
+        env:
+          OUTPUT_DIR: ${{ runner.temp }}/2g-main-batch
+        run: |
+          python scripts/run_2g_batch.py \
+            --mode main \
+            --output-dir "${OUTPUT_DIR}" \
+            --baseline-git-sha "${GITHUB_SHA}"
+
+  final-2g-evidence:
+    name: Final 2G evidence
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [tests, live-eval-postgres, frontend, docker, eval-2g-main]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Build and finalize 2G evidence package
+        env:
+          OUTPUT_DIR: ${{ runner.temp }}/2g-final-evidence
+        run: |
+          python scripts/run_2g_finalize.py \
+            --output-dir "${OUTPUT_DIR}" \
+            --baseline-git-sha "${GITHUB_SHA}" \
+            --finalize-closure \
+            --ci-event "${{ github.event_name }}" \
+            --ci-branch "${{ github.ref_name }}" \
+            --ci-run-id "${GITHUB_RUN_ID}" \
+            --ci-head-sha "${GITHUB_SHA}" \
+            --required-check tests=${{ needs.tests.result }} \
+            --required-check live_eval_postgresql=${{ needs['live-eval-postgres'].result }} \
+            --required-check frontend=${{ needs.frontend.result }} \
+            --required-check docker=${{ needs.docker.result }} \
+            --required-check 2g_main_eval=${{ needs['eval-2g-main'].result }} \
+            --documentation-root .
+
+      - name: Upload 2G final evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 2g-final-evidence-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/2g-final-evidence/2g_generation_manifest.json
+            ${{ runner.temp }}/2g-final-evidence/2g_batch_report.json
+            ${{ runner.temp }}/2g-final-evidence/2g_failures.json
+            ${{ runner.temp }}/2g-final-evidence/2g_coverage_report.json
+            ${{ runner.temp }}/2g-final-evidence/2g_final_report.json
+          if-no-files-found: error

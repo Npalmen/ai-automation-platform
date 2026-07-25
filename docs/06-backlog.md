@@ -695,7 +695,7 @@ Production deploy and Phase A-C re-run completed on 2026-07-07. Live commit afte
 - [x] Kapitel 2F.2 — Live Gmail Transport Testbot — **CLOSED.** Authoritative success workflow run `30050565974`, evaluation_run_id `77d87e8f-d6a3-427c-a2cc-e25c5995968a`.
 - [x] Kapitel 2F.3 — Live LLM E2E — **CLOSED.** Authoritative success workflow run `30131333378`, evaluation_run_id `ed492673-bcca-4fb2-be3d-3e4653dcb709`.
 - [x] Kapitel 2F.4 — Evidence package, offline replay, CI delivery, documentation closure — **closure candidate complete.** Merge-stable replay binding and Release Gate job `final-2f-evidence` implemented. **Closure declaration:** `Kapitel 2F — PASS och stängt`. Repository CLOSED status becomes official only when post-merge `final-2f-evidence` succeeds on the same `main` SHA and uploads `2f-final-evidence-<main-sha>` with `2f_final_report.json` where `overall_status=passed`.
-- [ ] **Kapitel 2G — AI-generated scenarios, fuzzing och volymtester** (seed-based variants from gold templates; 100–500 email volume runs; root-cause grouping). **Next chapter after locked 2F baseline.**
+- [x] **Kapitel 2G — Deterministic generated scenario evaluation** (template generator, mutation engine, PR/main batches, quality gates, `final-2g-evidence`). **Closure declaration:** `Kapitel 2G — PASS och stängt` (authoritative after post-merge `final-2g-evidence` on same `main` SHA with `2g_final_report.json` where `overall_status=passed` inside artifact `2g-final-evidence-<main-sha>`).
 - [ ] Stabilize daily operations routine (scheduler, alerts, failed job triage).
 - [ ] Package standard onboarding steps for next customer.
 - [ ] Improve UI where pilot feedback shows clear need.
