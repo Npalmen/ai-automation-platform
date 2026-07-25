@@ -19,6 +19,7 @@ from app.evaluation.live.final_evidence import (
     build_evidence_manifest,
     build_final_evidence,
     build_final_report,
+    compute_evidence_source_descriptor_hash,
     load_evidence_sources,
 )
 from app.evaluation.live.redaction import FORBIDDEN_KEYS
@@ -277,6 +278,27 @@ def test_final_report_overall_status_not_passed_in_2f4b():
 
 def load_evidence_sources_from_dict(raw: dict):
     return EvidenceSourcesDocument.model_validate(raw)
+
+
+def test_source_descriptor_hash_stable_across_baseline_sha():
+    sources = _load_v1()
+    baseline_a = compute_evidence_source_descriptor_hash(sources)
+    mutated = sources.model_copy(
+        update={"baseline_git_sha": "dd65822c56a9f3cbb53b5a965b3aa95d677ad0ed"}
+    )
+    baseline_b = compute_evidence_source_descriptor_hash(mutated)
+    assert baseline_a == baseline_b
+    assert baseline_a != build_evidence_manifest(sources)["evidence_payload_hash"]
+    assert baseline_a != build_evidence_manifest(mutated)["evidence_payload_hash"]
+
+
+def test_closure_criteria_include_unknown_split():
+    manifest = build_evidence_manifest(_load_v1())
+    report = build_final_report(manifest)
+    criteria = report["closure_criteria"]
+    assert "no_unknown_external_side_effects_in_authoritative_evidence" in criteria
+    assert "historical_unknowns_classified_and_excluded" in criteria
+    assert "no_unknown_external_side_effects_in_closure" not in criteria
 
 
 def test_build_final_evidence_end_to_end():

@@ -1,0 +1,214 @@
+{
+  "source_descriptor_version": "replay-sources-v1",
+  "evidence_source_descriptor_hash": "67938dc636a0919c91935e714ad416ec962e36a86ecb672abb688b0b47b59de9",
+  "gmail_artifact_reference": {
+    "workflow_run_id": "30050565974",
+    "evaluation_run_id": "77d87e8f-d6a3-427c-a2cc-e25c5995968a",
+    "artifact_schema": "2f.2",
+    "artifact_name": "live-eval-report-77d87e8f-d6a3-427c-a2cc-e25c5995968a",
+    "artifact_file_sha256": "f110730cb53724ac1a6ac8154069f2f7cc9e7d92b1d5da853cf91348c627bf03",
+    "final_status": "passed",
+    "job_status": "awaiting_approval",
+    "pending_approval_count": 1,
+    "gmail_sends": 1,
+    "gmail_mutations": 1,
+    "llm_provider_calls": 0,
+    "external_action_writes": 0,
+    "provenance": "verified_from_local_artifact"
+  },
+  "llm_artifact_reference": {
+    "workflow_run_id": "30131333378",
+    "evaluation_run_id": "ed492673-bcca-4fb2-be3d-3e4653dcb709",
+    "artifact_schema": "2f.3.llm",
+    "artifact_name": "live-llm-report-ed492673-bcca-4fb2-be3d-3e4653dcb709",
+    "artifact_file_sha256": "8b771845d20eda74bf00216b1995122a781cc5c40d3555e8d1bd4c1e6791c63f",
+    "original_run_head_sha": "5af00210833e9d78cd7a5033ddd5c796408c8378",
+    "final_status": "passed",
+    "job_status": "awaiting_approval",
+    "pending_approval_count": 1,
+    "provider_calls": 4,
+    "succeeded": 4,
+    "retries": 0,
+    "fallbacks": 0,
+    "external_action_writes": 0,
+    "provenance": "verified_from_local_artifact",
+    "original_artifact_pre_fix_report_semantics": true
+  },
+  "llm_telemetry_events": [
+    {
+      "category": "app_live_llm",
+      "operation_key": "ed492673-bcca-4fb2-be3d-3e4653dcb709:app_live_llm:classification_v1:1",
+      "operation": "classification_v1",
+      "outcome": "in_progress",
+      "metadata": {
+        "ordinal": 1,
+        "prompt_name": "classification_v1",
+        "llm_provider": "openai",
+        "llm_requested_model": "gpt-4o-mini"
+      }
+    },
+    {
+      "category": "app_live_llm",
+      "operation_key": "ed492673-bcca-4fb2-be3d-3e4653dcb709:app_live_llm:classification_v1:1",
+      "operation": "classification_v1",
+      "outcome": "succeeded",
+      "metadata": {
+        "ordinal": 1,
+        "prompt_name": "classification_v1",
+        "llm_provider": "openai",
+        "llm_requested_model": "gpt-4o-mini",
+        "returned_model": "gpt-4o-mini-2024-07-18",
+        "finish_reason": "stop",
+        "schema_validation_status": "passed",
+        "input_tokens": 374,
+        "output_tokens": 39,
+        "total_tokens": 413,
+        "latency_ms": 2050,
+        "output_hash": "8c4729b7a748741e52cc150db4eb8401b3ff3c2b13da877d551bd6f5ad5accfc",
+        "retry_count": 0,
+        "fallback_used": false
+      }
+    },
+    {
+      "category": "app_live_llm",
+      "operation_key": "ed492673-bcca-4fb2-be3d-3e4653dcb709:app_live_llm:entity_extraction_v1:2",
+      "operation": "entity_extraction_v1",
+      "outcome": "in_progress",
+      "metadata": {
+        "ordinal": 2,
+        "prompt_name": "entity_extraction_v1",
+        "llm_provider": "openai",
+        "llm_requested_model": "gpt-4o-mini"
+      }
+    },
+    {
+      "category": "app_live_llm",
+      "operation_key": "ed492673-bcca-4fb2-be3d-3e4653dcb709:app_live_llm:entity_extraction_v1:2",
+      "operation": "entity_extraction_v1",
+      "outcome": "succeeded",
+      "metadata": {
+        "ordinal": 2,
+        "prompt_name": "entity_extraction_v1",
+        "llm_provider": "openai",
+        "llm_requested_model": "gpt-4o-mini",
+        "returned_model": "gpt-4o-mini-2024-07-18",
+        "finish_reason": "stop",
+        "schema_validation_status": "passed",
+        "input_tokens": 529,
+        "output_tokens": 114,
+        "total_tokens": 643,
+        "latency_ms": 1750,
+        "output_hash": "b7cd7e1cda677e82e0f483160dde122fedff2484c2fd10e4d8f591e5d015a3b6",
+        "retry_count": 0,
+        "fallback_used": false
+      }
+    },
+    {
+      "category": "app_live_llm",
+      "operation_key": "ed492673-bcca-4fb2-be3d-3e4653dcb709:app_live_llm:lead_scoring_v1:3",
+      "operation": "lead_scoring_v1",
+      "outcome": "in_progress",
+      "metadata": {
+        "ordinal": 3,
+        "prompt_name": "lead_scoring_v1",
+        "llm_provider": "openai",
+        "llm_requested_model": "gpt-4o-mini"
+      }
+    },
+    {
+      "category": "app_live_llm",
+      "operation_key": "ed492673-bcca-4fb2-be3d-3e4653dcb709:app_live_llm:lead_scoring_v1:3",
+      "operation": "lead_scoring_v1",
+      "outcome": "succeeded",
+      "metadata": {
+        "ordinal": 3,
+        "prompt_name": "lead_scoring_v1",
+        "llm_provider": "openai",
+        "llm_requested_model": "gpt-4o-mini",
+        "returned_model": "gpt-4o-mini-2024-07-18",
+        "finish_reason": "stop",
+        "schema_validation_status": "passed",
+        "input_tokens": 705,
+        "output_tokens": 75,
+        "total_tokens": 780,
+        "latency_ms": 1003,
+        "output_hash": "2b11bba5f102284628ed56c84cff9d56619dd9501204537b98df4b2da93208ad",
+        "retry_count": 0,
+        "fallback_used": false
+      }
+    },
+    {
+      "category": "app_live_llm",
+      "operation_key": "ed492673-bcca-4fb2-be3d-3e4653dcb709:app_live_llm:decisioning_v1:4",
+      "operation": "decisioning_v1",
+      "outcome": "in_progress",
+      "metadata": {
+        "ordinal": 4,
+        "prompt_name": "decisioning_v1",
+        "llm_provider": "openai",
+        "llm_requested_model": "gpt-4o-mini"
+      }
+    },
+    {
+      "category": "app_live_llm",
+      "operation_key": "ed492673-bcca-4fb2-be3d-3e4653dcb709:app_live_llm:decisioning_v1:4",
+      "operation": "decisioning_v1",
+      "outcome": "succeeded",
+      "metadata": {
+        "ordinal": 4,
+        "prompt_name": "decisioning_v1",
+        "llm_provider": "openai",
+        "llm_requested_model": "gpt-4o-mini",
+        "returned_model": "gpt-4o-mini-2024-07-18",
+        "finish_reason": "stop",
+        "schema_validation_status": "passed",
+        "input_tokens": 826,
+        "output_tokens": 87,
+        "total_tokens": 913,
+        "latency_ms": 1656,
+        "output_hash": "8d8b4dc5638557ef91dee350b291a1b82e53328bc2a106859fe7810eaebbfa65",
+        "retry_count": 0,
+        "fallback_used": false
+      }
+    }
+  ],
+  "historical_failure_reference": {
+    "workflow_run_id": "30125105087",
+    "evaluation_run_id": "94e17d29-c159-4ead-890b-d6553ebdab59",
+    "classification": "historical_harness_failure",
+    "provider_outcome": "unknown",
+    "never_rerun": true,
+    "never_resume": true,
+    "never_valid_as_success": true,
+    "provenance": "derived_from_verified_artifact"
+  },
+  "expected_replay_results": {
+    "llm_regeneration": {
+      "attempted": 4,
+      "succeeded": 4,
+      "failed": 0,
+      "outcome_unknown": 0,
+      "operations_length": 4,
+      "input_tokens": 2434,
+      "output_tokens": 315,
+      "total_tokens": 2749,
+      "latency_ms": 6459,
+      "output_hashes": [
+        "8c4729b7a748741e52cc150db4eb8401b3ff3c2b13da877d551bd6f5ad5accfc",
+        "b7cd7e1cda677e82e0f483160dde122fedff2484c2fd10e4d8f591e5d015a3b6",
+        "2b11bba5f102284628ed56c84cff9d56619dd9501204537b98df4b2da93208ad",
+        "8d8b4dc5638557ef91dee350b291a1b82e53328bc2a106859fe7810eaebbfa65"
+      ]
+    }
+  },
+  "provenance": {
+    "llm_telemetry_events": "sanitized_verified_telemetry",
+    "gmail_artifact_reference": "verified_from_local_artifact",
+    "llm_artifact_reference": "verified_from_local_artifact",
+    "historical_failure_reference": "derived_from_verified_artifact"
+  },
+  "limitations": [
+    "llm telemetry derived from verified live run artifact without raw model output",
+    "original llm artifact predates report semantics fix on b344701"
+  ]
+}

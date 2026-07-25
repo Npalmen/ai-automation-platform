@@ -486,6 +486,41 @@ def _compute_payload_hash(payload: dict[str, Any]) -> str:
     return hashlib.sha256(canonical_json_bytes(payload)).hexdigest()
 
 
+def evidence_source_descriptor_payload(sources: EvidenceSourcesDocument) -> dict[str, Any]:
+    serialized_runs = sorted(
+        (_serialize_run(run) for run in sources.runs),
+        key=_run_sort_key,
+    )
+    serialized_failures = sorted(
+        (_serialize_failure(failure) for failure in sources.historical_failures),
+        key=_run_sort_key,
+    )
+    chapters_payload: dict[str, Any] = {}
+    for chapter_id in sorted(sources.chapters):
+        chapter = sources.chapters[chapter_id]
+        entry: dict[str, Any] = {
+            "status": chapter.status,
+            "authoritative_evidence": sorted(chapter.authoritative_evidence),
+        }
+        if chapter.report_semantics_fixed_by_sha:
+            entry["report_semantics_fixed_by_sha"] = chapter.report_semantics_fixed_by_sha
+        chapters_payload[chapter_id] = entry
+
+    return {
+        "source_descriptor_version": sources.source_descriptor_version,
+        "canonicalization_version": CANONICALIZATION_VERSION,
+        "descriptor_kind": "evidence-sources",
+        "chapters": chapters_payload,
+        "runs": serialized_runs,
+        "historical_failures": serialized_failures,
+        "limitations": sorted(sources.limitations),
+    }
+
+
+def compute_evidence_source_descriptor_hash(sources: EvidenceSourcesDocument) -> str:
+    return _compute_payload_hash(evidence_source_descriptor_payload(sources))
+
+
 def build_evidence_manifest(
     sources: EvidenceSourcesDocument,
     *,
@@ -566,7 +601,8 @@ def _closure_criteria_states() -> dict[str, str]:
         "replay_determinism": "pending",
         "final_ci_delivery": "pending",
         "formal_documentation_closure": "pending",
-        "no_unknown_external_side_effects_in_closure": "pending",
+        "no_unknown_external_side_effects_in_authoritative_evidence": "pending",
+        "historical_unknowns_classified_and_excluded": "pending",
         "redaction_clean": "passed",
         "ci_green_on_baseline": "passed",
         "no_active_live_eval_runs": "passed",
