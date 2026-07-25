@@ -1,0 +1,25 @@
+scenario_id: TBS03_invoice_observe
+scenario_version: v1
+mode: observe
+job_type: invoice
+service_profile: accounting
+synthetic_customer_id: family-invoice-001
+thread_id: thread-invoice-001
+label: krowolf-live-eval
+
+email:
+  subject: Fakturafråga
+  message_text: |
+    Hej, jag har en fråga om faktura 2026-TEST-001.
+    Beloppet verkar inte stämma med offerten.
+  sender:
+    name: Testbot Maria
+    email: testbot-maria@eval.test
+
+expected_classification:
+  job_type: invoice
+
+budgets:
+  gmail_sends: 1
+  gmail_replies: 0
+  external_writes: 0

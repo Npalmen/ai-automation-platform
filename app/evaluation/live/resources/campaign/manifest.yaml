@@ -1,0 +1,21 @@
+manifest_version: full-system-testbot-campaign-v1
+description: Isolated full-system testbot campaign scenarios (synthetic Gmail)
+
+campaigns:
+  transport-smoke:
+    default_mode: observe
+    scenarios:
+      - TBS01_lead_observe.yaml
+      - TBS02_support_observe.yaml
+      - TBS03_invoice_observe.yaml
+      - TBS04_unknown_observe.yaml
+      - TBS05_noisy_observe.yaml
+
+  observe-core:
+    default_mode: observe
+    scenarios:
+      - TBS01_lead_observe.yaml
+      - TBS02_support_observe.yaml
+      - TBS03_invoice_observe.yaml
+      - TBS04_unknown_observe.yaml
+      - TBS05_noisy_observe.yaml

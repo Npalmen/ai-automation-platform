@@ -198,6 +198,21 @@ def require_scenario_allowed_for_2f2(scenario_id: str) -> None:
         )
 
 
+def require_scenario_allowed_for_live_gmail(scenario_id: str) -> None:
+    """Allow 2F.2 S01 or full-system campaign scenarios when campaign gate is enabled."""
+    from app.evaluation.live.constants import ALLOWED_2F2_SCENARIOS
+
+    if scenario_id in ALLOWED_2F2_SCENARIOS:
+        return
+    from app.evaluation.live.campaign.gates import (
+        require_campaign_enabled,
+        require_campaign_scenario_allowed,
+    )
+
+    require_campaign_enabled()
+    require_campaign_scenario_allowed(scenario_id)
+
+
 def require_gmail_eval_enabled(config: LiveEvalConfig | None = None) -> LiveEvalConfig:
     config = require_live_eval_enabled(config)
     if not config.gmail_enabled:
@@ -236,7 +251,7 @@ def validate_live_gmail_registration(
 ) -> None:
     if transport_mode != "live_gmail":
         return
-    require_scenario_allowed_for_2f2(scenario_id)
+    require_scenario_allowed_for_live_gmail(scenario_id)
     if ai_mode != "fixture_ai":
         raise LiveEvalSafetyError("live_gmail transport requires ai_mode fixture_ai")
 
@@ -295,7 +310,7 @@ def validate_live_gmail_run_for_mutation(
     require_tenant_allowed(tenant_id)
     if row.tenant_id != tenant_id:
         raise LiveEvalSafetyError("run tenant mismatch")
-    require_scenario_allowed_for_2f2(row.scenario_id)
+    require_scenario_allowed_for_live_gmail(row.scenario_id)
     if row.ai_mode != "fixture_ai":
         raise LiveEvalSafetyError("fixture_ai required for live Gmail mutation")
     if row.transport_mode != "live_gmail":
