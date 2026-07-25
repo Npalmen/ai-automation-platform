@@ -284,7 +284,7 @@ def test_documentation_rejects_premature_official_closure_claims(tmp_path):
 
 def test_release_gate_2g_pr_eval_job_contract():
     data = yaml.safe_load(RELEASE_GATE_PATH.read_text(encoding="utf-8"))
-    job = data["jobs"]["2g-pr-eval"]
+    job = data["jobs"]["eval-2g-pr"]
     assert job["if"] == "github.event_name == 'pull_request'"
     assert "needs" not in job or job.get("needs") is None
 
@@ -298,7 +298,7 @@ def test_release_gate_2g_pr_eval_job_contract():
 
 def test_release_gate_2g_main_eval_job_contract():
     data = yaml.safe_load(RELEASE_GATE_PATH.read_text(encoding="utf-8"))
-    job = data["jobs"]["2g-main-eval"]
+    job = data["jobs"]["eval-2g-main"]
     assert job["if"] == "github.event_name == 'push' && github.ref == 'refs/heads/main'"
     assert job["needs"] == ["tests", "live-eval-postgres", "frontend", "docker"]
 
@@ -311,7 +311,7 @@ def test_release_gate_final_2g_evidence_job_contract():
     data = yaml.safe_load(RELEASE_GATE_PATH.read_text(encoding="utf-8"))
     job = data["jobs"]["final-2g-evidence"]
     assert job["if"] == "github.event_name == 'push' && github.ref == 'refs/heads/main'"
-    assert job["needs"] == ["tests", "live-eval-postgres", "frontend", "docker", "2g-main-eval"]
+    assert job["needs"] == ["tests", "live-eval-postgres", "frontend", "docker", "eval-2g-main"]
     assert "always()" not in job.get("if", "")
     assert "workflow_dispatch" not in str(job)
 
@@ -326,7 +326,7 @@ def test_release_gate_final_2g_evidence_job_contract():
     assert '--baseline-git-sha "${GITHUB_SHA}"' in build_run
     assert '--ci-run-id "${GITHUB_RUN_ID}"' in build_run
     assert "--required-check tests=${{ needs.tests.result }}" in build_run
-    assert "--required-check 2g_main_eval=${{ needs['2g-main-eval'].result }}" in build_run
+    assert "--required-check 2g_main_eval=${{ needs['eval-2g-main'].result }}" in build_run
     assert "--required-check tests=success" not in build_run
     assert "run_2g_finalize.py" in build_run
     assert "gmail" not in build_run.lower()

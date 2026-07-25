@@ -304,7 +304,7 @@ jobs:
             ${{ runner.temp }}/2f-final-evidence/2f_final_report.json
           if-no-files-found: error
 
-  2g-pr-eval:
+  eval-2g-pr:
     name: 2G PR batch eval
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
@@ -329,7 +329,7 @@ jobs:
             --output-dir "${OUTPUT_DIR}" \
             --baseline-git-sha "${GITHUB_SHA}"
 
-  2g-main-eval:
+  eval-2g-main:
     name: 2G main batch eval
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -359,7 +359,7 @@ jobs:
     name: Final 2G evidence
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [tests, live-eval-postgres, frontend, docker, 2g-main-eval]
+    needs: [tests, live-eval-postgres, frontend, docker, eval-2g-main]
 
     steps:
       - uses: actions/checkout@v4
@@ -388,7 +388,7 @@ jobs:
             --required-check live_eval_postgresql=${{ needs['live-eval-postgres'].result }} \
             --required-check frontend=${{ needs.frontend.result }} \
             --required-check docker=${{ needs.docker.result }} \
-            --required-check 2g_main_eval=${{ needs['2g-main-eval'].result }} \
+            --required-check 2g_main_eval=${{ needs['eval-2g-main'].result }} \
             --documentation-root .
 
       - name: Upload 2G final evidence artifact
