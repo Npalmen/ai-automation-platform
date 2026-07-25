@@ -116,25 +116,45 @@ def _run_campaign(
     return 0 if result.overall_status == "passed" else 1
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Full-system testbot campaign runner")
-    sub = parser.add_subparsers(dest="command", required=True)
-
-    list_parser = sub.add_parser("list-scenarios", help="List registered campaign scenarios")
-    list_parser.add_argument("--campaign-type", default=None)
-
-    validate_parser = sub.add_parser("validate", help="Run offline readiness validation")
-    validate_parser.add_argument("--campaign-type", default="transport-smoke")
-
-    dry_parser = sub.add_parser("dry-run", help="Preview synthetic emails without sending")
-    dry_parser.add_argument("--campaign-type", default="transport-smoke")
-
-    run_parser = sub.add_parser("run", help="Run campaign (requires --confirm-external)")
-    run_parser.add_argument("--campaign-type", default="transport-smoke")
-    run_parser.add_argument("--confirm-external", action="store_true")
-
+def _add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--tenant-id", default="TENANT_LIVE_EVAL")
     parser.add_argument("--app-base-url", default="")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Full-system testbot campaign runner")
+    common = argparse.ArgumentParser(add_help=False)
+    _add_common_args(common)
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    list_parser = sub.add_parser(
+        "list-scenarios",
+        help="List registered campaign scenarios",
+        parents=[common],
+    )
+    list_parser.add_argument("--campaign-type", default=None)
+
+    validate_parser = sub.add_parser(
+        "validate",
+        help="Run offline readiness validation",
+        parents=[common],
+    )
+    validate_parser.add_argument("--campaign-type", default="transport-smoke")
+
+    dry_parser = sub.add_parser(
+        "dry-run",
+        help="Preview synthetic emails without sending",
+        parents=[common],
+    )
+    dry_parser.add_argument("--campaign-type", default="transport-smoke")
+
+    run_parser = sub.add_parser(
+        "run",
+        help="Run campaign (requires --confirm-external)",
+        parents=[common],
+    )
+    run_parser.add_argument("--campaign-type", default="transport-smoke")
+    run_parser.add_argument("--confirm-external", action="store_true")
 
     args = parser.parse_args()
 
