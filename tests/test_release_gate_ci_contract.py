@@ -84,7 +84,7 @@ def test_live_eval_foundation_integration_db_count_contract():
     steps = foundation["steps"]
     collect = _step_by_name(steps, "Verify integration_db test selection")
     collect_run = collect.get("run") or ""
-    assert '!= "11"' in collect_run or "!= \"11\"" in collect_run
+    assert '!= "30"' in collect_run or "!= \"30\"" in collect_run or "exactly 30" in collect_run
     assert "test_registry_refresh_pg.py" in collect_run
     assert "test_cleanup_persistence_pg.py" in collect_run
     assert "test_root_job_atomic_pg.py" in collect_run
@@ -95,7 +95,7 @@ def test_live_eval_foundation_integration_db_count_contract():
     }
 
     junit = _step_by_name(steps, "Verify integration_db JUnit gate")
-    assert "verify_pytest_junit.py foundation_integration_db.junit.xml --expected 11" in (
+    assert "verify_pytest_junit.py foundation_integration_db.junit.xml --expected 30" in (
         junit.get("run") or ""
     )
     assert junit.get("continue-on-error") is not True
