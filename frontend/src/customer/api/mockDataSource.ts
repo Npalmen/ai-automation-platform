@@ -4,6 +4,18 @@ import {
   type OverviewMockScenario,
 } from "@/customer/features/overview/overviewFixtures"
 import {
+  cloneActivityItem,
+  getActivityItemsForScenario,
+  getActivityPartialErrors,
+  type ActivityMockScenario,
+} from "@/customer/features/activity/activityFixtures"
+import { buildActivityListResponse } from "@/customer/features/activity/activityMockLogic"
+import {
+  buildWorkItemDetail,
+  cloneWorkItemDetail,
+  EMPTY_TIMELINE_WORK_ITEM_ID,
+} from "@/customer/features/work-detail/workDetailFixtures"
+import {
   cloneApproval,
   cloneWorkItem,
   getApprovalsForScenario,
@@ -34,6 +46,7 @@ const MOCK_CONTEXT = {
 export type MockDataSourceOptions = {
   overviewScenario?: OverviewMockScenario
   queueScenario?: QueueMockScenario
+  activityScenario?: ActivityMockScenario
 }
 
 export function createMockDataSource(
@@ -41,13 +54,44 @@ export function createMockDataSource(
 ): WorkspaceDataSource {
   const resolved =
     typeof options === "string"
-      ? { overviewScenario: options, queueScenario: options as QueueMockScenario }
+      ? {
+          overviewScenario: options,
+          queueScenario: options as QueueMockScenario,
+          activityScenario: options as ActivityMockScenario,
+        }
       : {
           overviewScenario: options.overviewScenario ?? "populated",
           queueScenario: options.queueScenario ?? "populated",
+          activityScenario: options.activityScenario ?? "populated",
         }
 
-  const { overviewScenario, queueScenario } = resolved
+  const { overviewScenario, queueScenario, activityScenario } = resolved
+
+  function allWorkItems() {
+    const items = getWorkItemsForScenario(queueScenario).map(cloneWorkItem)
+    if (queueScenario === "empty_timeline") {
+      const emptyItem = items.find(
+        (item) => item.work_item_id === EMPTY_TIMELINE_WORK_ITEM_ID,
+      )
+      if (!emptyItem) {
+        items.push({
+          work_item_id: EMPTY_TIMELINE_WORK_ITEM_ID,
+          type: "needs_help",
+          title: "Ärende utan historik ännu",
+          customer_name: "Test Kund",
+          customer_email: "test@fiktivmail.se",
+          customer_status: "new",
+          customer_status_label: "Ny",
+          priority_rank: 5,
+          priority_label: null,
+          summary: "Ett ärende utan registrerad historik i förhandsläget.",
+          created_at: "2026-07-26T10:00:00+02:00",
+          updated_at: "2026-07-26T10:00:00+02:00",
+        })
+      }
+    }
+    return items
+  }
 
   return {
     async getContext() {
@@ -73,9 +117,8 @@ export function createMockDataSource(
         return new Promise(() => {})
       }
 
-      const items = getWorkItemsForScenario(queueScenario).map(cloneWorkItem)
       return buildWorkItemListResponse(
-        items,
+        allWorkItems(),
         params,
         getQueuePartialErrors(queueScenario),
       )
@@ -97,12 +140,41 @@ export function createMockDataSource(
       )
     },
 
-    async getWorkItemDetail() {
-      return null
+    async getWorkItem(workItemId) {
+      if (queueScenario === "full_error") {
+        throw new Error("Kunde inte hämta arbetsobjektet i förhandsläget")
+      }
+      if (queueScenario === "delayed") {
+        return new Promise(() => {})
+      }
+      if (queueScenario === "not_found") {
+        return null
+      }
+
+      const item = allWorkItems().find(
+        (candidate) => candidate.work_item_id === workItemId,
+      )
+      if (!item) return null
+
+      return cloneWorkItemDetail(buildWorkItemDetail(item))
     },
 
-    async getActivity() {
-      return { items: [], total: 0 }
+    async listActivity(params) {
+      if (activityScenario === "full_error") {
+        throw new Error("Kunde inte hämta aktiviteten i förhandsläget")
+      }
+      if (activityScenario === "delayed") {
+        return new Promise(() => {})
+      }
+
+      const items = getActivityItemsForScenario(activityScenario).map(
+        cloneActivityItem,
+      )
+      return buildActivityListResponse(
+        items,
+        params,
+        getActivityPartialErrors(activityScenario),
+      )
     },
 
     async getHealth() {

@@ -323,6 +323,8 @@ export type QueueMockScenario =
   | "full_error"
   | "unknown_status"
   | "delayed"
+  | "not_found"
+  | "empty_timeline"
 
 export function getPopulatedWorkItems(): WorkItemListItem[] {
   return [...LEAD_ITEMS, ...SUPPORT_ITEMS, ...NEEDS_HELP_ITEMS]
