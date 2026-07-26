@@ -1,4 +1,4 @@
-import type { FormEvent } from "react"
+import type { FormEvent, Ref } from "react"
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 
@@ -9,11 +9,13 @@ import { cn } from "@/lib/utils"
 type CustomerHeaderProps = {
   onOpenMenu?: () => void
   showMenuButton?: boolean
+  menuButtonRef?: Ref<HTMLButtonElement>
 }
 
 export function CustomerHeader({
   onOpenMenu,
   showMenuButton = false,
+  menuButtonRef,
 }: CustomerHeaderProps) {
   const { auth } = useCustomerAuth()
   const navigate = useNavigate()
@@ -31,9 +33,11 @@ export function CustomerHeader({
       <div className="flex min-h-14 items-center gap-3 px-4 py-2 md:px-6">
         {showMenuButton ? (
           <button
+            ref={menuButtonRef}
             type="button"
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border text-text-primary md:hidden"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand md:hidden"
             aria-label="Öppna meny"
+            aria-expanded={false}
             onClick={onOpenMenu}
           >
             <span aria-hidden>☰</span>
@@ -95,7 +99,7 @@ export function CustomerHeader({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Sök i arbetsytan…"
-            className="h-11 w-full rounded-md border border-border bg-surface px-3 text-body"
+            className="h-11 w-full rounded-md border border-border bg-surface px-3 text-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           />
         </form>
       </div>

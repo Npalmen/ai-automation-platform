@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Outlet } from "react-router-dom"
 
 import { CustomerHeader } from "@/customer/components/CustomerHeader"
@@ -7,17 +7,29 @@ import {
   CustomerTabletDrawer,
 } from "@/customer/components/CustomerMobileNavigation"
 import { CustomerSidebar } from "@/customer/components/CustomerSidebar"
+import { SkipToContentLink } from "@/customer/components/SkipToContentLink"
+import { useRouteFocus } from "@/customer/hooks/useRouteFocus"
 import { CUSTOMER_NAV_ITEMS } from "@/customer/routes/navConfig"
 import { cn } from "@/lib/utils"
 
 export function CustomerAppShell() {
   const [tabletMenuOpen, setTabletMenuOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+
+  useRouteFocus()
+
+  function closeTabletMenu() {
+    setTabletMenuOpen(false)
+    menuButtonRef.current?.focus()
+  }
 
   return (
     <div className="min-h-screen bg-page">
+      <SkipToContentLink />
       <CustomerHeader
         showMenuButton
+        menuButtonRef={menuButtonRef}
         onOpenMenu={() => setTabletMenuOpen(true)}
       />
 
@@ -27,12 +39,13 @@ export function CustomerAppShell() {
             "hidden shrink-0 border-r border-border bg-surface-subtle/40 lg:block",
             sidebarCollapsed ? "w-16" : "w-60",
           )}
+          aria-label="Sidomeny"
         >
           <div className="sticky top-14 flex h-[calc(100vh-3.5rem)] flex-col p-4">
             <div className="mb-4 hidden lg:flex lg:justify-end">
               <button
                 type="button"
-                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border text-text-secondary"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 aria-label={
                   sidebarCollapsed ? "Expandera sidomeny" : "Minimera sidomeny"
                 }
@@ -50,7 +63,7 @@ export function CustomerAppShell() {
 
         <main
           id="main-content"
-          className="min-w-0 flex-1 pb-24 md:pb-6"
+          className="min-w-0 flex-1 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] md:pb-6"
           tabIndex={-1}
         >
           <Outlet />
@@ -60,7 +73,7 @@ export function CustomerAppShell() {
       <CustomerMobileNavigation />
       <CustomerTabletDrawer
         open={tabletMenuOpen}
-        onClose={() => setTabletMenuOpen(false)}
+        onClose={closeTabletMenu}
       />
     </div>
   )

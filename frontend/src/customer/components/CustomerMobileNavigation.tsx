@@ -13,12 +13,18 @@ export function CustomerMobileNavigation() {
   const [moreOpen, setMoreOpen] = useState(false)
   const location = useLocation()
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const moreTriggerRef = useRef<HTMLButtonElement>(null)
 
   const moreActive = MOBILE_MORE_NAV.some((item) =>
     item.end
       ? location.pathname === item.to
       : location.pathname.startsWith(item.to),
   )
+
+  function closeMoreMenu() {
+    setMoreOpen(false)
+    moreTriggerRef.current?.focus()
+  }
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -35,7 +41,7 @@ export function CustomerMobileNavigation() {
     <>
       <nav
         aria-label="Mobilnavigation"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-page md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-page pb-[env(safe-area-inset-bottom,0px)] md:hidden"
       >
         <ul className="grid grid-cols-5">
           {MOBILE_PRIMARY_NAV.map((item) => (
@@ -45,7 +51,7 @@ export function CustomerMobileNavigation() {
                 end={item.end}
                 className={({ isActive }) =>
                   cn(
-                    "flex min-h-14 flex-col items-center justify-center gap-1 px-1 text-caption font-medium",
+                    "flex min-h-14 flex-col items-center justify-center gap-1 px-1 text-caption font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand",
                     isActive
                       ? "text-brand"
                       : "text-text-secondary hover:text-text-primary",
@@ -58,9 +64,10 @@ export function CustomerMobileNavigation() {
           ))}
           <li>
             <button
+              ref={moreTriggerRef}
               type="button"
               className={cn(
-                "flex min-h-14 w-full flex-col items-center justify-center gap-1 px-1 text-caption font-medium",
+                "flex min-h-14 w-full flex-col items-center justify-center gap-1 px-1 text-caption font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand",
                 moreActive
                   ? "text-brand"
                   : "text-text-secondary hover:text-text-primary",
@@ -79,7 +86,7 @@ export function CustomerMobileNavigation() {
         ref={dialogRef}
         className="m-0 h-full max-h-none w-full max-w-none rounded-none border-0 bg-page p-0 md:hidden"
         aria-label="Fler val"
-        onCancel={() => setMoreOpen(false)}
+        onCancel={closeMoreMenu}
         onClose={() => setMoreOpen(false)}
       >
         <div className="flex h-full flex-col">
@@ -87,17 +94,17 @@ export function CustomerMobileNavigation() {
             <h2 className="text-section-title text-text-primary">Mer</h2>
             <button
               type="button"
-              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               aria-label="Stäng meny"
-              onClick={() => setMoreOpen(false)}
+              onClick={closeMoreMenu}
             >
-              ✕
+              <span aria-hidden>✕</span>
             </button>
           </div>
           <div className="flex-1 overflow-auto p-4">
             <CustomerSidebar
               items={MOBILE_MORE_NAV}
-              onNavigate={() => setMoreOpen(false)}
+              onNavigate={closeMoreMenu}
             />
           </div>
         </div>
@@ -122,12 +129,13 @@ export function CustomerTabletDrawer({
     if (!open && dialog.open) dialog.close()
   }, [open])
 
-  if (!open) return null
-
   return (
     <dialog
       ref={dialogRef}
-      className="m-0 h-full max-h-none w-72 max-w-[85vw] rounded-none border-0 border-r border-border bg-page p-0"
+      className={cn(
+        "m-0 h-full max-h-none w-72 max-w-[85vw] rounded-none border-0 border-r border-border bg-page p-0 md:max-lg:block lg:hidden",
+        !open && "hidden",
+      )}
       aria-label="Navigation"
       onCancel={onClose}
       onClose={onClose}
@@ -137,11 +145,11 @@ export function CustomerTabletDrawer({
           <p className="text-section-title text-text-primary">Meny</p>
           <button
             type="button"
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             aria-label="Stäng meny"
             onClick={onClose}
           >
-            ✕
+            <span aria-hidden>✕</span>
           </button>
         </div>
         <div className="flex-1 overflow-auto p-4">
