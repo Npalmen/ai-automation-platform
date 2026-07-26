@@ -154,25 +154,43 @@ def test_duplicate_approve_execution_chain_requires_single_records():
     observation = {
         "job": {
             "decision_records": [
-                {"record_type": "action_approval_resolution"},
-                {"record_type": "execution_intent"},
-                {"record_type": "execution_outcome", "execution_status": "succeeded"},
+                {"record_type": "action_approval_resolution", "action_operation_id": "op-target"},
+                {"record_type": "execution_intent", "action_operation_id": "op-target"},
+                {
+                    "record_type": "execution_outcome",
+                    "execution_status": "succeeded",
+                    "action_operation_id": "op-target",
+                },
             ]
         }
     }
-    assert assert_duplicate_approve_execution_chain(observation) == []
+    assert assert_duplicate_approve_execution_chain(
+        observation,
+        target_action_operation_id="op-target",
+    ) == []
 
 
 def test_duplicate_approve_execution_chain_fails_on_extra_outcome():
     observation = {
         "job": {
             "decision_records": [
-                {"record_type": "action_approval_resolution"},
-                {"record_type": "execution_intent"},
-                {"record_type": "execution_outcome", "execution_status": "succeeded"},
-                {"record_type": "execution_outcome", "execution_status": "succeeded"},
+                {"record_type": "action_approval_resolution", "action_operation_id": "op-target"},
+                {"record_type": "execution_intent", "action_operation_id": "op-target"},
+                {
+                    "record_type": "execution_outcome",
+                    "execution_status": "succeeded",
+                    "action_operation_id": "op-target",
+                },
+                {
+                    "record_type": "execution_outcome",
+                    "execution_status": "succeeded",
+                    "action_operation_id": "op-target",
+                },
             ]
         }
     }
-    violations = assert_duplicate_approve_execution_chain(observation)
+    violations = assert_duplicate_approve_execution_chain(
+        observation,
+        target_action_operation_id="op-target",
+    )
     assert any("exactly one execution_outcome" in v for v in violations)

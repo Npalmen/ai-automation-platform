@@ -368,37 +368,103 @@ def assert_semi_automatic_campaign_pipeline(
     return violations
 
 
-def assert_duplicate_approve_execution_chain(observation: dict[str, Any]) -> list[str]:
-    """TBSM06: exactly one resolution/intent/outcome; duplicate approve must not add more."""
+def _records_for_operation(
+    records: list[dict[str, Any]],
+    *,
+    record_type: str,
+    action_operation_id: str | None,
+) -> list[dict[str, Any]]:
+    if not action_operation_id:
+        return [row for row in records if row.get("record_type") == record_type]
+    return [
+        row for row in records
+        if row.get("record_type") == record_type
+        and row.get("action_operation_id") == action_operation_id
+    ]
+
+
+def assert_target_scoped_execution_chain(
+    observation: dict[str, Any],
+    *,
+    target_action_operation_id: str | None,
+    expect_execution_outcome: bool,
+) -> list[str]:
+    """Assert resolution/intent/outcome records are scoped to the target operation."""
     violations: list[str] = []
+    if not target_action_operation_id:
+        violations.append("missing target_action_operation_id for scoped assertions")
+        return violations
+
     job = observation.get("job") or {}
     records = job.get("decision_records") or []
 
-    def _count(record_type: str) -> int:
-        return sum(1 for row in records if row.get("record_type") == record_type)
-
-    for record_type in (
-        "action_approval_resolution",
-        "execution_intent",
-        "execution_outcome",
-    ):
-        count = _count(record_type)
-        if count != 1:
-            violations.append(
-                f"duplicate approve requires exactly one {record_type}, got {count}"
-            )
-
-    outcomes = [
-        row
-        for row in records
-        if row.get("record_type") == "execution_outcome"
-    ]
-    if outcomes and outcomes[0].get("execution_status") != "succeeded":
+    resolution_count = len(
+        _records_for_operation(
+            records,
+            record_type="action_approval_resolution",
+            action_operation_id=target_action_operation_id,
+        )
+    )
+    if resolution_count != 1:
         violations.append(
-            f"execution_outcome must be succeeded, got {outcomes[0].get('execution_status')!r}"
+            "target requires exactly one action_approval_resolution, "
+            f"got {resolution_count}"
         )
 
+    if expect_execution_outcome:
+        intent_count = len(
+            _records_for_operation(
+                records,
+                record_type="execution_intent",
+                action_operation_id=target_action_operation_id,
+            )
+        )
+        outcome_rows = _records_for_operation(
+            records,
+            record_type="execution_outcome",
+            action_operation_id=target_action_operation_id,
+        )
+        if intent_count != 1:
+            violations.append(
+                f"target requires exactly one execution_intent, got {intent_count}"
+            )
+        if len(outcome_rows) != 1:
+            violations.append(
+                f"target requires exactly one execution_outcome, got {len(outcome_rows)}"
+            )
+        elif outcome_rows[0].get("execution_status") != "succeeded":
+            violations.append(
+                "target execution_outcome must be succeeded, got "
+                f"{outcome_rows[0].get('execution_status')!r}"
+            )
+    else:
+        for record_type in ("execution_intent", "execution_outcome"):
+            count = len(
+                _records_for_operation(
+                    records,
+                    record_type=record_type,
+                    action_operation_id=target_action_operation_id,
+                )
+            )
+            if count:
+                violations.append(
+                    f"target reject must not create {record_type}, got {count}"
+                )
+
     return violations
+
+
+def assert_duplicate_approve_execution_chain(
+    observation: dict[str, Any],
+    *,
+    target_action_operation_id: str | None = None,
+) -> list[str]:
+    """TBSM06: exactly one target-scoped resolution/intent/outcome."""
+    return assert_target_scoped_execution_chain(
+        observation,
+        target_action_operation_id=target_action_operation_id,
+        expect_execution_outcome=True,
+    )
 
 
 def assert_expected_sender_reply(

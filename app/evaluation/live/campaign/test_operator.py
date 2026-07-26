@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
 
+from app.evaluation.live.campaign.operator_contract import OperatorPlanStep
 from app.evaluation.live.campaign.schemas import CampaignScenario
 from app.evaluation.live.campaign.semi_automatic_expected_outcomes import (
     SemiAutomaticExpectedOutcome,
@@ -22,12 +23,19 @@ class PendingApproval:
     approval_id: str
     state: str
     next_on_approve: str | None
+    action_type: str
+    delivery_type: str
+    action_operation_id: str | None
+    recipient_redacted: str
+    created_at: str | None = None
 
 
 @dataclass(frozen=True)
 class OperatorActionResult:
     action: str
     approval_id: str
+    action_type: str
+    action_operation_id: str | None
     http_status: int
     changed: bool | None
     idempotent: bool
@@ -35,11 +43,60 @@ class OperatorActionResult:
     body: dict[str, Any]
 
 
+@dataclass
+class OperatorExecutionContext:
+    results: list[OperatorActionResult] = field(default_factory=list)
+    target_action_operation_id: str | None = None
+    target_approval_id: str | None = None
+    target_action_type: str | None = None
+    secondary_operation_ids: dict[str, str] = field(default_factory=dict)
+    touched_approval_ids: list[str] = field(default_factory=list)
+
+
 def _headers(*, admin_api_key: str, tenant_id: str) -> dict[str, str]:
     return {
         "X-Admin-API-Key": admin_api_key,
         "X-Tenant-ID": tenant_id,
     }
+
+
+def _redact_recipient(value: str) -> str:
+    text = (value or "").strip()
+    if "@" not in text:
+        return text or "(none)"
+    local, domain = text.split("@", 1)
+    if len(local) <= 2:
+        masked_local = "*"
+    else:
+        masked_local = f"{local[:2]}***"
+    return f"{masked_local}@{domain}"
+
+
+def _parse_pending_approval(row: dict[str, Any]) -> PendingApproval:
+    request_payload = dict(row.get("request_payload") or {})
+    delivery_payload = dict(row.get("delivery_payload") or {})
+    action_type = str(
+        request_payload.get("action_type")
+        or delivery_payload.get("type")
+        or ""
+    )
+    delivery_type = str(delivery_payload.get("type") or action_type)
+    recipient = str(
+        delivery_payload.get("to")
+        or delivery_payload.get("item_name")
+        or delivery_payload.get("channel")
+        or ""
+    )
+    return PendingApproval(
+        approval_id=str(row.get("approval_id") or ""),
+        state=str(row.get("state") or ""),
+        next_on_approve=row.get("next_on_approve"),
+        action_type=action_type,
+        delivery_type=delivery_type,
+        action_operation_id=request_payload.get("action_operation_id"),
+        recipient_redacted=_redact_recipient(recipient),
+        created_at=row.get("created_at"),
+    )
 
 
 def _validate_operator_guards(
@@ -63,6 +120,10 @@ def _validate_operator_guards(
         raise LiveEvalSafetyError("test operator blocked: reply budget exhausted")
     if not expected_sender:
         raise LiveEvalSafetyError("test operator blocked: missing expected_sender allowlist")
+    if not outcome.operator_plan:
+        raise LiveEvalSafetyError(
+            f"test operator blocked: scenario {scenario.scenario_id!r} missing operator_plan"
+        )
 
 
 def list_job_approvals(
@@ -81,20 +142,45 @@ def list_job_approvals(
     response.raise_for_status()
     payload = response.json()
     items = payload.get("items") or []
-    return [
-        PendingApproval(
-            approval_id=str(row.get("approval_id") or ""),
-            state=str(row.get("state") or ""),
-            next_on_approve=row.get("next_on_approve"),
-        )
-        for row in items
+    return [_parse_pending_approval(row) for row in items]
+
+
+def match_target_approval(
+    pending: list[PendingApproval],
+    step: OperatorPlanStep,
+    *,
+    locked_operation_id: str | None = None,
+) -> PendingApproval:
+    """Match exactly one pending approval for an operator plan step."""
+    candidates = [
+        row for row in pending
+        if row.state == "pending"
+        and row.next_on_approve in ("action_execute", "email_send")
+        and row.action_type == step.action_type
+        and row.delivery_type == step.resolved_delivery_type
     ]
+    if locked_operation_id:
+        locked = [
+            row for row in candidates
+            if row.action_operation_id == locked_operation_id
+        ]
+        if len(locked) == 1:
+            return locked[0]
+        if len(locked) > 1:
+            raise LiveEvalSafetyError("ambiguous_target_approval")
+        if candidates and all(row.action_operation_id != locked_operation_id for row in candidates):
+            raise LiveEvalSafetyError("target_approval_not_found")
+    if not candidates:
+        raise LiveEvalSafetyError("target_approval_not_found")
+    if len(candidates) > 1:
+        raise LiveEvalSafetyError("ambiguous_target_approval")
+    return candidates[0]
 
 
 def _parse_action_result(
     *,
     action: str,
-    approval_id: str,
+    approval: PendingApproval,
     response: httpx.Response,
 ) -> OperatorActionResult:
     body: dict[str, Any] = {}
@@ -109,7 +195,9 @@ def _parse_action_result(
 
     return OperatorActionResult(
         action=action,
-        approval_id=approval_id,
+        approval_id=approval.approval_id,
+        action_type=approval.action_type,
+        action_operation_id=approval.action_operation_id,
         http_status=response.status_code,
         changed=changed if isinstance(changed, bool) else None,
         idempotent=idempotent,
@@ -123,12 +211,12 @@ def approve_approval(
     base_url: str,
     admin_api_key: str,
     tenant_id: str,
-    approval_id: str,
+    approval: PendingApproval,
     reason: str = "testbot semi-auto approve",
     timeout: float = 60.0,
 ) -> OperatorActionResult:
     response = httpx.post(
-        f"{base_url.rstrip('/')}/approvals/{approval_id}/approve",
+        f"{base_url.rstrip('/')}/approvals/{approval.approval_id}/approve",
         headers=_headers(admin_api_key=admin_api_key, tenant_id=tenant_id),
         json={
             "actor": TESTBOT_OPERATOR_ACTOR,
@@ -139,7 +227,7 @@ def approve_approval(
     )
     if response.status_code >= 500:
         response.raise_for_status()
-    return _parse_action_result(action="approve", approval_id=approval_id, response=response)
+    return _parse_action_result(action="approve", approval=approval, response=response)
 
 
 def reject_approval(
@@ -147,12 +235,12 @@ def reject_approval(
     base_url: str,
     admin_api_key: str,
     tenant_id: str,
-    approval_id: str,
+    approval: PendingApproval,
     reason: str = "testbot semi-auto reject",
     timeout: float = 60.0,
 ) -> OperatorActionResult:
     response = httpx.post(
-        f"{base_url.rstrip('/')}/approvals/{approval_id}/reject",
+        f"{base_url.rstrip('/')}/approvals/{approval.approval_id}/reject",
         headers=_headers(admin_api_key=admin_api_key, tenant_id=tenant_id),
         json={
             "actor": TESTBOT_OPERATOR_ACTOR,
@@ -163,20 +251,75 @@ def reject_approval(
     )
     if response.status_code >= 500:
         response.raise_for_status()
-    return _parse_action_result(action="reject", approval_id=approval_id, response=response)
+    return _parse_action_result(action="reject", approval=approval, response=response)
 
 
-def _select_operator_pending_approvals(
-    pending: list[PendingApproval],
-) -> list[PendingApproval]:
-    """Prefer per-action approvals over job-level dispatcher rows when both exist."""
-    per_action = [
-        row for row in pending
-        if row.next_on_approve in ("action_execute", "email_send")
-    ]
-    if per_action:
-        return per_action
-    return pending
+def _expected_statuses_for_step(step: OperatorPlanStep) -> set[int]:
+    if step.expected_http_status is not None:
+        return {step.expected_http_status}
+    if step.expected_result == "idempotent":
+        return {200, 201, 409}
+    if step.decision == "approve":
+        return {200, 201}
+    return {200, 201}
+
+
+def assert_secondary_approvals(
+    *,
+    approvals: list[PendingApproval],
+    outcome: SemiAutomaticExpectedOutcome,
+    touched_approval_ids: set[str],
+    decision_records: list[dict[str, Any]],
+) -> list[str]:
+    violations: list[str] = []
+    for secondary in outcome.secondary_approvals:
+        matches = [
+            row for row in approvals
+            if row.action_type == secondary.action_type
+            and row.delivery_type == secondary.resolved_delivery_type
+        ]
+        if not matches:
+            if secondary.expected_final_state == "not_materialized":
+                continue
+            violations.append(
+                f"secondary approval {secondary.action_type!r} not found"
+            )
+            continue
+        if len(matches) > 1:
+            violations.append(
+                f"ambiguous secondary approval {secondary.action_type!r}"
+            )
+            continue
+        row = matches[0]
+        if row.approval_id in touched_approval_ids:
+            violations.append(
+                f"test operator touched secondary approval {secondary.action_type!r}"
+            )
+        if secondary.expected_final_state == "remain_pending":
+            if row.state != "pending":
+                violations.append(
+                    f"secondary {secondary.action_type!r} expected remain_pending, "
+                    f"got state={row.state!r}"
+                )
+            op_id = row.action_operation_id
+            if op_id:
+                for record_type in (
+                    "action_approval_resolution",
+                    "execution_intent",
+                    "execution_outcome",
+                ):
+                    count = sum(
+                        1
+                        for rec in decision_records
+                        if rec.get("record_type") == record_type
+                        and rec.get("action_operation_id") == op_id
+                    )
+                    if count:
+                        violations.append(
+                            f"secondary {secondary.action_type!r} must not have "
+                            f"{record_type}, got {count}"
+                        )
+    return violations
 
 
 def execute_test_operator_actions(
@@ -190,10 +333,11 @@ def execute_test_operator_actions(
     outcome: SemiAutomaticExpectedOutcome,
     expected_sender: str,
     reply_budget_remaining: int,
-) -> list[OperatorActionResult]:
+) -> OperatorExecutionContext:
     """Run contract-authorized operator actions for a semi-auto scenario."""
+    ctx = OperatorExecutionContext()
     if outcome.is_negative_hold or not outcome.allow_operator_action:
-        return []
+        return ctx
 
     _validate_operator_guards(
         tenant_id=tenant_id,
@@ -204,81 +348,87 @@ def execute_test_operator_actions(
         reply_budget_remaining=reply_budget_remaining,
     )
 
-    pending = _select_operator_pending_approvals([
-        row for row in list_job_approvals(
-            base_url=base_url,
-            admin_api_key=admin_api_key,
-            tenant_id=tenant_id,
-            job_id=job_id,
-        )
-        if row.state == "pending"
-    ])
-    if not pending:
-        raise LiveEvalSafetyError(
-            f"test operator blocked: no pending approval for job {job_id!r}"
-        )
-    if len(pending) != 1:
-        raise LiveEvalSafetyError(
-            f"test operator blocked: expected exactly one pending approval, got {len(pending)}"
-        )
+    locked_operation_id: str | None = None
+    locked_approval_id: str | None = None
 
-    approval_id = pending[0].approval_id
-    results: list[OperatorActionResult] = []
-
-    if outcome.operator_action == "approve":
-        first = approve_approval(
-            base_url=base_url,
-            admin_api_key=admin_api_key,
-            tenant_id=tenant_id,
-            approval_id=approval_id,
-        )
-        results.append(first)
-        if first.http_status not in (200, 201):
-            raise LiveEvalSafetyError(
-                f"test operator approve failed: status={first.http_status}"
-            )
-        if outcome.expect_duplicate_idempotent:
-            second = approve_approval(
+    for index, step in enumerate(outcome.operator_plan):
+        pending = [
+            row for row in list_job_approvals(
                 base_url=base_url,
                 admin_api_key=admin_api_key,
                 tenant_id=tenant_id,
-                approval_id=approval_id,
-                reason="testbot duplicate approve",
+                job_id=job_id,
             )
-            results.append(second)
-            if second.http_status not in (200, 201, 409):
+            if row.state == "pending" or (
+                locked_approval_id and row.approval_id == locked_approval_id
+            )
+        ]
+        if index == 0:
+            target = match_target_approval(pending, step)
+            locked_operation_id = target.action_operation_id
+            locked_approval_id = target.approval_id
+            ctx.target_action_operation_id = locked_operation_id
+            ctx.target_approval_id = locked_approval_id
+            ctx.target_action_type = target.action_type
+            for sec in outcome.secondary_approvals:
+                sec_rows = [
+                    row for row in pending
+                    if row.action_type == sec.action_type
+                    and row.delivery_type == sec.resolved_delivery_type
+                ]
+                if len(sec_rows) == 1 and sec_rows[0].action_operation_id:
+                    ctx.secondary_operation_ids[sec.action_type] = (
+                        sec_rows[0].action_operation_id
+                    )
+        else:
+            if not locked_operation_id or not locked_approval_id:
+                raise LiveEvalSafetyError("operator plan missing locked target operation")
+            target = match_target_approval(
+                pending,
+                step,
+                locked_operation_id=locked_operation_id,
+            )
+            if target.approval_id != locked_approval_id:
                 raise LiveEvalSafetyError(
-                    f"duplicate approve unexpected status={second.http_status}"
+                    "duplicate/stale step must reuse same target approval"
                 )
-        return results
 
-    if outcome.operator_action == "reject":
-        first = reject_approval(
-            base_url=base_url,
-            admin_api_key=admin_api_key,
-            tenant_id=tenant_id,
-            approval_id=approval_id,
-        )
-        results.append(first)
-        if first.http_status not in (200, 201):
-            raise LiveEvalSafetyError(
-                f"test operator reject failed: status={first.http_status}"
-            )
-        if outcome.expect_stale_conflict:
-            stale = approve_approval(
+        if step.decision == "approve":
+            result = approve_approval(
                 base_url=base_url,
                 admin_api_key=admin_api_key,
                 tenant_id=tenant_id,
-                approval_id=approval_id,
-                reason="testbot stale approve attempt",
+                approval=target,
+                reason=(
+                    "testbot duplicate approve"
+                    if step.expected_result == "idempotent"
+                    else "testbot semi-auto approve"
+                ),
             )
-            results.append(stale)
-            if not stale.conflict and not stale.idempotent:
-                raise LiveEvalSafetyError(
-                    "stale approve must be denied without action"
-                )
-        return results
+        elif step.decision == "reject":
+            result = reject_approval(
+                base_url=base_url,
+                admin_api_key=admin_api_key,
+                tenant_id=tenant_id,
+                approval=target,
+            )
+        else:
+            raise LiveEvalSafetyError(f"unsupported operator decision {step.decision!r}")
 
-    raise LiveEvalSafetyError(
-        f"unsupported operator_action {outcome.operator_action!r}"
-    )
+        ctx.results.append(result)
+        ctx.touched_approval_ids.append(target.approval_id)
+
+        allowed = _expected_statuses_for_step(step)
+        if result.http_status not in allowed:
+            raise LiveEvalSafetyError(
+                f"test operator {step.decision} failed: status={result.http_status}, "
+                f"expected one of {sorted(allowed)}"
+            )
+        if step.expected_result == "idempotent" and not (
+            result.idempotent or result.conflict
+        ):
+            raise LiveEvalSafetyError("duplicate approve must be idempotent or conflict-safe")
+        if step.expected_http_status == 409 and not result.conflict:
+            raise LiveEvalSafetyError("stale approve must return conflict")
+
+    return ctx
