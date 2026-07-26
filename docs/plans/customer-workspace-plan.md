@@ -22,7 +22,7 @@ todos:
     status: completed
   - id: workspace-g-quality-pass
     content: Genomför responsivitet, tillgänglighet, felhantering och UX-kvalitetspass
-    status: in_progress
+    status: completed
   - id: workspace-h-closure
     content: Slutverifiera arbetsytan, dokumentera begränsningar och stäng utvecklingsspåret
     status: pending
