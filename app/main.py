@@ -1095,6 +1095,46 @@ def list_pending_approvals(
     )
 
 
+def _uses_per_action_approval_resolution(approval) -> bool:
+    """True when approval should use resolve_per_action_approval, not legacy job resume."""
+    if approval.next_on_approve in ("email_send", "action_execute"):
+        return True
+    request_payload = approval.request_payload or {}
+    delivery = approval.delivery_payload or {}
+    if request_payload.get("action_operation_id") and delivery.get("type"):
+        return True
+    return False
+
+
+def _legacy_approval_terminal_response(
+    approval,
+    *,
+    approved: bool,
+) -> dict | None:
+    """Return idempotent/conflict payload when legacy path hits a terminal approval row."""
+    state = str(approval.state or "")
+    if state not in ("approved", "rejected"):
+        return None
+    terminal_approved = state == "approved"
+    if approved == terminal_approved:
+        return {
+            "approval_id": approval.approval_id,
+            "job_id": approval.job_id,
+            "status": state,
+            "approval_state": state,
+            "idempotent": True,
+            "contract_conflict": None,
+        }
+    return {
+        "approval_id": approval.approval_id,
+        "job_id": approval.job_id,
+        "status": state,
+        "approval_state": state,
+        "idempotent": False,
+        "contract_conflict": "approval_terminal_state_conflict",
+    }
+
+
 def _resolve_email_approval(
     db,
     approval,
@@ -1162,7 +1202,7 @@ def approve_request(
             raise HTTPException(status_code=400, detail=str(exc))
 
     # Email and per-action approvals: execute stored delivery payload
-    if approval.next_on_approve in ("email_send", "action_execute"):
+    if _uses_per_action_approval_resolution(approval):
         return _resolve_email_approval(db, approval, approved=True,
                                        actor=request.actor, note=request.note)
 
@@ -1186,15 +1226,23 @@ def approve_request(
             note=request.note,
         )
 
-    job = resolve_approval(
-        db=db,
-        tenant_id=tenant_id,
-        job_id=approval.job_id,
-        approved=True,
-        actor=request.actor,
-        channel=request.channel,
-        note=request.note,
-    )
+    try:
+        job = resolve_approval(
+            db=db,
+            tenant_id=tenant_id,
+            job_id=approval.job_id,
+            approved=True,
+            actor=request.actor,
+            channel=request.channel,
+            note=request.note,
+        )
+    except ValueError as exc:
+        terminal = _legacy_approval_terminal_response(approval, approved=True)
+        if terminal is not None:
+            if terminal.get("contract_conflict"):
+                raise HTTPException(status_code=409, detail=terminal) from exc
+            return terminal
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     from app.workflows.approval_service import enrich_job_response_data
     return JobResponse(**enrich_job_response_data(job, db))
@@ -1231,8 +1279,8 @@ def reject_request(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
 
-    # Email approvals: just mark rejected, no send
-    if approval.next_on_approve in ("email_send", "action_execute"):
+    # Email and per-action approvals: just mark rejected, no send
+    if _uses_per_action_approval_resolution(approval):
         return _resolve_email_approval(db, approval, approved=False,
                                        actor=request.actor, note=request.note)
 
@@ -1256,15 +1304,23 @@ def reject_request(
             note=request.note,
         )
 
-    job = resolve_approval(
-        db=db,
-        tenant_id=tenant_id,
-        job_id=approval.job_id,
-        approved=False,
-        actor=request.actor,
-        channel=request.channel,
-        note=request.note,
-    )
+    try:
+        job = resolve_approval(
+            db=db,
+            tenant_id=tenant_id,
+            job_id=approval.job_id,
+            approved=False,
+            actor=request.actor,
+            channel=request.channel,
+            note=request.note,
+        )
+    except ValueError as exc:
+        terminal = _legacy_approval_terminal_response(approval, approved=False)
+        if terminal is not None:
+            if terminal.get("contract_conflict"):
+                raise HTTPException(status_code=409, detail=terminal) from exc
+            return terminal
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     from app.workflows.approval_service import enrich_job_response_data
     return JobResponse(**enrich_job_response_data(job, db))
