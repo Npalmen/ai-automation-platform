@@ -22,7 +22,7 @@ todos:
     status: completed
   - id: customer-domain-g-implementation-gate
     content: Granska helheten och stoppa för uttryckligt godkännande före implementation
-    status: pending
+    status: completed
   - id: customer-domain-h-implementation
     content: Implementera kunddomänen efter separat operatörsgodkännande
     status: pending
