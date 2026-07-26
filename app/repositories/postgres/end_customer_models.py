@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, JSON
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.repositories.postgres.database import Base
+
+# PostgreSQL migration uses JSONB; SQLite metadata tests need a compilable JSON type.
+_JSONB = JSON().with_variant(JSONB(), "postgresql")
 
 
 class EndCustomerCompanyRecord(Base):
@@ -64,7 +67,7 @@ class EndCustomerSourceFactRecord(Base):
     normalized_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     fact_state: Mapped[str] = mapped_column(String(32), nullable=False)
     source_type: Mapped[str] = mapped_column(String(32), nullable=False)
-    source_reference: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    source_reference: Mapped[dict | None] = mapped_column(_JSONB, nullable=True)
     source_actor: Mapped[str | None] = mapped_column(String(128), nullable=True)
     confidence: Mapped[float] = mapped_column(nullable=False)
     observed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -72,7 +75,7 @@ class EndCustomerSourceFactRecord(Base):
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     verified_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
     supersedes_fact_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    conflicts_with_fact_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    conflicts_with_fact_ids: Mapped[list] = mapped_column(_JSONB, nullable=False, default=list)
 
 
 class EndCustomerIdentityRecord(Base):
@@ -150,7 +153,7 @@ class EndCustomerTimelineEventRecord(Base):
     reference_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     reference_id: Mapped[str | None] = mapped_column(String(320), nullable=True)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
-    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict)
+    metadata_json: Mapped[dict] = mapped_column("metadata", _JSONB, nullable=False, default=dict)
     replay_identity_key: Mapped[str] = mapped_column(String(512), nullable=False)
 
 
@@ -163,8 +166,8 @@ class EndCustomerDuplicateCandidateRecord(Base):
     right_customer_id: Mapped[str] = mapped_column(String(36), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     confidence: Mapped[float] = mapped_column(nullable=False)
-    evidence: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
-    conflicts: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    evidence: Mapped[list] = mapped_column(_JSONB, nullable=False, default=list)
+    conflicts: Mapped[list] = mapped_column(_JSONB, nullable=False, default=list)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
