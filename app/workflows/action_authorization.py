@@ -59,8 +59,13 @@ def authorize_action(
     if spec is None or action_type not in SUPPORTED_ACTIONS:
         return ActionAuthorization.BLOCKED
 
-    if policy_decision in ("hold_for_review", "send_for_approval"):
+    if policy_decision == "hold_for_review":
         return ActionAuthorization.BLOCKED
+
+    if policy_decision == "send_for_approval":
+        # Policy already routed the job to approval; dispatch must queue per-action
+        # approvals instead of blocking outbound actions at this boundary.
+        return ActionAuthorization.APPROVAL_REQUIRED
 
     if spec.effect in (ActionEffect.INTERNAL_STUB, ActionEffect.INTERNAL_RECORD):
         return ActionAuthorization.EXECUTION_ALLOWED

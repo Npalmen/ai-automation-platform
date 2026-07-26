@@ -59,6 +59,29 @@ def _build_delivery_payload(job: Job, approval_request: dict[str, Any]) -> dict[
     }
 
 
+def _should_materialize_per_action_approvals(job: Job) -> bool:
+    """Only trusted live-eval jobs need per-action rows before operator action."""
+    from app.evaluation.live.context import snapshot_from_job_input
+
+    snapshot = snapshot_from_job_input(job.input_data)
+    return snapshot is not None and bool(snapshot.trusted)
+
+
+def _materialize_per_action_approvals(db: Session, job: Job) -> Job:
+    """Run action dispatch once to queue per-action approvals before job-level fallback."""
+    if not _should_materialize_per_action_approvals(job):
+        return job
+    if action_dispatch_pending_approval_count(job) > 0:
+        return job
+
+    from app.workflows.pipeline_run_context import PipelineRunSource, create_trace_session
+    from app.workflows.processors.action_dispatch_processor import process_action_dispatch_job
+
+    trace = create_trace_session(job, source=PipelineRunSource.INTAKE, db=db)
+    materialized = process_action_dispatch_job(job, db=db, trace=trace)
+    return JobRepository.update_job(db, materialized)
+
+
 def dispatch_approval_request(db: Session | None, job: Job) -> Job:
     approval_request = get_pending_approval(job)
     if approval_request is None:
@@ -86,6 +109,8 @@ def dispatch_approval_request(db: Session | None, job: Job) -> Job:
 
     if db:
         updated_job = JobRepository.update_job(db, updated_job)
+        if action_dispatch_pending_approval_count(updated_job) == 0:
+            updated_job = _materialize_per_action_approvals(db, updated_job)
         # Per-action approvals from action_dispatch_processor are authoritative in DB.
         # Do not create a competing job-level row (next_on_approve=action_dispatch) that
         # would shadow the per-action approval (action_execute) for operators.

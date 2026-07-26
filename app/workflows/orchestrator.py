@@ -152,6 +152,9 @@ class WorkflowOrchestrator:
             current = job.model_copy(deep=True)
             current.status = JobStatus.PROCESSING
             current.updated_at = self._utcnow()
+            input_data = dict(current.input_data or {})
+            input_data["_resume_after_job_approval"] = True
+            current.input_data = input_data
             current = self._persist(current)
 
             parent_run_id = self._latest_pipeline_run_id(current)

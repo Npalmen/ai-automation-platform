@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,15 @@ from app.repositories.postgres.decision_record_models import DecisionRecordRow
 
 
 class DecisionRecordRepository:
+    @staticmethod
+    def _next_event_sequence(db: Session, *, tenant_id: str, job_id: str) -> int:
+        stmt = select(func.coalesce(func.max(DecisionRecordRow.event_sequence), 0)).where(
+            DecisionRecordRow.tenant_id == tenant_id,
+            DecisionRecordRow.job_id == job_id,
+        )
+        current = db.execute(stmt).scalar_one()
+        return int(current or 0) + 1
+
     @staticmethod
     def append_if_absent(db: Session, record: dict[str, Any]) -> DecisionRecordRow:
         row = DecisionRecordRow(
@@ -52,6 +61,12 @@ class DecisionRecordRepository:
             metadata_json=record.get("metadata") or {},
             created_at=record.get("created_at") or datetime.now(timezone.utc),
         )
+        if db.get_bind().dialect.name == "sqlite":
+            row.event_sequence = DecisionRecordRepository._next_event_sequence(
+                db,
+                tenant_id=record["tenant_id"],
+                job_id=record["job_id"],
+            )
         try:
             with db.begin_nested():
                 db.add(row)

@@ -76,6 +76,7 @@ def _apply_dispatch_authorization(
     auto_actions = automation_settings.get("auto_actions") or {}
 
     authorized: list[dict[str, Any]] = []
+    resume_after_job_approval = bool((job.input_data or {}).get("_resume_after_job_approval"))
     for action in actions:
         annotated = apply_action_authorization(
             action,
@@ -83,7 +84,7 @@ def _apply_dispatch_authorization(
             auto_actions=auto_actions,
             risk_detected=bool(risk["risk_detected"]),
             policy_decision=policy_decision,
-            pre_authorized=bool(action.get("_pre_authorized")),
+            pre_authorized=bool(action.get("_pre_authorized")) or resume_after_job_approval,
         )
         if (
             db is not None
@@ -1084,6 +1085,8 @@ def _compute_lead_sla_payload(
         return None
 
     created_at = job.created_at or datetime.now(timezone.utc)
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
     due_at = created_at + timedelta(minutes=_LEAD_SLA_TARGET_MINUTES)
     now = datetime.now(timezone.utc)
 

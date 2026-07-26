@@ -17,6 +17,7 @@ from app.domain.workflows.statuses import JobStatus
 from app.evaluation.live.errors import LiveEvalPipelinePollError
 from app.evaluation.live.pipeline_poll import poll_pipeline_observation
 from app.evaluation.live.routes import router as live_eval_router
+from app.repositories.postgres.action_execution_models import ActionExecutionRecord
 from app.repositories.postgres.approval_models import ApprovalRequestRecord
 from app.repositories.postgres.audit_models import AuditEventRecord
 from app.repositories.postgres.database import Base
@@ -50,6 +51,7 @@ def pipeline_db(live_eval_env):
             TenantConfigRecord.__table__,
             DecisionRecordRow.__table__,
             ApprovalRequestRecord.__table__,
+            ActionExecutionRecord.__table__,
         ],
     )
     Session = sessionmaker(bind=engine)
