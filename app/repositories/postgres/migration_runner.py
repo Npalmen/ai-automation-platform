@@ -24,12 +24,13 @@ ORDERED_MIGRATION_FILES: tuple[str, ...] = (
     "020_live_eval_llm_contract.sql",
     "021_live_eval_llm_operations.sql",
     "022_end_customer_foundation.sql",
+    "023_end_customer_idempotency.sql",
 )
 
 MIGRATIONS_THROUGH_014: tuple[str, ...] = ORDERED_MIGRATION_FILES[:6]
 MIGRATIONS_THROUGH_015: tuple[str, ...] = ORDERED_MIGRATION_FILES[:7]
 MIGRATIONS_THROUGH_019: tuple[str, ...] = ORDERED_MIGRATION_FILES[:10]
-LATEST_MIGRATION_VERSION = "022"
+LATEST_MIGRATION_VERSION = "023"
 
 # Tables created exclusively by migrations/009-015 SQL files (not create_tables.py baseline).
 MIGRATION_OWNED_TABLES: frozenset[str] = frozenset(
@@ -61,6 +62,7 @@ MIGRATION_OWNED_TABLES: frozenset[str] = frozenset(
         "end_customer_thread_links",
         "end_customer_timeline_events",
         "end_customer_duplicate_candidates",
+        "end_customer_idempotency_records",
     }
 )
 

@@ -21,6 +21,8 @@ END_CUSTOMER_FOUNDATION_TABLES: tuple[str, ...] = (
     "end_customer_companies",
 )
 
+END_CUSTOMER_IDEMPOTENCY_TABLE = "end_customer_idempotency_records"
+
 END_CUSTOMER_CONSTRAINT_NAMES: tuple[tuple[str, str], ...] = (
     ("end_customers", "ck_end_customers_version"),
     ("end_customer_source_facts", "ck_end_customer_source_facts_confidence"),
@@ -51,5 +53,6 @@ def postgres_database_url() -> str:
 def teardown_end_customer_foundation_tables(engine: Engine) -> None:
     """Reverse-order cleanup for migration rehearsal tests — not production rollback."""
     with engine.begin() as conn:
+        conn.execute(text(f"DROP TABLE IF EXISTS {END_CUSTOMER_IDEMPOTENCY_TABLE} CASCADE"))
         for table_name in END_CUSTOMER_FOUNDATION_TABLES:
             conn.execute(text(f"DROP TABLE IF EXISTS {table_name} CASCADE"))
