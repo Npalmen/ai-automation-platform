@@ -17,8 +17,8 @@ export function PreviewLoginPage() {
         </div>
         <p className="text-body text-text-secondary">
           När ansluten inloggning finns kommer du kunna logga in säkert utan
-          API-nycklar i webbläsaren. Tills dess visar arbetsytan hur navigation
-          och vyer kommer att fungera.
+          att lagra känsliga uppgifter i webbläsaren. Tills dess visar
+          arbetsytan hur navigation och vyer kommer att fungera.
         </p>
         <p className="mt-4">
           <Link

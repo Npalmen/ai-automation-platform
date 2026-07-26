@@ -1,5 +1,6 @@
 import type { ApprovalListItem } from "@/customer/types/approvals"
 import type { WorkItemListItem } from "@/customer/types/work-items"
+import { LONG_CONTENT_WORK_ITEM } from "@/customer/features/quality/longContentFixtures"
 
 const LEAD_ITEMS: WorkItemListItem[] = [
   {
@@ -325,6 +326,7 @@ export type QueueMockScenario =
   | "delayed"
   | "not_found"
   | "empty_timeline"
+  | "long_content"
 
 export function getPopulatedWorkItems(): WorkItemListItem[] {
   return [...LEAD_ITEMS, ...SUPPORT_ITEMS, ...NEEDS_HELP_ITEMS]
@@ -346,6 +348,7 @@ export function getWorkItemsForScenario(
   scenario: QueueMockScenario,
 ): WorkItemListItem[] {
   if (scenario === "empty") return []
+  if (scenario === "long_content") return [LONG_CONTENT_WORK_ITEM]
   if (scenario === "unknown_status") {
     return getPopulatedWorkItems().filter(
       (item) => item.customer_status === "unknown",
