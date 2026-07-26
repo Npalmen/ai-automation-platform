@@ -898,7 +898,7 @@ class LiveEvalRunner:
                     violations.append("stale operator action must be denied with conflict")
         elif not ctx.unexpected_reply:
             violations.extend(assert_no_unexpected_reply(ctx.unexpected_reply))
-        if self.use_observe_assertions:
+        elif self.use_observe_assertions:
             outcome = self.observe_expected_outcome
             violations.extend(
                 assert_observe_campaign_pipeline(
@@ -918,9 +918,8 @@ class LiveEvalRunner:
                     ),
                 )
             )
-        else:
+        elif not self.use_semi_automatic_assertions:
             violations.extend(assert_s01_pipeline(observation))
-        if not self.use_semi_automatic_assertions:
             events = observation.get("events") or []
             violations.extend(
                 assert_telemetry_summary(

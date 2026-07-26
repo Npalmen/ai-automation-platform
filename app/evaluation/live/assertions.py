@@ -36,19 +36,32 @@ OBSERVE_DECISION_SUBSEQUENCE_NO_DECISIONING = (
 
 ALLOWED_INTERLEAVED_DECISION_TYPES: frozenset[str] = frozenset()
 
+SEMI_AUTO_POST_APPROVAL_INTERLEAVED: frozenset[str] = frozenset({
+    "pipeline_run_started",
+    "classification",
+    "decisioning_recommendation",
+    "policy_authorization",
+    "action_authorization",
+    "action_approval_resolution",
+    "execution_intent",
+    "execution_outcome",
+})
+
 
 def _assert_decision_subsequence(
     types: list[str],
     *,
     required: tuple[str, ...] = REQUIRED_DECISION_SUBSEQUENCE,
+    interleaved: frozenset[str] | None = None,
 ) -> list[str]:
     violations: list[str] = []
+    allowed_interleaved = interleaved or ALLOWED_INTERLEAVED_DECISION_TYPES
     cursor = 0
     for record_type in types:
-        if record_type in ALLOWED_INTERLEAVED_DECISION_TYPES:
-            continue
         if cursor < len(required) and record_type == required[cursor]:
             cursor += 1
+            continue
+        if record_type in allowed_interleaved:
             continue
         if record_type in required:
             violations.append(f"decision record out of order: {record_type}")
@@ -326,6 +339,11 @@ def assert_semi_automatic_campaign_pipeline(
         _assert_decision_subsequence(
             types,
             required=decision_subsequence or REQUIRED_DECISION_SUBSEQUENCE,
+            interleaved=(
+                SEMI_AUTO_POST_APPROVAL_INTERLEAVED
+                if expect_approval_resolution_record
+                else None
+            ),
         )
     )
 
@@ -334,7 +352,7 @@ def assert_semi_automatic_campaign_pipeline(
             violations.append("expected action_approval_resolution decision record")
     for forbidden in FORBIDDEN_DECISION_TYPES:
         if forbidden in types:
-            if forbidden == "action_approval_resolution" and expect_approval_resolution_record:
+            if expect_approval_resolution_record and forbidden in SEMI_AUTO_POST_APPROVAL_INTERLEAVED:
                 continue
             violations.append(f"forbidden decision record {forbidden}")
 
