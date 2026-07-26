@@ -28,6 +28,7 @@ def test_tbsm01_lead_approve_reply_expectations():
     assert outcome.expected_reply is True
     assert outcome.final_job_status == "completed"
     assert outcome.expect_approval_resolution is True
+    assert "action_approval_resolution" in outcome.decision_subsequence
 
 
 def test_tbsm04_lead_reject_expectations():
@@ -66,6 +67,23 @@ def test_semi_auto_core_has_eight_scenarios():
     scenarios = list_campaign_scenarios(campaign_type="semi-auto-core")
     assert len(scenarios) == 8
     assert all(s.mode == "semi_automatic" for s in scenarios)
+
+
+def test_tbsm_scenarios_have_fixture_bundles():
+    from app.evaluation.live.fixture_bundle import resolve_fixture_bundle_id
+
+    for scenario_id in (
+        "TBSM01_lead_approve_reply",
+        "TBSM02_support_approve_reply",
+        "TBSM03_noisy_approve_reply",
+        "TBSM04_lead_reject",
+        "TBSM05_support_reject",
+        "TBSM06_duplicate_approve",
+        "TBSM07_stale_approve",
+        "TBSM08_unknown_negative_hold",
+    ):
+        bundle_id = resolve_fixture_bundle_id(scenario_id=scenario_id, ai_mode="fixture_ai")
+        assert bundle_id is not None
 
 
 def test_approve_reply_telemetry_allows_one_reply():

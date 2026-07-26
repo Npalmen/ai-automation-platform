@@ -109,7 +109,9 @@ def _redact_token(evaluation_run_id: str, scenario_id: str) -> str:
 
 def _expected_job_type(scenario: CampaignScenario) -> str | None:
     expected = scenario.expected_classification.get("job_type")
-    return str(expected) if expected else scenario.job_type if scenario.job_type != "unknown" else None
+    if expected is not None and str(expected).strip():
+        return str(expected).strip()
+    return scenario.job_type or None
 
 
 def run_observe_campaign(
@@ -287,8 +289,9 @@ def run_semi_automatic_campaign(
         run_id = new_evaluation_run_id()
         payload = build_campaign_send_payload(scenario=scenario, evaluation_run_id=run_id)
         expected_outcome = resolve_semi_automatic_expected_outcome(scenario)
+        operator_reply_budget = reply_budget_remaining
         if expected_outcome.expected_reply:
-            if reply_budget_remaining <= 0:
+            if reply_budget_remaining < 1:
                 raise LiveEvalSafetyError(
                     f"reply budget exhausted before scenario {scenario.scenario_id!r}"
                 )
@@ -307,7 +310,7 @@ def run_semi_automatic_campaign(
             expected_job_type=_expected_job_type(scenario),
             use_semi_automatic_assertions=True,
             semi_automatic_expected_outcome=expected_outcome,
-            reply_budget_remaining=reply_budget_remaining,
+            reply_budget_remaining=operator_reply_budget,
             campaign_scenario=scenario,
         )
         exit_code = runner.run()
