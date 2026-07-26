@@ -9,7 +9,7 @@ from app.core.audit_service import create_audit_event
 from app.domain.workflows.models import Job
 from app.repositories.postgres.approval_repository import ApprovalRequestRepository
 from app.repositories.postgres.job_repository import JobRepository
-from app.workflows.approval_service import get_pending_approval
+from app.workflows.approval_service import action_dispatch_pending_approval_count, get_pending_approval
 from app.workflows.processors.ai_processor_utils import append_processor_result
 
 PROCESSOR_NAME = "approval_dispatcher"
@@ -86,14 +86,18 @@ def dispatch_approval_request(db: Session | None, job: Job) -> Job:
 
     if db:
         updated_job = JobRepository.update_job(db, updated_job)
-        ApprovalRequestRepository.upsert_from_payload(
-            db=db,
-            tenant_id=updated_job.tenant_id,
-            job_id=updated_job.job_id,
-            job_type=updated_job.job_type.value if hasattr(updated_job.job_type, "value") else str(updated_job.job_type),
-            approval_request=approval_request,
-            delivery_payload=delivery,
-        )
+        # Per-action approvals from action_dispatch_processor are authoritative in DB.
+        # Do not create a competing job-level row (next_on_approve=action_dispatch) that
+        # would shadow the per-action approval (action_execute) for operators.
+        if action_dispatch_pending_approval_count(updated_job) == 0:
+            ApprovalRequestRepository.upsert_from_payload(
+                db=db,
+                tenant_id=updated_job.tenant_id,
+                job_id=updated_job.job_id,
+                job_type=updated_job.job_type.value if hasattr(updated_job.job_type, "value") else str(updated_job.job_type),
+                approval_request=approval_request,
+                delivery_payload=delivery,
+            )
 
     create_audit_event(
         db=db,

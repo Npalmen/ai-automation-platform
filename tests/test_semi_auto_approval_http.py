@@ -179,3 +179,58 @@ class TestSemiAutoApprovalHttp:
 
         result = _resolve_email_approval(db, approval, approved=False, actor="op")
         assert result["idempotent"] is True
+
+    def test_routes_by_action_operation_id_not_only_next_on_approve(self, approval_db):
+        db, approval = _seed(approval_db)
+        approval.next_on_approve = "action_dispatch"
+        db.commit()
+        from app.main import _uses_per_action_approval_resolution
+
+        assert _uses_per_action_approval_resolution(approval) is True
+
+    def test_legacy_duplicate_approve_never_500(self, approval_db):
+        from unittest.mock import patch
+
+        from app.main import ApprovalDecisionRequest, approve_request
+        from app.repositories.postgres.approval_models import ApprovalRequestRecord
+
+        db, approval = _seed(approval_db, state="approved")
+        approval.next_on_approve = "action_dispatch"
+        approval.delivery_payload = {"channel": "dashboard"}
+        approval.request_payload = dict(approval.request_payload or {})
+        db.commit()
+
+        with patch("app.main.resolve_approval", side_effect=ValueError("no pending approval")):
+            result = approve_request(
+                approval_id=approval.approval_id,
+                request=ApprovalDecisionRequest(actor="op", channel="dashboard"),
+                db=db,
+                tenant_id=approval.tenant_id,
+            )
+
+        assert result["idempotent"] is True
+        assert result["status"] == "approved"
+
+    def test_legacy_stale_approve_after_reject_returns_409(self, approval_db):
+        from unittest.mock import patch
+
+        import pytest
+        from fastapi import HTTPException
+
+        from app.main import ApprovalDecisionRequest, approve_request
+
+        db, approval = _seed(approval_db, state="rejected")
+        approval.next_on_approve = "action_dispatch"
+        approval.delivery_payload = {"channel": "dashboard"}
+        db.commit()
+
+        with patch("app.main.resolve_approval", side_effect=ValueError("no pending approval")):
+            with pytest.raises(HTTPException) as exc_info:
+                approve_request(
+                    approval_id=approval.approval_id,
+                    request=ApprovalDecisionRequest(actor="op", channel="dashboard"),
+                    db=db,
+                    tenant_id=approval.tenant_id,
+                )
+
+        assert exc_info.value.status_code == 409

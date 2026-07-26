@@ -166,6 +166,19 @@ def reject_approval(
     return _parse_action_result(action="reject", approval_id=approval_id, response=response)
 
 
+def _select_operator_pending_approvals(
+    pending: list[PendingApproval],
+) -> list[PendingApproval]:
+    """Prefer per-action approvals over job-level dispatcher rows when both exist."""
+    per_action = [
+        row for row in pending
+        if row.next_on_approve in ("action_execute", "email_send")
+    ]
+    if per_action:
+        return per_action
+    return pending
+
+
 def execute_test_operator_actions(
     *,
     base_url: str,
@@ -191,7 +204,7 @@ def execute_test_operator_actions(
         reply_budget_remaining=reply_budget_remaining,
     )
 
-    pending = [
+    pending = _select_operator_pending_approvals([
         row for row in list_job_approvals(
             base_url=base_url,
             admin_api_key=admin_api_key,
@@ -199,7 +212,7 @@ def execute_test_operator_actions(
             job_id=job_id,
         )
         if row.state == "pending"
-    ]
+    ])
     if not pending:
         raise LiveEvalSafetyError(
             f"test operator blocked: no pending approval for job {job_id!r}"
