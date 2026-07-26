@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build",
     "typecheck:customer": "tsc -b tsconfig.customer.json --noEmit",
     "build:customer": "tsc -b tsconfig.customer.json && vite build --config vite.customer.config.ts",
-    "test:customer": "node --test src/customer/**/*.test.mjs",
+    "test:customer": "node --test src/customer/shell.test.mjs src/customer/features/overview/overview.test.mjs",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "test:contracts": "node --test design/contracts.test.mjs",

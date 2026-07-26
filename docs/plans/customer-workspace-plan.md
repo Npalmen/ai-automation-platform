@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: workspace-d-overview
     content: Bygg kundens dagliga översikt och prioriterade arbetslista
-    status: pending
+    status: completed
   - id: workspace-e-inbox-workflows
     content: Bygg vyer för leads, kundfrågor, approvals och needs-help
     status: pending

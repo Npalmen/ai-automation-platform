@@ -34,6 +34,7 @@ function readAllCustomerSources() {
 test("customer routes include all required paths", () => {
   const routerSource = readCustomerFile("routes/router.tsx")
   const requiredPaths = [
+    "<OverviewPage />",
     'path: "leads"',
     'path: "support"',
     'path: "approvals"',
@@ -85,7 +86,11 @@ test("mock adapter does not perform network calls", () => {
 })
 
 test("customer shell avoids secret storage and forbidden APIs", () => {
-  const combined = readAllCustomerSources()
+  const combined = [
+    readAllCustomerSources(),
+    readFileSync(join(customerDir, "features/overview/OverviewPage.tsx"), "utf8"),
+    readFileSync(join(customerDir, "features/overview/overviewFixtures.ts"), "utf8"),
+  ].join("\n")
   const forbidden = [
     "localStorage",
     "sessionStorage",

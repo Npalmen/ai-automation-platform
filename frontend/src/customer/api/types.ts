@@ -1,3 +1,4 @@
+import type { WorkspaceOverview } from "@/customer/types/overview"
 import type {
   CustomerAuthState,
   FeatureFlags,
@@ -7,7 +8,7 @@ import type {
 
 export type WorkspaceDataSource = {
   getContext(): Promise<WorkspaceContext>
-  getOverview(): Promise<Record<string, unknown>>
+  getOverview(): Promise<WorkspaceOverview>
   getWorkItems(): Promise<{ items: unknown[]; total: number }>
   getWorkItemDetail(workItemId: string): Promise<Record<string, unknown> | null>
   getApprovals(): Promise<{ items: unknown[]; total: number }>
