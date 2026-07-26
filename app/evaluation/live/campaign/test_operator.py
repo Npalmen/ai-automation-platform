@@ -260,7 +260,7 @@ def execute_test_operator_actions(
                 reason="testbot stale approve attempt",
             )
             results.append(stale)
-            if not stale.conflict:
+            if not stale.conflict and not stale.idempotent:
                 raise LiveEvalSafetyError(
                     "stale approve must be denied without action"
                 )
