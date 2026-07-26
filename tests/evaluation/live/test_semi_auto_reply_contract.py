@@ -139,10 +139,10 @@ def test_build_scenario_reply_metrics_separates_physical_counts():
 def test_campaign_reply_totals_sum_physical_counts():
     totals = CampaignReplyTotals.from_scenarios(
         [
-            ScenarioReplyMetrics(1, 1, 1, 1, 0),
-            ScenarioReplyMetrics(1, 1, 1, 1, 0),
-            ScenarioReplyMetrics(1, 1, 1, 1, 0),
-            ScenarioReplyMetrics(1, 1, 1, 1, 0),
+            ScenarioReplyMetrics(1, 1, 1, 1, 0, 0, 1, 0),
+            ScenarioReplyMetrics(1, 1, 1, 1, 0, 0, 1, 0),
+            ScenarioReplyMetrics(1, 1, 1, 1, 0, 0, 1, 0),
+            ScenarioReplyMetrics(1, 1, 1, 1, 0, 0, 1, 0),
         ]
     )
     assert totals.expected_reply_count == 4

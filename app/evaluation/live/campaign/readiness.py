@@ -145,6 +145,16 @@ def build_full_system_testbot_readiness(
         issues.extend(operator_issues)
         warnings.extend(operator_warnings)
         gates["semi_auto_operator_contract"] = operator_matrix
+        from app.evaluation.live.campaign.tenant_materialization import (
+            resolve_live_eval_tenant_context,
+        )
+
+        tenant_ctx = resolve_live_eval_tenant_context(tenant_id=tenant_id)
+        gates["tenant_materialization"] = {
+            "tenant_id": tenant_ctx.tenant_id,
+            "internal_notification_email": tenant_ctx.internal_notification_email,
+            "internal_handoff_enabled": tenant_ctx.internal_handoff_enabled,
+        }
 
     required_secrets = [
         "LIVE_EVAL_SENDER_GMAIL_REFRESH_TOKEN",

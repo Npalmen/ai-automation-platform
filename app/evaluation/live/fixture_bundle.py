@@ -19,7 +19,7 @@ SCENARIO_BUNDLE_MAP: dict[str, str] = {
     "TBSM03_noisy_approve_reply": "k2f_bundle_tbs05",
     "TBSM04_lead_reject": "k2f_bundle_tbs01",
     "TBSM05_support_reject": "k2f_bundle_tbs02",
-    "TBSM06_duplicate_approve": "k2f_bundle_tbs01",
+    "TBSM06_duplicate_approve": "k2f_bundle_tbsm06_dup",
     "TBSM07_stale_approve": "k2f_bundle_tbs01",
     "TBSM08_unknown_negative_hold": "k2f_bundle_tbs04",
 }
@@ -60,6 +60,12 @@ BUNDLE_FIXTURES: dict[str, dict[str, dict[str, Any]]] = {
     "k2f_bundle_tbs01": {
         "classification_v1": {"detected_job_type": "lead", "confidence": 0.9, "reasons": ["campaign"]},
         "entity_extraction_v1": {"entities": {"customer_name": "Testbot Anna"}, "confidence": 0.85},
+        "lead_scoring_v1": {"lead_score": 70, "priority": "medium", "routing": "crm_update", "reasons": [], "confidence": 0.85},
+        "decisioning_v1": {"decision": "auto_route", "target_queue": "sales_queue", "action_flags": {"create_crm_lead": False, "notify_human": False, "request_missing_data": True}, "reasons": [], "confidence": 0.85},
+    },
+    "k2f_bundle_tbsm06_dup": {
+        "classification_v1": {"detected_job_type": "lead", "confidence": 0.9, "reasons": ["campaign", "duplicate_approve"]},
+        "entity_extraction_v1": {"entities": {"customer_name": "Testbot Anna Dup"}, "confidence": 0.85},
         "lead_scoring_v1": {"lead_score": 70, "priority": "medium", "routing": "crm_update", "reasons": [], "confidence": 0.85},
         "decisioning_v1": {"decision": "auto_route", "target_queue": "sales_queue", "action_flags": {"create_crm_lead": False, "notify_human": False, "request_missing_data": True}, "reasons": [], "confidence": 0.85},
     },

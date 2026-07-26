@@ -28,6 +28,7 @@ expected_approval:
   operator_action: none
   expected_reply: false
   test_variant: negative_hold
+  negative_control: true
 
 budgets:
   gmail_sends: 1

@@ -642,6 +642,21 @@ class LiveEvalRunner:
                 recipient_verified=ctx.expected_reply is not None,
                 unauthorized=ctx.unexpected_reply is not None,
             )
+            if (
+                self.semi_automatic_expected_outcome.expected_reply
+                and self.reply_metrics.adapter_send_count > 0
+                and self.reply_metrics.recipient_verified_reply_count == 0
+                and self.reply_metrics.provider_outcome_unknown_count == 0
+                and self.reply_metrics.provider_accepted_count > 0
+            ):
+                violations = [
+                    "provider_accepted_without_recipient_verification: outcome_unknown"
+                ]
+                self._transition("asserting", violations=violations)
+                self._set_primary_failure(EXIT_ASSERTION, category="outcome_unknown")
+                self._abort_run()
+                self._write_report("failed", violations, ctx)
+                return
 
         violations = self._assert_all(observation, ctx)
         self._transition("asserting", violations=violations)
@@ -895,13 +910,14 @@ class LiveEvalRunner:
                 if ctx.operator_execution is not None
                 else None
             )
-            violations.extend(
-                assert_target_scoped_execution_chain(
-                    observation,
-                    target_action_operation_id=target_operation_id,
-                    expect_execution_outcome=outcome.expected_reply,
+            if not outcome.is_negative_hold:
+                violations.extend(
+                    assert_target_scoped_execution_chain(
+                        observation,
+                        target_action_operation_id=target_operation_id,
+                        expect_execution_outcome=outcome.expected_reply,
+                    )
                 )
-            )
             job_id_for_secondary = (observation.get("job") or {}).get("job_id")
             if ctx.operator_execution is not None and job_id_for_secondary:
                 post_approvals = list_job_approvals(

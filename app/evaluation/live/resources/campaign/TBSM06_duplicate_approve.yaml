@@ -36,9 +36,13 @@ expected_approval:
     - action_type: send_customer_auto_reply
       decision: approve
       expected_result: idempotent
-  secondary_approvals:
+  expected_actions:
+    - action_type: send_customer_auto_reply
+      materialization: materialized_pending
+      operator_role: target
     - action_type: send_internal_handoff
-      expected_final_state: remain_pending
+      materialization: not_materialized
+      reason: tenant_internal_notification_disabled
 
 expected_external_actions:
   - action_type: send_customer_auto_reply

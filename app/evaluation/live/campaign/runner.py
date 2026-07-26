@@ -285,6 +285,7 @@ def run_semi_automatic_campaign(
     if not scenarios:
         raise LiveEvalSafetyError(f"no scenarios for campaign_type={campaign_type!r}")
 
+    campaign_run_id = new_evaluation_run_id()
     results: list[ScenarioResult] = []
     safety_violations: list[str] = []
     sends = 0
@@ -299,7 +300,11 @@ def run_semi_automatic_campaign(
             )
 
         run_id = new_evaluation_run_id()
-        payload = build_campaign_send_payload(scenario=scenario, evaluation_run_id=run_id)
+        payload = build_campaign_send_payload(
+            scenario=scenario,
+            evaluation_run_id=run_id,
+            campaign_run_id=campaign_run_id,
+        )
         expected_outcome = resolve_semi_automatic_expected_outcome(scenario)
         operator_reply_budget = reply_budget_remaining
         if expected_outcome.expected_reply:
@@ -346,6 +351,13 @@ def run_semi_automatic_campaign(
         if metrics is not None:
             scenario_reply_metrics.append(metrics)
 
+        records = job.get("decision_records") or []
+        observed_approval_status = "none"
+        if job.get("has_pending_approvals"):
+            observed_approval_status = "pending"
+        elif any(r.get("record_type") == "action_approval_resolution" for r in records):
+            observed_approval_status = "resolved"
+
         result = ScenarioResult(
             scenario_id=scenario.scenario_id,
             scenario_version=scenario.scenario_version,
@@ -356,7 +368,7 @@ def run_semi_automatic_campaign(
             job_id=job.get("job_id"),
             classification=dict(job.get("classification") or {}),
             job_status=job.get("job_status"),
-            approval_status="resolved" if expected_outcome.expect_approval_resolution else "none",
+            approval_status=observed_approval_status,
             violations=violations,
             reply_metrics=metrics,
         )

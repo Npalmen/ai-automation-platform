@@ -152,6 +152,25 @@ def match_target_approval(
     locked_operation_id: str | None = None,
 ) -> PendingApproval:
     """Match exactly one pending approval for an operator plan step."""
+    if locked_operation_id:
+        locked_rows = [
+            row for row in pending
+            if row.action_operation_id == locked_operation_id
+            and row.action_type == step.action_type
+            and row.delivery_type == step.resolved_delivery_type
+        ]
+        if locked_rows:
+            by_approval_id: dict[str, PendingApproval] = {}
+            for row in locked_rows:
+                existing = by_approval_id.get(row.approval_id)
+                if existing is None or existing.state == "pending":
+                    by_approval_id[row.approval_id] = row
+            locked_rows = list(by_approval_id.values())
+        if len(locked_rows) == 1:
+            return locked_rows[0]
+        if len(locked_rows) > 1:
+            raise LiveEvalSafetyError("ambiguous_target_approval")
+
     candidates = [
         row for row in pending
         if row.state == "pending"
@@ -160,13 +179,13 @@ def match_target_approval(
         and row.delivery_type == step.resolved_delivery_type
     ]
     if locked_operation_id:
-        locked = [
+        locked_pending = [
             row for row in candidates
             if row.action_operation_id == locked_operation_id
         ]
-        if len(locked) == 1:
-            return locked[0]
-        if len(locked) > 1:
+        if len(locked_pending) == 1:
+            return locked_pending[0]
+        if len(locked_pending) > 1:
             raise LiveEvalSafetyError("ambiguous_target_approval")
         if candidates and all(row.action_operation_id != locked_operation_id for row in candidates):
             raise LiveEvalSafetyError("target_approval_not_found")

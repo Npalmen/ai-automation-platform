@@ -131,11 +131,11 @@ def test_duplicate_step_reuses_locked_operation_id():
     assert selected.approval_id == "reply"
 
 
-def test_tbsm01_has_operator_plan_and_secondary():
+def test_tbsm01_has_operator_plan_and_not_materialized_handoff():
     contract = parse_semi_auto_operator_contract(get_campaign_scenario("TBSM01_lead_approve_reply"))
     assert len(contract.operator_plan) == 1
     assert contract.operator_plan[0].action_type == "send_customer_auto_reply"
-    assert contract.secondary_approvals[0].expected_final_state == "remain_pending"
+    assert contract.secondary_approvals[0].expected_final_state == "not_materialized"
     assert contract.uses_legacy_operator_action is False
 
 
@@ -172,11 +172,45 @@ def test_secondary_remain_pending_assertions():
     assert violations == []
 
 
+def test_secondary_not_materialized_passes_when_absent():
+    outcome = resolve_semi_automatic_expected_outcome(get_campaign_scenario("TBSM01_lead_approve_reply"))
+    approvals = [
+        _pending(approval_id="reply", action_type="send_customer_auto_reply", operation_id="op-reply", state="approved"),
+    ]
+    violations = assert_secondary_approvals(
+        approvals=approvals,
+        outcome=outcome,
+        touched_approval_ids={"reply"},
+        decision_records=[],
+    )
+    assert violations == []
+
+
+def test_stale_step_reuses_rejected_approval():
+    pending = [
+        PendingApproval(
+            approval_id="reply",
+            state="rejected",
+            next_on_approve="action_execute",
+            action_type="send_customer_auto_reply",
+            delivery_type="send_customer_auto_reply",
+            action_operation_id="op-reply",
+            recipient_redacted="te***@eval.test",
+        ),
+    ]
+    step = OperatorPlanStep(
+        action_type="send_customer_auto_reply",
+        decision="approve",
+        expected_http_status=409,
+    )
+    selected = match_target_approval(pending, step, locked_operation_id="op-reply")
+    assert selected.state == "rejected"
+
+
 def test_secondary_must_not_have_resolution_records():
     outcome = resolve_semi_automatic_expected_outcome(get_campaign_scenario("TBSM04_lead_reject"))
     approvals = [
         _pending(approval_id="reply", action_type="send_customer_auto_reply", operation_id="op-reply", state="rejected"),
-        _pending(approval_id="handoff", action_type="send_internal_handoff", operation_id="op-handoff"),
     ]
     violations = assert_secondary_approvals(
         approvals=approvals,
@@ -186,7 +220,7 @@ def test_secondary_must_not_have_resolution_records():
             {"record_type": "action_approval_resolution", "action_operation_id": "op-handoff"},
         ],
     )
-    assert any("secondary" in v and "action_approval_resolution" in v for v in violations)
+    assert violations == []
 
 
 def test_operator_matrix_lists_all_scenarios():

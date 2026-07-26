@@ -32,9 +32,13 @@ expected_approval:
     - action_type: send_customer_auto_reply
       decision: reject
       expected_http_status: 200
-  secondary_approvals:
+  expected_actions:
+    - action_type: send_customer_auto_reply
+      materialization: materialized_pending
+      operator_role: target
     - action_type: send_internal_handoff
-      expected_final_state: remain_pending
+      materialization: not_materialized
+      reason: tenant_internal_notification_disabled
 
 budgets:
   gmail_sends: 1
