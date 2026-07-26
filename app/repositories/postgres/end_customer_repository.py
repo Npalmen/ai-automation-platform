@@ -477,25 +477,6 @@ class EndCustomerRepository:
         return EndCustomerRepository._to_customer(record)
 
     @staticmethod
-    def list_customers(
-        db: Session,
-        tenant_id: str,
-        status: CustomerStatus | None = None,
-        limit: int = 50,
-        offset: int = 0,
-    ) -> list[Customer]:
-        query = db.query(EndCustomerRecord).filter_by(tenant_id=tenant_id)
-        if status is not None:
-            query = query.filter(EndCustomerRecord.status == status.value)
-        records = (
-            query.order_by(EndCustomerRecord.created_at.desc())
-            .offset(offset)
-            .limit(limit)
-            .all()
-        )
-        return [EndCustomerRepository._to_customer(r) for r in records]
-
-    @staticmethod
     def update_customer(
         db: Session,
         tenant_id: str,
@@ -1100,6 +1081,326 @@ class EndCustomerRepository:
             .all()
         )
         return [EndCustomerRepository._to_duplicate_candidate(r) for r in records]
+
+    # --- read-only queries (API chapter) ---
+
+    _LIST_SORT_FIELDS = frozenset({"created_at", "display_name"})
+
+    @staticmethod
+    def count_customers(
+        db: Session,
+        tenant_id: str,
+        status: CustomerStatus | None = None,
+        customer_type: CustomerType | None = None,
+    ) -> int:
+        query = db.query(EndCustomerRecord).filter_by(tenant_id=tenant_id)
+        if status is not None:
+            query = query.filter(EndCustomerRecord.status == status.value)
+        if customer_type is not None:
+            query = query.filter(EndCustomerRecord.customer_type == customer_type.value)
+        return int(query.count())
+
+    @staticmethod
+    def list_customers(
+        db: Session,
+        tenant_id: str,
+        status: CustomerStatus | None = None,
+        customer_type: CustomerType | None = None,
+        sort: str = "created_at",
+        order: str = "desc",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[Customer]:
+        sort_field = sort if sort in EndCustomerRepository._LIST_SORT_FIELDS else "created_at"
+        order_norm = order.strip().lower()
+        primary_col = (
+            EndCustomerRecord.display_name
+            if sort_field == "display_name"
+            else EndCustomerRecord.created_at
+        )
+        query = db.query(EndCustomerRecord).filter_by(tenant_id=tenant_id)
+        if status is not None:
+            query = query.filter(EndCustomerRecord.status == status.value)
+        if customer_type is not None:
+            query = query.filter(EndCustomerRecord.customer_type == customer_type.value)
+        if order_norm == "asc":
+            query = query.order_by(primary_col.asc(), EndCustomerRecord.customer_id.asc())
+        else:
+            query = query.order_by(primary_col.desc(), EndCustomerRecord.customer_id.asc())
+        records = query.offset(offset).limit(limit).all()
+        return [EndCustomerRepository._to_customer(r) for r in records]
+
+    @staticmethod
+    def search_customers_by_display_name_prefix(
+        db: Session,
+        tenant_id: str,
+        prefix: str,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[Customer]:
+        escaped = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"{escaped}%"
+        records = (
+            db.query(EndCustomerRecord)
+            .filter(
+                EndCustomerRecord.tenant_id == tenant_id,
+                EndCustomerRecord.display_name.ilike(pattern, escape="\\"),
+            )
+            .order_by(EndCustomerRecord.display_name.asc(), EndCustomerRecord.customer_id.asc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+        return [EndCustomerRepository._to_customer(r) for r in records]
+
+    @staticmethod
+    def _customer_subject_refs(
+        db: Session,
+        tenant_id: str,
+        customer_id: str,
+    ) -> list[tuple[EntityOwnerType, str]]:
+        record = EndCustomerRepository._get_customer_record(db, tenant_id, customer_id)
+        if record is None:
+            return []
+        refs: list[tuple[EntityOwnerType, str]] = [
+            (EntityOwnerType.CUSTOMER, customer_id),
+        ]
+        if record.primary_company_id:
+            refs.append((EntityOwnerType.COMPANY, record.primary_company_id))
+        if record.primary_contact_id:
+            refs.append((EntityOwnerType.CONTACT, record.primary_contact_id))
+        rels = (
+            db.query(EndCustomerRelationshipRecord)
+            .filter_by(tenant_id=tenant_id, customer_id=customer_id)
+            .all()
+        )
+        for rel in rels:
+            refs.append((EntityOwnerType(rel.subject_type), rel.subject_id))
+        return refs
+
+    @staticmethod
+    def count_open_conflicts_for_customer(
+        db: Session,
+        tenant_id: str,
+        customer_id: str,
+    ) -> int:
+        refs = EndCustomerRepository._customer_subject_refs(db, tenant_id, customer_id)
+        if not refs:
+            return 0
+        count = 0
+        for subject_type, subject_id in refs:
+            facts = (
+                db.query(EndCustomerSourceFactRecord)
+                .filter_by(
+                    tenant_id=tenant_id,
+                    subject_type=subject_type.value,
+                    subject_id=subject_id,
+                )
+                .all()
+            )
+            for fact in facts:
+                conflicts = fact.conflicts_with_fact_ids or []
+                if conflicts and fact.fact_state in {
+                    FactState.PROPOSED.value,
+                    FactState.VERIFIED.value,
+                }:
+                    count += 1
+        return count
+
+    @staticmethod
+    def get_duplicate_status_for_customer(
+        db: Session,
+        tenant_id: str,
+        customer_id: str,
+    ) -> DuplicateStatus | None:
+        record = (
+            db.query(EndCustomerDuplicateCandidateRecord)
+            .filter(
+                EndCustomerDuplicateCandidateRecord.tenant_id == tenant_id,
+                EndCustomerDuplicateCandidateRecord.status == DuplicateStatus.OPEN.value,
+                (
+                    (EndCustomerDuplicateCandidateRecord.left_customer_id == customer_id)
+                    | (EndCustomerDuplicateCandidateRecord.right_customer_id == customer_id)
+                ),
+            )
+            .first()
+        )
+        if record is None:
+            return None
+        return DuplicateStatus(record.status)
+
+    @staticmethod
+    def count_job_links(db: Session, tenant_id: str, customer_id: str) -> int:
+        return int(
+            db.query(EndCustomerJobLinkRecord)
+            .filter_by(tenant_id=tenant_id, customer_id=customer_id)
+            .count()
+        )
+
+    @staticmethod
+    def list_job_links(
+        db: Session,
+        tenant_id: str,
+        customer_id: str,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[CustomerJobLink]:
+        records = (
+            db.query(EndCustomerJobLinkRecord)
+            .filter_by(tenant_id=tenant_id, customer_id=customer_id)
+            .order_by(
+                EndCustomerJobLinkRecord.created_at.desc(),
+                EndCustomerJobLinkRecord.link_id.asc(),
+            )
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+        return [EndCustomerRepository._to_job_link(r) for r in records]
+
+    @staticmethod
+    def count_thread_links(db: Session, tenant_id: str, customer_id: str) -> int:
+        return int(
+            db.query(EndCustomerThreadLinkRecord)
+            .filter_by(tenant_id=tenant_id, customer_id=customer_id)
+            .count()
+        )
+
+    @staticmethod
+    def list_thread_links(
+        db: Session,
+        tenant_id: str,
+        customer_id: str,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[CustomerThreadLink]:
+        records = (
+            db.query(EndCustomerThreadLinkRecord)
+            .filter_by(tenant_id=tenant_id, customer_id=customer_id)
+            .order_by(
+                EndCustomerThreadLinkRecord.created_at.desc(),
+                EndCustomerThreadLinkRecord.link_id.asc(),
+            )
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+        return [EndCustomerRepository._to_thread_link(r) for r in records]
+
+    @staticmethod
+    def count_timeline_events(db: Session, tenant_id: str, customer_id: str) -> int:
+        return int(
+            db.query(EndCustomerTimelineEventRecord)
+            .filter_by(tenant_id=tenant_id, customer_id=customer_id)
+            .count()
+        )
+
+    @staticmethod
+    def list_timeline_events_paginated(
+        db: Session,
+        tenant_id: str,
+        customer_id: str,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[CustomerTimelineEvent]:
+        records = (
+            db.query(EndCustomerTimelineEventRecord)
+            .filter_by(tenant_id=tenant_id, customer_id=customer_id)
+            .order_by(
+                EndCustomerTimelineEventRecord.occurred_at.desc(),
+                EndCustomerTimelineEventRecord.recorded_at.desc(),
+                EndCustomerTimelineEventRecord.timeline_event_id.desc(),
+            )
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+        return [EndCustomerRepository._to_timeline_event(r) for r in records]
+
+    @staticmethod
+    def get_latest_timeline_event(
+        db: Session,
+        tenant_id: str,
+        customer_id: str,
+    ) -> CustomerTimelineEvent | None:
+        record = (
+            db.query(EndCustomerTimelineEventRecord)
+            .filter_by(tenant_id=tenant_id, customer_id=customer_id)
+            .order_by(
+                EndCustomerTimelineEventRecord.occurred_at.desc(),
+                EndCustomerTimelineEventRecord.recorded_at.desc(),
+                EndCustomerTimelineEventRecord.timeline_event_id.desc(),
+            )
+            .first()
+        )
+        if record is None:
+            return None
+        return EndCustomerRepository._to_timeline_event(record)
+
+    @staticmethod
+    def count_open_duplicate_candidates(db: Session, tenant_id: str) -> int:
+        return int(
+            db.query(EndCustomerDuplicateCandidateRecord)
+            .filter_by(tenant_id=tenant_id, status=DuplicateStatus.OPEN.value)
+            .count()
+        )
+
+    @staticmethod
+    def get_job_records_for_tenant(
+        db: Session,
+        tenant_id: str,
+        job_ids: list[str],
+    ) -> dict[str, JobRecord]:
+        if not job_ids:
+            return {}
+        unique_ids = list(dict.fromkeys(job_ids))
+        records = (
+            db.query(JobRecord)
+            .filter(
+                JobRecord.tenant_id == tenant_id,
+                JobRecord.job_id.in_(unique_ids),
+            )
+            .all()
+        )
+        return {record.job_id: record for record in records}
+
+    @staticmethod
+    def resolve_customer_ids_for_owner(
+        db: Session,
+        tenant_id: str,
+        owner_type: EntityOwnerType,
+        owner_id: str,
+    ) -> set[str]:
+        ids: set[str] = set()
+        if owner_type == EntityOwnerType.CUSTOMER:
+            if EndCustomerRepository._get_customer_record(db, tenant_id, owner_id) is not None:
+                ids.add(owner_id)
+            return ids
+        if owner_type == EntityOwnerType.CONTACT:
+            for row in (
+                db.query(EndCustomerRecord)
+                .filter_by(tenant_id=tenant_id, primary_contact_id=owner_id)
+                .all()
+            ):
+                ids.add(row.customer_id)
+        elif owner_type == EntityOwnerType.COMPANY:
+            for row in (
+                db.query(EndCustomerRecord)
+                .filter_by(tenant_id=tenant_id, primary_company_id=owner_id)
+                .all()
+            ):
+                ids.add(row.customer_id)
+        for rel in (
+            db.query(EndCustomerRelationshipRecord)
+            .filter_by(
+                tenant_id=tenant_id,
+                subject_type=owner_type.value,
+                subject_id=owner_id,
+            )
+            .all()
+        ):
+            ids.add(rel.customer_id)
+        return ids
 
     @staticmethod
     def update_duplicate_candidate_status(

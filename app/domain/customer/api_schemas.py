@@ -13,10 +13,16 @@ from app.domain.customer.enums import (
     CustomerType,
     DuplicateStatus,
     EntityOwnerType,
+    FactState,
+    IdentityType,
+    LinkType,
     MatchDecision,
     MergeDecisionType,
+    ReferenceType,
     RelationshipType,
+    SourceType,
     TimelineEventType,
+    VerificationStatus,
 )
 from app.domain.customer.schemas import (
     CustomerCard,
@@ -31,6 +37,7 @@ from app.domain.customer.schemas import (
 DEFAULT_LIST_LIMIT = 50
 MAX_LIST_LIMIT = 100
 MIN_SEARCH_QUERY_LENGTH = 2
+ALLOWED_LIST_SORT_FIELDS = frozenset({"created_at", "display_name"})
 
 
 class CustomerApiPagination(BaseModel):
@@ -74,6 +81,194 @@ class EndCustomerCardResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     card: CustomerCard
+
+
+class EndCustomerListItemView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_id: str
+    customer_type: CustomerType
+    display_name: str
+    status: CustomerStatus
+    version: int = Field(ge=1, default=1)
+    created_at: datetime
+    updated_at: datetime
+    last_activity_at: datetime | None = None
+
+
+class EndCustomerListViewResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[EndCustomerListItemView] = Field(default_factory=list)
+    total: int = Field(ge=0, default=0)
+    limit: int = Field(ge=1, le=MAX_LIST_LIMIT)
+    offset: int = Field(ge=0, default=0)
+
+
+class EndCustomerCardCompanyView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    company_id: str | None = None
+    display_name: str | None = None
+    organization_number: str | None = None
+
+
+class EndCustomerCardContactView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    contact_id: str | None = None
+    display_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+
+
+class EndCustomerCardView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_id: str = Field(min_length=1)
+    customer_type: CustomerType
+    display_name: str = Field(min_length=1)
+    status: CustomerStatus
+    primary_company: EndCustomerCardCompanyView | None = None
+    primary_contact: EndCustomerCardContactView | None = None
+    open_conflict_count: int = Field(ge=0, default=0)
+    linked_job_count: int = Field(ge=0, default=0)
+    linked_thread_count: int = Field(ge=0, default=0)
+    duplicate_status: DuplicateStatus | None = None
+    data_quality_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    last_activity_at: datetime | None = None
+    version: int = Field(ge=1, default=1)
+    created_at: datetime
+    updated_at: datetime
+
+
+class SafeCustomerIdentityView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    identity_id: str
+    owner_type: EntityOwnerType
+    owner_id: str
+    identity_type: IdentityType
+    raw_value: str
+    verification_status: VerificationStatus
+    fact_state: FactState
+
+
+class EndCustomerCardDetailResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    card: EndCustomerCardView
+    identities: list[SafeCustomerIdentityView] = Field(default_factory=list)
+
+
+class EndCustomerTimelineEventView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    timeline_event_id: str
+    customer_id: str
+    event_type: TimelineEventType
+    occurred_at: datetime
+    recorded_at: datetime
+    actor_type: str | None = None
+    actor_id: str | None = None
+    source_type: SourceType | None = None
+    reference_type: ReferenceType | None = None
+    reference_id: str | None = None
+    summary: str
+    metadata: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+
+
+class TimelineViewResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_id: str
+    items: list[EndCustomerTimelineEventView] = Field(default_factory=list)
+    total: int = Field(ge=0, default=0)
+    limit: int = Field(ge=1, le=MAX_LIST_LIMIT)
+    offset: int = Field(ge=0, default=0)
+
+
+class EndCustomerJobSummaryView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    job_type: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class EndCustomerJobLinkView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    link_id: str
+    customer_id: str
+    job_id: str
+    link_type: LinkType
+    confidence: float = Field(ge=0.0, le=1.0)
+    source_type: SourceType
+    created_at: datetime
+    created_by: str | None = None
+    job_exists: bool = False
+    job_summary: EndCustomerJobSummaryView | None = None
+
+
+class LinkedJobsViewResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_id: str
+    items: list[EndCustomerJobLinkView] = Field(default_factory=list)
+    total: int = Field(ge=0, default=0)
+    limit: int = Field(ge=1, le=MAX_LIST_LIMIT)
+    offset: int = Field(ge=0, default=0)
+
+
+class EndCustomerThreadLinkView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    link_id: str
+    customer_id: str
+    integration_type: str
+    integration_account_reference: str
+    thread_id: str
+    link_type: LinkType
+    confidence: float = Field(ge=0.0, le=1.0)
+    source_type: SourceType
+    created_at: datetime
+
+
+class LinkedThreadsViewResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_id: str
+    items: list[EndCustomerThreadLinkView] = Field(default_factory=list)
+    total: int = Field(ge=0, default=0)
+    limit: int = Field(ge=1, le=MAX_LIST_LIMIT)
+    offset: int = Field(ge=0, default=0)
+
+
+class DuplicateCandidateView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_id: str
+    left_customer_id: str
+    right_customer_id: str
+    status: DuplicateStatus
+    confidence: float = Field(ge=0.0, le=1.0)
+    evidence: list[MatchEvidence] = Field(default_factory=list)
+    conflicts: list[MatchConflict] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+    version: int = Field(ge=1, default=1)
+
+
+class DuplicateCandidateListViewResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[DuplicateCandidateView] = Field(default_factory=list)
+    total: int = Field(ge=0, default=0)
+    limit: int = Field(ge=1, le=MAX_LIST_LIMIT)
+    offset: int = Field(ge=0, default=0)
 
 
 class CreatePrivateEndCustomerRequest(BaseModel):
