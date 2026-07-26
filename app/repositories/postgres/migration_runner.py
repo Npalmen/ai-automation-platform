@@ -23,12 +23,13 @@ ORDERED_MIGRATION_FILES: tuple[str, ...] = (
     "019_live_eval_runs_activated_at.sql",
     "020_live_eval_llm_contract.sql",
     "021_live_eval_llm_operations.sql",
+    "022_end_customer_foundation.sql",
 )
 
 MIGRATIONS_THROUGH_014: tuple[str, ...] = ORDERED_MIGRATION_FILES[:6]
 MIGRATIONS_THROUGH_015: tuple[str, ...] = ORDERED_MIGRATION_FILES[:7]
 MIGRATIONS_THROUGH_019: tuple[str, ...] = ORDERED_MIGRATION_FILES[:10]
-LATEST_MIGRATION_VERSION = "021"
+LATEST_MIGRATION_VERSION = "022"
 
 # Tables created exclusively by migrations/009-015 SQL files (not create_tables.py baseline).
 MIGRATION_OWNED_TABLES: frozenset[str] = frozenset(
@@ -50,6 +51,16 @@ MIGRATION_OWNED_TABLES: frozenset[str] = frozenset(
         "live_eval_runs",
         "live_eval_external_events",
         "live_eval_llm_operations",
+        "end_customers",
+        "end_customer_companies",
+        "end_customer_contacts",
+        "end_customer_relationships",
+        "end_customer_identities",
+        "end_customer_source_facts",
+        "end_customer_job_links",
+        "end_customer_thread_links",
+        "end_customer_timeline_events",
+        "end_customer_duplicate_candidates",
     }
 )
 
@@ -189,6 +200,14 @@ def read_migration_state(engine: Engine) -> dict[str, object]:
     if not table_exists(engine, "live_eval_llm_operations"):
         raise RuntimeError(
             "Migration state incomplete — live_eval_llm_operations missing (021)"
+        )
+    if not table_exists(engine, "end_customers"):
+        raise RuntimeError(
+            "Migration state incomplete — end_customers missing (022)"
+        )
+    if not column_exists(engine, "end_customers", "version"):
+        raise RuntimeError(
+            "Migration state incomplete — end_customers.version missing (022)"
         )
     return {
         "latest_version": LATEST_MIGRATION_VERSION,
