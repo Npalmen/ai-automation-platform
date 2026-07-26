@@ -475,6 +475,9 @@ class EndCustomerReadService:
     def _sanitize_evidence(raw_items: list[Any]) -> list[MatchEvidence]:
         cleaned: list[MatchEvidence] = []
         for item in raw_items:
+            if isinstance(item, MatchEvidence):
+                cleaned.append(item)
+                continue
             if not isinstance(item, dict):
                 continue
             code_raw = str(item.get("code", "")).strip()
@@ -502,6 +505,9 @@ class EndCustomerReadService:
     def _sanitize_conflicts(raw_items: list[Any]) -> list[MatchConflict]:
         cleaned: list[MatchConflict] = []
         for item in raw_items:
+            if isinstance(item, MatchConflict):
+                cleaned.append(item)
+                continue
             if not isinstance(item, dict):
                 continue
             code_raw = str(item.get("code", "")).strip()
