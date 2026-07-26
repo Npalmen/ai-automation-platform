@@ -288,5 +288,5 @@ test("Todo H closure docs are present on main", () => {
     "utf8",
   )
   assert.match(releaseNotes, /Preview release/)
-  assert.match(verification, /Overall closure status: \*\*PARTIAL\*\*/)
+  assert.match(verification, /Overall closure status: PARTIAL/)
 })
