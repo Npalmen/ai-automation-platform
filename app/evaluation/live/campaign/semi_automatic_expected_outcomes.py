@@ -14,9 +14,6 @@ _APPROVAL_FIRST_PRE = frozenset({"awaiting_approval"})
 _SAFE_HOLD_PRE = frozenset({"manual_review"})
 _APPROVE_FINAL = frozenset({"completed"})
 _REJECT_FINAL = frozenset({"manual_review"})
-_SEMI_AUTO_WITH_RESOLUTION = REQUIRED_DECISION_SUBSEQUENCE + (
-    "action_approval_resolution",
-)
 
 
 @dataclass(frozen=True)
@@ -79,7 +76,7 @@ def resolve_semi_automatic_expected_outcome(
         pre_statuses = _APPROVAL_FIRST_PRE
         final_statuses = _APPROVE_FINAL
         expect_pending_pre = True
-        decision_subsequence = _SEMI_AUTO_WITH_RESOLUTION
+        decision_subsequence = REQUIRED_DECISION_SUBSEQUENCE
         expect_resolution = True
         expect_dup = test_variant == "duplicate_approve"
         expect_stale = False
@@ -90,7 +87,7 @@ def resolve_semi_automatic_expected_outcome(
         pre_statuses = _APPROVAL_FIRST_PRE
         final_statuses = _REJECT_FINAL
         expect_pending_pre = True
-        decision_subsequence = _SEMI_AUTO_WITH_RESOLUTION
+        decision_subsequence = REQUIRED_DECISION_SUBSEQUENCE
         expect_resolution = True
         expect_dup = False
         expect_stale = test_variant == "stale_action"

@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from app.evaluation.live.assertions import (
+    REQUIRED_DECISION_SUBSEQUENCE,
     assert_semi_automatic_campaign_pipeline,
     assert_semi_automatic_telemetry,
 )
@@ -28,7 +29,7 @@ def test_tbsm01_lead_approve_reply_expectations():
     assert outcome.expected_reply is True
     assert outcome.final_job_status == "completed"
     assert outcome.expect_approval_resolution is True
-    assert "action_approval_resolution" in outcome.decision_subsequence
+    assert outcome.decision_subsequence == REQUIRED_DECISION_SUBSEQUENCE
 
 
 def test_tbsm04_lead_reject_expectations():
@@ -107,6 +108,39 @@ def test_reject_telemetry_requires_zero_replies():
             {"category": "app_live_eval_intake_succeeded", "outcome": "succeeded", "operation_key": "i1"},
         ],
         expected_reply_count=0,
+    )
+    assert violations == []
+
+
+def test_semi_auto_pipeline_allows_post_approval_interleaved_records():
+    observation = {
+        "job": {
+            "job_id": "job-1",
+            "job_status": "completed",
+            "has_pending_approvals": False,
+            "classification": {"detected_job_type": "lead"},
+            "policy": {"policy_authorization": "approval_required"},
+            "decision_records": [
+                {"record_type": "pipeline_run_started", "event_sequence": 1},
+                {"record_type": "classification", "event_sequence": 2},
+                {"record_type": "decisioning_recommendation", "event_sequence": 3},
+                {"record_type": "policy_authorization", "event_sequence": 4},
+                {"record_type": "pipeline_run_started", "event_sequence": 5},
+                {"record_type": "action_authorization", "event_sequence": 6},
+                {"record_type": "action_approval_resolution", "event_sequence": 7},
+                {"record_type": "execution_intent", "event_sequence": 8},
+                {"record_type": "execution_outcome", "event_sequence": 9},
+            ],
+        },
+        "events": [],
+    }
+    violations = assert_semi_automatic_campaign_pipeline(
+        observation,
+        expected_job_type="lead",
+        expected_job_status="completed",
+        expected_policy_authorization="approval_required",
+        expect_pending_approval=False,
+        expect_approval_resolution_record=True,
     )
     assert violations == []
 
