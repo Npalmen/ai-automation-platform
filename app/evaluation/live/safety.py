@@ -220,7 +220,11 @@ def require_gmail_eval_enabled(config: LiveEvalConfig | None = None) -> LiveEval
     return config
 
 
-def validate_config_readiness(config: LiveEvalConfig | None = None) -> list[str]:
+def validate_config_readiness(
+    config: LiveEvalConfig | None = None,
+    *,
+    campaign_mode: bool = False,
+) -> list[str]:
     """Return list of missing/invalid gate messages (empty = ready)."""
     config = config or get_live_eval_config()
     issues: list[str] = []
@@ -234,6 +238,8 @@ def validate_config_readiness(config: LiveEvalConfig | None = None) -> list[str]
         issues.append("LIVE_EVAL_RECIPIENT_EMAILS is empty")
     if not config.intake_label:
         issues.append("LIVE_EVAL_GMAIL_LABEL is empty")
+    if campaign_mode:
+        return issues
     if config.max_scenarios_per_run != 1:
         issues.append("LIVE_EVAL_MAX_SCENARIOS_PER_RUN must be 1 for 2F.2")
     if config.max_gmail_sends_per_run != 1:

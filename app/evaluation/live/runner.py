@@ -243,7 +243,10 @@ class LiveEvalRunner:
         write_report_atomic(self.evaluation_run_id, report)
 
     def _validate_static_config(self) -> None:
-        issues = validate_config_readiness(self.config)
+        campaign_mode = (
+            self.use_observe_assertions or self.use_semi_automatic_assertions
+        )
+        issues = validate_config_readiness(self.config, campaign_mode=campaign_mode)
         if issues:
             raise LiveEvalSafetyError("; ".join(issues))
 
