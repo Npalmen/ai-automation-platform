@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom"
 import { ForbiddenPage } from "@/customer/auth/ForbiddenPage"
 import { PreviewLoginPage } from "@/customer/auth/PreviewLoginPage"
 import { RoutePlaceholder } from "@/customer/components/RoutePlaceholder"
+import { OverviewPage } from "@/customer/features/overview/OverviewPage"
 import { CustomerAppShell } from "@/customer/layouts/CustomerAppShell"
 import { NotFoundPage } from "@/customer/pages/NotFoundPage"
 
@@ -21,12 +22,7 @@ export const customerRouter = createBrowserRouter(
       children: [
         {
           index: true,
-          element: (
-            <RoutePlaceholder
-              title="Översikt"
-              description="Din dagliga överblick över vad som hänt och vad som behöver uppmärksamhet."
-            />
-          ),
+          element: <OverviewPage />,
         },
         {
           path: "leads",

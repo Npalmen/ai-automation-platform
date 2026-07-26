@@ -1,3 +1,8 @@
+import {
+  cloneOverview,
+  createOverviewFixture,
+  type OverviewMockScenario,
+} from "@/customer/features/overview/overviewFixtures"
 import { DEFAULT_FEATURE_FLAGS } from "@/customer/types/workspace"
 
 import type { WorkspaceDataSource } from "./types"
@@ -14,47 +19,49 @@ const MOCK_CONTEXT = {
   feature_flags: DEFAULT_FEATURE_FLAGS,
 }
 
-export const mockDataSource: WorkspaceDataSource = {
-  async getContext() {
-    return MOCK_CONTEXT
-  },
+export function createMockDataSource(
+  overviewScenario: OverviewMockScenario = "populated",
+): WorkspaceDataSource {
+  return {
+    async getContext() {
+      return MOCK_CONTEXT
+    },
 
-  async getOverview() {
-    return {
-      last_updated_at: new Date().toISOString(),
-      summary: {
-        cases_handled_today: 0,
-        waiting_for_decision: 0,
-        waiting_for_customer: 0,
-        needs_help: 0,
-        failed_today: 0,
-      },
-      priority_work_items: [],
-      partial_errors: [],
-    }
-  },
+    async getOverview() {
+      const result = createOverviewFixture(overviewScenario)
+      if (result === "full_error") {
+        throw new Error("Kunde inte hämta översikten i förhandsläget")
+      }
+      if (result === "loading") {
+        return new Promise(() => {})
+      }
+      return cloneOverview(result)
+    },
 
-  async getWorkItems() {
-    return { items: [], total: 0 }
-  },
+    async getWorkItems() {
+      return { items: [], total: 0 }
+    },
 
-  async getWorkItemDetail() {
-    return null
-  },
+    async getWorkItemDetail() {
+      return null
+    },
 
-  async getApprovals() {
-    return { items: [], total: 0 }
-  },
+    async getApprovals() {
+      return { items: [], total: 0 }
+    },
 
-  async getActivity() {
-    return { items: [], total: 0 }
-  },
+    async getActivity() {
+      return { items: [], total: 0 }
+    },
 
-  async getHealth() {
-    return {
-      overall_status: "preview",
-      message: "Förhandsvisning — inga riktiga kopplingar",
-      systems: {},
-    }
-  },
+    async getHealth() {
+      return {
+        overall_status: "preview",
+        message: "Förhandsvisning — inga riktiga kopplingar",
+        systems: {},
+      }
+    },
+  }
 }
+
+export const mockDataSource = createMockDataSource("populated")
