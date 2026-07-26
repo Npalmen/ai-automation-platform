@@ -25,7 +25,7 @@ todos:
     status: completed
   - id: workspace-h-closure
     content: Slutverifiera arbetsytan, dokumentera begränsningar och stäng utvecklingsspåret
-    status: pending
+    status: in_progress
 isProject: true
 ---
 
