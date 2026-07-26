@@ -278,10 +278,10 @@ class TestOrchestratorSkipStep:
         from app.workflows.orchestrator import WorkflowOrchestrator
         return WorkflowOrchestrator(db=None)
 
-    def test_skips_action_dispatch_on_send_for_approval(self):
+    def test_runs_action_dispatch_on_send_for_approval(self):
         orch = self._orchestrator()
         job = _job_with_policy(decision="send_for_approval")
-        assert orch._should_skip_step(job, JobType.ACTION_DISPATCH) is True
+        assert orch._should_skip_step(job, JobType.ACTION_DISPATCH) is False
 
     def test_skips_action_dispatch_on_hold_for_review(self):
         orch = self._orchestrator()

@@ -229,13 +229,7 @@ class WorkflowOrchestrator:
         decision = policy_payload.get("decision")
         recommended_next_step = policy_payload.get("recommended_next_step")
 
-        if decision == "send_for_approval":
-            return True
-
         if decision == "hold_for_review":
-            return True
-
-        if recommended_next_step == "awaiting_approval":
             return True
 
         if recommended_next_step == "manual_review":
