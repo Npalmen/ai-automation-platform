@@ -48,7 +48,7 @@ from app.domain.customer.normalization import (
     normalize_phone,
 )
 from app.domain.customer.provenance import (
-    build_timeline_replay_identity,
+    TimelineReplayIdentity,
     lower_source_cannot_supersede_verified,
     validate_timeline_metadata,
 )
@@ -179,7 +179,7 @@ def _append_timeline(
     metadata: dict[str, object] | None = None,
 ) -> None:
     now = _utcnow()
-    replay_identity = build_timeline_replay_identity(
+    replay_identity = TimelineReplayIdentity(
         tenant_id=tenant_id,
         customer_id=customer_id,
         event_type=event_type,

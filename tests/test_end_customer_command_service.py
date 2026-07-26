@@ -175,6 +175,7 @@ class TestAggregateOwnership:
             subject_id=company.company_id,
             field_name="note",
             raw_value="blocked",
+            confidence=1.0,
             reason="Should fail",
         )
         with pytest.raises(EndCustomerNotFoundError):
