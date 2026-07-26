@@ -1,3 +1,4 @@
+import { WorkItemLink } from "@/customer/components/WorkItemLink"
 import {
   displayStatusLabel,
   formatOverviewDateTime,
@@ -60,7 +61,11 @@ export function ApprovalItemCard({ item }: ApprovalItemCardProps) {
       <dl className="mt-3 grid gap-1 text-body-small text-text-secondary">
         <div className="flex flex-wrap gap-1">
           <dt className="font-medium text-text-primary">Gäller:</dt>
-          <dd className="break-words">{item.work_item_title}</dd>
+          <dd className="break-words">
+            <WorkItemLink workItemId={item.work_item_id}>
+              {item.work_item_title}
+            </WorkItemLink>
+          </dd>
         </div>
         <div className="flex flex-wrap gap-1">
           <dt className="font-medium text-text-primary">Skapad:</dt>

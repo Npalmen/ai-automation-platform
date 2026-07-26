@@ -1,3 +1,4 @@
+import { WorkItemLink } from "@/customer/components/WorkItemLink"
 import {
   displayStatusLabel,
   formatOverviewDateTime,
@@ -63,6 +64,11 @@ export function PriorityWorkItemCard({ item }: PriorityWorkItemCardProps) {
           <dd>{formatOverviewDateTime(item.updated_at)}</dd>
         </div>
       </dl>
+      <p className="mt-4">
+        <WorkItemLink workItemId={item.work_item_id}>
+          Visa detalj
+        </WorkItemLink>
+      </p>
     </article>
   )
 }

@@ -166,6 +166,7 @@ export function WorkItemsQueuePage({ config }: { config: WorkItemsQueueConfig })
     >
       <WorkQueueList
         items={data.items}
+        linkItems
         emptyTitle={config.emptyTitle}
         emptyDescription={config.emptyDescription}
       />

@@ -39,9 +39,9 @@ test("customer routes include all required paths", () => {
     "<SupportPage />",
     "<ApprovalsPage />",
     "<NeedsHelpPage />",
-    'path: "activity"',
-    'path: "search"',
-    'path: "work/:workItemId"',
+    "<ActivityPage />",
+    "<SearchPage />",
+    "<WorkDetailPage />",
     'path: "/login"',
     'path: "/forbidden"',
     'basename: "/app"',
@@ -93,6 +93,9 @@ test("customer shell avoids secret storage and forbidden APIs", () => {
     readFileSync(join(customerDir, "features/work-queues/WorkItemsQueuePage.tsx"), "utf8"),
     readFileSync(join(customerDir, "features/work-queues/workQueueFixtures.ts"), "utf8"),
     readFileSync(join(customerDir, "features/approvals/ApprovalsPage.tsx"), "utf8"),
+    readFileSync(join(customerDir, "features/activity/ActivityPage.tsx"), "utf8"),
+    readFileSync(join(customerDir, "features/search/SearchPage.tsx"), "utf8"),
+    readFileSync(join(customerDir, "features/work-detail/WorkDetailPage.tsx"), "utf8"),
   ].join("\n")
   const forbidden = [
     "localStorage",

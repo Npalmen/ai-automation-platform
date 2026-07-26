@@ -1,3 +1,4 @@
+import { WorkItemLink } from "@/customer/components/WorkItemLink"
 import {
   displayStatusLabel,
   formatOverviewDateTime,
@@ -9,6 +10,7 @@ import { cn } from "@/lib/utils"
 
 type WorkQueueItemCardProps = {
   item: WorkItemListItem
+  showDetailLink?: boolean
 }
 
 function statusTone(status: WorkItemListItem["customer_status"]): string {
@@ -28,7 +30,10 @@ function statusTone(status: WorkItemListItem["customer_status"]): string {
   }
 }
 
-export function WorkQueueItemCard({ item }: WorkQueueItemCardProps) {
+export function WorkQueueItemCard({
+  item,
+  showDetailLink = false,
+}: WorkQueueItemCardProps) {
   const statusLabel = displayStatusLabel(item.customer_status_label)
 
   return (
@@ -80,6 +85,13 @@ export function WorkQueueItemCard({ item }: WorkQueueItemCardProps) {
           </dd>
         </div>
       </dl>
+      {showDetailLink ? (
+        <p className="mt-4">
+          <WorkItemLink workItemId={item.work_item_id}>
+            Visa detalj
+          </WorkItemLink>
+        </p>
+      ) : null}
     </article>
   )
 }

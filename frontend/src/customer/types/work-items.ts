@@ -23,6 +23,9 @@ export type WorkItemListParams = {
   status?: CustomerStatus
   sort?: "updated_at" | "priority_rank" | "created_at"
   order?: "asc" | "desc"
+  q?: string
+  from?: string
+  to?: string
   limit: number
   offset: number
 }

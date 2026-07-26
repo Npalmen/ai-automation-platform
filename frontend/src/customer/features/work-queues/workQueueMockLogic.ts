@@ -1,6 +1,7 @@
 import type { ApprovalListParams } from "@/customer/types/approvals"
 import type { ApprovalListItem } from "@/customer/types/approvals"
 import type { ListResponse } from "@/customer/types/lists"
+import { matchesCreatedDateRange } from "@/customer/features/work-queues/dateFilterUtils"
 import type {
   WorkItemListItem,
   WorkItemListParams,
@@ -16,6 +17,30 @@ function compareValues(
   return order === "asc" ? result : -result
 }
 
+function normalizeSearchText(value: string): string {
+  return value.trim().toLocaleLowerCase("sv-SE")
+}
+
+export function matchesWorkItemSearch(
+  item: WorkItemListItem,
+  query: string | undefined,
+): boolean {
+  const needle = normalizeSearchText(query ?? "")
+  if (!needle) return true
+
+  const haystack = [
+    item.title,
+    item.customer_name,
+    item.customer_email,
+    item.summary,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" ")
+    .toLocaleLowerCase("sv-SE")
+
+  return haystack.includes(needle)
+}
+
 export function filterWorkItems(
   items: WorkItemListItem[],
   params: WorkItemListParams,
@@ -29,6 +54,16 @@ export function filterWorkItems(
   if (params.status) {
     filtered = filtered.filter(
       (item) => item.customer_status === params.status,
+    )
+  }
+
+  if (params.q) {
+    filtered = filtered.filter((item) => matchesWorkItemSearch(item, params.q))
+  }
+
+  if (params.from || params.to) {
+    filtered = filtered.filter((item) =>
+      matchesCreatedDateRange(item.created_at, params.from, params.to),
     )
   }
 

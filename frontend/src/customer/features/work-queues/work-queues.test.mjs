@@ -203,11 +203,11 @@ test("needs-help route uses real feature view", () => {
   assert.match(routerSource, /<NeedsHelpPage \/>/)
 })
 
-test("activity search and work detail remain placeholders", () => {
+test("activity search and work detail use real feature views", () => {
   const routerSource = readCustomerFile("routes/router.tsx")
-  assert.match(routerSource, /path: "activity"[\s\S]*?<RoutePlaceholder/)
-  assert.match(routerSource, /path: "search"[\s\S]*?<RoutePlaceholder/)
-  assert.match(routerSource, /path: "work\/:workItemId"[\s\S]*?<RoutePlaceholder/)
+  assert.match(routerSource, /<ActivityPage \/>/)
+  assert.match(routerSource, /<SearchPage \/>/)
+  assert.match(routerSource, /<WorkDetailPage \/>/)
 })
 
 test("filter state is parsed safely from URL", () => {
