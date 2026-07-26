@@ -278,10 +278,15 @@ test("quality pass does not introduce network clients or storage", () => {
   }
 })
 
-test("Todo H closure work was not started", () => {
-  const plan = readFileSync(
-    join(customerDir, "..", "..", "..", "docs", "plans", "customer-workspace-plan.md"),
+test("Todo H closure docs are present on main", () => {
+  const releaseNotes = readFileSync(
+    join(customerDir, "..", "..", "..", "docs", "customer-workspace", "release-notes.md"),
     "utf8",
   )
-  assert.match(plan, /workspace-h-closure[\s\S]*status: pending/)
+  const verification = readFileSync(
+    join(customerDir, "..", "..", "..", "docs", "customer-workspace", "verification.md"),
+    "utf8",
+  )
+  assert.match(releaseNotes, /Preview release/)
+  assert.match(verification, /Overall closure status: \*\*PARTIAL\*\*/)
 })
