@@ -9677,17 +9677,18 @@ def admin_run_all_alerts(
 # ---------------------------------------------------------------------------
 
 _OPS_DIST_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+_CUSTOMER_DIST_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist-customer"
 
 
-def _ops_index_html() -> str | None:
-    index_path = _OPS_DIST_DIR / "index.html"
+def _spa_index_html(dist_dir: Path) -> str | None:
+    index_path = dist_dir / "index.html"
     if not index_path.is_file():
         return None
     return index_path.read_text(encoding="utf-8")
 
 
-def _resolve_ops_asset(asset_path: str) -> Path | None:
-    assets_root = (_OPS_DIST_DIR / "assets").resolve()
+def _resolve_spa_asset(dist_dir: Path, asset_path: str) -> Path | None:
+    assets_root = (dist_dir / "assets").resolve()
     if not assets_root.is_dir():
         return None
 
@@ -9700,6 +9701,26 @@ def _resolve_ops_asset(asset_path: str) -> Path | None:
     if candidate.is_file():
         return candidate
     return None
+
+
+def _ops_index_html() -> str | None:
+    return _spa_index_html(_OPS_DIST_DIR)
+
+
+def _resolve_ops_asset(asset_path: str) -> Path | None:
+    return _resolve_spa_asset(_OPS_DIST_DIR, asset_path)
+
+
+def _customer_index_html() -> str | None:
+    for candidate_name in ("index.html", "customer.html"):
+        index_path = _CUSTOMER_DIST_DIR / candidate_name
+        if index_path.is_file():
+            return index_path.read_text(encoding="utf-8")
+    return None
+
+
+def _resolve_customer_asset(asset_path: str) -> Path | None:
+    return _resolve_spa_asset(_CUSTOMER_DIST_DIR, asset_path)
 
 
 @app.get("/ops/assets/{asset_path:path}", include_in_schema=False)
@@ -9729,5 +9750,47 @@ def ops_spa_fallback(frontend_path: str):
         raise HTTPException(
             status_code=503,
             detail="Frontend build not found. Run npm run build in frontend/.",
+        )
+    return HTMLResponse(content=html)
+
+
+# ---------------------------------------------------------------------------
+# Customer workspace static frontend
+# ---------------------------------------------------------------------------
+
+
+@app.get("/app/assets/{asset_path:path}", include_in_schema=False)
+def customer_static_asset(asset_path: str):
+    asset_file = _resolve_customer_asset(asset_path)
+    if asset_file is None:
+        raise HTTPException(status_code=404)
+    return FileResponse(asset_file)
+
+
+@app.get("/app", response_class=HTMLResponse, include_in_schema=False)
+def customer_spa_root():
+    html = _customer_index_html()
+    if html is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Customer frontend build not found. Run npm run build:customer in frontend/.",
+        )
+    return HTMLResponse(content=html)
+
+
+@app.get("/app/", response_class=HTMLResponse, include_in_schema=False)
+def customer_spa_root_slash():
+    return customer_spa_root()
+
+
+@app.get("/app/{frontend_path:path}", response_class=HTMLResponse, include_in_schema=False)
+def customer_spa_fallback(frontend_path: str):
+    if frontend_path.startswith("assets/"):
+        raise HTTPException(status_code=404)
+    html = _customer_index_html()
+    if html is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Customer frontend build not found. Run npm run build:customer in frontend/.",
         )
     return HTMLResponse(content=html)
