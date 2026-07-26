@@ -16,8 +16,9 @@ def build_campaign_message_body(
     marker = f"<!-- KROWOLF_EVAL:evaluation_run_id={evaluation_run_id} -->"
     customer_marker = f"<!-- KROWOLF_CUSTOMER:{scenario.synthetic_customer_id} -->"
     thread_marker = f"<!-- KROWOLF_THREAD:{scenario.thread_id} -->"
+  # Avoid "campaign" in marker text — classify_email_type treats it as newsletter.
     run_marker = (
-        f"<!-- KROWOLF_CAMPAIGN_RUN:{campaign_run_id} -->"
+        f"<!-- KROWOLF_RUN_SCOPE:{campaign_run_id} -->"
         if campaign_run_id
         else ""
     )
