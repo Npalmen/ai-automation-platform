@@ -8,9 +8,15 @@ from typing import Any
 from app.evaluation.live.campaign.modes import CAMPAIGN_TYPE_REPLY_BUDGET
 from app.evaluation.live.campaign.registry import list_campaign_scenarios
 from app.evaluation.live.campaign.schemas import CampaignScenario
+from app.evaluation.live.campaign.tenant_materialization import (
+    LIVE_EVAL_TENANT_ID,
+    count_expected_materialized_pending,
+    materialization_to_secondary_state,
+    resolve_expected_actions_for_semi_auto,
+    resolve_live_eval_tenant_context,
+)
 from app.evaluation.live.config import LiveEvalConfig
 
-DEFAULT_SECONDARY_HANDOFF = "send_internal_handoff"
 VALID_DECISIONS = frozenset({"approve", "reject"})
 VALID_SECONDARY_STATES = frozenset({
     "remain_pending",
@@ -131,25 +137,40 @@ def _legacy_operator_plan(approval: dict[str, Any]) -> tuple[OperatorPlanStep, .
     return ()
 
 
-def _default_secondary_for_semi_auto(
+def _secondary_from_expected_actions(
     approval: dict[str, Any],
     *,
     operator_plan: tuple[OperatorPlanStep, ...],
+    tenant_id: str = LIVE_EVAL_TENANT_ID,
 ) -> tuple[SecondaryApprovalExpectation, ...]:
     explicit = approval.get("secondary_approvals")
     if explicit is not None:
         return tuple(_parse_secondary_expectation(row) for row in explicit)
+
     if not operator_plan:
         return ()
+
+    target_action = operator_plan[0].action_type
+    context = resolve_live_eval_tenant_context(tenant_id=tenant_id)
+    expected_actions = resolve_expected_actions_for_semi_auto(
+        target_action_type=target_action,
+        context=context,
+        explicit_expected_actions=approval.get("expected_actions"),
+    )
     target_types = {step.action_type for step in operator_plan}
-    if DEFAULT_SECONDARY_HANDOFF not in target_types:
-        return (
+    secondary: list[SecondaryApprovalExpectation] = []
+    for action in expected_actions:
+        if action.action_type in target_types:
+            continue
+        secondary.append(
             SecondaryApprovalExpectation(
-                action_type=DEFAULT_SECONDARY_HANDOFF,
-                expected_final_state="remain_pending",
-            ),
+                action_type=action.action_type,
+                expected_final_state=materialization_to_secondary_state(
+                    action.materialization
+                ),
+            )
         )
-    return ()
+    return tuple(secondary)
 
 
 def parse_semi_auto_operator_contract(scenario: CampaignScenario) -> SemiAutoOperatorContract:
@@ -162,7 +183,7 @@ def parse_semi_auto_operator_contract(scenario: CampaignScenario) -> SemiAutoOpe
         legacy_action = str(approval.get("operator_action") or "none").strip().lower()
         uses_legacy = legacy_action in ("approve", "reject")
         operator_plan = _legacy_operator_plan(approval)
-    secondary_approvals = _default_secondary_for_semi_auto(
+    secondary_approvals = _secondary_from_expected_actions(
         approval,
         operator_plan=operator_plan,
     )
@@ -183,15 +204,38 @@ def build_semi_auto_operator_contract_matrix(
 
     scenarios = list_campaign_scenarios(campaign_type=campaign_type)
     per_scenario: list[dict[str, Any]] = []
+    tenant_context = resolve_live_eval_tenant_context()
     for scenario in scenarios:
         contract = parse_semi_auto_operator_contract(scenario)
         outcome = resolve_semi_automatic_expected_outcome(scenario)
+        approval = dict(scenario.expected_approval or {})
+        target_action = (
+            contract.operator_plan[0].action_type if contract.operator_plan else None
+        )
+        expected_actions = resolve_expected_actions_for_semi_auto(
+            target_action_type=target_action or "send_customer_auto_reply",
+            context=tenant_context,
+            explicit_expected_actions=approval.get("expected_actions"),
+        )
         per_scenario.append(
             {
                 "scenario_id": scenario.scenario_id,
+                "negative_control": bool(approval.get("negative_control"))
+                or outcome.is_negative_hold,
                 "expected_materialized_approvals": (
-                    0 if outcome.is_negative_hold else 2
+                    0
+                    if outcome.is_negative_hold
+                    else count_expected_materialized_pending(expected_actions)
                 ),
+                "expected_actions": [
+                    {
+                        "action_type": action.action_type,
+                        "materialization": action.materialization,
+                        "operator_role": action.operator_role,
+                        "reason": action.reason,
+                    }
+                    for action in expected_actions
+                ],
                 "operator_plan": [
                     {
                         "action_type": step.action_type,
@@ -238,6 +282,8 @@ def validate_semi_auto_operator_contract(
     if campaign_type != "semi-auto-core":
         return issues, warnings, matrix
 
+    tenant_context = resolve_live_eval_tenant_context()
+
     for row in matrix["per_scenario"]:
         scenario_id = row["scenario_id"]
         plan = row["operator_plan"]
@@ -246,6 +292,8 @@ def validate_semi_auto_operator_contract(
         if scenario_id == "TBSM08_unknown_negative_hold":
             if plan:
                 issues.append(f"{scenario_id}: negative hold must not define operator_plan")
+            if not row.get("negative_control"):
+                warnings.append(f"{scenario_id}: should set negative_control: true")
             continue
 
         if not plan:
@@ -274,6 +322,14 @@ def validate_semi_auto_operator_contract(
         for sec in secondary:
             if sec["expected_final_state"] not in VALID_SECONDARY_STATES:
                 issues.append(f"{scenario_id}: invalid secondary expected_final_state")
+            if (
+                sec["expected_final_state"] == "remain_pending"
+                and not tenant_context.internal_handoff_enabled
+            ):
+                issues.append(
+                    f"{scenario_id}: send_internal_handoff remain_pending conflicts with "
+                    "tenant_internal_notification_disabled"
+                )
 
         if row["expected_reply"] and row["reply_budget"] != 1:
             issues.append(f"{scenario_id}: reply scenario must have gmail_replies budget 1")

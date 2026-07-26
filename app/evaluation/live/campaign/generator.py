@@ -10,13 +10,23 @@ def build_campaign_message_body(
     *,
     scenario: CampaignScenario,
     evaluation_run_id: str,
+    campaign_run_id: str | None = None,
 ) -> str:
     """Build HTML body with correlation marker and scenario text."""
     marker = f"<!-- KROWOLF_EVAL:evaluation_run_id={evaluation_run_id} -->"
     customer_marker = f"<!-- KROWOLF_CUSTOMER:{scenario.synthetic_customer_id} -->"
     thread_marker = f"<!-- KROWOLF_THREAD:{scenario.thread_id} -->"
+    run_marker = (
+        f"<!-- KROWOLF_CAMPAIGN_RUN:{campaign_run_id} -->"
+        if campaign_run_id
+        else ""
+    )
     text = (scenario.email.message_text or "").strip()
-    return f"{marker}\n{customer_marker}\n{thread_marker}\n{text}"
+    parts = [marker, customer_marker, thread_marker]
+    if run_marker:
+        parts.append(run_marker)
+    parts.append(text)
+    return "\n".join(parts)
 
 
 def build_campaign_subject(
@@ -38,6 +48,7 @@ def build_campaign_send_payload(
     scenario: CampaignScenario,
     evaluation_run_id: str,
     attempt_id: int = 1,
+    campaign_run_id: str | None = None,
 ) -> dict[str, str]:
     return {
         "subject": build_campaign_subject(
@@ -48,6 +59,7 @@ def build_campaign_send_payload(
         "body": build_campaign_message_body(
             scenario=scenario,
             evaluation_run_id=evaluation_run_id,
+            campaign_run_id=campaign_run_id,
         ),
         "sender_name": scenario.email.sender_name,
         "sender_email": scenario.email.sender_email,
