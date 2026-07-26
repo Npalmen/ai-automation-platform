@@ -247,6 +247,17 @@ class CustomerTimelineEvent(BaseModel):
     def validate_timestamps(cls, value: datetime) -> datetime:
         return _require_tz_aware(value)
 
+    @field_validator("metadata", mode="before")
+    @classmethod
+    def validate_metadata_allowlist(cls, value: object) -> dict[str, str | int | float | bool | None]:
+        if value is None:
+            return {}
+        if not isinstance(value, dict):
+            raise ValueError("metadata must be a mapping")
+        from app.domain.customer.provenance import validate_timeline_metadata
+
+        return validate_timeline_metadata(value)
+
 
 class CustomerJobLink(BaseModel):
     model_config = ConfigDict(extra="forbid")

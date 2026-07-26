@@ -13,13 +13,13 @@ todos:
     status: completed
   - id: customer-domain-d-timeline-provenance
     content: Definiera kundtidslinje, historik, källor och konfliktregler
-    status: pending
+    status: completed
   - id: customer-domain-e-api-contract
     content: Definiera read/write-API, behörigheter, tenantisolering och UI-kontrakt
-    status: pending
+    status: completed
   - id: customer-domain-f-migration-test-plan
     content: Ta fram migrationsordning, backfillstrategi, fixtures och testmatris
-    status: pending
+    status: completed
   - id: customer-domain-g-implementation-gate
     content: Granska helheten och stoppa för uttryckligt godkännande före implementation
     status: pending
