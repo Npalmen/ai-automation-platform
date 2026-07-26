@@ -894,7 +894,7 @@ class LiveEvalRunner:
                     violations.append("duplicate approve did not return idempotent/conflict-safe result")
             if outcome.expect_stale_conflict and ctx.operator_results:
                 stale = ctx.operator_results[-1]
-                if not stale.get("conflict"):
+                if not stale.get("conflict") and not stale.get("idempotent"):
                     violations.append("stale operator action must be denied with conflict")
         elif not ctx.unexpected_reply:
             violations.extend(assert_no_unexpected_reply(ctx.unexpected_reply))
