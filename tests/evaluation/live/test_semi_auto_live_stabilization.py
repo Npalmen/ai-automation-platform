@@ -92,14 +92,17 @@ def test_tbsm08_negative_control_skips_target_scoped_assertions():
 
 
 def test_campaign_run_marker_in_body():
+    from app.workflows.processors.classification_processor import classify_email_type
+
     scenario = get_campaign_scenario("TBSM01_lead_approve_reply")
     body = build_campaign_message_body(
         scenario=scenario,
         evaluation_run_id="run-abc",
-        campaign_run_id="campaign-xyz",
+        campaign_run_id="550e8400-e29b-41d4-a716-446655440000",
     )
-    assert "KROWOLF_CAMPAIGN_RUN:campaign-xyz" in body
+    assert "KROWOLF_RUN_SCOPE:550e8400-e29b-41d4-a716-446655440000" in body
     assert "KROWOLF_EVAL:evaluation_run_id=run-abc" in body
+    assert classify_email_type(scenario.email.subject, body) != "newsletter"
 
 
 def test_reply_metrics_independent_counters():
