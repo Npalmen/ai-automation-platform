@@ -108,6 +108,7 @@ class TimelineEventType(str, Enum):
     GMAIL_MESSAGE_RECEIVED = "gmail_message_received"
     GMAIL_THREAD_LINKED = "gmail_thread_linked"
     JOB_CREATED = "job_created"
+    JOB_LINKED = "job_linked"
     JOB_CLASSIFIED = "job_classified"
     JOB_STATUS_CHANGED = "job_status_changed"
     APPROVAL_CREATED = "approval_created"
@@ -210,6 +211,17 @@ class CustomerErrorCode(str, Enum):
     INVALID_SEARCH_QUERY = "INVALID_SEARCH_QUERY"
     INVALID_SORT = "INVALID_SORT"
     INVALID_PAGINATION = "INVALID_PAGINATION"
+    IDENTITY_COLLISION_REVIEW_REQUIRED = "IDENTITY_COLLISION_REVIEW_REQUIRED"
+
+
+class EndCustomerWriteOperation(str, Enum):
+    CREATE_CUSTOMER = "create_customer"
+    UPDATE_CUSTOMER = "update_customer"
+    APPEND_FACT = "append_fact"
+    VERIFY_FACT = "verify_fact"
+    CREATE_IDENTITY = "create_identity"
+    JOB_LINK = "job_link"
+    DUPLICATE_DECISION = "duplicate_decision"
 
 
 class ActorType(str, Enum):

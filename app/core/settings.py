@@ -129,6 +129,7 @@ class Settings(BaseSettings):
     OPERATOR_ALERT_RECIPIENT: str = ""
 
     END_CUSTOMER_READ_API_ENABLED: bool = False
+    END_CUSTOMER_WRITE_API_ENABLED: bool = False
 
     # Kapitel 2C — decision trace
     APP_CODE_VERSION: str = "dev-local"

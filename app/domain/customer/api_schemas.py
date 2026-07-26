@@ -474,3 +474,221 @@ class CustomerWriteHeaders(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     idempotency_key: str = Field(min_length=1, max_length=128)
+
+
+MAX_INITIAL_WRITE_ITEMS = 10
+OPERATOR_REASON_MAX_LENGTH = 500
+
+
+class OperatorInitialFactRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject_type: EntityOwnerType
+    subject_id: str = Field(min_length=1)
+    field_name: str = Field(min_length=1, max_length=128)
+    raw_value: str = Field(min_length=1)
+    normalized_value: str | None = None
+    fact_state: FactState = FactState.PROPOSED
+    source_type: SourceType = SourceType.ADMIN_CORRECTION
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def subject_must_be_end_customer_entity(self) -> OperatorInitialFactRequest:
+        if self.subject_type not in {
+            EntityOwnerType.CUSTOMER,
+            EntityOwnerType.COMPANY,
+            EntityOwnerType.CONTACT,
+        }:
+            raise ValueError("subject_type must be customer, company, or contact")
+        return self
+
+
+class OperatorInitialIdentityRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    owner_type: EntityOwnerType
+    owner_id: str = Field(min_length=1)
+    identity_type: IdentityType
+    raw_value: str = Field(min_length=1)
+    verification_status: VerificationStatus = VerificationStatus.VERIFIED
+    source_fact_id: str | None = None
+
+    @model_validator(mode="after")
+    def owner_must_be_end_customer_entity(self) -> OperatorInitialIdentityRequest:
+        if self.owner_type not in {
+            EntityOwnerType.CUSTOMER,
+            EntityOwnerType.COMPANY,
+            EntityOwnerType.CONTACT,
+        }:
+            raise ValueError("owner_type must be customer, company, or contact")
+        if self.identity_type in {IdentityType.GMAIL_MESSAGE, IdentityType.GMAIL_THREAD}:
+            raise ValueError("gmail identity types are not allowed for operator writes")
+        return self
+
+
+class OperatorCreateCustomerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_type: CustomerType
+    private: CreatePrivateEndCustomerRequest | None = None
+    company: CreateCompanyEndCustomerRequest | None = None
+    reason: str = Field(min_length=1, max_length=OPERATOR_REASON_MAX_LENGTH)
+    initial_facts: list[OperatorInitialFactRequest] = Field(default_factory=list, max_length=MAX_INITIAL_WRITE_ITEMS)
+    initial_identities: list[OperatorInitialIdentityRequest] = Field(
+        default_factory=list, max_length=MAX_INITIAL_WRITE_ITEMS
+    )
+
+    @model_validator(mode="after")
+    def validate_shape(self) -> OperatorCreateCustomerRequest:
+        if self.customer_type == CustomerType.PRIVATE:
+            if self.private is None:
+                raise ValueError("private payload required for private customer")
+            if self.company is not None:
+                raise ValueError("company payload not allowed for private customer")
+        elif self.customer_type in {CustomerType.COMPANY, CustomerType.ASSOCIATION}:
+            if self.company is None:
+                raise ValueError("company payload required for company customer")
+            if self.private is not None:
+                raise ValueError("private payload not allowed for company customer")
+        return self
+
+
+class OperatorUpdateCustomerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_version: int = Field(ge=1)
+    reason: str = Field(min_length=1, max_length=OPERATOR_REASON_MAX_LENGTH)
+    display_name: str | None = Field(default=None, min_length=1)
+    status: CustomerStatus | None = None
+    primary_company_id: str | None = None
+    primary_contact_id: str | None = None
+    clear_primary_company: bool = False
+    clear_primary_contact: bool = False
+
+
+class OperatorAddFactRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject_type: EntityOwnerType
+    subject_id: str = Field(min_length=1)
+    field_name: str = Field(min_length=1, max_length=128)
+    raw_value: str = Field(min_length=1)
+    normalized_value: str | None = None
+    fact_state: FactState = FactState.PROPOSED
+    source_type: SourceType = SourceType.ADMIN_CORRECTION
+    confidence: float = Field(ge=0.0, le=1.0)
+    reason: str = Field(min_length=1, max_length=OPERATOR_REASON_MAX_LENGTH)
+
+    @model_validator(mode="after")
+    def validate_fact_rules(self) -> OperatorAddFactRequest:
+        if self.subject_type not in {
+            EntityOwnerType.CUSTOMER,
+            EntityOwnerType.COMPANY,
+            EntityOwnerType.CONTACT,
+        }:
+            raise ValueError("subject_type must be customer, company, or contact")
+        if self.source_type == SourceType.AI_EXTRACTION and self.fact_state == FactState.VERIFIED:
+            raise ValueError("ai_extraction cannot create verified facts")
+        if self.fact_state == FactState.VERIFIED and self.source_type not in {
+            SourceType.ADMIN_CORRECTION,
+            SourceType.USER_INPUT,
+        }:
+            raise ValueError("verified facts require admin_correction or user_input source")
+        return self
+
+
+class OperatorVerifyFactRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    verified_raw_value: str = Field(min_length=1)
+    normalized_value: str | None = None
+    reason: str = Field(min_length=1, max_length=OPERATOR_REASON_MAX_LENGTH)
+
+
+class OperatorCreateIdentityRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    owner_type: EntityOwnerType
+    owner_id: str = Field(min_length=1)
+    identity_type: IdentityType
+    raw_value: str = Field(min_length=1)
+    verification_status: VerificationStatus = VerificationStatus.VERIFIED
+    source_fact_id: str | None = None
+    reason: str = Field(min_length=1, max_length=OPERATOR_REASON_MAX_LENGTH)
+
+    @model_validator(mode="after")
+    def validate_identity_rules(self) -> OperatorCreateIdentityRequest:
+        if self.owner_type not in {
+            EntityOwnerType.CUSTOMER,
+            EntityOwnerType.COMPANY,
+            EntityOwnerType.CONTACT,
+        }:
+            raise ValueError("owner_type must be customer, company, or contact")
+        if self.identity_type in {IdentityType.GMAIL_MESSAGE, IdentityType.GMAIL_THREAD}:
+            raise ValueError("gmail identity types are not allowed for operator writes")
+        return self
+
+
+class OperatorCreateJobLinkRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str = Field(min_length=1)
+    link_type: LinkType = LinkType.MANUAL
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    source_type: SourceType = SourceType.ADMIN_CORRECTION
+    reason: str = Field(min_length=1, max_length=OPERATOR_REASON_MAX_LENGTH)
+
+
+class OperatorWriteCustomerResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_id: str
+    customer_type: CustomerType
+    display_name: str
+    status: CustomerStatus
+    version: int = Field(ge=1)
+    primary_company_id: str | None = None
+    primary_contact_id: str | None = None
+    created: bool = True
+
+
+class OperatorWriteFactResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    fact_id: str
+    fact_state: FactState
+    subject_type: EntityOwnerType
+    subject_id: str
+    field_name: str
+    supersedes_fact_id: str | None = None
+
+
+class OperatorWriteIdentityResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    identity_id: str
+    owner_type: EntityOwnerType
+    owner_id: str
+    identity_type: IdentityType
+    verification_status: VerificationStatus
+    normalized_value: str | None = None
+
+
+class OperatorWriteJobLinkResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    link_id: str
+    customer_id: str
+    job_id: str
+    link_type: LinkType
+    created: bool
+
+
+class OperatorDuplicateDecisionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_id: str
+    status: DuplicateStatus
+    version: int = Field(ge=1)
+    left_customer_id: str
+    right_customer_id: str
