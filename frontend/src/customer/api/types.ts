@@ -1,4 +1,9 @@
+import type { ApprovalListParams, ApprovalListResponse } from "@/customer/types/approvals"
 import type { WorkspaceOverview } from "@/customer/types/overview"
+import type {
+  WorkItemListParams,
+  WorkItemListResponse,
+} from "@/customer/types/work-items"
 import type {
   CustomerAuthState,
   FeatureFlags,
@@ -9,9 +14,9 @@ import type {
 export type WorkspaceDataSource = {
   getContext(): Promise<WorkspaceContext>
   getOverview(): Promise<WorkspaceOverview>
-  getWorkItems(): Promise<{ items: unknown[]; total: number }>
+  listWorkItems(params: WorkItemListParams): Promise<WorkItemListResponse>
+  listApprovals(params: ApprovalListParams): Promise<ApprovalListResponse>
   getWorkItemDetail(workItemId: string): Promise<Record<string, unknown> | null>
-  getApprovals(): Promise<{ items: unknown[]; total: number }>
   getActivity(): Promise<{ items: unknown[]; total: number }>
   getHealth(): Promise<Record<string, unknown>>
 }

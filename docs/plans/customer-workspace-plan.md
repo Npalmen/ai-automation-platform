@@ -16,7 +16,7 @@ todos:
     status: completed
   - id: workspace-e-inbox-workflows
     content: Bygg vyer för leads, kundfrågor, approvals och needs-help
-    status: pending
+    status: completed
   - id: workspace-f-activity-search
     content: Bygg aktivitetshistorik, sökning, filtrering och detaljvyer
     status: pending

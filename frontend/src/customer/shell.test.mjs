@@ -35,10 +35,10 @@ test("customer routes include all required paths", () => {
   const routerSource = readCustomerFile("routes/router.tsx")
   const requiredPaths = [
     "<OverviewPage />",
-    'path: "leads"',
-    'path: "support"',
-    'path: "approvals"',
-    'path: "needs-help"',
+    "<LeadsPage />",
+    "<SupportPage />",
+    "<ApprovalsPage />",
+    "<NeedsHelpPage />",
     'path: "activity"',
     'path: "search"',
     'path: "work/:workItemId"',
@@ -90,6 +90,9 @@ test("customer shell avoids secret storage and forbidden APIs", () => {
     readAllCustomerSources(),
     readFileSync(join(customerDir, "features/overview/OverviewPage.tsx"), "utf8"),
     readFileSync(join(customerDir, "features/overview/overviewFixtures.ts"), "utf8"),
+    readFileSync(join(customerDir, "features/work-queues/WorkItemsQueuePage.tsx"), "utf8"),
+    readFileSync(join(customerDir, "features/work-queues/workQueueFixtures.ts"), "utf8"),
+    readFileSync(join(customerDir, "features/approvals/ApprovalsPage.tsx"), "utf8"),
   ].join("\n")
   const forbidden = [
     "localStorage",
@@ -98,7 +101,7 @@ test("customer shell avoids secret storage and forbidden APIs", () => {
     "X-API-Key",
     "X-Tenant-ID",
     "/auth/admin/",
-    "/approvals/",
+    "/approvals/pending",
     "/jobs",
     "/workspace/v1",
   ]

@@ -3,7 +3,11 @@ import { createBrowserRouter, Navigate } from "react-router-dom"
 import { ForbiddenPage } from "@/customer/auth/ForbiddenPage"
 import { PreviewLoginPage } from "@/customer/auth/PreviewLoginPage"
 import { RoutePlaceholder } from "@/customer/components/RoutePlaceholder"
+import { ApprovalsPage } from "@/customer/features/approvals/ApprovalsPage"
+import { LeadsPage } from "@/customer/features/leads/LeadsPage"
+import { NeedsHelpPage } from "@/customer/features/needs-help/NeedsHelpPage"
 import { OverviewPage } from "@/customer/features/overview/OverviewPage"
+import { SupportPage } from "@/customer/features/support/SupportPage"
 import { CustomerAppShell } from "@/customer/layouts/CustomerAppShell"
 import { NotFoundPage } from "@/customer/pages/NotFoundPage"
 
@@ -26,39 +30,19 @@ export const customerRouter = createBrowserRouter(
         },
         {
           path: "leads",
-          element: (
-            <RoutePlaceholder
-              title="Leads"
-              description="Inkommande förfrågningar och prioriterade affärsmöjligheter."
-            />
-          ),
+          element: <LeadsPage />,
         },
         {
           path: "support",
-          element: (
-            <RoutePlaceholder
-              title="Kundfrågor"
-              description="Supportärenden och frågor från era kunder."
-            />
-          ),
+          element: <SupportPage />,
         },
         {
           path: "approvals",
-          element: (
-            <RoutePlaceholder
-              title="Godkännanden"
-              description="Beslut som väntar på dig — visas read-only i förhandsläget."
-            />
-          ),
+          element: <ApprovalsPage />,
         },
         {
           path: "needs-help",
-          element: (
-            <RoutePlaceholder
-              title="Behöver hjälp"
-              description="Ärenden där en människa behöver ta över."
-            />
-          ),
+          element: <NeedsHelpPage />,
         },
         {
           path: "activity",
