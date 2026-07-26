@@ -224,7 +224,10 @@ jobs:
         env:
           BUILD_COMMIT_SHA: ${{ github.sha }}
         run: |
-          test ! -e storage
+          if ! grep -qx 'storage/' .dockerignore; then
+            echo "::error::storage/ must be listed in .dockerignore before docker build"
+            exit 1
+          fi
           BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           RELEASE_ID="ci-${GITHUB_SHA::7}"
           docker build \
