@@ -7,7 +7,7 @@ todos:
     status: completed
   - id: workspace-b-product-contract
     content: Lås informationsarkitektur, routes, roller, vyer och API-kontrakt
-    status: in_progress
+    status: completed
   - id: workspace-c-shell-navigation
     content: Bygg kundens appskal, navigation, behörigheter och responsiva grund
     status: pending
