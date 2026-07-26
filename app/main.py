@@ -8530,6 +8530,23 @@ from app.evaluation.live.routes import router as live_eval_router
 
 app.include_router(live_eval_router)
 
+if get_settings().END_CUSTOMER_READ_API_ENABLED:
+    from app.api.routes.end_customers import (
+        admin_duplicates_router,
+        admin_router,
+        tenant_duplicates_router,
+        tenant_router,
+    )
+
+    app.include_router(tenant_router, prefix="/end-customers", tags=["end-customers"])
+    app.include_router(
+        tenant_duplicates_router,
+        prefix="/end-customer-duplicates",
+        tags=["end-customers"],
+    )
+    app.include_router(admin_router, tags=["admin"])
+    app.include_router(admin_duplicates_router, tags=["admin"])
+
 
 def _validate_usage_days(days: int) -> int:
     if days not in VALID_USAGE_DAYS:

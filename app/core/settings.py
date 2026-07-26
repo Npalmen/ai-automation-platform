@@ -128,6 +128,8 @@ class Settings(BaseSettings):
     # Operator alert email (Kapitel 10) — platform allowlist only; empty = in-app only.
     OPERATOR_ALERT_RECIPIENT: str = ""
 
+    END_CUSTOMER_READ_API_ENABLED: bool = False
+
     # Kapitel 2C — decision trace
     APP_CODE_VERSION: str = "dev-local"
     DECISION_RECORD_HMAC_KEY: str = ""
