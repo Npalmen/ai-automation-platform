@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.customer.tsbuildinfo"
+  },
+  "include": ["src/customer", "src/components/shared", "src/lib", "src/styles", "src/vite-env.d.ts"]
+}

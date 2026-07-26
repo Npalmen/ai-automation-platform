@@ -4,6 +4,7 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
 RUN npm run build
+RUN npm run build:customer
 
 FROM python:3.12-slim
 
@@ -28,6 +29,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY scripts ./scripts
 COPY --from=frontend-build /frontend/dist ./frontend/dist
+COPY --from=frontend-build /frontend/dist-customer ./frontend/dist-customer
 
 RUN python scripts/write_build_metadata.py \
     --commit-sha "$BUILD_COMMIT_SHA" \

@@ -10,7 +10,7 @@ todos:
     status: completed
   - id: workspace-c-shell-navigation
     content: Bygg kundens appskal, navigation, behörigheter och responsiva grund
-    status: pending
+    status: completed
   - id: workspace-d-overview
     content: Bygg kundens dagliga översikt och prioriterade arbetslista
     status: pending
