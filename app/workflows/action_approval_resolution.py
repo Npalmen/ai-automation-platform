@@ -151,6 +151,16 @@ def _execution_snapshot(
     return state, reconciliation_required, automatic_retry_allowed
 
 
+def _refresh_approval(db: Session, approval) -> None:
+    db.refresh(approval)
+
+
+def _operation_id_from_approval(approval) -> str | None:
+    request_payload = approval.request_payload or {}
+    operation_id = request_payload.get("action_operation_id")
+    return str(operation_id) if operation_id else None
+
+
 def _idempotent_result(db: Session, approval, *, operation_id: str | None) -> ActionApprovalResolutionResult:
     execution_state: str | None = None
     reconciliation_required = False
@@ -172,6 +182,40 @@ def _idempotent_result(db: Session, approval, *, operation_id: str | None) -> Ac
         automatic_retry_allowed=automatic_retry_allowed,
         action_operation_id=operation_id,
         idempotent=True,
+    )
+
+
+def _terminal_resolution_result(
+    db: Session,
+    approval,
+    *,
+    approved: bool,
+    operation_id: str | None,
+) -> ActionApprovalResolutionResult | None:
+    """Return idempotent or conflict result when approval is already terminal."""
+    state = str(approval.state or "")
+    if state not in ("approved", "rejected"):
+        return None
+
+    terminal_approved = state == "approved"
+    if approved == terminal_approved:
+        return _idempotent_result(db, approval, operation_id=operation_id)
+
+    execution_state = "not_executed" if state == "rejected" else None
+    if operation_id and state == "approved":
+        execution_state, _, _ = _execution_snapshot(
+            db,
+            tenant_id=approval.tenant_id,
+            operation_id=operation_id,
+        )
+    return ActionApprovalResolutionResult(
+        approval_id=approval.approval_id,
+        job_id=approval.job_id,
+        approval_state=state,
+        execution_state=execution_state or "not_executed",
+        action_operation_id=operation_id,
+        idempotent=False,
+        contract_conflict="approval_terminal_state_conflict",
     )
 
 
@@ -287,6 +331,57 @@ def _commit_reject_phase(
     db.commit()
 
 
+def _commit_non_external_approve_phase(
+    db: Session,
+    *,
+    approval,
+    job: Job,
+    operation_id: str,
+    action_type: str,
+    fingerprint: str | None,
+    key_version: int | None,
+    parent_pipeline_run_id: str,
+    actor: str | None,
+    note: str | None,
+) -> None:
+    now = _utcnow()
+    transitioned, won = ApprovalRequestRepository.transition_state_if_pending(
+        db,
+        tenant_id=approval.tenant_id,
+        approval_id=approval.approval_id,
+        new_state="approved",
+        resolved_at=now,
+        resolved_by=actor or "operator",
+        resolution_note=note,
+    )
+    if transitioned is None:
+        raise ContractConflict("approval record not found")
+    if not won:
+        raise ContractConflict("approval already resolved")
+    if transitioned.state != "approved":
+        raise ContractConflict(f"approval transition failed, state={transitioned.state}")
+
+    trace = create_trace_session(
+        job,
+        source=PipelineRunSource.APPROVAL_RESUME,
+        db=db,
+        parent_pipeline_run_id=parent_pipeline_run_id,
+    )
+    record_pipeline_run_started(db, trace, job)
+    record_action_approval_resolution(
+        db,
+        trace,
+        job,
+        approval_id=approval.approval_id,
+        operation_id=operation_id,
+        action_type=action_type,
+        approved=True,
+        fingerprint=fingerprint,
+        key_version=key_version,
+    )
+    db.commit()
+
+
 def resolve_per_action_approval(
     db: Session,
     approval,
@@ -296,11 +391,17 @@ def resolve_per_action_approval(
     note: str | None = None,
 ) -> ActionApprovalResolutionResult:
     """Resolve a per-action / email approval with full decision trace on external writes."""
-    request_payload = approval.request_payload or {}
-    operation_id = request_payload.get("action_operation_id")
+    _refresh_approval(db, approval)
+    operation_id = _operation_id_from_approval(approval)
 
-    if approval.state in ("approved", "rejected"):
-        return _idempotent_result(db, approval, operation_id=operation_id)
+    terminal = _terminal_resolution_result(
+        db,
+        approval,
+        approved=approved,
+        operation_id=operation_id,
+    )
+    if terminal is not None:
+        return terminal
 
     delivery = dict(approval.delivery_payload or {})
     job = _load_job(db, approval)
@@ -308,7 +409,7 @@ def resolve_per_action_approval(
     if not approved:
         if not delivery:
             now = _utcnow()
-            ApprovalRequestRepository.transition_state_if_pending(
+            transitioned, won = ApprovalRequestRepository.transition_state_if_pending(
                 db,
                 tenant_id=approval.tenant_id,
                 approval_id=approval.approval_id,
@@ -316,8 +417,22 @@ def resolve_per_action_approval(
                 resolved_at=now,
                 resolved_by=actor or "operator",
                 resolution_note=note,
-            )[0]
+            )
+            if transitioned is None:
+                raise ContractConflict("approval record not found")
+            if not won:
+                _refresh_approval(db, approval)
+                retry = _terminal_resolution_result(
+                    db,
+                    approval,
+                    approved=False,
+                    operation_id=operation_id,
+                )
+                if retry is not None:
+                    return retry
+                raise ContractConflict("approval already resolved")
             db.commit()
+            _refresh_approval(db, approval)
             finalize_email_approval_resolution(
                 db, approval, approved=False, actor=actor, note=note,
                 send_result=None, send_error=None,
@@ -413,14 +528,15 @@ def resolve_per_action_approval(
         except ContractConflict as exc:
             if str(exc) == "approval already resolved":
                 db.rollback()
-                refreshed = ApprovalRequestRepository.get_by_approval_id(
+                _refresh_approval(db, approval)
+                retry = _terminal_resolution_result(
                     db,
-                    tenant_id=approval.tenant_id,
-                    approval_id=approval.approval_id,
+                    approval,
+                    approved=True,
+                    operation_id=operation_id,
                 )
-                if refreshed is not None:
-                    approval.state = refreshed.state
-                return _idempotent_result(db, approval, operation_id=operation_id)
+                if retry is not None:
+                    return retry
             db.rollback()
             raise
         except Exception:
@@ -465,19 +581,37 @@ def resolve_per_action_approval(
             )
 
     if not is_external:
-        now = _utcnow()
-        transitioned, won = ApprovalRequestRepository.transition_state_if_pending(
-            db,
-            tenant_id=approval.tenant_id,
-            approval_id=approval.approval_id,
-            new_state="approved",
-            resolved_at=now,
-            resolved_by=actor or "operator",
-            resolution_note=note,
-        )
-        if transitioned is not None and won:
-            db.commit()
-            approval.state = "approved"
+        try:
+            _commit_non_external_approve_phase(
+                db,
+                approval=approval,
+                job=job,
+                operation_id=operation_id,
+                action_type=str(delivery.get("type") or ""),
+                fingerprint=fingerprint,
+                key_version=key_version,
+                parent_pipeline_run_id=auth_row.pipeline_run_id,
+                actor=actor,
+                note=note,
+            )
+        except ContractConflict as exc:
+            if str(exc) == "approval already resolved":
+                db.rollback()
+                _refresh_approval(db, approval)
+                retry = _terminal_resolution_result(
+                    db,
+                    approval,
+                    approved=True,
+                    operation_id=operation_id,
+                )
+                if retry is not None:
+                    return retry
+            db.rollback()
+            raise
+        except Exception:
+            db.rollback()
+            raise
+        approval.state = "approved"
         execution_state = execution_state or (
             ExecutionStatus.SUCCEEDED.value if send_result else "not_executed"
         )

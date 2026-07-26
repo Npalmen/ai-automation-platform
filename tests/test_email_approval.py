@@ -517,9 +517,10 @@ class TestResolveEmailApproval:
             db, approval, approved=False, actor=None, note=None,
         )
 
-    def test_approve_without_delivery_payload_does_not_crash(self):
+    def test_approve_without_delivery_payload_returns_conflict(self):
         from app.main import _resolve_email_approval
         from app.workflows.action_approval_resolution import ActionApprovalResolutionResult
+        from fastapi import HTTPException
 
         db = MagicMock()
         approval = self._make_approval_record()
@@ -532,9 +533,10 @@ class TestResolveEmailApproval:
                 approval_state="pending",
                 contract_conflict="empty delivery_payload",
             )
-            result = _resolve_email_approval(db, approval, approved=True)
+            with pytest.raises(HTTPException) as exc_info:
+                _resolve_email_approval(db, approval, approved=True)
 
-        assert result["approval_state"] == "pending"
+        assert exc_info.value.status_code == 409
 
     def test_double_approve_is_idempotent(self):
         """Second approve on already-resolved approval must not re-execute action."""

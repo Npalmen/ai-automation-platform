@@ -172,7 +172,7 @@ def run_observe_campaign(
             observe_expected_outcome=expected_outcome,
         )
         exit_code = runner.run()
-        sends += 1 if exit_code == 0 else 0
+        sends += 1
 
         observation: dict[str, Any] = {}
         try:
@@ -314,7 +314,7 @@ def run_semi_automatic_campaign(
             campaign_scenario=scenario,
         )
         exit_code = runner.run()
-        sends += 1 if exit_code == 0 else 0
+        sends += 1
 
         observation: dict[str, Any] = {}
         try:

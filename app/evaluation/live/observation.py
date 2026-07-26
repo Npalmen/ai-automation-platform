@@ -98,6 +98,43 @@ def build_telemetry_summary(events: list[dict[str, Any]]) -> dict[str, int]:
     return summary
 
 
+def _summarize_execution_trace(records: list[dict[str, Any]]) -> dict[str, Any]:
+    resolution: dict[str, Any] | None = None
+    intent: dict[str, Any] | None = None
+    outcome: dict[str, Any] | None = None
+    operation_id: str | None = None
+
+    for row in records:
+        record_type = str(row.get("record_type") or "")
+        metadata = row.get("metadata") or {}
+        if record_type == "action_approval_resolution":
+            resolution = {
+                "approval_id": metadata.get("approval_id"),
+                "resolution": metadata.get("resolution"),
+                "action_operation_id": row.get("action_operation_id"),
+            }
+            operation_id = row.get("action_operation_id") or operation_id
+        elif record_type == "execution_intent":
+            intent = {
+                "action_operation_id": row.get("action_operation_id"),
+                "execution_status": row.get("execution_status"),
+            }
+            operation_id = row.get("action_operation_id") or operation_id
+        elif record_type == "execution_outcome":
+            outcome = {
+                "action_operation_id": row.get("action_operation_id"),
+                "execution_status": row.get("execution_status"),
+            }
+            operation_id = row.get("action_operation_id") or operation_id
+
+    return {
+        "action_operation_id": operation_id,
+        "approval_resolution": resolution,
+        "execution_intent": intent,
+        "execution_outcome": outcome,
+    }
+
+
 def build_job_observation(db: Session, tenant_id: str, job_id: str) -> dict[str, Any]:
     job = JobRepository.get_job_by_id(db, tenant_id, job_id)
     if job is None:
@@ -119,6 +156,8 @@ def build_job_observation(db: Session, tenant_id: str, job_id: str) -> dict[str,
                 "event_sequence": r.event_sequence,
                 "policy_authorization": r.policy_authorization,
                 "action_authorization": r.action_authorization,
+                "action_operation_id": r.action_operation_id,
+                "execution_status": r.execution_status,
                 "pipeline_run_id": r.pipeline_run_id,
                 "metadata": {
                     k: _truncate(v)
@@ -151,6 +190,7 @@ def build_job_observation(db: Session, tenant_id: str, job_id: str) -> dict[str,
         "pending_approval_count": 1 if pending else 0,
         "pipeline_run_id": pipeline_run_id,
         "decision_records": decision_rows,
+        "execution_trace": _summarize_execution_trace(decision_rows),
         "live_eval": _redact_live_eval(job.input_data.get("live_eval") if job.input_data else None),
     }
 
