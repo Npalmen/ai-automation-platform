@@ -15,6 +15,7 @@ from app.evaluation.live.campaign.gates import (
     validate_no_production_resources,
 )
 from app.evaluation.live.campaign.modes import CAMPAIGN_TYPE_SEND_BUDGET
+from app.evaluation.live.campaign.reply_contract import validate_semi_auto_reply_contract
 from app.evaluation.live.campaign.registry import list_campaign_scenarios, load_campaign_manifest
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.readiness import run_offline_readiness_checks
@@ -124,7 +125,16 @@ def build_full_system_testbot_readiness(
     gates["sender_count"] = len(config.sender_emails)
     gates["recipient_count"] = len(config.recipient_emails)
     gates["max_gmail_sends"] = config.max_gmail_sends_per_run
+    gates["max_gmail_replies_per_run"] = config.max_gmail_replies_per_run
     gates["intake_label"] = config.intake_label
+
+    if campaign_type == "semi-auto-core":
+        contract_issues, contract_matrix = validate_semi_auto_reply_contract(
+            campaign_type=campaign_type,
+            config=config,
+        )
+        issues.extend(contract_issues)
+        gates["semi_auto_reply_contract"] = contract_matrix
 
     required_secrets = [
         "LIVE_EVAL_SENDER_GMAIL_REFRESH_TOKEN",

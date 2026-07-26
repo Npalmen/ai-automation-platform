@@ -45,6 +45,8 @@ def test_tbsm06_duplicate_approve_variant():
     outcome = resolve_semi_automatic_expected_outcome(scenario)
     assert outcome.test_variant == "duplicate_approve"
     assert outcome.expect_duplicate_idempotent is True
+    assert outcome.expected_reply is True
+    assert scenario.budgets.gmail_replies == 1
 
 
 def test_tbsm07_stale_action_variant():

@@ -23,6 +23,7 @@ class CampaignReport:
     replies: int = 0
     approvals: int = 0
     auto_actions: int = 0
+    reply_totals: dict[str, int] | None = None
     writes_per_integration: dict[str, int] = field(default_factory=dict)
     customer_card_outcomes: list[dict[str, Any]] = field(default_factory=list)
     failures: list[dict[str, Any]] = field(default_factory=list)
@@ -45,6 +46,7 @@ class CampaignReport:
             "replies": self.replies,
             "approvals": self.approvals,
             "auto_actions": self.auto_actions,
+            "reply_totals": self.reply_totals,
             "writes_per_integration": self.writes_per_integration,
             "customer_card_outcomes": self.customer_card_outcomes,
             "failures": self.failures,

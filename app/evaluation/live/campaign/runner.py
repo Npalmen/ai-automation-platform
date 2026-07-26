@@ -17,6 +17,10 @@ from app.evaluation.live.campaign.gates import (
 from app.evaluation.live.campaign.modes import CAMPAIGN_TYPE_REPLY_BUDGET
 from app.evaluation.live.campaign.registry import list_campaign_scenarios
 from app.evaluation.live.campaign.report import CampaignReport, write_campaign_report
+from app.evaluation.live.campaign.reply_metrics import (
+    CampaignReplyTotals,
+    ScenarioReplyMetrics,
+)
 from app.evaluation.live.campaign.schemas import CampaignScenario
 from app.evaluation.live.campaign.semi_automatic_expected_outcomes import (
     resolve_semi_automatic_expected_outcome,
@@ -42,6 +46,7 @@ class ScenarioResult:
     approval_status: str | None = None
     violations: list[str] = field(default_factory=list)
     safety_violations: list[str] = field(default_factory=list)
+    reply_metrics: ScenarioReplyMetrics | None = None
 
 
 @dataclass
@@ -54,11 +59,12 @@ class ObserveCampaignResult:
     approval_resolutions: int = 0
     external_writes: int = 0
     safety_violations: list[str] = field(default_factory=list)
+    reply_totals: CampaignReplyTotals | None = None
     main_sha: str = ""
     server_sha: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "campaign_type": self.campaign_type,
             "overall_status": self.overall_status,
             "sends": self.sends,
@@ -83,10 +89,16 @@ class ObserveCampaignResult:
                     "violations": r.violations,
                     "safety_violations": r.safety_violations,
                     "customer_card": "NOT_IMPLEMENTED",
+                    "reply_metrics": (
+                        r.reply_metrics.to_dict() if r.reply_metrics is not None else None
+                    ),
                 }
                 for r in self.scenario_results
             ],
         }
+        if self.reply_totals is not None:
+            payload["reply_totals"] = self.reply_totals.to_dict()
+        return payload
 
 
 def _git_sha(ref: str = "HEAD") -> str:
@@ -276,9 +288,9 @@ def run_semi_automatic_campaign(
     results: list[ScenarioResult] = []
     safety_violations: list[str] = []
     sends = 0
-    replies = 0
     approval_resolutions = 0
     reply_budget_remaining = reply_ceiling
+    scenario_reply_metrics: list[ScenarioReplyMetrics] = []
 
     for scenario in scenarios:
         if scenario.mode != "semi_automatic":
@@ -329,8 +341,10 @@ def run_semi_automatic_campaign(
 
         if expected_outcome.expect_approval_resolution and exit_code == 0:
             approval_resolutions += 1
-        if expected_outcome.expected_reply and exit_code == 0:
-            replies += 1
+
+        metrics = runner.reply_metrics
+        if metrics is not None:
+            scenario_reply_metrics.append(metrics)
 
         result = ScenarioResult(
             scenario_id=scenario.scenario_id,
@@ -344,15 +358,40 @@ def run_semi_automatic_campaign(
             job_status=job.get("job_status"),
             approval_status="resolved" if expected_outcome.expect_approval_resolution else "none",
             violations=violations,
+            reply_metrics=metrics,
         )
         results.append(result)
+
+    reply_totals = (
+        CampaignReplyTotals.from_scenarios(scenario_reply_metrics)
+        if scenario_reply_metrics
+        else None
+    )
+    replies = (
+        reply_totals.recipient_verified_reply_count if reply_totals is not None else 0
+    )
 
     passed = sum(1 for r in results if r.status == "passed")
     expected_count = len(scenarios)
     overall = "passed" if passed == expected_count else "failed"
     if sends != expected_count:
         safety_violations.append(f"send count mismatch: {sends} != {expected_count}")
-    if replies > reply_ceiling:
+    if reply_totals is not None:
+        if reply_totals.expected_reply_count != reply_ceiling:
+            safety_violations.append(
+                "expected_reply_count mismatch: "
+                f"{reply_totals.expected_reply_count} != {reply_ceiling}"
+            )
+        if reply_totals.recipient_verified_reply_count != reply_ceiling:
+            safety_violations.append(
+                "recipient_verified_reply_count mismatch: "
+                f"{reply_totals.recipient_verified_reply_count} != {reply_ceiling}"
+            )
+        if reply_totals.unauthorized_reply_count != 0:
+            safety_violations.append(
+                f"unauthorized_reply_count must be 0, got {reply_totals.unauthorized_reply_count}"
+            )
+    elif replies > reply_ceiling:
         safety_violations.append(f"reply budget exceeded: {replies} > {reply_ceiling}")
 
     campaign_result = ObserveCampaignResult(
@@ -364,6 +403,7 @@ def run_semi_automatic_campaign(
         approval_resolutions=approval_resolutions,
         external_writes=0,
         safety_violations=safety_violations,
+        reply_totals=reply_totals,
         main_sha=_git_sha("HEAD"),
         server_sha=os.environ.get("BUILD_GIT_SHA"),
     )
@@ -379,6 +419,7 @@ def run_semi_automatic_campaign(
             replies=campaign_result.replies,
             approvals=campaign_result.approval_resolutions,
             overall_status=campaign_result.overall_status,
+            reply_totals=reply_totals.to_dict() if reply_totals is not None else None,
         )
         write_campaign_report(report_path, report)
 

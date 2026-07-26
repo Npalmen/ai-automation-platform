@@ -12,6 +12,8 @@ from typing import Any
 import httpx
 
 from app.evaluation.live.assertions import (
+    _count_unique_succeeded_operation_keys,
+    assert_duplicate_approve_execution_chain,
     assert_expected_sender_reply,
     assert_no_unexpected_reply,
     assert_observe_campaign_pipeline,
@@ -22,6 +24,10 @@ from app.evaluation.live.assertions import (
     assert_telemetry_summary,
 )
 from app.evaluation.live.campaign.expected_outcomes import ObserveExpectedOutcome
+from app.evaluation.live.campaign.reply_metrics import (
+    ScenarioReplyMetrics,
+    build_scenario_reply_metrics,
+)
 from app.evaluation.live.campaign.semi_automatic_expected_outcomes import (
     SemiAutomaticExpectedOutcome,
 )
@@ -171,6 +177,7 @@ class LiveEvalRunner:
         self._timeout_job_snapshot: dict[str, Any] | None = None
         self._poll_attempts: int | None = None
         self._poll_duration_seconds: float | None = None
+        self.reply_metrics: ScenarioReplyMetrics | None = None
 
     def _transition(self, state: str, **extra: Any) -> None:
         self._failed_stage = state
@@ -621,6 +628,14 @@ class LiveEvalRunner:
                     "internal_date_ms": expected.internal_date_ms,
                 }
 
+        if self.use_semi_automatic_assertions and self.semi_automatic_expected_outcome:
+            self.reply_metrics = build_scenario_reply_metrics(
+                expected_reply=self.semi_automatic_expected_outcome.expected_reply,
+                observation=observation,
+                recipient_verified=ctx.expected_reply is not None,
+                unauthorized=ctx.unexpected_reply is not None,
+            )
+
         violations = self._assert_all(observation, ctx)
         self._transition("asserting", violations=violations)
         if violations:
@@ -867,15 +882,17 @@ class LiveEvalRunner:
                 reply = _count_unique_succeeded_operation_keys(
                     events, TELEMETRY_APP_GMAIL_REPLY
                 )
-                if reply > 1:
+                if reply != expected_reply_count:
                     violations.append(
-                        f"duplicate approve must produce at most one reply, got {reply}"
+                        f"duplicate approve must produce exactly {expected_reply_count} "
+                        f"reply, got {reply}"
                     )
+                violations.extend(assert_duplicate_approve_execution_chain(observation))
                 violations.extend(
                     assert_semi_automatic_telemetry(
                         self.testbot_events,
                         events,
-                        expected_reply_count=reply,
+                        expected_reply_count=expected_reply_count,
                         app_summary=observation.get("telemetry_summary") or {},
                     )
                 )

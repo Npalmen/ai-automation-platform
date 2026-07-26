@@ -27,8 +27,12 @@ expected_routing:
 
 expected_approval:
   operator_action: approve
-  expected_reply: false
+  expected_reply: true
   test_variant: duplicate_approve
+
+expected_external_actions:
+  - action_type: send_customer_auto_reply
+    expected_executions: 1
 
 budgets:
   gmail_sends: 1

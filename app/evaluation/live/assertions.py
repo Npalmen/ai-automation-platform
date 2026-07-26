@@ -368,6 +368,39 @@ def assert_semi_automatic_campaign_pipeline(
     return violations
 
 
+def assert_duplicate_approve_execution_chain(observation: dict[str, Any]) -> list[str]:
+    """TBSM06: exactly one resolution/intent/outcome; duplicate approve must not add more."""
+    violations: list[str] = []
+    job = observation.get("job") or {}
+    records = job.get("decision_records") or []
+
+    def _count(record_type: str) -> int:
+        return sum(1 for row in records if row.get("record_type") == record_type)
+
+    for record_type in (
+        "action_approval_resolution",
+        "execution_intent",
+        "execution_outcome",
+    ):
+        count = _count(record_type)
+        if count != 1:
+            violations.append(
+                f"duplicate approve requires exactly one {record_type}, got {count}"
+            )
+
+    outcomes = [
+        row
+        for row in records
+        if row.get("record_type") == "execution_outcome"
+    ]
+    if outcomes and outcomes[0].get("execution_status") != "succeeded":
+        violations.append(
+            f"execution_outcome must be succeeded, got {outcomes[0].get('execution_status')!r}"
+        )
+
+    return violations
+
+
 def assert_expected_sender_reply(
     expected_reply: dict[str, Any] | None,
     *,
