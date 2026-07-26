@@ -1085,6 +1085,8 @@ def _compute_lead_sla_payload(
         return None
 
     created_at = job.created_at or datetime.now(timezone.utc)
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
     due_at = created_at + timedelta(minutes=_LEAD_SLA_TARGET_MINUTES)
     now = datetime.now(timezone.utc)
 
