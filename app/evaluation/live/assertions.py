@@ -14,11 +14,14 @@ from app.evaluation.live.constants import (
 )
 
 FORBIDDEN_DECISION_TYPES = frozenset({
-    "action_authorization",
     "execution_intent",
     "execution_outcome",
     "action_approval_resolution",
     "dispatch_approval_resolution",
+})
+
+PIPELINE_PRE_APPROVAL_INTERLEAVED: frozenset[str] = frozenset({
+    "action_authorization",
 })
 
 REQUIRED_DECISION_SUBSEQUENCE = (
@@ -122,6 +125,7 @@ def assert_observe_campaign_pipeline(
         _assert_decision_subsequence(
             types,
             required=decision_subsequence or REQUIRED_DECISION_SUBSEQUENCE,
+            interleaved=PIPELINE_PRE_APPROVAL_INTERLEAVED,
         )
     )
     for forbidden in FORBIDDEN_DECISION_TYPES:
@@ -155,7 +159,12 @@ def assert_s01_pipeline(observation: dict[str, Any]) -> list[str]:
 
     records = job.get("decision_records") or []
     types = [r.get("record_type") for r in sorted(records, key=lambda x: int(x.get("event_sequence") or 0))]
-    violations.extend(_assert_decision_subsequence(types))
+    violations.extend(
+        _assert_decision_subsequence(
+            types,
+            interleaved=PIPELINE_PRE_APPROVAL_INTERLEAVED,
+        )
+    )
     for forbidden in FORBIDDEN_DECISION_TYPES:
         if forbidden in types:
             violations.append(f"forbidden decision record {forbidden}")

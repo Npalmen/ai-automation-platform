@@ -34,6 +34,7 @@ from app.evaluation.live.llm_report import build_live_eval_llm_report, write_llm
 from app.evaluation.live.routes import router as live_eval_router
 from app.evaluation.live.scenario_input import load_locked_scenario_input
 from app.evaluation.live.write_policy import enforce_live_eval_write_policy
+from app.repositories.postgres.action_execution_models import ActionExecutionRecord
 from app.repositories.postgres.approval_models import ApprovalRequestRecord
 from app.repositories.postgres.audit_models import AuditEventRecord
 from app.repositories.postgres.database import Base
@@ -91,6 +92,7 @@ def llm_db(llm_eval_env):
             TenantConfigRecord.__table__,
             DecisionRecordRow.__table__,
             ApprovalRequestRecord.__table__,
+            ActionExecutionRecord.__table__,
         ],
     )
 
@@ -541,7 +543,12 @@ def test_fixture_input_pipeline_reaches_awaiting_approval(llm_client, llm_db):
 
     approvals = llm_db.query(ApprovalRequestRecord).filter_by(tenant_id="TENANT_LIVE_EVAL").all()
     pending = [row for row in approvals if row.state == "pending"]
-    assert len(pending) == 1
+    customer_reply_pending = [
+        row for row in pending
+        if row.next_on_approve == "action_execute"
+        and (row.delivery_payload or {}).get("type") == "send_customer_auto_reply"
+    ]
+    assert len(customer_reply_pending) == 1
 
     observation = llm_client.get(
         f"/admin/live-eval/runs/{run_id}/observation",

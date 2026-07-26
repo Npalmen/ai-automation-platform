@@ -6,6 +6,7 @@ from typing import Any
 
 from app.evaluation.live.assertions import (
     FORBIDDEN_DECISION_TYPES,
+    PIPELINE_PRE_APPROVAL_INTERLEAVED,
     REQUIRED_DECISION_SUBSEQUENCE,
     _assert_decision_subsequence,
 )
@@ -81,7 +82,12 @@ def assert_s01_live_llm_pipeline(observation: dict[str, Any]) -> list[str]:
         r.get("record_type")
         for r in sorted(records, key=lambda x: int(x.get("event_sequence") or 0))
     ]
-    violations.extend(_assert_decision_subsequence(types))
+    violations.extend(
+        _assert_decision_subsequence(
+            types,
+            interleaved=PIPELINE_PRE_APPROVAL_INTERLEAVED,
+        )
+    )
     for forbidden in FORBIDDEN_DECISION_TYPES:
         if forbidden in types:
             violations.append(f"forbidden decision record {forbidden}")

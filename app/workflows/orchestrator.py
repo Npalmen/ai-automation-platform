@@ -152,6 +152,9 @@ class WorkflowOrchestrator:
             current = job.model_copy(deep=True)
             current.status = JobStatus.PROCESSING
             current.updated_at = self._utcnow()
+            input_data = dict(current.input_data or {})
+            input_data["_resume_after_job_approval"] = True
+            current.input_data = input_data
             current = self._persist(current)
 
             parent_run_id = self._latest_pipeline_run_id(current)
@@ -229,7 +232,13 @@ class WorkflowOrchestrator:
         decision = policy_payload.get("decision")
         recommended_next_step = policy_payload.get("recommended_next_step")
 
+        if decision == "send_for_approval":
+            return True
+
         if decision == "hold_for_review":
+            return True
+
+        if recommended_next_step == "awaiting_approval":
             return True
 
         if recommended_next_step == "manual_review":

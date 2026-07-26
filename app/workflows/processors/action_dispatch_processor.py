@@ -76,6 +76,7 @@ def _apply_dispatch_authorization(
     auto_actions = automation_settings.get("auto_actions") or {}
 
     authorized: list[dict[str, Any]] = []
+    resume_after_job_approval = bool((job.input_data or {}).get("_resume_after_job_approval"))
     for action in actions:
         annotated = apply_action_authorization(
             action,
@@ -83,7 +84,7 @@ def _apply_dispatch_authorization(
             auto_actions=auto_actions,
             risk_detected=bool(risk["risk_detected"]),
             policy_decision=policy_decision,
-            pre_authorized=bool(action.get("_pre_authorized")),
+            pre_authorized=bool(action.get("_pre_authorized")) or resume_after_job_approval,
         )
         if (
             db is not None
