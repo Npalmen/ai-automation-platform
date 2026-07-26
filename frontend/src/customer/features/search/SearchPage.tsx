@@ -5,6 +5,7 @@ import {
   useMemo,
   useState,
   type FormEvent,
+  type ReactNode,
 } from "react"
 import { useSearchParams } from "react-router-dom"
 
@@ -39,6 +40,47 @@ const SEARCH_TYPE_FILTERS = [
   { value: "needs_help" as const, label: "Behöver hjälp" },
 ]
 
+function SearchQueryForm({
+  initialQuery,
+  onSubmitQuery,
+}: {
+  initialQuery: string
+  onSubmitQuery: (query: string) => void
+}) {
+  const [draftQuery, setDraftQuery] = useState(initialQuery)
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const trimmed = draftQuery.trim()
+    if (!trimmed) return
+    onSubmitQuery(trimmed)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} role="search" className="mb-4">
+      <label htmlFor="global-search" className="mb-1 block text-body-small font-medium text-text-primary">
+        Sök
+      </label>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          id="global-search"
+          type="search"
+          value={draftQuery}
+          onChange={(event) => setDraftQuery(event.target.value)}
+          placeholder="Sök efter ärende, kund eller e-postadress"
+          className="min-h-11 flex-1 rounded-md border border-border bg-surface px-3 text-body text-text-primary"
+        />
+        <button
+          type="submit"
+          className="inline-flex min-h-11 items-center justify-center rounded-md bg-brand px-4 text-body font-medium text-brand-foreground"
+        >
+          Sök
+        </button>
+      </div>
+    </form>
+  )
+}
+
 export function SearchPage() {
   const { dataSource } = useCustomerAuth()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -46,13 +88,8 @@ export function SearchPage() {
     () => parseSearchUrlState(searchParams),
     [searchParams],
   )
-  const [draftQuery, setDraftQuery] = useState(urlState.q)
   const invalidDateRange = hasInvalidSearchDateRange(urlState)
   const hasQuery = urlState.q.length > 0
-
-  useEffect(() => {
-    setDraftQuery(urlState.q)
-  }, [urlState.q])
 
   const queryParams = useMemo<WorkItemListParams | null>(() => {
     if (!hasQuery || invalidDateRange) return null
@@ -112,12 +149,20 @@ export function SearchPage() {
     [urlState.order, urlState.sort],
   )
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const trimmed = draftQuery.trim()
-    if (!trimmed) return
-    updateUrlState({ q: trimmed, page: 1 })
-  }
+  const submitSearchQuery = useCallback(
+    (query: string) => {
+      updateUrlState({ q: query, page: 1 })
+    },
+    [updateUrlState],
+  )
+
+  const searchForm: ReactNode = (
+    <SearchQueryForm
+      key={urlState.q}
+      initialQuery={urlState.q}
+      onSubmitQuery={submitSearchQuery}
+    />
+  )
 
   function clearFilters() {
     updateUrlState({
@@ -128,30 +173,6 @@ export function SearchPage() {
       page: 1,
     })
   }
-
-  const searchForm = (
-    <form onSubmit={handleSubmit} role="search" className="mb-4">
-      <label htmlFor="global-search" className="mb-1 block text-body-small font-medium text-text-primary">
-        Sök
-      </label>
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <input
-          id="global-search"
-          type="search"
-          value={draftQuery}
-          onChange={(event) => setDraftQuery(event.target.value)}
-          placeholder="Sök efter ärende, kund eller e-postadress"
-          className="min-h-11 flex-1 rounded-md border border-border bg-surface px-3 text-body text-text-primary"
-        />
-        <button
-          type="submit"
-          className="inline-flex min-h-11 items-center justify-center rounded-md bg-brand px-4 text-body font-medium text-brand-foreground"
-        >
-          Sök
-        </button>
-      </div>
-    </form>
-  )
 
   if (!hasQuery) {
     return (
