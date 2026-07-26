@@ -227,6 +227,32 @@ class TestActionApprovalResolution:
         assert second.idempotent
         assert adapter_calls["n"] == 1
 
+    def test_stale_approve_on_rejected_returns_conflict(self, approval_db):
+        tenant_id = "T_STALE"
+        job_id = str(uuid.uuid4())
+        operation_id = str(uuid.uuid4())
+        delivery = {
+            "type": "send_customer_auto_reply",
+            "to": "c@example.com",
+            "subject": "Hej",
+            "body": "Tack",
+            "tenant_id": tenant_id,
+        }
+        job = _seed_job(approval_db, tenant_id, job_id)
+        _seed_authorization(approval_db, job, delivery, operation_id)
+        approval = _seed_approval(
+            approval_db, tenant_id=tenant_id, job_id=job_id,
+            operation_id=operation_id, delivery=delivery,
+        )
+        with patch("app.workflows.email_approval_resolution.finalize_email_approval_resolution"):
+            resolve_per_action_approval(approval_db, approval, approved=False, actor="op")
+        approval_db.refresh(approval)
+        assert approval.state == "rejected"
+
+        stale = resolve_per_action_approval(approval_db, approval, approved=True, actor="op")
+        assert stale.contract_conflict == "approval_terminal_state_conflict"
+        assert stale.idempotent is False
+
     def test_pending_intent_blocks_blind_retry(self, approval_db):
         tenant_id = "T_PENDING"
         job_id = str(uuid.uuid4())

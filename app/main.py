@@ -1105,15 +1105,30 @@ def _resolve_email_approval(
 ) -> dict:
     """Mark an email approval approved/rejected; execute external action when approved."""
     from app.workflows.action_approval_resolution import resolve_per_action_approval
+    from app.workflows.decision_trace_errors import ContractConflict
 
-    result = resolve_per_action_approval(
-        db,
-        approval,
-        approved=approved,
-        actor=actor,
-        note=note,
-    )
-    return result.to_api_dict()
+    try:
+        result = resolve_per_action_approval(
+            db,
+            approval,
+            approved=approved,
+            actor=actor,
+            note=note,
+        )
+    except ContractConflict as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "contract_conflict",
+                "message": str(exc),
+            },
+        ) from exc
+
+    payload = result.to_api_dict()
+    payload["status"] = result.approval_state
+    if result.contract_conflict and not result.idempotent:
+        raise HTTPException(status_code=409, detail=payload)
+    return payload
 
 
 @app.post("/approvals/{approval_id}/approve")

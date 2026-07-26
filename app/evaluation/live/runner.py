@@ -832,11 +832,19 @@ class LiveEvalRunner:
             for result in operator_results
         ]
 
-        return self.observer.poll_pipeline(
+        observation = self.observer.poll_pipeline(
             self.evaluation_run_id,
             timeout_seconds=min(600, self.config.max_runtime_minutes * 60),
             success_statuses=outcome.final_success_statuses,
         )
+        if outcome.expect_approval_resolution:
+            observation = self.observer.poll_until_decision_record(
+                self.evaluation_run_id,
+                record_type="action_approval_resolution",
+                timeout_seconds=min(120, self.config.max_runtime_minutes * 60),
+            )
+
+        return observation
 
     def _assert_all(self, observation: dict[str, Any], ctx: _RunContext) -> list[str]:
         violations: list[str] = []

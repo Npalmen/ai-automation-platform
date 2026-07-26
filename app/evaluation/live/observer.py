@@ -10,7 +10,7 @@ import httpx
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.errors import LiveEvalIntakeSkippedError, LiveEvalSafetyRejectedError
 from app.evaluation.live.intake_errors import parse_intake_skipped_payload
-from app.evaluation.live.pipeline_poll import poll_pipeline_observation
+from app.evaluation.live.pipeline_poll import poll_pipeline_observation, poll_until_decision_record
 from app.evaluation.live.safety_errors import parse_safety_rejected_payload
 
 
@@ -134,6 +134,22 @@ class LiveEvalObserver:
             timeout_seconds=timeout_seconds,
             on_poll=on_poll,
             success_statuses=success_statuses,
+        )
+        return result.observation
+
+    def poll_until_decision_record(
+        self,
+        evaluation_run_id: str,
+        *,
+        record_type: str,
+        timeout_seconds: float = 120,
+        on_poll: Callable[[dict[str, Any]], None] | None = None,
+    ) -> dict[str, Any]:
+        result = poll_until_decision_record(
+            lambda: self.get_observation(evaluation_run_id),
+            record_type=record_type,
+            timeout_seconds=timeout_seconds,
+            on_poll=on_poll,
         )
         return result.observation
 

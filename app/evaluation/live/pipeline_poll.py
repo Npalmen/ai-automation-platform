@@ -101,6 +101,39 @@ def classify_poll_outcome(
     return "job_timeout_unknown"
 
 
+def poll_until_decision_record(
+    fetch: Callable[[], dict[str, Any]],
+    *,
+    record_type: str,
+    timeout_seconds: float,
+    on_poll: Callable[[dict[str, Any]], None] | None = None,
+) -> PipelinePollResult:
+    """Poll until a decision record type appears in job observation or timeout."""
+    started = time.monotonic()
+    deadline = started + timeout_seconds
+    delay = 2.0
+    poll_attempts = 0
+    last: dict[str, Any] = {}
+
+    while time.monotonic() < deadline:
+        poll_attempts += 1
+        last = fetch()
+        if on_poll:
+            on_poll(last)
+        job = last.get("job") or {}
+        records = job.get("decision_records") or []
+        if any(str(row.get("record_type") or "") == record_type for row in records):
+            return PipelinePollResult(
+                observation=last,
+                poll_attempts=poll_attempts,
+                poll_duration_seconds=time.monotonic() - started,
+            )
+        time.sleep(delay)
+        delay = min(delay * 1.5, 30.0)
+
+    raise _raise_poll_error("decision_record_timeout", last, poll_attempts, started)
+
+
 def poll_pipeline_observation(
     fetch: Callable[[], dict[str, Any]],
     *,

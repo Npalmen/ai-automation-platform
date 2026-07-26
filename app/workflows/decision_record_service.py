@@ -221,7 +221,7 @@ def record_action_approval_resolution(
     key_version: int | None = None,
 ) -> str | None:
     resolution = "approved" if approved else "rejected"
-    return append_record(
+    decision_id = append_record(
         db,
         trace,
         job,
@@ -233,6 +233,13 @@ def record_action_approval_resolution(
         fingerprint_key_version=key_version,
         metadata={"approval_id": approval_id, "resolution": resolution},
     )
+    if decision_id is None:
+        from app.core.settings import resolve_decision_record_enforce_writes
+        from app.workflows.decision_trace_errors import ContractConflict
+
+        if resolve_decision_record_enforce_writes():
+            raise ContractConflict("failed to persist action_approval_resolution")
+    return decision_id
 
 
 def record_execution_intent(
