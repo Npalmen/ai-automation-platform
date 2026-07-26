@@ -19,7 +19,7 @@ todos:
     status: completed
   - id: workspace-f-activity-search
     content: Bygg aktivitetshistorik, sökning, filtrering och detaljvyer
-    status: pending
+    status: in_progress
   - id: workspace-g-quality-pass
     content: Genomför responsivitet, tillgänglighet, felhantering och UX-kvalitetspass
     status: pending
