@@ -18,6 +18,8 @@ from app.domain.customer.enums import (
     FactState,
     IdentityType,
     LinkType,
+    MatchConflictCode,
+    MatchEvidenceCode,
     ReferenceType,
     RelationshipType,
     SourceType,
@@ -36,6 +38,8 @@ from app.domain.customer.schemas import (
     CustomerSourceFact,
     CustomerThreadLink,
     CustomerTimelineEvent,
+    MatchConflict,
+    MatchEvidence,
     SourceReference,
 )
 from app.repositories.postgres.end_customer_models import (
@@ -258,6 +262,53 @@ class EndCustomerRepository:
         )
 
     @staticmethod
+    def _sanitize_evidence_records(raw_items: list | None) -> list[MatchEvidence]:
+        cleaned: list[MatchEvidence] = []
+        for item in raw_items or []:
+            if not isinstance(item, dict):
+                continue
+            code_raw = str(item.get("code", "")).strip()
+            try:
+                code = MatchEvidenceCode(code_raw)
+            except ValueError:
+                continue
+            try:
+                score_val = float(item.get("score", 0.0))
+            except (TypeError, ValueError):
+                score_val = 0.0
+            cleaned.append(
+                MatchEvidence(
+                    code=code,
+                    score=max(0.0, min(1.0, score_val)),
+                    left_value=item.get("left_value") if isinstance(item.get("left_value"), str) else None,
+                    right_value=item.get("right_value") if isinstance(item.get("right_value"), str) else None,
+                    detail=item.get("detail") if isinstance(item.get("detail"), str) else None,
+                )
+            )
+        return cleaned
+
+    @staticmethod
+    def _sanitize_conflict_records(raw_items: list | None) -> list[MatchConflict]:
+        cleaned: list[MatchConflict] = []
+        for item in raw_items or []:
+            if not isinstance(item, dict):
+                continue
+            code_raw = str(item.get("code", "")).strip()
+            try:
+                code = MatchConflictCode(code_raw)
+            except ValueError:
+                continue
+            cleaned.append(
+                MatchConflict(
+                    code=code,
+                    detail=item.get("detail") if isinstance(item.get("detail"), str) else None,
+                    left_value=item.get("left_value") if isinstance(item.get("left_value"), str) else None,
+                    right_value=item.get("right_value") if isinstance(item.get("right_value"), str) else None,
+                )
+            )
+        return cleaned
+
+    @staticmethod
     def _to_duplicate_candidate(record: EndCustomerDuplicateCandidateRecord) -> CustomerDuplicateCandidate:
         return CustomerDuplicateCandidate(
             candidate_id=record.candidate_id,
@@ -266,8 +317,8 @@ class EndCustomerRepository:
             right_customer_id=record.right_customer_id,
             status=DuplicateStatus(record.status),
             confidence=record.confidence,
-            evidence=list(record.evidence or []),
-            conflicts=list(record.conflicts or []),
+            evidence=EndCustomerRepository._sanitize_evidence_records(record.evidence),
+            conflicts=EndCustomerRepository._sanitize_conflict_records(record.conflicts),
             created_at=record.created_at,
             updated_at=record.updated_at,
             version=record.version,

@@ -195,7 +195,7 @@ class TestReadServiceProjection:
         source_ref = SourceReference(
             reference_type=ReferenceType.JOB,
             reference_id=_new_id(),
-            source_type=SourceType.MANUAL,
+            source_type=SourceType.USER_INPUT,
         )
         replay = build_timeline_replay_identity(
             "TENANT_A",
@@ -255,7 +255,7 @@ class TestReadServiceProjection:
             existing_job,
             LinkType.PRIMARY,
             1.0,
-            SourceType.MANUAL,
+            SourceType.USER_INPUT,
         )
         missing_job = _new_id()
         db.add(
@@ -266,7 +266,7 @@ class TestReadServiceProjection:
                 job_id=missing_job,
                 link_type=LinkType.RELATED.value,
                 confidence=0.5,
-                source_type=SourceType.MANUAL.value,
+                source_type=SourceType.USER_INPUT.value,
                 created_at=_utcnow(),
                 created_by=None,
             )
@@ -325,7 +325,21 @@ class TestReadServiceProjection:
 
     def test_search_tenant_isolation(self, db):
         contact_a = EndCustomerRepository.create_contact(db, "TENANT_A", display_name="A")
+        customer_a = EndCustomerRepository.create_customer(
+            db,
+            "TENANT_A",
+            CustomerType.PRIVATE,
+            display_name="Customer A",
+            primary_contact_id=contact_a.contact_id,
+        )
         contact_b = EndCustomerRepository.create_contact(db, "TENANT_B", display_name="B")
+        customer_b = EndCustomerRepository.create_customer(
+            db,
+            "TENANT_B",
+            CustomerType.PRIVATE,
+            display_name="Customer B",
+            primary_contact_id=contact_b.contact_id,
+        )
         email = "shared@example.com"
         EndCustomerRepository.create_identity(
             db,
@@ -359,7 +373,8 @@ class TestReadServiceProjection:
         result_b = EndCustomerReadService.search(db, "TENANT_B", email)
         assert result_a.total == 1
         assert result_b.total == 1
-        assert result_a.items[0].customer_id != result_b.items[0].customer_id
+        assert result_a.items[0].customer_id == customer_a.customer_id
+        assert result_b.items[0].customer_id == customer_b.customer_id
 
     def test_invalid_sort_raises(self, db):
         with pytest.raises(EndCustomerReadValidationError) as exc:
