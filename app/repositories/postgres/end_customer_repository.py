@@ -1416,6 +1416,21 @@ class EndCustomerRepository:
         return {record.job_id: record for record in records}
 
     @staticmethod
+    def subject_belongs_to_customer_aggregate(
+        db: Session,
+        tenant_id: str,
+        customer_id: str,
+        subject_type: EntityOwnerType,
+        subject_id: str,
+    ) -> bool:
+        if subject_type == EntityOwnerType.CUSTOMER:
+            return subject_id == customer_id
+        linked = EndCustomerRepository.resolve_customer_ids_for_owner(
+            db, tenant_id, subject_type, subject_id
+        )
+        return customer_id in linked
+
+    @staticmethod
     def resolve_customer_ids_for_owner(
         db: Session,
         tenant_id: str,

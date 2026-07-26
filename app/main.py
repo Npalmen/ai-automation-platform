@@ -8547,6 +8547,15 @@ if get_settings().END_CUSTOMER_READ_API_ENABLED:
     app.include_router(admin_router, tags=["admin"])
     app.include_router(admin_duplicates_router, tags=["admin"])
 
+    if get_settings().END_CUSTOMER_WRITE_API_ENABLED:
+        from app.api.routes.end_customer_writes import (
+            admin_customer_writes_router,
+            admin_duplicate_writes_router,
+        )
+
+        app.include_router(admin_customer_writes_router, tags=["admin"])
+        app.include_router(admin_duplicate_writes_router, tags=["admin"])
+
 
 def _validate_usage_days(days: int) -> int:
     if days not in VALID_USAGE_DAYS:
