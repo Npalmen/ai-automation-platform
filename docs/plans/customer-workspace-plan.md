@@ -4,10 +4,10 @@ overview: Bygg en separat, kundorienterad och initialt read-only arbetsyta ovanp
 todos:
   - id: workspace-a-current-truth
     content: Audita befintlig frontend, kundvyer, API-kontrakt och återanvändbara komponenter
-    status: in_progress
+    status: completed
   - id: workspace-b-product-contract
     content: Lås informationsarkitektur, routes, roller, vyer och API-kontrakt
-    status: pending
+    status: in_progress
   - id: workspace-c-shell-navigation
     content: Bygg kundens appskal, navigation, behörigheter och responsiva grund
     status: pending
