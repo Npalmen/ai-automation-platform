@@ -1,0 +1,37 @@
+{
+  "schema_version": "customer_domain_fixture_v1",
+  "family_id": "family_01_new_private_customer",
+  "tenant_id": "T_FIXTURE_001",
+  "description": "New private end customer with first contact, email fact, job and thread links.",
+  "observations": [
+    {
+      "at": "2026-01-10T09:00:00+00:00",
+      "source_type": "gmail_inbound",
+      "kind": "email",
+      "value": "fixture.private.a@example.invalid"
+    }
+  ],
+  "expected_facts": [
+    {
+      "field_name": "email",
+      "fact_state": "proposed",
+      "source_type": "gmail_inbound"
+    }
+  ],
+  "expected_timeline": [
+    "first_contact",
+    "gmail_message_received",
+    "job_created"
+  ],
+  "expected_links": {
+    "jobs": 1,
+    "threads": 1
+  },
+  "expected_conflicts": [],
+  "expected_duplicate": {
+    "status": "none",
+    "requires_manual_review": false
+  },
+  "automatic_merge_allowed": false,
+  "automatic_link_allowed": false
+}

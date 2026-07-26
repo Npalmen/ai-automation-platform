@@ -1,0 +1,55 @@
+{
+  "schema_version": "customer_domain_fixture_v1",
+  "family_id": "family_04_company_multiple_contacts",
+  "tenant_id": "T_FIXTURE_001",
+  "description": "Company with two contacts; shared switchboard does not merge contacts.",
+  "observations": [
+    {
+      "at": "2026-01-12T11:00:00+00:00",
+      "source_type": "integration",
+      "kind": "company",
+      "value": "Fixture AB"
+    },
+    {
+      "at": "2026-01-12T11:05:00+00:00",
+      "source_type": "gmail_inbound",
+      "kind": "contact",
+      "value": "fixture.contact.c1@example.invalid"
+    },
+    {
+      "at": "2026-01-12T11:06:00+00:00",
+      "source_type": "gmail_inbound",
+      "kind": "contact",
+      "value": "info@fixture-ab.invalid",
+      "role_based": true
+    }
+  ],
+  "expected_facts": [
+    {
+      "field_name": "legal_name",
+      "fact_state": "proposed",
+      "subject_type": "company"
+    },
+    {
+      "field_name": "email",
+      "fact_state": "proposed",
+      "subject_type": "contact"
+    }
+  ],
+  "expected_timeline": [
+    "first_contact",
+    "contact_fact_proposed"
+  ],
+  "expected_links": {
+    "jobs": 2,
+    "threads": 2
+  },
+  "expected_conflicts": [],
+  "expected_duplicate": {
+    "status": "none",
+    "requires_manual_review": false
+  },
+  "company_contact_separation": true,
+  "automatic_merge_allowed": false,
+  "automatic_link_allowed": false
+}

@@ -1,0 +1,43 @@
+{
+  "schema_version": "customer_domain_fixture_v1",
+  "family_id": "family_02_returning_customer_new_thread",
+  "tenant_id": "T_FIXTURE_001",
+  "description": "Returning customer matched by email in a new Gmail thread; no new Customer aggregate.",
+  "observations": [
+    {
+      "at": "2026-01-10T09:00:00+00:00",
+      "source_type": "gmail_inbound",
+      "kind": "email",
+      "value": "fixture.return.b@example.invalid"
+    },
+    {
+      "at": "2026-02-15T14:30:00+00:00",
+      "source_type": "gmail_inbound",
+      "kind": "thread",
+      "value": "thread-fixture-002"
+    }
+  ],
+  "expected_facts": [
+    {
+      "field_name": "email",
+      "fact_state": "proposed",
+      "source_type": "gmail_inbound"
+    }
+  ],
+  "expected_timeline": [
+    "first_contact",
+    "gmail_thread_linked",
+    "gmail_message_received"
+  ],
+  "expected_links": {
+    "jobs": 2,
+    "threads": 2
+  },
+  "expected_conflicts": [],
+  "expected_duplicate": {
+    "status": "none",
+    "requires_manual_review": false
+  },
+  "automatic_merge_allowed": false,
+  "automatic_link_allowed": false
+}

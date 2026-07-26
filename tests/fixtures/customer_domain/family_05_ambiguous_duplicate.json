@@ -1,0 +1,47 @@
+{
+  "schema_version": "customer_domain_fixture_v1",
+  "family_id": "family_05_ambiguous_duplicate",
+  "tenant_id": "T_FIXTURE_001",
+  "description": "Ambiguous identity creates duplicate candidate; manual review; no merge.",
+  "observations": [
+    {
+      "at": "2026-02-01T09:00:00+00:00",
+      "source_type": "ai_extraction",
+      "kind": "email",
+      "value": "fixture.ambiguous@example.invalid"
+    },
+    {
+      "at": "2026-02-01T09:01:00+00:00",
+      "source_type": "gmail_inbound",
+      "kind": "email",
+      "value": "fixture.ambiguous@example.invalid"
+    }
+  ],
+  "expected_facts": [
+    {
+      "field_name": "email",
+      "fact_state": "proposed",
+      "source_type": "ai_extraction"
+    },
+    {
+      "field_name": "email",
+      "fact_state": "proposed",
+      "source_type": "gmail_inbound"
+    }
+  ],
+  "expected_timeline": [
+    "duplicate_candidate_created"
+  ],
+  "expected_links": {
+    "jobs": 2,
+    "threads": 1
+  },
+  "expected_conflicts": [],
+  "expected_duplicate": {
+    "status": "open",
+    "requires_manual_review": true,
+    "decision": "resolve_without_merge"
+  },
+  "automatic_merge_allowed": false,
+  "automatic_link_allowed": false
+}

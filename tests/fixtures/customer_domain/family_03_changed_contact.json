@@ -1,0 +1,54 @@
+{
+  "schema_version": "customer_domain_fixture_v1",
+  "family_id": "family_03_changed_contact",
+  "tenant_id": "T_FIXTURE_001",
+  "description": "Verified phone preserved; new phone proposed as conflicting.",
+  "observations": [
+    {
+      "at": "2026-01-05T08:00:00+00:00",
+      "source_type": "user_input",
+      "kind": "phone",
+      "value": "+46701234567",
+      "verified": true
+    },
+    {
+      "at": "2026-03-01T10:00:00+00:00",
+      "source_type": "gmail_inbound",
+      "kind": "phone",
+      "value": "+46709876543"
+    }
+  ],
+  "expected_facts": [
+    {
+      "field_name": "phone",
+      "fact_state": "verified",
+      "source_type": "user_input"
+    },
+    {
+      "field_name": "phone",
+      "fact_state": "proposed",
+      "source_type": "gmail_inbound"
+    }
+  ],
+  "expected_timeline": [
+    "contact_fact_verified",
+    "contact_fact_proposed",
+    "contact_fact_conflict"
+  ],
+  "expected_links": {
+    "jobs": 1,
+    "threads": 1
+  },
+  "expected_conflicts": [
+    {
+      "field_name": "phone",
+      "resolution": "manual_review"
+    }
+  ],
+  "expected_duplicate": {
+    "status": "none",
+    "requires_manual_review": true
+  },
+  "automatic_merge_allowed": false,
+  "automatic_link_allowed": false
+}
