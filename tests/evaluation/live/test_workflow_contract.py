@@ -152,9 +152,11 @@ def test_live_eval_workflow_contract():
 
     operator_gate = data["jobs"]["operator-gate"]
     assert "environment" not in operator_gate
-    gate_run = operator_gate["steps"][0]["run"]
-    assert 'test "${GITHUB_REF}" = "refs/heads/main"' in gate_run
+    gate_step = _step_by_name(operator_gate["steps"], "Verify live Gmail authorization")
+    gate_run = gate_step.get("run") or ""
+    assert "merge-base --is-ancestor" in gate_run
     assert "READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_SEMI_AUTO_CORE" in gate_run
+    assert 'test "${GITHUB_REF}" = "refs/heads/main"' not in gate_run
     assert 'test "${{ inputs.confirm_live_gmail }}" = "RUN_S01"' not in gate_run
 
     steps = transport["steps"]

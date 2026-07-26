@@ -129,13 +129,22 @@ jobs:
   operator-gate:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Verify live Gmail authorization
         run: |
-          test "${GITHUB_REF}" = "refs/heads/main"
           case "${{ inputs.confirm_live_gmail }}" in
             READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_SEMI_AUTO_CORE) ;;
             *) echo "confirm_live_gmail must be READINESS_ONLY, RUN_S01, RUN_TRANSPORT_SMOKE, or RUN_SEMI_AUTO_CORE"; exit 1 ;;
           esac
+          git fetch origin main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" FETCH_HEAD; then
+            echo "runtime SHA ${GITHUB_SHA} is not contained in origin/main history" >&2
+            exit 1
+          fi
+          echo "authorized runtime_sha=${GITHUB_SHA} ref=${GITHUB_REF}"
 
   live_gmail_transport:
     runs-on: ubuntu-latest
