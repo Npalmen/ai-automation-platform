@@ -118,6 +118,7 @@ test("preview login page is informational, not connected login", () => {
   assert.match(loginSource, /Förhandsvisning/)
   assert.doesNotMatch(loginSource, /type="password"/)
   assert.doesNotMatch(loginSource, /X-API-Key/)
+  assert.doesNotMatch(loginSource, /API-nyckel/)
 })
 
 test("error boundary component exists", () => {

@@ -21,7 +21,7 @@ export function LoadingState({
       {Array.from({ length: rows }).map((_, index) => (
         <div
           key={index}
-          className="h-16 w-full animate-pulse rounded-lg bg-surface-subtle"
+          className="h-16 w-full rounded-lg bg-surface-subtle motion-safe:animate-pulse"
         />
       ))}
     </div>

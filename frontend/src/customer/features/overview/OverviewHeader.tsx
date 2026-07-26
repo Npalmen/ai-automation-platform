@@ -15,7 +15,12 @@ export function OverviewHeader({
   return (
     <header className="mb-8 min-w-0">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-page-title text-text-primary">Översikt</h1>
+        <h1
+          className="text-page-title text-text-primary"
+          tabIndex={-1}
+        >
+          Översikt
+        </h1>
         <WorkspaceModeBadge />
         {isRefreshing ? (
           <span className="text-body-small text-text-muted" aria-live="polite">
@@ -35,6 +40,8 @@ export function OverviewHeader({
             · Senast uppdaterad {formatOverviewDateTime(lastUpdatedAt)}
           </>
         ) : null}
+        {" "}
+        · Förhandsvisning med exempeldata, inte liveuppdatering
       </p>
     </header>
   )

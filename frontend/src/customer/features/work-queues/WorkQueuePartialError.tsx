@@ -16,9 +16,9 @@ export function WorkQueuePartialError({ errors }: WorkQueuePartialErrorProps) {
         Delar av listan kunde inte visas
       </h2>
       <ul className="mt-2 space-y-2">
-        {errors.map((error) => (
+        {errors.map((error, index) => (
           <li
-            key={`${error.section}-${error.code}`}
+            key={`${error.section}-${index}`}
             className="text-body text-text-secondary"
           >
             {error.message}

@@ -30,7 +30,7 @@ export function CustomerSidebar({
           onClick={onNavigate}
           className={({ isActive }) =>
             cn(
-              "flex min-h-11 items-center rounded-md px-3 text-body font-medium transition-colors",
+              "flex min-h-11 items-center rounded-md px-3 text-body font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
               collapsed ? "justify-center px-2" : "justify-start",
               isActive
                 ? "bg-brand/10 text-brand"

@@ -16,8 +16,8 @@ export function OverviewPartialError({ errors }: OverviewPartialErrorProps) {
         Delar av översikten kunde inte visas
       </h2>
       <ul className="mt-2 space-y-2">
-        {errors.map((error) => (
-          <li key={`${error.section}-${error.code}`} className="text-body text-text-secondary">
+        {errors.map((error, index) => (
+          <li key={`${error.section}-${index}`} className="text-body text-text-secondary">
             {error.message}
           </li>
         ))}
