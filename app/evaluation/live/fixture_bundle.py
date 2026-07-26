@@ -14,6 +14,14 @@ SCENARIO_BUNDLE_MAP: dict[str, str] = {
     "TBS03_invoice_observe": "k2f_bundle_tbs03",
     "TBS04_unknown_observe": "k2f_bundle_tbs04",
     "TBS05_noisy_observe": "k2f_bundle_tbs05",
+    "TBSM01_lead_approve_reply": "k2f_bundle_tbs01",
+    "TBSM02_support_approve_reply": "k2f_bundle_tbs02",
+    "TBSM03_noisy_approve_reply": "k2f_bundle_tbs05",
+    "TBSM04_lead_reject": "k2f_bundle_tbs01",
+    "TBSM05_support_reject": "k2f_bundle_tbs02",
+    "TBSM06_duplicate_approve": "k2f_bundle_tbs01",
+    "TBSM07_stale_approve": "k2f_bundle_tbs01",
+    "TBSM08_unknown_negative_hold": "k2f_bundle_tbs04",
 }
 
 ALLOWLISTED_BUNDLE_IDS = frozenset(SCENARIO_BUNDLE_MAP.values())
