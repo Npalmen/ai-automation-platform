@@ -118,12 +118,9 @@ test("overview feature does not use network clients", () => {
   assert.doesNotMatch(sources, /\/workspace\/v1/)
 })
 
-test("overview route uses OverviewPage and Todo F routes stay placeholders", () => {
+test("overview route uses OverviewPage", () => {
   const routerSource = readCustomerFile("routes/router.tsx")
   assert.match(routerSource, /<OverviewPage \/>/)
-  assert.match(routerSource, /path: "activity"[\s\S]*?<RoutePlaceholder/)
-  assert.match(routerSource, /path: "search"[\s\S]*?<RoutePlaceholder/)
-  assert.match(routerSource, /path: "work\/:workItemId"[\s\S]*?<RoutePlaceholder/)
 })
 
 test("work item type labels are customer-friendly", () => {
