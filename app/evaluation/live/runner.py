@@ -21,6 +21,7 @@ from app.evaluation.live.assertions import (
     assert_safety_invariants,
     assert_semi_automatic_campaign_pipeline,
     assert_semi_automatic_telemetry,
+    assert_target_scoped_execution_chain,
     assert_telemetry_summary,
 )
 from app.evaluation.live.campaign.expected_outcomes import ObserveExpectedOutcome
@@ -31,7 +32,12 @@ from app.evaluation.live.campaign.reply_metrics import (
 from app.evaluation.live.campaign.semi_automatic_expected_outcomes import (
     SemiAutomaticExpectedOutcome,
 )
-from app.evaluation.live.campaign.test_operator import execute_test_operator_actions
+from app.evaluation.live.campaign.test_operator import (
+    OperatorExecutionContext,
+    assert_secondary_approvals,
+    execute_test_operator_actions,
+    list_job_approvals,
+)
 from app.evaluation.live.cleanup import cleanup_recipient_message, cleanup_unexpected_reply
 from app.evaluation.live.cleanup_phase import resolve_cleanup_phase
 from app.evaluation.live.cleanup_resolver import resolve_recipient_from_journal
@@ -102,6 +108,7 @@ class _RunContext:
     unexpected_reply: dict[str, Any] | None = None
     expected_reply: dict[str, Any] | None = None
     operator_results: list[dict[str, Any]] | None = None
+    operator_execution: OperatorExecutionContext | None = None
 
 
 class LiveEvalRunner:
@@ -825,7 +832,7 @@ class LiveEvalRunner:
         if self.campaign_scenario is None:
             raise LiveEvalSafetyError("semi-auto operator phase requires campaign scenario")
 
-        operator_results = execute_test_operator_actions(
+        operator_execution = execute_test_operator_actions(
             base_url=self.base_url,
             admin_api_key=self.observer.admin_api_key,
             tenant_id=self.tenant_id,
@@ -836,15 +843,18 @@ class LiveEvalRunner:
             expected_sender=self.expected_sender,
             reply_budget_remaining=self.reply_budget_remaining,
         )
+        ctx.operator_execution = operator_execution
         ctx.operator_results = [
             {
                 "action": result.action,
                 "approval_id": result.approval_id,
+                "action_type": result.action_type,
+                "action_operation_id": result.action_operation_id,
                 "http_status": result.http_status,
                 "idempotent": result.idempotent,
                 "conflict": result.conflict,
             }
-            for result in operator_results
+            for result in operator_execution.results
         ]
 
         observation = self.observer.poll_pipeline(
@@ -865,17 +875,49 @@ class LiveEvalRunner:
         violations: list[str] = []
         if self.use_semi_automatic_assertions and self.semi_automatic_expected_outcome:
             outcome = self.semi_automatic_expected_outcome
+            expect_pending_post = any(
+                sec.expected_final_state == "remain_pending"
+                for sec in outcome.secondary_approvals
+            )
             violations.extend(
                 assert_semi_automatic_campaign_pipeline(
                     observation,
                     expected_job_type=self.expected_job_type,
                     expected_job_status=outcome.final_job_status,
                     expected_policy_authorization=outcome.policy_authorization,
-                    expect_pending_approval=False,
+                    expect_pending_approval=expect_pending_post,
                     decision_subsequence=outcome.decision_subsequence,
                     expect_approval_resolution_record=outcome.expect_approval_resolution,
                 )
             )
+            target_operation_id = (
+                ctx.operator_execution.target_action_operation_id
+                if ctx.operator_execution is not None
+                else None
+            )
+            violations.extend(
+                assert_target_scoped_execution_chain(
+                    observation,
+                    target_action_operation_id=target_operation_id,
+                    expect_execution_outcome=outcome.expected_reply,
+                )
+            )
+            job_id_for_secondary = (observation.get("job") or {}).get("job_id")
+            if ctx.operator_execution is not None and job_id_for_secondary:
+                post_approvals = list_job_approvals(
+                    base_url=self.base_url,
+                    admin_api_key=self.observer.admin_api_key,
+                    tenant_id=self.tenant_id,
+                    job_id=str(job_id_for_secondary),
+                )
+                violations.extend(
+                    assert_secondary_approvals(
+                        approvals=post_approvals,
+                        outcome=outcome,
+                        touched_approval_ids=set(ctx.operator_execution.touched_approval_ids),
+                        decision_records=(observation.get("job") or {}).get("decision_records") or [],
+                    )
+                )
             expected_reply_count = 1 if outcome.expected_reply else 0
             if outcome.expect_duplicate_idempotent:
                 events = observation.get("events") or []
@@ -887,7 +929,6 @@ class LiveEvalRunner:
                         f"duplicate approve must produce exactly {expected_reply_count} "
                         f"reply, got {reply}"
                     )
-                violations.extend(assert_duplicate_approve_execution_chain(observation))
                 violations.extend(
                     assert_semi_automatic_telemetry(
                         self.testbot_events,

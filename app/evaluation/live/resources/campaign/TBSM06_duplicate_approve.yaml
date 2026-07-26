@@ -23,12 +23,22 @@ expected_classification:
 expected_routing:
   job_status: awaiting_approval
   policy_authorization: approval_required
-  final_job_status: completed
+  final_job_status: awaiting_approval
 
 expected_approval:
   operator_action: approve
   expected_reply: true
   test_variant: duplicate_approve
+  operator_plan:
+    - action_type: send_customer_auto_reply
+      decision: approve
+      expected_http_status: 200
+    - action_type: send_customer_auto_reply
+      decision: approve
+      expected_result: idempotent
+  secondary_approvals:
+    - action_type: send_internal_handoff
+      expected_final_state: remain_pending
 
 expected_external_actions:
   - action_type: send_customer_auto_reply

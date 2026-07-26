@@ -8,12 +8,16 @@ from app.evaluation.live.assertions import (
     OBSERVE_DECISION_SUBSEQUENCE_NO_DECISIONING,
     REQUIRED_DECISION_SUBSEQUENCE,
 )
+from app.evaluation.live.campaign.operator_contract import (
+    OperatorPlanStep,
+    SecondaryApprovalExpectation,
+    parse_semi_auto_operator_contract,
+)
 from app.evaluation.live.campaign.schemas import CampaignScenario
 
 _APPROVAL_FIRST_PRE = frozenset({"awaiting_approval"})
 _SAFE_HOLD_PRE = frozenset({"manual_review"})
-_APPROVE_FINAL = frozenset({"completed"})
-_REJECT_FINAL = frozenset({"manual_review"})
+_TERMINAL_WITH_SECONDARY_PENDING = frozenset({"awaiting_approval"})
 
 
 @dataclass(frozen=True)
@@ -32,14 +36,34 @@ class SemiAutomaticExpectedOutcome:
     expect_approval_resolution: bool
     expect_duplicate_idempotent: bool
     expect_stale_conflict: bool
+    operator_plan: tuple[OperatorPlanStep, ...]
+    secondary_approvals: tuple[SecondaryApprovalExpectation, ...]
+    uses_legacy_operator_action: bool
 
     @property
     def is_negative_hold(self) -> bool:
         return self.test_variant == "negative_hold"
 
+    @property
+    def target_action_type(self) -> str | None:
+        if not self.operator_plan:
+            return None
+        return self.operator_plan[0].action_type
+
 
 def _approval_block(scenario: CampaignScenario) -> dict:
     return dict(scenario.expected_approval or {})
+
+
+def _derive_legacy_operator_action(plan: tuple[OperatorPlanStep, ...]) -> str:
+    if not plan:
+        return "none"
+    first = plan[0].decision
+    if first == "approve":
+        return "approve"
+    if first == "reject":
+        return "reject"
+    return "none"
 
 
 def resolve_semi_automatic_expected_outcome(
@@ -48,13 +72,20 @@ def resolve_semi_automatic_expected_outcome(
     """Derive operator, poll, and assertion expectations from scenario YAML."""
     approval = _approval_block(scenario)
     routing = scenario.expected_routing or {}
+    contract = parse_semi_auto_operator_contract(scenario)
 
-    operator_action = str(approval.get("operator_action") or "none").strip().lower()
     expected_reply = bool(approval.get("expected_reply"))
     test_variant = str(approval.get("test_variant") or "normal").strip().lower()
+    operator_action = _derive_legacy_operator_action(contract.operator_plan)
+    if approval.get("operator_action") and contract.uses_legacy_operator_action:
+        operator_action = str(approval.get("operator_action")).strip().lower()
 
     policy_authorization = str(routing.get("policy_authorization") or "").strip()
     pre_status = str(routing.get("job_status") or "").strip()
+    has_secondary_pending = any(
+        sec.expected_final_state == "remain_pending"
+        for sec in contract.secondary_approvals
+    )
 
     if test_variant == "negative_hold":
         pre_status = pre_status or "manual_review"
@@ -69,34 +100,33 @@ def resolve_semi_automatic_expected_outcome(
         expect_resolution = False
         expect_dup = False
         expect_stale = False
-    elif operator_action == "approve":
+        final_status = str(routing.get("final_job_status") or "manual_review")
+    elif contract.operator_plan:
         pre_status = pre_status or "awaiting_approval"
         policy_authorization = policy_authorization or "approval_required"
         allow_operator = True
         pre_statuses = _APPROVAL_FIRST_PRE
-        final_statuses = _APPROVE_FINAL
+        final_status = str(routing.get("final_job_status") or "awaiting_approval")
+        final_statuses = (
+            _TERMINAL_WITH_SECONDARY_PENDING
+            if has_secondary_pending
+            else frozenset({final_status})
+        )
         expect_pending_pre = True
         decision_subsequence = REQUIRED_DECISION_SUBSEQUENCE
         expect_resolution = True
-        expect_dup = test_variant == "duplicate_approve"
-        expect_stale = False
-    elif operator_action == "reject":
-        pre_status = pre_status or "awaiting_approval"
-        policy_authorization = policy_authorization or "approval_required"
-        allow_operator = True
-        pre_statuses = _APPROVAL_FIRST_PRE
-        final_statuses = _REJECT_FINAL
-        expect_pending_pre = True
-        decision_subsequence = REQUIRED_DECISION_SUBSEQUENCE
-        expect_resolution = True
-        expect_dup = False
-        expect_stale = test_variant == "stale_action"
+        expect_dup = any(step.expected_result == "idempotent" for step in contract.operator_plan)
+        expect_stale = any(
+            step.decision == "approve" and step.expected_http_status == 409
+            for step in contract.operator_plan[1:]
+        )
     else:
         pre_status = pre_status or "awaiting_approval"
         policy_authorization = policy_authorization or "approval_required"
         allow_operator = False
         pre_statuses = _APPROVAL_FIRST_PRE
-        final_statuses = _REJECT_FINAL
+        final_status = str(routing.get("final_job_status") or "manual_review")
+        final_statuses = frozenset({final_status})
         expect_pending_pre = True
         decision_subsequence = REQUIRED_DECISION_SUBSEQUENCE
         expect_resolution = False
@@ -108,10 +138,7 @@ def resolve_semi_automatic_expected_outcome(
         expected_reply=expected_reply,
         test_variant=test_variant,
         pre_action_job_status=pre_status,
-        final_job_status=str(routing.get("final_job_status") or (
-            "completed" if operator_action == "approve" and test_variant != "negative_hold"
-            else "manual_review"
-        )),
+        final_job_status=final_status,
         expect_pending_approval_pre=expect_pending_pre,
         policy_authorization=policy_authorization,
         allow_operator_action=allow_operator,
@@ -121,4 +148,7 @@ def resolve_semi_automatic_expected_outcome(
         expect_approval_resolution=expect_resolution,
         expect_duplicate_idempotent=expect_dup,
         expect_stale_conflict=expect_stale,
+        operator_plan=contract.operator_plan,
+        secondary_approvals=contract.secondary_approvals,
+        uses_legacy_operator_action=contract.uses_legacy_operator_action,
     )

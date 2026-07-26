@@ -22,12 +22,19 @@ expected_classification:
 expected_routing:
   job_status: awaiting_approval
   policy_authorization: approval_required
-  final_job_status: completed
+  final_job_status: awaiting_approval
 
 expected_approval:
   operator_action: approve
   expected_reply: true
   test_variant: normal
+  operator_plan:
+    - action_type: send_customer_auto_reply
+      decision: approve
+      expected_http_status: 200
+  secondary_approvals:
+    - action_type: send_internal_handoff
+      expected_final_state: remain_pending
 
 budgets:
   gmail_sends: 1

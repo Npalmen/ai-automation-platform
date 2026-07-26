@@ -15,6 +15,7 @@ from app.evaluation.live.campaign.gates import (
     validate_no_production_resources,
 )
 from app.evaluation.live.campaign.modes import CAMPAIGN_TYPE_SEND_BUDGET
+from app.evaluation.live.campaign.operator_contract import validate_semi_auto_operator_contract
 from app.evaluation.live.campaign.reply_contract import validate_semi_auto_reply_contract
 from app.evaluation.live.campaign.registry import list_campaign_scenarios, load_campaign_manifest
 from app.evaluation.live.config import get_live_eval_config
@@ -135,6 +136,15 @@ def build_full_system_testbot_readiness(
         )
         issues.extend(contract_issues)
         gates["semi_auto_reply_contract"] = contract_matrix
+        operator_issues, operator_warnings, operator_matrix = (
+            validate_semi_auto_operator_contract(
+                campaign_type=campaign_type,
+                config=config,
+            )
+        )
+        issues.extend(operator_issues)
+        warnings.extend(operator_warnings)
+        gates["semi_auto_operator_contract"] = operator_matrix
 
     required_secrets = [
         "LIVE_EVAL_SENDER_GMAIL_REFRESH_TOKEN",
