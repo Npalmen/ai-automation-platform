@@ -2,12 +2,14 @@ import { createBrowserRouter, Navigate } from "react-router-dom"
 
 import { ForbiddenPage } from "@/customer/auth/ForbiddenPage"
 import { PreviewLoginPage } from "@/customer/auth/PreviewLoginPage"
-import { RoutePlaceholder } from "@/customer/components/RoutePlaceholder"
+import { ActivityPage } from "@/customer/features/activity/ActivityPage"
 import { ApprovalsPage } from "@/customer/features/approvals/ApprovalsPage"
 import { LeadsPage } from "@/customer/features/leads/LeadsPage"
 import { NeedsHelpPage } from "@/customer/features/needs-help/NeedsHelpPage"
 import { OverviewPage } from "@/customer/features/overview/OverviewPage"
+import { SearchPage } from "@/customer/features/search/SearchPage"
 import { SupportPage } from "@/customer/features/support/SupportPage"
+import { WorkDetailPage } from "@/customer/features/work-detail/WorkDetailPage"
 import { CustomerAppShell } from "@/customer/layouts/CustomerAppShell"
 import { NotFoundPage } from "@/customer/pages/NotFoundPage"
 
@@ -46,30 +48,15 @@ export const customerRouter = createBrowserRouter(
         },
         {
           path: "activity",
-          element: (
-            <RoutePlaceholder
-              title="Aktivitet"
-              description="Historik över vad systemet har gjort åt er."
-            />
-          ),
+          element: <ActivityPage />,
         },
         {
           path: "search",
-          element: (
-            <RoutePlaceholder
-              title="Sökning"
-              description="Sök bland leads, kundfrågor och andra arbetsobjekt."
-            />
-          ),
+          element: <SearchPage />,
         },
         {
           path: "work/:workItemId",
-          element: (
-            <RoutePlaceholder
-              title="Arbetsobjekt"
-              description="Detaljvy för ett enskilt ärende."
-            />
-          ),
+          element: <WorkDetailPage />,
         },
         {
           path: "403-test",

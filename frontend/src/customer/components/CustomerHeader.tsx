@@ -22,10 +22,7 @@ export function CustomerHeader({
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const trimmed = query.trim()
-    if (!trimmed) {
-      navigate("/search")
-      return
-    }
+    if (!trimmed) return
     navigate(`/search?q=${encodeURIComponent(trimmed)}`)
   }
 

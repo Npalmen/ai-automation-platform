@@ -6,12 +6,14 @@ type WorkQueueListProps = {
   items: WorkItemListItem[]
   emptyTitle: string
   emptyDescription: string
+  linkItems?: boolean
 }
 
 export function WorkQueueList({
   items,
   emptyTitle,
   emptyDescription,
+  linkItems = false,
 }: WorkQueueListProps) {
   if (items.length === 0) {
     return (
@@ -26,7 +28,7 @@ export function WorkQueueList({
     <ul className="space-y-3" aria-label="Arbetskö">
       {items.map((item) => (
         <li key={item.work_item_id}>
-          <WorkQueueItemCard item={item} />
+          <WorkQueueItemCard item={item} showDetailLink={linkItems} />
         </li>
       ))}
     </ul>
