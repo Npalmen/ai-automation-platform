@@ -69,7 +69,7 @@ Customer as aggregate root with separate Company/Contact is consistent with isol
 
 #### Recommended models
 
-1. **Minimal initial persistence (9 tables):** customers, companies, contacts, relationships, identities, source_facts, job_links, thread_links, timeline_events, duplicate_candidates.
+1. **Minimal initial persistence (10 tables):** customers, companies, contacts, relationships, identities, source_facts, job_links, thread_links, timeline_events, duplicate_candidates.
 2. **Full future model:** add `end_customer_addresses`, `end_customer_merge_decisions` when address indexing and manual merge are approved.
 3. **Not building initially:** merge decision table, address table, CustomerCard table (projection).
 
@@ -185,7 +185,7 @@ Existing roles sufficient for documented matrix (`read_only`, `operations`, `adm
 | Ingen duplicerad kunddomän | PASS | No `end_customer` persistence; isolated package only on design branch | — | — |
 | Tenantisolering | PASS | `tenant_id` on all core tables; match blocks cross-tenant | Repository enforcement pending implementation | Tenant filter in every repo method |
 | Terminologisk separation | PASS | Domain docs + `/end-customers` proposal | `/ops/customers` unchanged | Keep operator label "tenant" in UI |
-| Minimal datamodell | PASS | 9-table initial recommendation | 11-table plan is superset | Defer addresses + merge_decisions |
+| Minimal datamodell | PASS | 10-table initial recommendation | 12-table full plan is superset | Defer addresses + merge_decisions |
 | Company/Contact-separation | PASS | Separate schemas + tests | — | Enforce FK owner types in repos |
 | Source provenance | PASS | `provenance.py`, fact states, tests | Runtime ingestion not built | Implement fact writer in chapter 3 |
 | Konfliktregler | PASS | Transitions + `lower_source_cannot_supersede_verified` | — | — |
@@ -218,7 +218,7 @@ Existing roles sufficient for documented matrix (`read_only`, `operations`, `adm
 ## Mandatory conclusions
 
 1. **Existing end-customer domain duplicated?** No — only isolated contracts on design branch.
-2. **Minimal initial persistence?** 9 tables (no addresses, no merge_decisions).
+2. **Minimal initial persistence?** 10 tables (no addresses, no merge_decisions).
 3. **Deferred tables?** `end_customer_addresses`, `end_customer_merge_decisions`.
 4. **Customer as aggregate root?** Yes — recommended.
 5. **Company/Contact separation?** Yes — separate schemas, IDs, and tables.
@@ -264,7 +264,7 @@ Existing roles sufficient for documented matrix (`read_only`, `operations`, `adm
 
 **Name:** Customer Domain Foundation  
 **Branch (future):** `feat/customer-card-foundation`  
-**Goal:** Create 9 `end_customer_*` tables, SQLAlchemy models, repositories with strict `tenant_id` filtering, feature flag default off.
+**Goal:** Create 10 `end_customer_*` tables, SQLAlchemy models, repositories with strict `tenant_id` filtering, feature flag default off.
 
 ### May create/change
 
