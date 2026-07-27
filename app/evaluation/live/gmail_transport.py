@@ -38,6 +38,9 @@ class SenderCredentials:
     api_url: str = "https://gmail.googleapis.com/gmail/v1"
 
 
+RecipientCredentials = SenderCredentials
+
+
 @dataclass(frozen=True)
 class SenderReadinessReport:
     ready: bool
@@ -96,6 +99,47 @@ def load_sender_credentials() -> SenderCredentials:
 
 def build_sender_client(credentials: SenderCredentials | None = None) -> GoogleMailClient:
     credentials = credentials or load_sender_credentials()
+    from app.integrations.google.mail_client import refresh_access_token
+
+    access_token = refresh_access_token(
+        refresh_token=credentials.refresh_token,
+        client_id=credentials.client_id,
+        client_secret=credentials.client_secret,
+    )
+    return GoogleMailClient(
+        api_url=credentials.api_url,
+        access_token=access_token,
+        user_id=credentials.user_id,
+        refresh_token=credentials.refresh_token,
+        client_id=credentials.client_id,
+        client_secret=credentials.client_secret,
+    )
+
+
+def load_recipient_credentials() -> RecipientCredentials:
+    refresh = os.environ.get("LIVE_EVAL_RECIPIENT_GMAIL_REFRESH_TOKEN", "").strip()
+    client_id = os.environ.get("LIVE_EVAL_RECIPIENT_GMAIL_CLIENT_ID", "").strip()
+    client_secret = os.environ.get("LIVE_EVAL_RECIPIENT_GMAIL_CLIENT_SECRET", "").strip()
+    user_id = os.environ.get("LIVE_EVAL_RECIPIENT_GMAIL_USER", "me").strip() or "me"
+    api_url = os.environ.get(
+        "LIVE_EVAL_RECIPIENT_GMAIL_API_URL",
+        "https://gmail.googleapis.com/gmail/v1",
+    ).strip()
+    if not refresh or not client_id or not client_secret:
+        raise LiveEvalSafetyError(
+            "LIVE_EVAL_RECIPIENT_GMAIL_REFRESH_TOKEN, CLIENT_ID, and CLIENT_SECRET are required"
+        )
+    return RecipientCredentials(
+        refresh_token=refresh,
+        client_id=client_id,
+        client_secret=client_secret,
+        user_id=user_id,
+        api_url=api_url,
+    )
+
+
+def build_recipient_client(credentials: RecipientCredentials | None = None) -> GoogleMailClient:
+    credentials = credentials or load_recipient_credentials()
     from app.integrations.google.mail_client import refresh_access_token
 
     access_token = refresh_access_token(
@@ -497,12 +541,13 @@ def observe_expected_sender_reply(
     scenario_id: str,
     attempt_id: int,
     expected_recipient: str,
+    expected_sender: str,
     send_window_start: datetime,
     expires_at: datetime | None = None,
     timeout_seconds: float = 120.0,
     poll_interval_seconds: float = 3.0,
 ) -> ExpectedReplyEvidence | None:
-    """Poll sender inbox for required app reply correlated to evaluation run."""
+    """Poll sender inbox and recipient Sent for required app reply."""
     import time
 
     deadline = time.monotonic() + timeout_seconds
@@ -512,6 +557,7 @@ def observe_expected_sender_reply(
             scenario_id=scenario_id,
             attempt_id=attempt_id,
             expected_recipient=expected_recipient,
+            expected_sender=expected_sender,
             send_window_start=send_window_start,
             expires_at=expires_at,
         )
@@ -521,55 +567,141 @@ def observe_expected_sender_reply(
     return None
 
 
+def _reply_evidence_from_message(
+    *,
+    message_id: str,
+    detail: dict[str, Any],
+) -> ExpectedReplyEvidence:
+    subject = str(detail.get("subject") or "")
+    from_email = _parse_from_email(str(detail.get("from") or ""))
+    local, _, domain = from_email.partition("@")
+    masked_from = f"{local[:1]}***@{domain}" if local else "***"
+    return ExpectedReplyEvidence(
+        message_id=str(detail.get("message_id") or message_id),
+        subject_truncated=subject[:120],
+        from_masked=masked_from,
+        internal_date_ms=_internal_date_ms(detail),
+    )
+
+
+def _matches_expected_reply(
+    detail: dict[str, Any],
+    *,
+    evaluation_run_id: str,
+    scenario_id: str,
+    attempt_id: int,
+    expected_recipient: str,
+    expected_sender: str,
+    send_window_start: datetime,
+    window_end: datetime,
+    require_sender_inbox: bool,
+) -> bool:
+    parsed = parse_subject_token(str(detail.get("subject") or ""))
+    if parsed is None:
+        return False
+    if (
+        parsed.evaluation_run_id != evaluation_run_id
+        or parsed.scenario_id != scenario_id
+        or parsed.attempt_id != attempt_id
+    ):
+        return False
+    if _parse_from_email(str(detail.get("from") or "")) != expected_recipient.strip().lower():
+        return False
+    if require_sender_inbox:
+        recipients = _sent_recipient_emails(detail)
+        if expected_sender.strip().lower() not in recipients:
+            return False
+    return _message_in_send_window(
+        detail,
+        window_start=send_window_start,
+        window_end=window_end,
+    )
+
+
+def _search_reply_evidence(
+    client: GoogleMailClient,
+    *,
+    query: str,
+    evaluation_run_id: str,
+    scenario_id: str,
+    attempt_id: int,
+    expected_recipient: str,
+    expected_sender: str,
+    send_window_start: datetime,
+    window_end: datetime,
+    require_sender_inbox: bool,
+) -> ExpectedReplyEvidence | None:
+    ids = client.list_message_ids(max_results=_RECONCILE_CANDIDATE_CAP, query=query)
+    matches: list[ExpectedReplyEvidence] = []
+    for message_id in ids:
+        detail = client.get_message(message_id)
+        if not _matches_expected_reply(
+            detail,
+            evaluation_run_id=evaluation_run_id,
+            scenario_id=scenario_id,
+            attempt_id=attempt_id,
+            expected_recipient=expected_recipient,
+            expected_sender=expected_sender,
+            send_window_start=send_window_start,
+            window_end=window_end,
+            require_sender_inbox=require_sender_inbox,
+        ):
+            continue
+        matches.append(_reply_evidence_from_message(message_id=message_id, detail=detail))
+    if len(matches) > 1:
+        raise LiveEvalSafetyError("correlation_failure: multiple expected replies")
+    return matches[0] if matches else None
+
+
 def _find_expected_sender_reply(
     *,
     evaluation_run_id: str,
     scenario_id: str,
     attempt_id: int,
     expected_recipient: str,
+    expected_sender: str,
     send_window_start: datetime,
     expires_at: datetime | None = None,
 ) -> ExpectedReplyEvidence | None:
-    client = build_sender_client()
     after_epoch = int(send_window_start.astimezone(timezone.utc).timestamp()) - 60
-    query = f'in:inbox from:{expected_recipient} after:{after_epoch}'
-    ids = client.list_message_ids(max_results=_RECONCILE_CANDIDATE_CAP, query=query)
     window_end = expires_at or datetime.now(timezone.utc)
-    matches: list[ExpectedReplyEvidence] = []
-    for message_id in ids:
-        detail = client.get_message(message_id)
-        parsed = parse_subject_token(str(detail.get("subject") or ""))
-        if parsed is None:
-            continue
-        if (
-            parsed.evaluation_run_id != evaluation_run_id
-            or parsed.scenario_id != scenario_id
-            or parsed.attempt_id != attempt_id
-        ):
-            continue
-        if _parse_from_email(str(detail.get("from") or "")) != expected_recipient.strip().lower():
-            continue
-        if not _message_in_send_window(
-            detail,
-            window_start=send_window_start,
-            window_end=window_end,
-        ):
-            continue
-        subject = str(detail.get("subject") or "")
-        from_email = _parse_from_email(str(detail.get("from") or ""))
-        local, _, domain = from_email.partition("@")
-        masked_from = f"{local[:1]}***@{domain}" if local else "***"
-        matches.append(
-            ExpectedReplyEvidence(
-                message_id=str(detail.get("message_id") or message_id),
-                subject_truncated=subject[:120],
-                from_masked=masked_from,
-                internal_date_ms=_internal_date_ms(detail),
-            )
+    sender = expected_sender.strip().lower()
+    recipient = expected_recipient.strip().lower()
+    search_kwargs = {
+        "evaluation_run_id": evaluation_run_id,
+        "scenario_id": scenario_id,
+        "attempt_id": attempt_id,
+        "expected_recipient": recipient,
+        "expected_sender": sender,
+        "send_window_start": send_window_start,
+        "window_end": window_end,
+    }
+
+    sender_client = build_sender_client()
+    for query in (
+        f"from:{recipient} to:{sender} after:{after_epoch}",
+        f"from:{recipient} after:{after_epoch}",
+    ):
+        evidence = _search_reply_evidence(
+            sender_client,
+            query=query,
+            require_sender_inbox=True,
+            **search_kwargs,
         )
-    if len(matches) > 1:
-        raise LiveEvalSafetyError("correlation_failure: multiple expected replies")
-    return matches[0] if matches else None
+        if evidence is not None:
+            return evidence
+
+    try:
+        recipient_client = build_recipient_client()
+    except LiveEvalSafetyError:
+        return None
+
+    return _search_reply_evidence(
+        recipient_client,
+        query=f"in:sent to:{sender} after:{after_epoch}",
+        require_sender_inbox=False,
+        **search_kwargs,
+    )
 
 
 def archive_unexpected_reply(*, message_id: str) -> None:
