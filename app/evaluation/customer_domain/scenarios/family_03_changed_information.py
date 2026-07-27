@@ -12,6 +12,7 @@ from app.evaluation.customer_domain.assertions import (
     find_fact_by_value,
 )
 from app.evaluation.customer_domain.scenarios._common import finalize_result, ScenarioRunResult
+from pydantic import ValidationError
 from app.services.end_customer_command_service import EndCustomerCommandError
 
 
