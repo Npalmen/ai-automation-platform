@@ -65,25 +65,6 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
             assert_current_phone(before, "+46701111111")
             assert_pending_phone(before, "+46702222222")
 
-        proposed_id = find_fact_by_value(
-            db,
-            ctx.tenant_id,
-            EntityOwnerType.CONTACT,
-            contact_id,
-            "phone",
-            "+46702222222",
-        )
-        if proposed_id is None:
-            result.fail("proposed phone fact not found")
-
-        ctx.act_verify_fact(
-            db,
-            customer_id,
-            proposed_id,
-            "+46702222222",
-            new_id(),
-        )
-
         original_fact_id = find_fact_by_value(
             db,
             ctx.tenant_id,
@@ -92,13 +73,23 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
             "phone",
             "+46701111111",
         )
+        if original_fact_id is None:
+            result.fail("verified phone fact not found")
+
+        ctx.act_verify_fact(
+            db,
+            customer_id,
+            original_fact_id,
+            "+46702222222",
+            new_id(),
+        )
+
         after = ctx.read_customer_card(db, customer_id)
         if after is None:
             result.fail("card missing after verify")
         else:
             assert_current_phone(after, "+46702222222")
-            if original_fact_id:
-                assert_historical_phone(after, original_fact_id)
+            assert_historical_phone(after, original_fact_id)
 
         try:
             overwrite = OperatorAddFactRequest(
