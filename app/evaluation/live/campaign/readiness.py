@@ -69,6 +69,7 @@ def build_full_system_testbot_readiness(
     tenant_id: str = "TENANT_LIVE_EVAL",
     app_base_url: str = "",
     server_sha: str | None = None,
+    selected_scenario_ids: tuple[str, ...] | None = None,
 ) -> TestbotReadinessReport:
     settings = get_settings()
     config = get_live_eval_config()
@@ -133,6 +134,7 @@ def build_full_system_testbot_readiness(
         contract_issues, contract_matrix = validate_semi_auto_reply_contract(
             campaign_type=campaign_type,
             config=config,
+            selected_scenario_ids=selected_scenario_ids,
         )
         issues.extend(contract_issues)
         gates["semi_auto_reply_contract"] = contract_matrix

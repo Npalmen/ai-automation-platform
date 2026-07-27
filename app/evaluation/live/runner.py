@@ -157,6 +157,7 @@ class LiveEvalRunner:
         semi_automatic_expected_outcome: SemiAutomaticExpectedOutcome | None = None,
         reply_budget_remaining: int = 0,
         campaign_scenario: Any | None = None,
+        campaign_run_id: str | None = None,
     ):
         self.config = get_live_eval_config()
         self.base_url = base_url.rstrip("/")
@@ -178,6 +179,7 @@ class LiveEvalRunner:
         self.semi_automatic_expected_outcome = semi_automatic_expected_outcome
         self.reply_budget_remaining = reply_budget_remaining
         self.campaign_scenario = campaign_scenario
+        self.campaign_run_id = campaign_run_id
         self.observer = LiveEvalObserver(
             base_url=self.base_url,
             admin_api_key=admin_api_key,
@@ -650,6 +652,10 @@ class LiveEvalRunner:
                 send_window_start=self.send_window_start,
                 expires_at=expires_at,
                 provider_message_id=_provider_message_id_from_observation(observation),
+                inbound_rfc_message_id=(
+                    ctx.send_outcome.rfc_message_id if ctx.send_outcome else None
+                ),
+                campaign_run_id=self.campaign_run_id,
             )
             if expected:
                 ctx.expected_reply = {
@@ -674,10 +680,14 @@ class LiveEvalRunner:
                 and self.reply_metrics.provider_accepted_count > 0
             ):
                 violations = [
-                    "provider_accepted_without_recipient_verification: outcome_unknown"
+                    "provider_accepted_without_recipient_verification: "
+                    "provider_accepted_recipient_not_observed"
                 ]
                 self._transition("asserting", violations=violations)
-                self._set_primary_failure(EXIT_ASSERTION, category="outcome_unknown")
+                self._set_primary_failure(
+                    EXIT_ASSERTION,
+                    category="provider_accepted_recipient_not_observed",
+                )
                 self._abort_run()
                 self._write_report("failed", violations, ctx)
                 return

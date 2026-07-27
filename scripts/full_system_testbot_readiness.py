@@ -41,13 +41,25 @@ def main() -> int:
         action="store_true",
         help="Emit JSON report to stdout",
     )
+    parser.add_argument(
+        "--scenario-ids",
+        default="",
+        help="Comma-separated campaign scenario ids for selected-scenario budget",
+    )
     args = parser.parse_args()
+
+    selected_scenario_ids = tuple(
+        item.strip()
+        for item in str(getattr(args, "scenario_ids", "") or "").split(",")
+        if item.strip()
+    ) or None
 
     report = build_full_system_testbot_readiness(
         campaign_type=args.campaign_type,
         tenant_id=args.tenant_id,
         app_base_url=args.app_base_url,
         server_sha=args.server_sha or None,
+        selected_scenario_ids=selected_scenario_ids,
     )
 
     if args.json:

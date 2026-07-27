@@ -74,6 +74,25 @@ class ExpectedReplyEvidence:
     subject_truncated: str
     from_masked: str
     internal_date_ms: int | None
+    placement: str = "recipient_verified_in_inbox"
+
+
+@dataclass(frozen=True)
+class ProviderSentObjectEvidence:
+    message_id: str
+    thread_id: str
+    rfc_message_id: str | None
+    in_reply_to: str | None
+    references: str | None
+    labels: tuple[str, ...]
+    in_sent: bool
+    to_recipients: tuple[str, ...]
+    from_email: str
+    reply_to: str | None
+    subject_truncated: str
+
+
+_SYNTHETIC_EVAL_RECIPIENT_SUFFIXES = (".eval.test", "@eval.test")
 
 
 def load_sender_credentials() -> SenderCredentials:
@@ -276,6 +295,49 @@ def build_s01_message_body(*, evaluation_run_id: str) -> str:
 def _parse_from_email(header: str) -> str:
     _, email = parseaddr((header or "").strip())
     return email.strip().lower()
+
+
+def _normalize_rfc_message_id(value: str | None) -> str | None:
+    text = (value or "").strip()
+    if text.startswith("<") and text.endswith(">"):
+        text = text[1:-1].strip()
+    return text or None
+
+
+def _rfc822msgid_query(value: str | None) -> str | None:
+    normalized = _normalize_rfc_message_id(value)
+    if not normalized:
+        return None
+    return f"rfc822msgid:{normalized}"
+
+
+def is_synthetic_live_eval_recipient(email: str) -> bool:
+    normalized = (email or "").strip().lower()
+    if not normalized:
+        return False
+    return any(normalized.endswith(suffix) for suffix in _SYNTHETIC_EVAL_RECIPIENT_SUFFIXES)
+
+
+def assert_live_reply_recipient_allowed(
+    *,
+    recipient_email: str,
+    expected_sender: str,
+    fixture_sender_email: str | None = None,
+) -> None:
+    recipient = recipient_email.strip().lower()
+    sender = expected_sender.strip().lower()
+    if is_synthetic_live_eval_recipient(recipient):
+        raise LiveEvalSafetyError(
+            "synthetic fixture recipient is not allowed for live Gmail replies"
+        )
+    if recipient != sender:
+        raise LiveEvalSafetyError("live reply recipient must match verified inbound sender")
+    if fixture_sender_email:
+        fixture = fixture_sender_email.strip().lower()
+        if fixture and fixture != sender and is_synthetic_live_eval_recipient(fixture):
+            raise LiveEvalSafetyError(
+                "scenario fixture sender must not override live reply destination"
+            )
 
 
 def _parse_recipient_email(msg: dict[str, Any]) -> str:
@@ -548,6 +610,8 @@ def observe_expected_sender_reply(
     timeout_seconds: float = 120.0,
     poll_interval_seconds: float = 3.0,
     provider_message_id: str | None = None,
+    inbound_rfc_message_id: str | None = None,
+    campaign_run_id: str | None = None,
 ) -> ExpectedReplyEvidence | None:
     """Poll sender inbox and recipient Sent for required app reply."""
     import time
@@ -564,6 +628,8 @@ def observe_expected_sender_reply(
                 expected_sender=expected_sender,
                 send_window_start=send_window_start,
                 expires_at=expires_at,
+                inbound_rfc_message_id=inbound_rfc_message_id,
+                campaign_run_id=campaign_run_id,
             )
             if evidence is not None:
                 return evidence
@@ -575,6 +641,9 @@ def observe_expected_sender_reply(
             expected_sender=expected_sender,
             send_window_start=send_window_start,
             expires_at=expires_at,
+            inbound_rfc_message_id=inbound_rfc_message_id,
+            campaign_run_id=campaign_run_id,
+            provider_rfc_message_id=None,
         )
         if evidence is not None:
             return evidence
@@ -582,10 +651,55 @@ def observe_expected_sender_reply(
     return None
 
 
+def fetch_provider_sent_reply_object(
+    *,
+    provider_message_id: str,
+    expected_sender: str,
+    expected_recipient: str,
+) -> ProviderSentObjectEvidence | None:
+    """Fetch provider-accepted reply directly by Gmail message id (read-only)."""
+    message_id = (provider_message_id or "").strip()
+    if not message_id:
+        return None
+    sender = expected_sender.strip().lower()
+    recipient = expected_recipient.strip().lower()
+    try:
+        client = build_recipient_client()
+    except LiveEvalSafetyError:
+        return None
+    try:
+        detail = client.get_message(message_id)
+    except _TRANSPORT_ERRORS:
+        return None
+    labels = tuple(str(label) for label in (detail.get("label_ids") or []))
+    recipients = tuple(_sent_recipient_emails(detail))
+    if sender not in recipients:
+        return None
+    from_email = _parse_from_email(str(detail.get("from") or ""))
+    if from_email and from_email != recipient:
+        return None
+    return ProviderSentObjectEvidence(
+        message_id=str(detail.get("message_id") or message_id),
+        thread_id=str(detail.get("thread_id") or ""),
+        rfc_message_id=_normalize_rfc_message_id(
+            str(detail.get("internet_message_id") or "") or None
+        ),
+        in_reply_to=None,
+        references=None,
+        labels=labels,
+        in_sent="SENT" in labels,
+        to_recipients=recipients,
+        from_email=from_email,
+        reply_to=None,
+        subject_truncated=str(detail.get("subject") or "")[:120],
+    )
+
+
 def _reply_evidence_from_message(
     *,
     message_id: str,
     detail: dict[str, Any],
+    placement: str = "recipient_verified_in_inbox",
 ) -> ExpectedReplyEvidence:
     subject = str(detail.get("subject") or "")
     from_email = _parse_from_email(str(detail.get("from") or ""))
@@ -596,7 +710,17 @@ def _reply_evidence_from_message(
         subject_truncated=subject[:120],
         from_masked=masked_from,
         internal_date_ms=_internal_date_ms(detail),
+        placement=placement,
     )
+
+
+def _classify_recipient_placement(labels: list[str] | tuple[str, ...]) -> str:
+    label_set = {str(label) for label in labels}
+    if "SPAM" in label_set:
+        return "recipient_verified_in_spam"
+    if "INBOX" in label_set:
+        return "recipient_verified_in_inbox"
+    return "recipient_verified_in_all_mail"
 
 
 def _matches_expected_reply(
@@ -648,12 +772,14 @@ def _search_reply_evidence(
     window_end: datetime,
     require_sender_inbox: bool,
     require_matching_from: bool = True,
+    require_subject_token: bool = True,
+    campaign_run_id: str | None = None,
 ) -> ExpectedReplyEvidence | None:
     ids = client.list_message_ids(max_results=_RECONCILE_CANDIDATE_CAP, query=query)
     matches: list[ExpectedReplyEvidence] = []
     for message_id in ids:
         detail = client.get_message(message_id)
-        if not _matches_expected_reply(
+        if require_subject_token and not _matches_expected_reply(
             detail,
             evaluation_run_id=evaluation_run_id,
             scenario_id=scenario_id,
@@ -666,10 +792,66 @@ def _search_reply_evidence(
             require_matching_from=require_matching_from,
         ):
             continue
-        matches.append(_reply_evidence_from_message(message_id=message_id, detail=detail))
+        if not require_subject_token and not _matches_recipient_delivery(
+            detail,
+            expected_recipient=expected_recipient,
+            expected_sender=expected_sender,
+            send_window_start=send_window_start,
+            window_end=window_end,
+            evaluation_run_id=evaluation_run_id,
+            scenario_id=scenario_id,
+            campaign_run_id=campaign_run_id,
+        ):
+            continue
+        placement = _classify_recipient_placement(detail.get("label_ids") or [])
+        matches.append(
+            _reply_evidence_from_message(
+                message_id=message_id,
+                detail=detail,
+                placement=placement,
+            )
+        )
     if len(matches) > 1:
         raise LiveEvalSafetyError("correlation_failure: multiple expected replies")
     return matches[0] if matches else None
+
+
+def _matches_recipient_delivery(
+    detail: dict[str, Any],
+    *,
+    expected_recipient: str,
+    expected_sender: str,
+    send_window_start: datetime,
+    window_end: datetime,
+    evaluation_run_id: str,
+    scenario_id: str,
+    campaign_run_id: str | None,
+) -> bool:
+    recipients = _sent_recipient_emails(detail)
+    if expected_sender.strip().lower() not in recipients:
+        return False
+    from_email = _parse_from_email(str(detail.get("from") or ""))
+    if from_email and from_email != expected_recipient.strip().lower():
+        return False
+    if not _message_in_send_window(
+        detail,
+        window_start=send_window_start,
+        window_end=window_end,
+    ):
+        return False
+    subject = str(detail.get("subject") or "")
+    body = str(detail.get("body_text") or "")
+    parsed = parse_subject_token(subject)
+    if parsed is not None:
+        return (
+            parsed.evaluation_run_id == evaluation_run_id
+            and parsed.scenario_id == scenario_id
+        )
+    if evaluation_run_id in subject or evaluation_run_id in body:
+        return True
+    if campaign_run_id and (campaign_run_id in subject or campaign_run_id in body):
+        return True
+    return False
 
 
 def _observe_reply_by_provider_message_id(
@@ -682,38 +864,66 @@ def _observe_reply_by_provider_message_id(
     expected_sender: str,
     send_window_start: datetime,
     expires_at: datetime | None = None,
+    inbound_rfc_message_id: str | None = None,
+    campaign_run_id: str | None = None,
 ) -> ExpectedReplyEvidence | None:
-    """Fetch a provider-accepted reply directly by Gmail message id (read-only)."""
-    message_id = (provider_message_id or "").strip()
-    if not message_id:
+    """Verify provider Sent object, then locate delivery on allowlisted sender mailbox."""
+    provider_object = fetch_provider_sent_reply_object(
+        provider_message_id=provider_message_id,
+        expected_sender=expected_sender,
+        expected_recipient=expected_recipient,
+    )
+    if provider_object is None:
         return None
-    window_end = expires_at or datetime.now(timezone.utc)
-    search_kwargs = {
-        "evaluation_run_id": evaluation_run_id,
-        "scenario_id": scenario_id,
-        "attempt_id": attempt_id,
-        "expected_recipient": expected_recipient.strip().lower(),
-        "expected_sender": expected_sender.strip().lower(),
-        "send_window_start": send_window_start,
-        "window_end": window_end,
-    }
-    for build_client in (build_recipient_client, build_sender_client):
-        try:
-            client = build_client()
-        except LiveEvalSafetyError:
-            continue
-        try:
-            detail = client.get_message(message_id)
-        except _TRANSPORT_ERRORS:
-            continue
-        if _matches_expected_reply(
-            detail,
-            require_sender_inbox=False,
-            require_matching_from=False,
-            **search_kwargs,
-        ):
-            return _reply_evidence_from_message(message_id=message_id, detail=detail)
-    return None
+    return _find_expected_sender_reply(
+        evaluation_run_id=evaluation_run_id,
+        scenario_id=scenario_id,
+        attempt_id=attempt_id,
+        expected_recipient=expected_recipient,
+        expected_sender=expected_sender,
+        send_window_start=send_window_start,
+        expires_at=expires_at,
+        inbound_rfc_message_id=inbound_rfc_message_id,
+        campaign_run_id=campaign_run_id,
+        provider_rfc_message_id=provider_object.rfc_message_id,
+    )
+
+
+def _build_recipient_search_queries(
+    *,
+    evaluation_run_id: str,
+    scenario_id: str,
+    expected_recipient: str,
+    expected_sender: str,
+    after_epoch: int,
+    inbound_rfc_message_id: str | None,
+    campaign_run_id: str | None,
+    provider_rfc_message_id: str | None,
+) -> list[str]:
+    sender = expected_sender.strip().lower()
+    recipient = expected_recipient.strip().lower()
+    queries: list[str] = []
+    provider_query = _rfc822msgid_query(provider_rfc_message_id)
+    if provider_query:
+        queries.append(f"in:anywhere {provider_query}")
+    inbound_query = _rfc822msgid_query(inbound_rfc_message_id)
+    if inbound_query:
+        queries.append(f"in:anywhere {inbound_query}")
+    if campaign_run_id:
+        queries.append(f'in:anywhere "{campaign_run_id}"')
+    queries.append(f'in:anywhere "{evaluation_run_id}"')
+    queries.append(f'in:anywhere "{scenario_id}"')
+    queries.append(f"in:anywhere from:{recipient} to:{sender} after:{after_epoch}")
+    token = f"{SUBJECT_TOKEN_PREFIX}/{evaluation_run_id}"
+    queries.extend(
+        [
+            f"from:{recipient} to:{sender} after:{after_epoch}",
+            f"from:{recipient} after:{after_epoch}",
+            f"in:anywhere from:{recipient} to:{sender} after:{after_epoch}",
+            f'in:anywhere subject:"{token}" to:{sender} after:{after_epoch}',
+        ]
+    )
+    return queries
 
 
 def _find_expected_sender_reply(
@@ -725,6 +935,9 @@ def _find_expected_sender_reply(
     expected_sender: str,
     send_window_start: datetime,
     expires_at: datetime | None = None,
+    inbound_rfc_message_id: str | None = None,
+    campaign_run_id: str | None = None,
+    provider_rfc_message_id: str | None = None,
 ) -> ExpectedReplyEvidence | None:
     after_epoch = int(send_window_start.astimezone(timezone.utc).timestamp()) - 60
     window_end = expires_at or datetime.now(timezone.utc)
@@ -741,17 +954,24 @@ def _find_expected_sender_reply(
     }
 
     sender_client = build_sender_client()
-    token = f"{SUBJECT_TOKEN_PREFIX}/{evaluation_run_id}"
-    for query in (
-        f"from:{recipient} to:{sender} after:{after_epoch}",
-        f"from:{recipient} after:{after_epoch}",
-        f"in:anywhere from:{recipient} to:{sender} after:{after_epoch}",
-        f'in:anywhere subject:"{token}" to:{sender} after:{after_epoch}',
-    ):
+    queries = _build_recipient_search_queries(
+        evaluation_run_id=evaluation_run_id,
+        scenario_id=scenario_id,
+        expected_recipient=recipient,
+        expected_sender=sender,
+        after_epoch=after_epoch,
+        inbound_rfc_message_id=inbound_rfc_message_id,
+        campaign_run_id=campaign_run_id,
+        provider_rfc_message_id=provider_rfc_message_id,
+    )
+    for index, query in enumerate(queries):
+        require_subject_token = index >= 4 and not provider_rfc_message_id
         evidence = _search_reply_evidence(
             sender_client,
             query=query,
             require_sender_inbox=True,
+            require_subject_token=require_subject_token,
+            campaign_run_id=campaign_run_id,
             **search_kwargs,
         )
         if evidence is not None:
@@ -765,13 +985,14 @@ def _find_expected_sender_reply(
     for query in (
         f"in:sent to:{sender} after:{after_epoch}",
         f"in:anywhere in:sent to:{sender} after:{after_epoch}",
-        f'in:anywhere in:sent subject:"{token}" after:{after_epoch}',
+        f'in:anywhere in:sent subject:"{SUBJECT_TOKEN_PREFIX}/{evaluation_run_id}" after:{after_epoch}',
     ):
         evidence = _search_reply_evidence(
             recipient_client,
             query=query,
             require_sender_inbox=False,
             require_matching_from=False,
+            campaign_run_id=campaign_run_id,
             **search_kwargs,
         )
         if evidence is not None:

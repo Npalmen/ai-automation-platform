@@ -310,12 +310,11 @@ jobs:
         env:
           LIVE_EVAL_MAX_GMAIL_REPLIES: "1"
         run: |
-          python scripts/full_system_testbot_readiness.py \
-            --campaign-type semi-auto-core \
-            --tenant-id TENANT_LIVE_EVAL \
-            --app-base-url "$LIVE_EVAL_APP_BASE_URL" \
-            --server-sha "$BUILD_GIT_SHA" \
-            --json
+          READINESS_ARGS="--campaign-type semi-auto-core --tenant-id TENANT_LIVE_EVAL --app-base-url \"$LIVE_EVAL_APP_BASE_URL\" --server-sha \"$BUILD_GIT_SHA\" --json"
+          if [ "${{ inputs.confirm_live_gmail }}" = "RUN_SEMI_AUTO_CANARY" ]; then
+            READINESS_ARGS="$READINESS_ARGS --scenario-ids TBSM01_lead_approve_reply,TBSM04_lead_reject"
+          fi
+          python scripts/full_system_testbot_readiness.py $READINESS_ARGS
 
       - name: Semi-auto campaign (TBSM01-TBSM08)
         id: run_semi_auto

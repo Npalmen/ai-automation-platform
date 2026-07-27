@@ -21,6 +21,7 @@ from app.evaluation.live.campaign.semi_automatic_expected_outcomes import (
     resolve_semi_automatic_expected_outcome,
 )
 from app.evaluation.live.config import get_live_eval_config
+from app.evaluation.live.errors import LiveEvalSafetyError
 
 
 @pytest.fixture(autouse=True)
@@ -79,9 +80,8 @@ def test_readiness_contract_passes_with_four_replies(semi_auto_env):
 
 def test_readiness_stops_when_workflow_budget_is_three(semi_auto_env, monkeypatch):
     monkeypatch.setitem(CAMPAIGN_TYPE_REPLY_BUDGET, "semi-auto-core", 3)
-    issues, _ = validate_semi_auto_reply_contract()
-    assert any("workflow reply budget must be 4" in issue for issue in issues)
-    assert any("does not match scenario expected_reply total" in issue for issue in issues)
+    with pytest.raises(LiveEvalSafetyError, match="exceeds campaign ceiling"):
+        validate_semi_auto_reply_contract()
 
 
 def test_readiness_includes_contract_matrix(semi_auto_env):
