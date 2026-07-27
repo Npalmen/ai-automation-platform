@@ -153,6 +153,135 @@ class TestReadServiceProjection:
             i.identity_type not in {IdentityType.GMAIL_THREAD, IdentityType.EXTERNAL_ID}
             for i in card.identities
         )
+        assert card.current_state is not None
+        assert card.current_state.subjects
+
+    def test_current_state_deterministic_with_insert_order(self, db):
+        contact_a = EndCustomerRepository.create_contact(db, "TENANT_A", display_name="Jane A")
+        customer_a = EndCustomerRepository.create_customer(
+            db,
+            "TENANT_A",
+            CustomerType.PRIVATE,
+            display_name="Jane A",
+            primary_contact_id=contact_a.contact_id,
+        )
+        verified = CustomerSourceFact(
+            fact_id=_new_id(),
+            tenant_id="TENANT_A",
+            subject_type=EntityOwnerType.CONTACT,
+            subject_id=contact_a.contact_id,
+            field_name="phone",
+            raw_value="0701111111",
+            normalized_value="0701111111",
+            fact_state=FactState.VERIFIED,
+            source_type=SourceType.ADMIN_CORRECTION,
+            confidence=1.0,
+            observed_at=_utcnow(),
+            recorded_at=_utcnow(),
+            verified_at=_utcnow(),
+            verified_by="op-1",
+        )
+        proposed = CustomerSourceFact(
+            fact_id=_new_id(),
+            tenant_id="TENANT_A",
+            subject_type=EntityOwnerType.CONTACT,
+            subject_id=contact_a.contact_id,
+            field_name="phone",
+            raw_value="0702222222",
+            normalized_value="0702222222",
+            fact_state=FactState.PROPOSED,
+            source_type=SourceType.AI_EXTRACTION,
+            confidence=0.5,
+            observed_at=_utcnow(),
+            recorded_at=_utcnow(),
+        )
+        EndCustomerRepository.append_fact(db, verified)
+        EndCustomerRepository.append_fact(db, proposed)
+        card_a = EndCustomerReadService.get_customer_card(
+            db, "TENANT_A", customer_a.customer_id
+        )
+
+        contact_b = EndCustomerRepository.create_contact(db, "TENANT_A", display_name="Jane B")
+        customer_b = EndCustomerRepository.create_customer(
+            db,
+            "TENANT_A",
+            CustomerType.PRIVATE,
+            display_name="Jane B",
+            primary_contact_id=contact_b.contact_id,
+        )
+        verified_b = verified.model_copy(
+            update={"fact_id": _new_id(), "subject_id": contact_b.contact_id}
+        )
+        proposed_b = proposed.model_copy(
+            update={"fact_id": _new_id(), "subject_id": contact_b.contact_id}
+        )
+        EndCustomerRepository.append_fact(db, proposed_b)
+        EndCustomerRepository.append_fact(db, verified_b)
+        card_b = EndCustomerReadService.get_customer_card(
+            db, "TENANT_A", customer_b.customer_id
+        )
+
+        assert card_a is not None and card_b is not None
+        assert card_a.current_state.current_values[0].display_value == "0701111111"
+        assert card_b.current_state.current_values[0].display_value == "0701111111"
+        assert any(
+            p.display_value == "0702222222"
+            for p in card_a.current_state.pending_values
+        )
+        assert any(
+            p.display_value == "0702222222"
+            for p in card_b.current_state.pending_values
+        )
+
+    def test_verified_successor_updates_current_state(self, db):
+        contact = EndCustomerRepository.create_contact(db, "TENANT_A", display_name="Jane")
+        customer = EndCustomerRepository.create_customer(
+            db,
+            "TENANT_A",
+            CustomerType.PRIVATE,
+            display_name="Jane",
+            primary_contact_id=contact.contact_id,
+        )
+        original_id = _new_id()
+        original = CustomerSourceFact(
+            fact_id=original_id,
+            tenant_id="TENANT_A",
+            subject_type=EntityOwnerType.CONTACT,
+            subject_id=contact.contact_id,
+            field_name="phone",
+            raw_value="0701111111",
+            normalized_value="0701111111",
+            fact_state=FactState.PROPOSED,
+            source_type=SourceType.GMAIL_INBOUND,
+            confidence=0.9,
+            observed_at=_utcnow(),
+            recorded_at=_utcnow(),
+        )
+        EndCustomerRepository.append_fact(db, original)
+        successor = CustomerSourceFact(
+            fact_id=_new_id(),
+            tenant_id="TENANT_A",
+            subject_type=EntityOwnerType.CONTACT,
+            subject_id=contact.contact_id,
+            field_name="phone",
+            raw_value="0702222222",
+            normalized_value="0702222222",
+            fact_state=FactState.VERIFIED,
+            source_type=SourceType.ADMIN_CORRECTION,
+            confidence=1.0,
+            observed_at=_utcnow(),
+            recorded_at=_utcnow(),
+            verified_at=_utcnow(),
+            verified_by="op-1",
+            supersedes_fact_id=original_id,
+        )
+        EndCustomerRepository.append_fact(db, successor)
+        card = EndCustomerReadService.get_customer_card(
+            db, "TENANT_A", customer.customer_id
+        )
+        assert card is not None
+        assert card.current_state.current_values[0].display_value == "0702222222"
+        assert any(h.fact_id == original_id for h in card.current_state.historical_values)
 
     def test_duplicate_sanitization(self, db):
         a = EndCustomerRepository.create_customer(db, "TENANT_A", CustomerType.PRIVATE, "A")

@@ -9,6 +9,11 @@ from sqlalchemy.orm import Session
 
 from app.domain.customer.api_schemas import (
     ALLOWED_LIST_SORT_FIELDS,
+    CustomerCurrentState,
+    CustomerHistoricalValue,
+    CustomerPendingValue,
+    CustomerResolutionIssue,
+    CustomerValueConflict,
     DEFAULT_LIST_LIMIT,
     DuplicateCandidateListViewResponse,
     DuplicateCandidateView,
@@ -28,8 +33,18 @@ from app.domain.customer.api_schemas import (
     LinkedThreadsViewResponse,
     MAX_LIST_LIMIT,
     MIN_SEARCH_QUERY_LENGTH,
+    ResolvedCustomerValue,
+    ResolvedIdentityValueView,
     SafeCustomerIdentityView,
+    SubjectCurrentStateView,
     TimelineViewResponse,
+    CurrentStateResolutionIssueCode,
+)
+from app.domain.customer.current_state import (
+    CustomerCurrentStateProjection,
+    SubjectRef,
+    current_identity_raw_value,
+    resolve_customer_current_state,
 )
 from app.domain.customer.enums import (
     CustomerStatus,
@@ -174,6 +189,299 @@ class EndCustomerReadService:
         )
 
     @staticmethod
+    def _build_aggregate_subjects(
+        customer: Any,
+        relationships: list[Any],
+    ) -> list[SubjectRef]:
+        seen: set[tuple[str, str]] = set()
+        subjects: list[SubjectRef] = []
+
+        def add(subject_type: EntityOwnerType, subject_id: str, is_primary: bool) -> None:
+            key = (subject_type.value, subject_id)
+            if key in seen:
+                return
+            seen.add(key)
+            subjects.append(
+                SubjectRef(
+                    subject_type=subject_type,
+                    subject_id=subject_id,
+                    is_primary=is_primary,
+                )
+            )
+
+        add(EntityOwnerType.CUSTOMER, customer.customer_id, False)
+        if customer.primary_company_id:
+            add(EntityOwnerType.COMPANY, customer.primary_company_id, True)
+        if customer.primary_contact_id:
+            add(EntityOwnerType.CONTACT, customer.primary_contact_id, True)
+        for rel in relationships:
+            add(rel.subject_type, rel.subject_id, rel.is_primary)
+        return subjects
+
+    @staticmethod
+    def _map_current_state(
+        projection: CustomerCurrentStateProjection,
+    ) -> CustomerCurrentState:
+        return CustomerCurrentState(
+            current_values=[
+                ResolvedCustomerValue(
+                    fact_id=v.fact_id,
+                    field_name=v.field_name,
+                    display_value=v.display_value,
+                    normalized_value=v.normalized_value,
+                    state=v.state,
+                    subject_type=v.subject_type,
+                    subject_id=v.subject_id,
+                    source_type=v.source_type,
+                    source_fact_id=v.fact_id,
+                    observed_at=v.observed_at,
+                    verified_at=v.verified_at,
+                    confidence=v.confidence,
+                    canonical_field_category=v.canonical_field_category,
+                    is_current=v.is_current,
+                )
+                for v in projection.current_values
+            ],
+            pending_values=[
+                CustomerPendingValue(
+                    fact_id=v.fact_id,
+                    field_name=v.field_name,
+                    display_value=v.display_value,
+                    normalized_value=v.normalized_value,
+                    state=v.state,
+                    subject_type=v.subject_type,
+                    subject_id=v.subject_id,
+                    source_type=v.source_type,
+                    source_fact_id=v.fact_id,
+                    observed_at=v.observed_at,
+                    confidence=v.confidence,
+                    canonical_field_category=v.canonical_field_category,
+                )
+                for v in projection.pending_values
+            ],
+            conflicts=[
+                CustomerValueConflict(
+                    fact_id=c.fact_id,
+                    field_name=c.field_name,
+                    display_value=c.display_value,
+                    state=c.state,
+                    subject_type=c.subject_type,
+                    subject_id=c.subject_id,
+                    source_type=c.source_type,
+                    conflicting_fact_ids=list(c.conflicting_fact_ids),
+                    issue_code=(
+                        CurrentStateResolutionIssueCode(c.issue_code.value)
+                        if c.issue_code is not None
+                        else None
+                    ),
+                )
+                for c in projection.conflicts
+            ],
+            historical_values=[
+                CustomerHistoricalValue(
+                    fact_id=h.fact_id,
+                    field_name=h.field_name,
+                    display_value=h.display_value,
+                    state=h.state,
+                    subject_type=h.subject_type,
+                    subject_id=h.subject_id,
+                    source_type=h.source_type,
+                    superseded_by_fact_id=h.superseded_by_fact_id,
+                )
+                for h in projection.historical_values
+            ],
+            resolution_issues=[
+                CustomerResolutionIssue(
+                    code=CurrentStateResolutionIssueCode(i.code.value),
+                    field_name=i.field_name,
+                    subject_type=i.subject_type,
+                    subject_id=i.subject_id,
+                    fact_ids=list(i.fact_ids),
+                )
+                for i in projection.resolution_issues
+            ],
+            subjects=[
+                SubjectCurrentStateView(
+                    subject_type=s.subject_type,
+                    subject_id=s.subject_id,
+                    is_primary=s.is_primary,
+                    current_values=[
+                        ResolvedCustomerValue(
+                            fact_id=v.fact_id,
+                            field_name=v.field_name,
+                            display_value=v.display_value,
+                            normalized_value=v.normalized_value,
+                            state=v.state,
+                            subject_type=v.subject_type,
+                            subject_id=v.subject_id,
+                            source_type=v.source_type,
+                            source_fact_id=v.fact_id,
+                            observed_at=v.observed_at,
+                            verified_at=v.verified_at,
+                            confidence=v.confidence,
+                            canonical_field_category=v.canonical_field_category,
+                            is_current=v.is_current,
+                        )
+                        for v in s.current_values
+                    ],
+                    pending_values=[
+                        CustomerPendingValue(
+                            fact_id=v.fact_id,
+                            field_name=v.field_name,
+                            display_value=v.display_value,
+                            normalized_value=v.normalized_value,
+                            state=v.state,
+                            subject_type=v.subject_type,
+                            subject_id=v.subject_id,
+                            source_type=v.source_type,
+                            source_fact_id=v.fact_id,
+                            observed_at=v.observed_at,
+                            confidence=v.confidence,
+                            canonical_field_category=v.canonical_field_category,
+                        )
+                        for v in s.pending_values
+                    ],
+                    conflicts=[
+                        CustomerValueConflict(
+                            fact_id=c.fact_id,
+                            field_name=c.field_name,
+                            display_value=c.display_value,
+                            state=c.state,
+                            subject_type=c.subject_type,
+                            subject_id=c.subject_id,
+                            source_type=c.source_type,
+                            conflicting_fact_ids=list(c.conflicting_fact_ids),
+                            issue_code=(
+                                CurrentStateResolutionIssueCode(c.issue_code.value)
+                                if c.issue_code is not None
+                                else None
+                            ),
+                        )
+                        for c in s.conflicts
+                    ],
+                    historical_values=[
+                        CustomerHistoricalValue(
+                            fact_id=h.fact_id,
+                            field_name=h.field_name,
+                            display_value=h.display_value,
+                            state=h.state,
+                            subject_type=h.subject_type,
+                            subject_id=h.subject_id,
+                            source_type=h.source_type,
+                            superseded_by_fact_id=h.superseded_by_fact_id,
+                        )
+                        for h in s.historical_values
+                    ],
+                    current_identities=[
+                        ResolvedIdentityValueView(
+                            identity_id=i.identity_id,
+                            identity_type=i.identity_type,
+                            raw_value=i.raw_value,
+                            normalized_value=i.normalized_value,
+                            verification_status=i.verification_status,
+                            fact_state=i.fact_state,
+                            source_fact_id=i.source_fact_id,
+                            is_current=i.is_current,
+                        )
+                        for i in s.current_identities
+                    ],
+                    alternate_identities=[
+                        ResolvedIdentityValueView(
+                            identity_id=i.identity_id,
+                            identity_type=i.identity_type,
+                            raw_value=i.raw_value,
+                            normalized_value=i.normalized_value,
+                            verification_status=i.verification_status,
+                            fact_state=i.fact_state,
+                            source_fact_id=i.source_fact_id,
+                            is_current=i.is_current,
+                        )
+                        for i in s.alternate_identities
+                    ],
+                )
+                for s in projection.subjects
+            ],
+        )
+
+    @staticmethod
+    def _resolve_customer_projection(
+        db: Session,
+        tenant_id: str,
+        customer: Any,
+    ) -> CustomerCurrentStateProjection:
+        relationships = EndCustomerRepository.list_relationships_for_customer(
+            db, tenant_id, customer.customer_id
+        )
+        subjects = EndCustomerReadService._build_aggregate_subjects(customer, relationships)
+        owner_refs = [(s.subject_type, s.subject_id) for s in subjects]
+        facts = EndCustomerRepository.list_facts_for_subjects(db, tenant_id, owner_refs)
+        identities = EndCustomerRepository.list_identities_for_owners(db, tenant_id, owner_refs)
+        facts_by_subject: dict[tuple[EntityOwnerType, str], list[Any]] = {}
+        for fact in facts:
+            key = (fact.subject_type, fact.subject_id)
+            facts_by_subject.setdefault(key, []).append(fact)
+        identities_by_owner: dict[tuple[EntityOwnerType, str], list[Any]] = {}
+        for identity in identities:
+            key = (identity.owner_type, identity.owner_id)
+            identities_by_owner.setdefault(key, []).append(identity)
+        return resolve_customer_current_state(subjects, facts_by_subject, identities_by_owner)
+
+    @staticmethod
+    def _build_company_view_from_projection(
+        db: Session,
+        tenant_id: str,
+        company_id: str | None,
+        projection: CustomerCurrentStateProjection,
+    ) -> EndCustomerCardCompanyView | None:
+        if not company_id:
+            return None
+        company = EndCustomerRepository.get_company(db, tenant_id, company_id)
+        if company is None:
+            return None
+        org_number = current_identity_raw_value(
+            projection,
+            EntityOwnerType.COMPANY,
+            company_id,
+            IdentityType.ORGANIZATION_NUMBER,
+        )
+        return EndCustomerCardCompanyView(
+            company_id=company.company_id,
+            display_name=company.display_name,
+            organization_number=org_number,
+        )
+
+    @staticmethod
+    def _build_contact_view_from_projection(
+        db: Session,
+        tenant_id: str,
+        contact_id: str | None,
+        projection: CustomerCurrentStateProjection,
+    ) -> EndCustomerCardContactView | None:
+        if not contact_id:
+            return None
+        contact = EndCustomerRepository.get_contact(db, tenant_id, contact_id)
+        if contact is None:
+            return None
+        email = current_identity_raw_value(
+            projection,
+            EntityOwnerType.CONTACT,
+            contact_id,
+            IdentityType.EMAIL,
+        )
+        phone = current_identity_raw_value(
+            projection,
+            EntityOwnerType.CONTACT,
+            contact_id,
+            IdentityType.PHONE,
+        )
+        return EndCustomerCardContactView(
+            contact_id=contact.contact_id,
+            display_name=contact.display_name,
+            email=email,
+            phone=phone,
+        )
+
+    @staticmethod
     def _identity_value_for_owner(
         db: Session,
         tenant_id: str,
@@ -294,6 +602,10 @@ class EndCustomerReadService:
         customer = EndCustomerRepository.get_customer(db, tenant_id, customer_id)
         if customer is None:
             return None
+        projection = EndCustomerReadService._resolve_customer_projection(
+            db, tenant_id, customer
+        )
+        current_state = EndCustomerReadService._map_current_state(projection)
         last_event = EndCustomerRepository.get_latest_timeline_event(
             db, tenant_id, customer_id
         )
@@ -303,11 +615,11 @@ class EndCustomerReadService:
             customer_type=customer.customer_type,
             display_name=customer.display_name,
             status=customer.status,
-            primary_company=EndCustomerReadService._build_company_view(
-                db, tenant_id, customer.primary_company_id
+            primary_company=EndCustomerReadService._build_company_view_from_projection(
+                db, tenant_id, customer.primary_company_id, projection
             ),
-            primary_contact=EndCustomerReadService._build_contact_view(
-                db, tenant_id, customer.primary_contact_id
+            primary_contact=EndCustomerReadService._build_contact_view_from_projection(
+                db, tenant_id, customer.primary_contact_id, projection
             ),
             open_conflict_count=EndCustomerRepository.count_open_conflicts_for_customer(
                 db, tenant_id, customer_id
@@ -334,7 +646,11 @@ class EndCustomerReadService:
             customer.primary_company_id,
             customer.primary_contact_id,
         )
-        return EndCustomerCardDetailResponse(card=card, identities=identities)
+        return EndCustomerCardDetailResponse(
+            card=card,
+            identities=identities,
+            current_state=current_state,
+        )
 
     @staticmethod
     def _timeline_view(event: Any) -> EndCustomerTimelineEventView:
