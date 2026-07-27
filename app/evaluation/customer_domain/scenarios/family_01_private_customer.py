@@ -23,7 +23,7 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
             db,
             display_name="Eval Private A",
             email="fam01.private@example.invalid",
-            phone="0701111111",
+            phone="+46701111111",
             idempotency_key=idem_key,
         )
         customer_id = create["body"]["customer_id"]
@@ -50,7 +50,7 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
             db,
             display_name="Eval Private A",
             email="fam01.private@example.invalid",
-            phone="0701111111",
+            phone="+46701111111",
             idempotency_key=idem_key,
         )
         if replay["body"]["customer_id"] != customer_id:

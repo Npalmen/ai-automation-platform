@@ -38,7 +38,7 @@ def run_tenant_controls(engine, tenant_a: str, tenant_b: str) -> dict[str, Any]:
         ctx_a = EvalContext(engine=engine, tenant_id=tenant_a)
         ctx_b = EvalContext(engine=engine, tenant_id=tenant_b)
         email = "shared-isolation@example.invalid"
-        phone = "0708888888"
+        phone = "+46708888888"
         thread_id = "shared-thread-001"
         idem_key = "shared-idem-key-001"
 

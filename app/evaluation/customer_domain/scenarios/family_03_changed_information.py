@@ -26,7 +26,7 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
         create = ctx.act_create_private_customer(
             db,
             display_name="Change Phone",
-            phone="0701111111",
+            phone="+46701111111",
             idempotency_key=new_id(),
         )
         customer_id = create["body"]["customer_id"]
@@ -36,8 +36,8 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
             subject_type=EntityOwnerType.CONTACT,
             subject_id=contact_id,
             field_name="phone",
-            raw_value="0701111111",
-            normalized_value="0701111111",
+            raw_value="+46701111111",
+            normalized_value="+46701111111",
             fact_state=FactState.VERIFIED,
             source_type=SourceType.ADMIN_CORRECTION,
             confidence=1.0,
@@ -49,8 +49,8 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
             subject_type=EntityOwnerType.CONTACT,
             subject_id=contact_id,
             field_name="phone",
-            raw_value="0702222222",
-            normalized_value="0702222222",
+            raw_value="+46702222222",
+            normalized_value="+46702222222",
             fact_state=FactState.PROPOSED,
             source_type=SourceType.AI_EXTRACTION,
             confidence=0.5,
@@ -62,8 +62,8 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
         if before is None:
             result.fail("card missing before verify")
         else:
-            assert_current_phone(before, "0701111111")
-            assert_pending_phone(before, "0702222222")
+            assert_current_phone(before, "+46701111111")
+            assert_pending_phone(before, "+46702222222")
 
         proposed_id = find_fact_by_value(
             db,
@@ -71,7 +71,7 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
             EntityOwnerType.CONTACT,
             contact_id,
             "phone",
-            "0702222222",
+            "+46702222222",
         )
         if proposed_id is None:
             result.fail("proposed phone fact not found")
@@ -80,7 +80,7 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
             db,
             customer_id,
             proposed_id,
-            "0702222222",
+            "+46702222222",
             new_id(),
         )
 
@@ -90,13 +90,13 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
             EntityOwnerType.CONTACT,
             contact_id,
             "phone",
-            "0701111111",
+            "+46701111111",
         )
         after = ctx.read_customer_card(db, customer_id)
         if after is None:
             result.fail("card missing after verify")
         else:
-            assert_current_phone(after, "0702222222")
+            assert_current_phone(after, "+46702222222")
             if original_fact_id:
                 assert_historical_phone(after, original_fact_id)
 
@@ -105,8 +105,8 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
                 subject_type=EntityOwnerType.CONTACT,
                 subject_id=contact_id,
                 field_name="phone",
-                raw_value="0709999999",
-                normalized_value="0709999999",
+                raw_value="+46709999999",
+                normalized_value="+46709999999",
                 fact_state=FactState.VERIFIED,
                 source_type=SourceType.AI_EXTRACTION,
                 confidence=0.9,
@@ -118,7 +118,7 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
             pass
 
         result.semantic_payload = {
-            "current_phone": "0702222222",
+            "current_phone": "+46702222222",
             "historical_fact": original_fact_id,
             "projection_verified": True,
         }
