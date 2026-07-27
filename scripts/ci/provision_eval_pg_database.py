@@ -16,20 +16,24 @@ def main() -> int:
         "postgresql://postgres:postgres@localhost:5432/postgres",
     )
     database_name = os.environ.get("EVAL_PG_DATABASE", "ai_platform_eval")
+    extra_databases = [database_name]
+    if database_name == "ai_platform_eval":
+        extra_databases.append("ai_platform_customer_domain_eval")
 
     conn = psycopg2.connect(admin_url)
     conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT 1 FROM pg_database WHERE datname = %s",
-                (database_name,),
-            )
-            if cur.fetchone() is None:
-                cur.execute(f'CREATE DATABASE "{database_name}"')
-                print(f"created database {database_name}")
-            else:
-                print(f"database {database_name} already exists")
+            for name in extra_databases:
+                cur.execute(
+                    "SELECT 1 FROM pg_database WHERE datname = %s",
+                    (name,),
+                )
+                if cur.fetchone() is None:
+                    cur.execute(f'CREATE DATABASE "{name}"')
+                    print(f"created database {name}")
+                else:
+                    print(f"database {name} already exists")
     finally:
         conn.close()
     return 0

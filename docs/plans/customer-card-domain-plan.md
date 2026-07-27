@@ -25,10 +25,10 @@ todos:
     status: completed
   - id: customer-domain-h-implementation
     content: Implementera kunddomänen efter separat operatörsgodkännande
-    status: in_progress
+    status: completed
   - id: customer-domain-i-stateful-evaluation
     content: Testa återkommande syntetiska kunder, tidslinje och deduplicering
-    status: pending
+    status: in_progress
   - id: customer-domain-j-closure
     content: Slutverifiera kundkortet och dokumentera produktgränser
     status: pending
