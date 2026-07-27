@@ -12,6 +12,7 @@ import httpx
 
 from app.evaluation.live.config import LiveEvalConfig, get_live_eval_config
 from app.evaluation.live.constants import (
+    SUBJECT_TOKEN_PREFIX,
     TELEMETRY_TESTBOT_SEND_ATTEMPT,
     TELEMETRY_TESTBOT_SEND_RECONCILE,
     TELEMETRY_TESTBOT_SEND_SUCCEEDED,
@@ -546,12 +547,26 @@ def observe_expected_sender_reply(
     expires_at: datetime | None = None,
     timeout_seconds: float = 120.0,
     poll_interval_seconds: float = 3.0,
+    provider_message_id: str | None = None,
 ) -> ExpectedReplyEvidence | None:
     """Poll sender inbox and recipient Sent for required app reply."""
     import time
 
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline:
+        if provider_message_id:
+            evidence = _observe_reply_by_provider_message_id(
+                provider_message_id=provider_message_id,
+                evaluation_run_id=evaluation_run_id,
+                scenario_id=scenario_id,
+                attempt_id=attempt_id,
+                expected_recipient=expected_recipient,
+                expected_sender=expected_sender,
+                send_window_start=send_window_start,
+                expires_at=expires_at,
+            )
+            if evidence is not None:
+                return evidence
         evidence = _find_expected_sender_reply(
             evaluation_run_id=evaluation_run_id,
             scenario_id=scenario_id,
@@ -595,6 +610,7 @@ def _matches_expected_reply(
     send_window_start: datetime,
     window_end: datetime,
     require_sender_inbox: bool,
+    require_matching_from: bool = True,
 ) -> bool:
     parsed = parse_subject_token(str(detail.get("subject") or ""))
     if parsed is None:
@@ -605,8 +621,9 @@ def _matches_expected_reply(
         or parsed.attempt_id != attempt_id
     ):
         return False
-    if _parse_from_email(str(detail.get("from") or "")) != expected_recipient.strip().lower():
-        return False
+    if require_matching_from:
+        if _parse_from_email(str(detail.get("from") or "")) != expected_recipient.strip().lower():
+            return False
     if require_sender_inbox:
         recipients = _sent_recipient_emails(detail)
         if expected_sender.strip().lower() not in recipients:
@@ -630,6 +647,7 @@ def _search_reply_evidence(
     send_window_start: datetime,
     window_end: datetime,
     require_sender_inbox: bool,
+    require_matching_from: bool = True,
 ) -> ExpectedReplyEvidence | None:
     ids = client.list_message_ids(max_results=_RECONCILE_CANDIDATE_CAP, query=query)
     matches: list[ExpectedReplyEvidence] = []
@@ -645,12 +663,57 @@ def _search_reply_evidence(
             send_window_start=send_window_start,
             window_end=window_end,
             require_sender_inbox=require_sender_inbox,
+            require_matching_from=require_matching_from,
         ):
             continue
         matches.append(_reply_evidence_from_message(message_id=message_id, detail=detail))
     if len(matches) > 1:
         raise LiveEvalSafetyError("correlation_failure: multiple expected replies")
     return matches[0] if matches else None
+
+
+def _observe_reply_by_provider_message_id(
+    *,
+    provider_message_id: str,
+    evaluation_run_id: str,
+    scenario_id: str,
+    attempt_id: int,
+    expected_recipient: str,
+    expected_sender: str,
+    send_window_start: datetime,
+    expires_at: datetime | None = None,
+) -> ExpectedReplyEvidence | None:
+    """Fetch a provider-accepted reply directly by Gmail message id (read-only)."""
+    message_id = (provider_message_id or "").strip()
+    if not message_id:
+        return None
+    window_end = expires_at or datetime.now(timezone.utc)
+    search_kwargs = {
+        "evaluation_run_id": evaluation_run_id,
+        "scenario_id": scenario_id,
+        "attempt_id": attempt_id,
+        "expected_recipient": expected_recipient.strip().lower(),
+        "expected_sender": expected_sender.strip().lower(),
+        "send_window_start": send_window_start,
+        "window_end": window_end,
+    }
+    for build_client in (build_recipient_client, build_sender_client):
+        try:
+            client = build_client()
+        except LiveEvalSafetyError:
+            continue
+        try:
+            detail = client.get_message(message_id)
+        except _TRANSPORT_ERRORS:
+            continue
+        if _matches_expected_reply(
+            detail,
+            require_sender_inbox=False,
+            require_matching_from=False,
+            **search_kwargs,
+        ):
+            return _reply_evidence_from_message(message_id=message_id, detail=detail)
+    return None
 
 
 def _find_expected_sender_reply(
@@ -678,9 +741,12 @@ def _find_expected_sender_reply(
     }
 
     sender_client = build_sender_client()
+    token = f"{SUBJECT_TOKEN_PREFIX}/{evaluation_run_id}"
     for query in (
         f"from:{recipient} to:{sender} after:{after_epoch}",
         f"from:{recipient} after:{after_epoch}",
+        f"in:anywhere from:{recipient} to:{sender} after:{after_epoch}",
+        f'in:anywhere subject:"{token}" to:{sender} after:{after_epoch}',
     ):
         evidence = _search_reply_evidence(
             sender_client,
@@ -696,12 +762,21 @@ def _find_expected_sender_reply(
     except LiveEvalSafetyError:
         return None
 
-    return _search_reply_evidence(
-        recipient_client,
-        query=f"in:sent to:{sender} after:{after_epoch}",
-        require_sender_inbox=False,
-        **search_kwargs,
-    )
+    for query in (
+        f"in:sent to:{sender} after:{after_epoch}",
+        f"in:anywhere in:sent to:{sender} after:{after_epoch}",
+        f'in:anywhere in:sent subject:"{token}" after:{after_epoch}',
+    ):
+        evidence = _search_reply_evidence(
+            recipient_client,
+            query=query,
+            require_sender_inbox=False,
+            require_matching_from=False,
+            **search_kwargs,
+        )
+        if evidence is not None:
+            return evidence
+    return None
 
 
 def archive_unexpected_reply(*, message_id: str) -> None:

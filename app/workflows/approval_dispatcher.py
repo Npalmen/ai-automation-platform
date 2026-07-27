@@ -79,7 +79,44 @@ def _materialize_per_action_approvals(db: Session, job: Job) -> Job:
 
     trace = create_trace_session(job, source=PipelineRunSource.INTAKE, db=db)
     materialized = process_action_dispatch_job(job, db=db, trace=trace)
-    return JobRepository.update_job(db, materialized)
+    updated = JobRepository.update_job(db, materialized)
+    _cancel_superseded_job_level_approvals(db, updated)
+    return updated
+
+
+def _cancel_superseded_job_level_approvals(db: Session, job: Job) -> None:
+    """Reject legacy job-level pending rows when per-action approvals are authoritative."""
+    rows = ApprovalRequestRepository.list_for_job(
+        db=db,
+        tenant_id=job.tenant_id,
+        job_id=job.job_id,
+    )
+    has_per_action = any(
+        row.next_on_approve in ("action_execute", "email_send")
+        for row in rows
+    )
+    if not has_per_action:
+        return
+
+    now = _utcnow()
+    changed = False
+    for row in rows:
+        if row.state != "pending":
+            continue
+        if row.next_on_approve != "action_dispatch":
+            continue
+        ApprovalRequestRepository.transition_state_if_pending(
+            db,
+            tenant_id=job.tenant_id,
+            approval_id=row.approval_id,
+            new_state="rejected",
+            resolved_at=now,
+            resolved_by="system",
+            resolution_note="superseded_by_per_action_approval",
+        )
+        changed = True
+    if changed:
+        db.commit()
 
 
 def dispatch_approval_request(db: Session | None, job: Job) -> Job:
@@ -111,6 +148,8 @@ def dispatch_approval_request(db: Session | None, job: Job) -> Job:
         updated_job = JobRepository.update_job(db, updated_job)
         if action_dispatch_pending_approval_count(updated_job) == 0:
             updated_job = _materialize_per_action_approvals(db, updated_job)
+        else:
+            _cancel_superseded_job_level_approvals(db, updated_job)
         # Per-action approvals from action_dispatch_processor are authoritative in DB.
         # Do not create a competing job-level row (next_on_approve=action_dispatch) that
         # would shadow the per-action approval (action_execute) for operators.
