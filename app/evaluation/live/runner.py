@@ -624,6 +624,7 @@ class LiveEvalRunner:
                 scenario_id=self.scenario_id,
                 attempt_id=self.attempt_id,
                 expected_recipient=self.expected_recipient,
+                expected_sender=self.expected_sender,
                 send_window_start=self.send_window_start,
                 expires_at=expires_at,
             )
@@ -894,9 +895,28 @@ class LiveEvalRunner:
                 sec.expected_final_state == "remain_pending"
                 for sec in outcome.secondary_approvals
             )
+            observation_for_assert = observation
+            job_id_for_secondary = (observation.get("job") or {}).get("job_id")
+            post_approvals: list = []
+            if ctx.operator_execution is not None and job_id_for_secondary:
+                post_approvals = list_job_approvals(
+                    base_url=self.base_url,
+                    admin_api_key=self.observer.admin_api_key,
+                    tenant_id=self.tenant_id,
+                    job_id=str(job_id_for_secondary),
+                )
+                pending_count = sum(1 for row in post_approvals if row.state == "pending")
+                observation_for_assert = {
+                    **observation,
+                    "job": {
+                        **(observation.get("job") or {}),
+                        "has_pending_approvals": pending_count > 0,
+                        "pending_approval_count": pending_count,
+                    },
+                }
             violations.extend(
                 assert_semi_automatic_campaign_pipeline(
-                    observation,
+                    observation_for_assert,
                     expected_job_type=self.expected_job_type,
                     expected_job_status=outcome.final_job_status,
                     expected_policy_authorization=outcome.policy_authorization,
@@ -918,14 +938,7 @@ class LiveEvalRunner:
                         expect_execution_outcome=outcome.expected_reply,
                     )
                 )
-            job_id_for_secondary = (observation.get("job") or {}).get("job_id")
             if ctx.operator_execution is not None and job_id_for_secondary:
-                post_approvals = list_job_approvals(
-                    base_url=self.base_url,
-                    admin_api_key=self.observer.admin_api_key,
-                    tenant_id=self.tenant_id,
-                    job_id=str(job_id_for_secondary),
-                )
                 violations.extend(
                     assert_secondary_approvals(
                         approvals=post_approvals,
