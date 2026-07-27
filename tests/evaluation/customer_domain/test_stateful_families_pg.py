@@ -68,3 +68,20 @@ def test_family_04_company_contacts(pg_engine):
 def test_family_05_ambiguous_identity(pg_engine):
     result = _run_family(pg_engine, "f05", run_family_05)
     assert result.result == "PASS", result.failures
+
+
+@pytest.mark.pg_eval
+def test_tenant_controls_isolation(pg_engine):
+    from app.evaluation.customer_domain.controls import run_tenant_controls, tenant_control_ids
+
+    tenant_a, tenant_b = tenant_control_ids("pg_iso")
+    result = run_tenant_controls(pg_engine, tenant_a, tenant_b)
+    assert result["result"] == "PASS", result.get("failures")
+
+
+@pytest.mark.pg_eval
+def test_concurrency_controls(pg_engine):
+    from app.evaluation.customer_domain.controls import run_concurrency_controls
+
+    result = run_concurrency_controls(pg_engine, "eval_cd_pg_concurrency")
+    assert result["result"] == "PASS", result
