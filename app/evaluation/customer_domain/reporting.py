@@ -11,19 +11,26 @@ REPORT_SCHEMA_VERSION = "customer_domain_stateful_eval_v1"
 
 
 def _scan_for_credentials(payload: Any) -> bool:
-    forbidden = (
+    forbidden_value_tokens = (
         "password",
         "api_key",
         "access_token",
         "refresh_token",
         "authorization",
-        "credential",
-        "secret",
+        "bearer ",
+        "refresh_token",
+    )
+    forbidden_key_tokens = (
+        "password",
+        "api_key",
+        "access_token",
+        "refresh_token",
+        "authorization",
     )
     if isinstance(payload, dict):
         for key, value in payload.items():
             key_norm = str(key).lower()
-            if any(token in key_norm for token in forbidden):
+            if any(token in key_norm for token in forbidden_key_tokens):
                 return True
             if _scan_for_credentials(value):
                 return True
@@ -31,7 +38,7 @@ def _scan_for_credentials(payload: Any) -> bool:
         return any(_scan_for_credentials(item) for item in payload)
     elif isinstance(payload, str):
         lower = payload.lower()
-        return any(token in lower for token in ("api_key=", "bearer ", "refresh_token"))
+        return any(token in lower for token in forbidden_value_tokens)
     return False
 
 
