@@ -12,12 +12,13 @@ from app.evaluation.live.subject_parser import build_subject_with_token
 def test_expected_reply_found_in_recipient_sent_folder(live_eval_env, monkeypatch):
     monkeypatch.setenv("EXTERNAL_SIDE_EFFECT_TESTS", "yes")
     run_id = "run-reply-sent-1"
-    subject = f"Re: {build_subject_with_token(
+    base_subject = build_subject_with_token(
         evaluation_run_id=run_id,
-        scenario_id='TBSM01_lead_approve_reply',
+        scenario_id="TBSM01_lead_approve_reply",
         attempt_id=1,
-        base_subject='Offert',
-    )}"
+        base_subject="Offert",
+    )
+    subject = f"Re: {base_subject}"
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     msg = {
         "message_id": "sent-reply-1",
