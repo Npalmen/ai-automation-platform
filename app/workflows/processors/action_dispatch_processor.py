@@ -10,7 +10,7 @@ from app.core.audit_service import create_audit_event
 from app.domain.workflows.models import Job
 from app.repositories.postgres.action_execution_repository import ActionExecutionRepository
 from app.service_profiles.name_extraction import resolve_customer_name
-from app.workflows.action_executor import execute_action
+from app.workflows.action_executor import _integration_allowed_for_action, execute_action
 from app.workflows.action_authorization import apply_action_authorization, classify_action, ActionEffect
 from app.workflows.decision_record_service import record_action_authorization
 from app.workflows.intelligence_safety import assess_content_risk
@@ -56,6 +56,47 @@ _PROFILE_OPENERS: dict[str, str] = {
 _ORG_PREFIX_WORDS = frozenset({"brf", "ab", "hb", "kb", "ab.", "ltd", "inc", "as", "oy"})
 
 
+def _dispatch_integration_gate_applies(tenant_id: str, db: Session | None) -> bool:
+    """Apply integration skip only when tenant integration policy is authoritative."""
+    from app.core.config import TENANT_CONFIGS
+
+    if db is not None:
+        try:
+            from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+            from app.repositories.postgres.tenant_config_models import TenantConfigRecord
+
+            record = TenantConfigRepository.get(db, tenant_id)
+            if isinstance(record, TenantConfigRecord):
+                return True
+        except Exception:
+            pass
+    return tenant_id in TENANT_CONFIGS
+
+
+def _integration_allowed_at_dispatch(
+    action_type: str,
+    tenant_id: str,
+    db: Session | None,
+) -> bool:
+    """Resolve integration policy from DB when authoritative, else static tenant config."""
+    from app.core.config import TENANT_CONFIGS
+
+    effective_db = db
+    if tenant_id in TENANT_CONFIGS:
+        try:
+            from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
+            from app.repositories.postgres.tenant_config_models import TenantConfigRecord
+
+            if db is None or not isinstance(
+                TenantConfigRepository.get(db, tenant_id),
+                TenantConfigRecord,
+            ):
+                effective_db = None
+        except Exception:
+            effective_db = None
+    return _integration_allowed_for_action(action_type, tenant_id, db=effective_db)
+
+
 def _apply_dispatch_authorization(
     job: Job,
     actions: list[dict[str, Any]],
@@ -86,6 +127,21 @@ def _apply_dispatch_authorization(
             policy_decision=policy_decision,
             pre_authorized=bool(action.get("_pre_authorized")) or resume_after_job_approval,
         )
+        if not annotated.get("_skip") and _dispatch_integration_gate_applies(job.tenant_id, db):
+            spec = classify_action(annotated.get("type"))
+            if (
+                spec is not None
+                and spec.effect == ActionEffect.EXTERNAL_WRITE
+                and not _integration_allowed_at_dispatch(
+                    str(annotated.get("type") or ""),
+                    job.tenant_id,
+                    db,
+                )
+            ):
+                annotated = _build_skipped_action(
+                    str(annotated.get("type") or "unknown"),
+                    "integration_not_allowed",
+                )
         if (
             db is not None
             and trace is not None

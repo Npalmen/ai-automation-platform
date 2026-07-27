@@ -84,6 +84,23 @@ def _materialize_per_action_approvals(db: Session, job: Job) -> Job:
     return updated
 
 
+def _has_authoritative_per_action_approvals(
+    db: Session,
+    *,
+    tenant_id: str,
+    job_id: str,
+) -> bool:
+    rows = ApprovalRequestRepository.list_for_job(
+        db=db,
+        tenant_id=tenant_id,
+        job_id=job_id,
+    )
+    return any(
+        row.next_on_approve in ("action_execute", "email_send")
+        for row in rows
+    )
+
+
 def _cancel_superseded_job_level_approvals(db: Session, job: Job) -> None:
     """Reject legacy job-level pending rows when per-action approvals are authoritative."""
     rows = ApprovalRequestRepository.list_for_job(
@@ -153,7 +170,14 @@ def dispatch_approval_request(db: Session | None, job: Job) -> Job:
         # Per-action approvals from action_dispatch_processor are authoritative in DB.
         # Do not create a competing job-level row (next_on_approve=action_dispatch) that
         # would shadow the per-action approval (action_execute) for operators.
-        if action_dispatch_pending_approval_count(updated_job) == 0:
+        if (
+            action_dispatch_pending_approval_count(updated_job) == 0
+            and not _has_authoritative_per_action_approvals(
+                db,
+                tenant_id=updated_job.tenant_id,
+                job_id=updated_job.job_id,
+            )
+        ):
             ApprovalRequestRepository.upsert_from_payload(
                 db=db,
                 tenant_id=updated_job.tenant_id,
