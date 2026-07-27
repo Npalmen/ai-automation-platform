@@ -66,7 +66,7 @@ def test_expected_reply_found_by_provider_message_id(live_eval_env, monkeypatch)
     )
     subject = f"Re: {base_subject}"
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    msg = {
+    provider_sent_msg = {
         "message_id": "provider-msg-99",
         "thread_id": "thread-1",
         "subject": subject,
@@ -76,11 +76,15 @@ def test_expected_reply_found_by_provider_message_id(live_eval_env, monkeypatch)
         "label_ids": ["SENT"],
         "internal_date_ms": now_ms,
     }
+    recipient_inbox_msg = {
+        **provider_sent_msg,
+        "label_ids": ["INBOX"],
+    }
     recipient_client = MagicMock()
-    recipient_client.get_message.return_value = msg
+    recipient_client.get_message.return_value = provider_sent_msg
     sender_client = MagicMock()
     sender_client.list_message_ids.return_value = ["provider-msg-99"]
-    sender_client.get_message.return_value = msg
+    sender_client.get_message.return_value = recipient_inbox_msg
 
     with patch(
         "app.evaluation.live.gmail_transport.build_recipient_client",

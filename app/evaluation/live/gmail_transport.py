@@ -633,22 +633,123 @@ def observe_expected_sender_reply(
             )
             if evidence is not None:
                 return evidence
-        evidence = _find_expected_sender_reply(
-            evaluation_run_id=evaluation_run_id,
-            scenario_id=scenario_id,
-            attempt_id=attempt_id,
-            expected_recipient=expected_recipient,
-            expected_sender=expected_sender,
-            send_window_start=send_window_start,
-            expires_at=expires_at,
-            inbound_rfc_message_id=inbound_rfc_message_id,
-            campaign_run_id=campaign_run_id,
-            provider_rfc_message_id=None,
-        )
-        if evidence is not None:
-            return evidence
+        elif not provider_message_id:
+            evidence = _find_expected_sender_reply(
+                evaluation_run_id=evaluation_run_id,
+                scenario_id=scenario_id,
+                attempt_id=attempt_id,
+                expected_recipient=expected_recipient,
+                expected_sender=expected_sender,
+                send_window_start=send_window_start,
+                expires_at=expires_at,
+                inbound_rfc_message_id=inbound_rfc_message_id,
+                campaign_run_id=campaign_run_id,
+                provider_rfc_message_id=None,
+            )
+            if evidence is not None:
+                return evidence
         time.sleep(poll_interval_seconds)
     return None
+
+
+def _from_matches_app_mailbox(
+    from_email: str,
+    *,
+    expected_recipient: str,
+    expected_sender: str,
+) -> bool:
+    """Reply must originate from app mailbox or send-as alias, never the testbot sender."""
+    from_addr = from_email.strip().lower()
+    sender = expected_sender.strip().lower()
+    if not from_addr or from_addr == sender:
+        return False
+    return True
+
+
+def _classify_sent_recipient_exclusion(
+    detail: dict[str, Any],
+    *,
+    expected_sender: str,
+    inbound_rfc_message_id: str | None,
+) -> str:
+    from_email = _parse_from_email(str(detail.get("from") or ""))
+    msg_rfc = _normalize_rfc_message_id(str(detail.get("internet_message_id") or ""))
+    inbound_norm = _normalize_rfc_message_id(inbound_rfc_message_id)
+    sender = expected_sender.strip().lower()
+    if from_email == sender:
+        return "inbound_sent_copy_not_reply"
+    if inbound_norm and msg_rfc == inbound_norm:
+        return "inbound_sent_copy_not_reply"
+    if from_email and from_email != sender:
+        return "sent_candidate_wrong_sender"
+    return "sent_candidate_wrong_rfc_message_id"
+
+
+def _matches_provider_rfc_recipient_candidate(
+    detail: dict[str, Any],
+    *,
+    provider_rfc_message_id: str,
+    expected_recipient: str,
+    expected_sender: str,
+    send_window_start: datetime,
+    window_end: datetime,
+    evaluation_run_id: str,
+    scenario_id: str,
+    campaign_run_id: str | None,
+    inbound_rfc_message_id: str | None,
+) -> bool:
+    labels = [str(label) for label in (detail.get("label_ids") or [])]
+    label_set = set(labels)
+    if "SENT" in label_set:
+        return False
+    if "TRASH" in label_set:
+        return False
+
+    msg_rfc = _normalize_rfc_message_id(str(detail.get("internet_message_id") or ""))
+    provider_norm = _normalize_rfc_message_id(provider_rfc_message_id)
+    if not provider_norm or msg_rfc != provider_norm:
+        return False
+
+    recipients = _sent_recipient_emails(detail)
+    if expected_sender.strip().lower() not in recipients:
+        return False
+
+    from_email = _parse_from_email(str(detail.get("from") or ""))
+    if from_email == expected_sender.strip().lower():
+        return False
+    if from_email and not _from_matches_app_mailbox(
+        from_email,
+        expected_recipient=expected_recipient,
+        expected_sender=expected_sender,
+    ):
+        return False
+
+    if not _message_in_send_window(
+        detail,
+        window_start=send_window_start,
+        window_end=window_end,
+    ):
+        return False
+
+    in_reply = _normalize_rfc_message_id(str(detail.get("in_reply_to") or ""))
+    inbound_norm = _normalize_rfc_message_id(inbound_rfc_message_id)
+    if inbound_norm and in_reply and in_reply != inbound_norm:
+        return False
+
+    subject = str(detail.get("subject") or "")
+    body = str(detail.get("body_text") or "")
+    parsed = parse_subject_token(subject)
+    if parsed is not None:
+        return (
+            parsed.evaluation_run_id == evaluation_run_id
+            and parsed.scenario_id == scenario_id
+        )
+    if evaluation_run_id in subject or evaluation_run_id in body:
+        return True
+    if campaign_run_id and (campaign_run_id in subject or campaign_run_id in body):
+        return True
+    # Provider RFC exact match is authoritative even without subject token.
+    return True
 
 
 def fetch_provider_sent_reply_object(
@@ -656,13 +757,13 @@ def fetch_provider_sent_reply_object(
     provider_message_id: str,
     expected_sender: str,
     expected_recipient: str,
+    inbound_rfc_message_id: str | None = None,
 ) -> ProviderSentObjectEvidence | None:
     """Fetch provider-accepted reply directly by Gmail message id (read-only)."""
     message_id = (provider_message_id or "").strip()
     if not message_id:
         return None
     sender = expected_sender.strip().lower()
-    recipient = expected_recipient.strip().lower()
     try:
         client = build_recipient_client()
     except LiveEvalSafetyError:
@@ -672,10 +773,20 @@ def fetch_provider_sent_reply_object(
     except _TRANSPORT_ERRORS:
         return None
     labels = tuple(str(label) for label in (detail.get("label_ids") or []))
+    if "SENT" not in labels:
+        return None
     recipients = tuple(_sent_recipient_emails(detail))
     if sender not in recipients:
         return None
     from_email = _parse_from_email(str(detail.get("from") or ""))
+    if from_email == sender:
+        return None
+    in_reply_to = _normalize_rfc_message_id(
+        str(detail.get("in_reply_to") or "") or None
+    )
+    inbound_norm = _normalize_rfc_message_id(inbound_rfc_message_id)
+    if inbound_norm and in_reply_to and in_reply_to != inbound_norm:
+        return None
     return ProviderSentObjectEvidence(
         message_id=str(detail.get("message_id") or message_id),
         thread_id=str(detail.get("thread_id") or ""),
@@ -776,12 +887,31 @@ def _search_reply_evidence(
     require_matching_from: bool = True,
     require_subject_token: bool = True,
     campaign_run_id: str | None = None,
+    provider_rfc_message_id: str | None = None,
+    inbound_rfc_message_id: str | None = None,
 ) -> ExpectedReplyEvidence | None:
     ids = client.list_message_ids(max_results=_RECONCILE_CANDIDATE_CAP, query=query)
     matches: list[ExpectedReplyEvidence] = []
     for message_id in ids:
         detail = client.get_message(message_id)
-        if require_subject_token and not _matches_expected_reply(
+        labels = [str(label) for label in (detail.get("label_ids") or [])]
+        if "SENT" in labels:
+            continue
+        if provider_rfc_message_id:
+            if not _matches_provider_rfc_recipient_candidate(
+                detail,
+                provider_rfc_message_id=provider_rfc_message_id,
+                expected_recipient=expected_recipient,
+                expected_sender=expected_sender,
+                send_window_start=send_window_start,
+                window_end=window_end,
+                evaluation_run_id=evaluation_run_id,
+                scenario_id=scenario_id,
+                campaign_run_id=campaign_run_id,
+                inbound_rfc_message_id=inbound_rfc_message_id,
+            ):
+                continue
+        elif require_subject_token and not _matches_expected_reply(
             detail,
             evaluation_run_id=evaluation_run_id,
             scenario_id=scenario_id,
@@ -794,7 +924,7 @@ def _search_reply_evidence(
             require_matching_from=require_matching_from,
         ):
             continue
-        if not require_subject_token and not _matches_recipient_delivery(
+        elif not require_subject_token and not _matches_recipient_delivery(
             detail,
             expected_recipient=expected_recipient,
             expected_sender=expected_sender,
@@ -805,7 +935,7 @@ def _search_reply_evidence(
             campaign_run_id=campaign_run_id,
         ):
             continue
-        placement = _classify_recipient_placement(detail.get("label_ids") or [])
+        placement = _classify_recipient_placement(labels)
         matches.append(
             _reply_evidence_from_message(
                 message_id=message_id,
@@ -872,8 +1002,11 @@ def _observe_reply_by_provider_message_id(
         provider_message_id=provider_message_id,
         expected_sender=expected_sender,
         expected_recipient=expected_recipient,
+        inbound_rfc_message_id=inbound_rfc_message_id,
     )
-    if provider_object is None:
+    if provider_object is None or not provider_object.in_sent:
+        return None
+    if not provider_object.rfc_message_id:
         return None
     return _find_expected_sender_reply(
         evaluation_run_id=evaluation_run_id,
@@ -886,6 +1019,7 @@ def _observe_reply_by_provider_message_id(
         inbound_rfc_message_id=inbound_rfc_message_id,
         campaign_run_id=campaign_run_id,
         provider_rfc_message_id=provider_object.rfc_message_id,
+        provider_only=True,
     )
 
 
@@ -896,9 +1030,9 @@ def _build_recipient_search_queries(
     expected_recipient: str,
     expected_sender: str,
     after_epoch: int,
-    inbound_rfc_message_id: str | None,
     campaign_run_id: str | None,
     provider_rfc_message_id: str | None,
+    provider_only: bool = False,
 ) -> list[str]:
     sender = expected_sender.strip().lower()
     recipient = expected_recipient.strip().lower()
@@ -906,9 +1040,8 @@ def _build_recipient_search_queries(
     provider_query = _rfc822msgid_query(provider_rfc_message_id)
     if provider_query:
         queries.append(f"in:anywhere {provider_query}")
-    inbound_query = _rfc822msgid_query(inbound_rfc_message_id)
-    if inbound_query:
-        queries.append(f"in:anywhere {inbound_query}")
+        if provider_only:
+            return queries
     if campaign_run_id:
         queries.append(f'in:anywhere "{campaign_run_id}"')
     queries.append(f'in:anywhere "{evaluation_run_id}"')
@@ -938,6 +1071,7 @@ def _find_expected_sender_reply(
     inbound_rfc_message_id: str | None = None,
     campaign_run_id: str | None = None,
     provider_rfc_message_id: str | None = None,
+    provider_only: bool = False,
 ) -> ExpectedReplyEvidence | None:
     after_epoch = int(send_window_start.astimezone(timezone.utc).timestamp()) - 60
     window_end = expires_at or datetime.now(timezone.utc)
@@ -951,6 +1085,7 @@ def _find_expected_sender_reply(
         "expected_sender": sender,
         "send_window_start": send_window_start,
         "window_end": window_end,
+        "inbound_rfc_message_id": inbound_rfc_message_id,
     }
 
     sender_client = build_sender_client()
@@ -960,22 +1095,28 @@ def _find_expected_sender_reply(
         expected_recipient=recipient,
         expected_sender=sender,
         after_epoch=after_epoch,
-        inbound_rfc_message_id=inbound_rfc_message_id,
         campaign_run_id=campaign_run_id,
         provider_rfc_message_id=provider_rfc_message_id,
+        provider_only=provider_only,
     )
     for index, query in enumerate(queries):
-        require_subject_token = index >= 4 and not provider_rfc_message_id
+        require_subject_token = (
+            not provider_rfc_message_id and index >= 3 and not provider_only
+        )
         evidence = _search_reply_evidence(
             sender_client,
             query=query,
             require_sender_inbox=True,
             require_subject_token=require_subject_token,
             campaign_run_id=campaign_run_id,
+            provider_rfc_message_id=provider_rfc_message_id,
             **search_kwargs,
         )
         if evidence is not None:
             return evidence
+
+    if provider_only:
+        return None
 
     try:
         recipient_client = build_recipient_client()
