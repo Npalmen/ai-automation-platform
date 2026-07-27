@@ -15,11 +15,15 @@ from app.evaluation.live.campaign.gates import (
     validate_no_production_resources,
 )
 from app.evaluation.live.campaign.modes import CAMPAIGN_TYPE_REPLY_BUDGET
-from app.evaluation.live.campaign.registry import list_campaign_scenarios
+from app.evaluation.live.campaign.registry import get_campaign_scenario, list_campaign_scenarios
 from app.evaluation.live.campaign.report import CampaignReport, write_campaign_report
 from app.evaluation.live.campaign.reply_metrics import (
     CampaignReplyTotals,
     ScenarioReplyMetrics,
+)
+from app.evaluation.live.campaign.scenario_budget import (
+    SelectedScenarioBudget,
+    build_selected_scenario_budget,
 )
 from app.evaluation.live.campaign.schemas import CampaignScenario
 from app.evaluation.live.campaign.semi_automatic_expected_outcomes import (
@@ -60,6 +64,7 @@ class ObserveCampaignResult:
     external_writes: int = 0
     safety_violations: list[str] = field(default_factory=list)
     reply_totals: CampaignReplyTotals | None = None
+    selected_scenario_budget: SelectedScenarioBudget | None = None
     main_sha: str = ""
     server_sha: str | None = None
 
@@ -98,6 +103,17 @@ class ObserveCampaignResult:
         }
         if self.reply_totals is not None:
             payload["reply_totals"] = self.reply_totals.to_dict()
+        if self.selected_scenario_budget is not None:
+            payload["selected_scenario_budget"] = self.selected_scenario_budget.to_dict()
+            payload["campaign_type_reply_ceiling"] = (
+                self.selected_scenario_budget.campaign_type_reply_ceiling
+            )
+            payload["selected_scenario_expected_replies"] = (
+                self.selected_scenario_budget.selected_scenario_expected_replies
+            )
+            payload["selected_scenario_authorized_reply_budget"] = (
+                self.selected_scenario_budget.selected_scenario_authorized_reply_budget
+            )
         return payload
 
 
@@ -277,29 +293,26 @@ def run_semi_automatic_campaign(
     if prod_issues:
         raise LiveEvalSafetyError("; ".join(prod_issues))
 
+    selected_budget = build_selected_scenario_budget(
+        campaign_type=campaign_type,
+        selected_scenario_ids=scenario_ids,
+    )
+    scenarios = [
+        get_campaign_scenario(scenario_id)
+        for scenario_id in selected_budget.selected_scenario_ids
+    ]
+
     senders = sorted(config.sender_emails)
     recipients = sorted(config.recipient_emails)
     if len(senders) != 1 or len(recipients) != 1:
         raise LiveEvalSafetyError("exactly one allowlisted sender and recipient required")
-
-    scenarios = list_campaign_scenarios(campaign_type=campaign_type)
-    if scenario_ids:
-        allowed = frozenset(scenario_ids)
-        scenarios = [scenario for scenario in scenarios if scenario.scenario_id in allowed]
-        missing = sorted(allowed - {scenario.scenario_id for scenario in scenarios})
-        if missing:
-            raise LiveEvalSafetyError(
-                f"unknown or unavailable campaign scenarios: {', '.join(missing)}"
-            )
-    if not scenarios:
-        raise LiveEvalSafetyError(f"no scenarios for campaign_type={campaign_type!r}")
 
     campaign_run_id = new_evaluation_run_id()
     results: list[ScenarioResult] = []
     safety_violations: list[str] = []
     sends = 0
     approval_resolutions = 0
-    reply_budget_remaining = reply_ceiling
+    reply_budget_remaining = selected_budget.max_reply_count
     scenario_reply_metrics: list[ScenarioReplyMetrics] = []
 
     for scenario in scenarios:
@@ -338,6 +351,7 @@ def run_semi_automatic_campaign(
             semi_automatic_expected_outcome=expected_outcome,
             reply_budget_remaining=operator_reply_budget,
             campaign_scenario=scenario,
+            campaign_run_id=campaign_run_id,
         )
         exit_code = runner.run()
         sends += 1
@@ -397,23 +411,32 @@ def run_semi_automatic_campaign(
     overall = "passed" if passed == expected_count else "failed"
     if sends != expected_count:
         safety_violations.append(f"send count mismatch: {sends} != {expected_count}")
+    expected_reply_budget = selected_budget.expected_reply_count
+    expected_recipient_verified = selected_budget.expected_reply_count
     if reply_totals is not None:
-        if reply_totals.expected_reply_count != reply_ceiling:
+        if reply_totals.expected_reply_count != expected_reply_budget:
             safety_violations.append(
                 "expected_reply_count mismatch: "
-                f"{reply_totals.expected_reply_count} != {reply_ceiling}"
+                f"{reply_totals.expected_reply_count} != {expected_reply_budget}"
             )
-        if reply_totals.recipient_verified_reply_count != reply_ceiling:
+        if reply_totals.recipient_verified_reply_count != expected_recipient_verified:
             safety_violations.append(
                 "recipient_verified_reply_count mismatch: "
-                f"{reply_totals.recipient_verified_reply_count} != {reply_ceiling}"
+                f"{reply_totals.recipient_verified_reply_count} != {expected_recipient_verified}"
             )
         if reply_totals.unauthorized_reply_count != 0:
             safety_violations.append(
                 f"unauthorized_reply_count must be 0, got {reply_totals.unauthorized_reply_count}"
             )
-    elif replies > reply_ceiling:
-        safety_violations.append(f"reply budget exceeded: {replies} > {reply_ceiling}")
+        if reply_totals.recipient_verified_reply_count > selected_budget.max_reply_count:
+            safety_violations.append(
+                "reply budget exceeded: "
+                f"{reply_totals.recipient_verified_reply_count} > {selected_budget.max_reply_count}"
+            )
+    elif replies > selected_budget.max_reply_count:
+        safety_violations.append(
+            f"reply budget exceeded: {replies} > {selected_budget.max_reply_count}"
+        )
 
     campaign_result = ObserveCampaignResult(
         campaign_type=campaign_type,
@@ -425,6 +448,7 @@ def run_semi_automatic_campaign(
         external_writes=0,
         safety_violations=safety_violations,
         reply_totals=reply_totals,
+        selected_scenario_budget=selected_budget,
         main_sha=_git_sha("HEAD"),
         server_sha=os.environ.get("BUILD_GIT_SHA"),
     )

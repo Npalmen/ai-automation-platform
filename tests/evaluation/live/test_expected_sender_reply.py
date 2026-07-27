@@ -68,20 +68,26 @@ def test_expected_reply_found_by_provider_message_id(live_eval_env, monkeypatch)
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     msg = {
         "message_id": "provider-msg-99",
+        "thread_id": "thread-1",
         "subject": subject,
-        "from": "alias@eval.test",
+        "from": "recipient@eval.test",
         "to": "sender@eval.test",
+        "internet_message_id": "<provider-rfc@mail.test>",
+        "label_ids": ["SENT"],
         "internal_date_ms": now_ms,
     }
     recipient_client = MagicMock()
     recipient_client.get_message.return_value = msg
+    sender_client = MagicMock()
+    sender_client.list_message_ids.return_value = ["provider-msg-99"]
+    sender_client.get_message.return_value = msg
 
     with patch(
         "app.evaluation.live.gmail_transport.build_recipient_client",
         return_value=recipient_client,
     ), patch(
         "app.evaluation.live.gmail_transport.build_sender_client",
-        side_effect=AssertionError("sender search should not run when provider id matches"),
+        return_value=sender_client,
     ):
         result = observe_expected_sender_reply(
             evaluation_run_id=run_id,

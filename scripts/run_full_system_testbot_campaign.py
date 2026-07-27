@@ -62,11 +62,17 @@ def _dry_run_campaign(campaign_type: str, tenant_id: str) -> int:
     return 0
 
 
-def _validate_campaign(campaign_type: str, tenant_id: str, app_base_url: str) -> int:
+def _validate_campaign(
+    campaign_type: str,
+    tenant_id: str,
+    app_base_url: str,
+    scenario_ids: tuple[str, ...] | None = None,
+) -> int:
     report = build_full_system_testbot_readiness(
         campaign_type=campaign_type,
         tenant_id=tenant_id,
         app_base_url=app_base_url,
+        selected_scenario_ids=scenario_ids,
     )
     print(json.dumps(report.to_dict(), indent=2, ensure_ascii=False))
     return 0 if report.ready else 1
@@ -151,6 +157,11 @@ def main() -> int:
         parents=[common],
     )
     validate_parser.add_argument("--campaign-type", default="transport-smoke")
+    validate_parser.add_argument(
+        "--scenario-ids",
+        default="",
+        help="Comma-separated campaign scenario ids (canary subset)",
+    )
 
     dry_parser = sub.add_parser(
         "dry-run",
@@ -177,10 +188,16 @@ def main() -> int:
     if args.command == "list-scenarios":
         return _list_scenarios(args.campaign_type)
     if args.command == "validate":
+        scenario_ids = tuple(
+            item.strip()
+            for item in str(getattr(args, "scenario_ids", "") or "").split(",")
+            if item.strip()
+        ) or None
         return _validate_campaign(
             getattr(args, "campaign_type", "transport-smoke"),
             args.tenant_id,
             args.app_base_url,
+            scenario_ids=scenario_ids,
         )
     if args.command == "dry-run":
         return _dry_run_campaign(args.campaign_type, args.tenant_id)

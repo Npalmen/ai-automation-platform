@@ -7,16 +7,16 @@ todos:
     status: completed
   - id: finalize-b-gmail-forensics
     content: Fastställ faktisk Gmail-destination, providerobjekt, headers, OAuth-scope och recipient-verifiering
-    status: in_progress
+    status: completed
   - id: finalize-c-reject-approval-truth
     content: Identifiera exakt vilka approval rows förblir pending efter reject och varför
-    status: in_progress
+    status: completed
   - id: finalize-d-bounded-fixes
     content: Implementera minsta bevisade Gmail-, approval-, harness- eller rapporteringsfix
-    status: in_progress
+    status: completed
   - id: finalize-e-regression-delivery
     content: Kör tester, PR, CI, merge och post-merge Release Gate
-    status: pending
+    status: in_progress
   - id: finalize-f-two-scenario-canary
     content: Kör en approve- och en reject-canary med strikt budget
     status: pending
@@ -31,8 +31,9 @@ isProject: true
 
 # Semi-auto finalisering
 
-**Failed run:** `30228379236` @ `3837c739` — 1/8 PASS (TBSM08)  
-**Branch:** `fix/semi-auto-finalization`  
+**Failed run:** `30231548426` @ `a25ccc738` — canary 1/2 PASS (TBSM04), TBSM01 recipient verify FAIL, budget harness `1 != 4`  
+**Prior failed full run:** `30228379236` @ `3837c739` — 1/8 PASS (TBSM08)  
+**Branch:** `fix/semi-auto-recipient-verification-canary-budget`  
 **Prior fixes:** PR #69–#73 (operator-gate, newsletter marker, Re: parser, recipient Sent fallback, API pending)
 
 ## Blockerare (run 30228379236)
