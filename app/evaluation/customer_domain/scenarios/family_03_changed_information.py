@@ -26,7 +26,7 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
         create = ctx.act_create_private_customer(
             db,
             display_name="Change Phone",
-            phone="+46701111111",
+            email="change.phone@example.invalid",
             idempotency_key=new_id(),
         )
         customer_id = create["body"]["customer_id"]
