@@ -102,32 +102,16 @@ from app.evaluation.live.reporting import (
     write_github_step_summary,
 )
 from app.evaluation.live.safety import require_scenario_allowed_for_live_gmail, validate_config_readiness
+from app.evaluation.live.provider_recipient_verification import (
+    extract_provider_execution_outcome,
+    provider_execution_outcome_ready,
+)
 from app.evaluation.live.schemas import LiveEvalReport
 
 
 def _provider_message_id_from_observation(observation: dict[str, Any]) -> str | None:
-    job = observation.get("job") or {}
-    for row in job.get("decision_records") or []:
-        if row.get("record_type") != "execution_outcome":
-            continue
-        if row.get("execution_status") != "succeeded":
-            continue
-        metadata = row.get("metadata") or {}
-        message_id = metadata.get("provider_message_id")
-        if message_id:
-            return str(message_id)
-    trace = job.get("execution_trace") or {}
-    outcome = trace.get("execution_outcome") or {}
-    metadata = outcome.get("metadata") or {}
-    message_id = metadata.get("provider_message_id")
-    if message_id:
-        return str(message_id)
-    for event in observation.get("events") or []:
-        event_metadata = event.get("metadata") or {}
-        message_id = event_metadata.get("provider_message_id")
-        if message_id:
-            return str(message_id)
-    return None
+    outcome = extract_provider_execution_outcome(observation)
+    return outcome.provider_message_id if outcome else None
 
 
 @dataclass
@@ -670,6 +654,7 @@ class LiveEvalRunner:
                     "subject_truncated": expected.subject_truncated,
                     "from_masked": expected.from_masked,
                     "internal_date_ms": expected.internal_date_ms,
+                    "placement": expected.placement,
                 }
 
         if self.use_semi_automatic_assertions and self.semi_automatic_expected_outcome:
@@ -924,6 +909,13 @@ class LiveEvalRunner:
                 record_type="action_approval_resolution",
                 timeout_seconds=min(120, self.config.max_runtime_minutes * 60),
             )
+        if outcome.expected_reply:
+            observation = self.observer.poll_until_provider_execution_outcome(
+                self.evaluation_run_id,
+                timeout_seconds=min(120, self.config.max_runtime_minutes * 60),
+            )
+            if not provider_execution_outcome_ready(observation):
+                raise LiveEvalSafetyError("provider_metadata_not_persisted")
 
         return observation
 

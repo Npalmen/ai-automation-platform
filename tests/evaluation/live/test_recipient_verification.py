@@ -107,8 +107,23 @@ def test_recipient_search_uses_rfc822msgid_query(live_eval_env):
 
 
 def test_recipient_search_uses_in_anywhere(live_eval_env):
+    run_id = "run-anywhere-1"
+    base_subject = build_subject_with_token(
+        evaluation_run_id=run_id,
+        scenario_id="TBSM01_lead_approve_reply",
+        attempt_id=1,
+        base_subject="Offert",
+    )
     sender_client = MagicMock()
-    sender_client.list_message_ids.return_value = []
+    sender_client.list_message_ids.return_value = ["all-mail-1"]
+    sender_client.get_message.return_value = {
+        "message_id": "all-mail-1",
+        "subject": f"Re: {base_subject}",
+        "from": "recipient@eval.test",
+        "to": "sender@eval.test",
+        "label_ids": ["CATEGORY_PERSONAL"],
+        "internal_date_ms": int(datetime.now(timezone.utc).timestamp() * 1000),
+    }
 
     with patch(
         "app.evaluation.live.gmail_transport.build_sender_client",
@@ -118,7 +133,7 @@ def test_recipient_search_uses_in_anywhere(live_eval_env):
         side_effect=LiveEvalSafetyError("missing recipient creds"),
     ):
         observe_expected_sender_reply(
-            evaluation_run_id="run-anywhere-1",
+            evaluation_run_id=run_id,
             scenario_id="TBSM01_lead_approve_reply",
             attempt_id=1,
             expected_recipient="recipient@eval.test",
@@ -126,7 +141,6 @@ def test_recipient_search_uses_in_anywhere(live_eval_env):
             send_window_start=datetime.now(timezone.utc),
             timeout_seconds=0.1,
             poll_interval_seconds=0.01,
-            inbound_rfc_message_id="<inbound-rfc@mail.test>",
         )
 
     assert any(
