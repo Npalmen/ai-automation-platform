@@ -14,7 +14,7 @@ from app.repositories.postgres.live_eval_repository import (
     LiveEvalRunRepository,
 )
 from app.repositories.postgres.job_repository import JobRepository
-from app.workflows.approval_service import has_pending_approval
+from app.workflows.approval_service import count_pending_approvals_for_job
 from app.workflows.processors.ai_processor_utils import get_latest_processor_payload
 
 _MAX_EVENTS = 100
@@ -172,7 +172,8 @@ def build_job_observation(db: Session, tenant_id: str, job_id: str) -> dict[str,
             pipeline_run_id = row["pipeline_run_id"]
             break
 
-    pending = has_pending_approval(job)
+    pending_count = count_pending_approvals_for_job(job, db=db)
+    pending = pending_count > 0
     return {
         "job_id": job.job_id,
         "job_type": job.job_type.value if hasattr(job.job_type, "value") else str(job.job_type),
@@ -187,7 +188,7 @@ def build_job_observation(db: Session, tenant_id: str, job_id: str) -> dict[str,
             "recommended_next_step": policy.get("recommended_next_step"),
         },
         "has_pending_approvals": pending,
-        "pending_approval_count": 1 if pending else 0,
+        "pending_approval_count": pending_count,
         "pipeline_run_id": pipeline_run_id,
         "decision_records": decision_rows,
         "execution_trace": _summarize_execution_trace(decision_rows),

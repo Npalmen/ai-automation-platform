@@ -45,8 +45,8 @@ def assert_s01_live_llm_pipeline(observation: dict[str, Any]) -> list[str]:
     if pending is None:
         if not job.get("has_pending_approvals"):
             violations.append("expected pending approval")
-    elif pending != 1:
-        violations.append(f"expected pending_approval_count 1, got {pending!r}")
+    elif pending < 1:
+        violations.append(f"expected pending_approval_count >= 1, got {pending!r}")
 
     classification = job.get("classification") or {}
     if classification.get("detected_job_type") != "lead":
