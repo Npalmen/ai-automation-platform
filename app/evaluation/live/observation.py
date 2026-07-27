@@ -124,6 +124,7 @@ def _summarize_execution_trace(records: list[dict[str, Any]]) -> dict[str, Any]:
             outcome = {
                 "action_operation_id": row.get("action_operation_id"),
                 "execution_status": row.get("execution_status"),
+                "metadata": metadata,
             }
             operation_id = row.get("action_operation_id") or operation_id
 

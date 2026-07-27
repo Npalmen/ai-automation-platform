@@ -198,3 +198,118 @@ def test_dispatch_materializes_per_action_before_job_level_upsert(dispatcher_db)
     assert len(rows) >= 1
     assert any(row.next_on_approve == "action_execute" for row in rows)
     assert not any(row.next_on_approve == "action_dispatch" for row in rows)
+
+
+def test_materialization_cancels_legacy_job_level_pending(dispatcher_db):
+    """Per-action materialization must reject stale job-level pending rows."""
+    tenant_id = "T_CANCEL_LEGACY"
+    job_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    legacy_id = f"job_{uuid.uuid4().hex[:12]}"
+    dispatcher_db.add(
+        JobRecord(
+            job_id=job_id,
+            tenant_id=tenant_id,
+            job_type="lead",
+            status="awaiting_approval",
+            input_data={
+                "subject": "Offert solceller",
+                "message_text": "Hej, jag vill ha offert.",
+                "sender": {"name": "Anna", "email": "anna@example.com"},
+                "live_eval": {
+                    "evaluation_run_id": "run-cancel-legacy",
+                    "tenant_id": tenant_id,
+                    "scenario_id": "TBSM04_lead_reject",
+                    "attempt_id": 1,
+                    "transport_mode": "live_gmail",
+                    "ai_mode": "fixture_ai",
+                    "config_hash": "abc123",
+                    "trusted": True,
+                },
+            },
+            result={"processor_history": []},
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    dispatcher_db.add(
+        ApprovalRequestRecord(
+            approval_id=legacy_id,
+            tenant_id=tenant_id,
+            job_id=job_id,
+            job_type="lead",
+            state="pending",
+            channel="dashboard",
+            title="Job-level",
+            summary="Legacy",
+            next_on_approve="action_dispatch",
+            request_payload={"approval_id": legacy_id},
+            delivery_payload={},
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    dispatcher_db.commit()
+
+    job = Job(
+        job_id=job_id,
+        tenant_id=tenant_id,
+        job_type=JobType.LEAD,
+        input_data={
+            "subject": "Offert solceller",
+            "message_text": "Hej, jag vill ha offert.",
+            "sender": {"name": "Anna", "email": "anna@example.com"},
+            "live_eval": {
+                "evaluation_run_id": "run-cancel-legacy",
+                "tenant_id": tenant_id,
+                "scenario_id": "TBSM04_lead_reject",
+                "attempt_id": 1,
+                "transport_mode": "live_gmail",
+                "ai_mode": "fixture_ai",
+                "config_hash": "abc123",
+                "trusted": True,
+            },
+        },
+    )
+    job.processor_history = [
+        {
+            "processor": "policy_processor",
+            "result": {
+                "payload": {
+                    "decision": "send_for_approval",
+                    "detected_job_type": "lead",
+                    "recommended_next_step": "awaiting_approval",
+                }
+            },
+        }
+    ]
+    approval_request = build_approval_request(job)
+    job = append_processor_result(
+        job,
+        "human_handoff_processor",
+        {
+            "status": "completed",
+            "payload": {"approval_request": approval_request},
+        },
+    )
+
+    with (
+        patch(
+            "app.workflows.processors.action_dispatch_processor._read_automation_settings",
+            return_value={
+                "followups_enabled": True,
+                "auto_actions": {"lead": "manual"},
+                "internal_notification_email": "",
+            },
+        ),
+        patch(
+            "app.workflows.processors.action_dispatch_processor._compute_lead_sla_payload",
+            return_value=None,
+        ),
+    ):
+        dispatch_approval_request(dispatcher_db, job)
+
+    rows = ApprovalRequestRepository.list_for_job(dispatcher_db, tenant_id=tenant_id, job_id=job_id)
+    legacy = next(row for row in rows if row.approval_id == legacy_id)
+    assert legacy.state == "rejected"
+    assert any(row.next_on_approve == "action_execute" and row.state == "pending" for row in rows)

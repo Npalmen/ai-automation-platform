@@ -24,6 +24,10 @@ from app.evaluation.live.assertions import (
     assert_target_scoped_execution_chain,
     assert_telemetry_summary,
 )
+from app.evaluation.live.campaign.approval_observation import (
+    count_contract_pending_external_write_approvals,
+    is_legacy_job_level_approval,
+)
 from app.evaluation.live.campaign.expected_outcomes import ObserveExpectedOutcome
 from app.evaluation.live.campaign.reply_metrics import (
     ScenarioReplyMetrics,
@@ -99,6 +103,24 @@ from app.evaluation.live.reporting import (
 )
 from app.evaluation.live.safety import require_scenario_allowed_for_live_gmail, validate_config_readiness
 from app.evaluation.live.schemas import LiveEvalReport
+
+
+def _provider_message_id_from_observation(observation: dict[str, Any]) -> str | None:
+    job = observation.get("job") or {}
+    for row in job.get("decision_records") or []:
+        if row.get("record_type") != "execution_outcome":
+            continue
+        if row.get("execution_status") != "succeeded":
+            continue
+        metadata = row.get("metadata") or {}
+        message_id = metadata.get("provider_message_id")
+        if message_id:
+            return str(message_id)
+    trace = job.get("execution_trace") or {}
+    outcome = trace.get("execution_outcome") or {}
+    metadata = outcome.get("metadata") or {}
+    message_id = metadata.get("provider_message_id")
+    return str(message_id) if message_id else None
 
 
 @dataclass
@@ -627,6 +649,7 @@ class LiveEvalRunner:
                 expected_sender=self.expected_sender,
                 send_window_start=self.send_window_start,
                 expires_at=expires_at,
+                provider_message_id=_provider_message_id_from_observation(observation),
             )
             if expected:
                 ctx.expected_reply = {
@@ -905,13 +928,24 @@ class LiveEvalRunner:
                     tenant_id=self.tenant_id,
                     job_id=str(job_id_for_secondary),
                 )
-                pending_count = sum(1 for row in post_approvals if row.state == "pending")
+                pending_count = sum(
+                    1
+                    for row in post_approvals
+                    if row.state == "pending" and not is_legacy_job_level_approval(row)
+                )
+                if expect_pending_post:
+                    effective_pending = pending_count
+                else:
+                    effective_pending = count_contract_pending_external_write_approvals(
+                        post_approvals,
+                        outcome,
+                    )
                 observation_for_assert = {
                     **observation,
                     "job": {
                         **(observation.get("job") or {}),
-                        "has_pending_approvals": pending_count > 0,
-                        "pending_approval_count": pending_count,
+                        "has_pending_approvals": effective_pending > 0,
+                        "pending_approval_count": effective_pending,
                     },
                 }
             violations.extend(

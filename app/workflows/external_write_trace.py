@@ -29,6 +29,19 @@ _UNRESOLVED_STATUSES = frozenset({
 })
 
 
+def _adapter_outcome_metadata(result: dict[str, Any]) -> dict[str, Any]:
+    metadata: dict[str, Any] = {"adapter_status": str(result.get("status"))}
+    payload = result.get("payload") or {}
+    provider_message_id = None
+    if isinstance(payload, dict):
+        provider_message_id = payload.get("google_message_id")
+    if not provider_message_id:
+        provider_message_id = result.get("external_id")
+    if provider_message_id:
+        metadata["provider_message_id"] = str(provider_message_id)
+    return metadata
+
+
 def _is_external_write(action_type: str | None) -> bool:
     spec = classify_action(action_type)
     return spec is not None and spec.effect == ActionEffect.EXTERNAL_WRITE
@@ -190,7 +203,7 @@ def execute_external_write_with_trace(
             fingerprint=fingerprint,
             key_version=key_version,
             status=ExecutionStatus.SUCCEEDED,
-            metadata={"adapter_status": str(result.get("status"))},
+            metadata=_adapter_outcome_metadata(result),
         )
     except Exception as persist_exc:
         logger.error(
