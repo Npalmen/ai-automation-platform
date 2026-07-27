@@ -149,6 +149,7 @@ def test_live_eval_workflow_contract():
         "RUN_TRANSPORT_SMOKE",
         "RUN_SEMI_AUTO_CORE",
         "RUN_SEMI_AUTO_CANARY",
+        "RUN_READONLY_FORENSICS",
     ]
 
     operator_gate = data["jobs"]["operator-gate"]
@@ -156,7 +157,10 @@ def test_live_eval_workflow_contract():
     gate_step = _step_by_name(operator_gate["steps"], "Verify live Gmail authorization")
     gate_run = gate_step.get("run") or ""
     assert "merge-base --is-ancestor" in gate_run
-    assert "READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_SEMI_AUTO_CORE|RUN_SEMI_AUTO_CANARY" in gate_run
+    assert (
+        "READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_SEMI_AUTO_CORE|"
+        "RUN_SEMI_AUTO_CANARY|RUN_READONLY_FORENSICS"
+    ) in gate_run
     assert 'test "${GITHUB_REF}" = "refs/heads/main"' not in gate_run
     assert 'test "${{ inputs.confirm_live_gmail }}" = "RUN_S01"' not in gate_run
 
@@ -195,6 +199,13 @@ def test_live_eval_workflow_contract():
         canary_step.get("run") or ""
     )
 
+    forensics_step = _step_by_name(steps, "Live Gmail read-only forensics")
+    assert forensics_step.get("if") == "inputs.confirm_live_gmail == 'RUN_READONLY_FORENSICS'"
+    forensics_run = forensics_step.get("run") or ""
+    assert "run_live_gmail_readonly_forensics.py" in forensics_run
+    assert forensics_step.get("env", {}).get("FULL_SYSTEM_TESTBOT_CAMPAIGN_ALLOWED") == "no"
+    assert forensics_step.get("env", {}).get("LIVE_EVAL_MAX_GMAIL_SENDS") == "0"
+
     run_step = _step_by_name(steps, "Live Gmail S01 scenario")
     assert run_step.get("if") == "inputs.confirm_live_gmail == 'RUN_S01'"
     run_run = run_step.get("run") or ""
@@ -229,7 +240,13 @@ def test_live_eval_workflow_contract():
     assert transport_env.get("STORAGE_PATH") == "${{ github.workspace }}/storage/ci-live-eval"
     assert transport_env.get("FULL_SYSTEM_TESTBOT_CAMPAIGN_ALLOWED") == "yes"
 
-    freeform_inputs = set(dispatch["inputs"].keys()) - {"confirm_live_gmail"}
+    freeform_inputs = set(dispatch["inputs"].keys()) - {
+        "confirm_live_gmail",
+        "forensics_evaluation_run_id",
+        "forensics_scenario_id",
+        "forensics_job_id",
+        "forensics_source_workflow_run",
+    }
     assert not freeform_inputs, f"unexpected workflow inputs: {freeform_inputs}"
 
 

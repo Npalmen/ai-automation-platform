@@ -15,6 +15,27 @@ on:
           - RUN_TRANSPORT_SMOKE
           - RUN_SEMI_AUTO_CORE
           - RUN_SEMI_AUTO_CANARY
+          - RUN_READONLY_FORENSICS
+      forensics_evaluation_run_id:
+        description: "Evaluation run ID for RUN_READONLY_FORENSICS"
+        required: false
+        type: string
+        default: ""
+      forensics_scenario_id:
+        description: "Scenario ID for RUN_READONLY_FORENSICS"
+        required: false
+        type: string
+        default: ""
+      forensics_job_id:
+        description: "Job ID for RUN_READONLY_FORENSICS (optional)"
+        required: false
+        type: string
+        default: ""
+      forensics_source_workflow_run:
+        description: "Source workflow run ID for RUN_READONLY_FORENSICS"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -137,8 +158,8 @@ jobs:
       - name: Verify live Gmail authorization
         run: |
           case "${{ inputs.confirm_live_gmail }}" in
-            READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_SEMI_AUTO_CORE|RUN_SEMI_AUTO_CANARY) ;;
-            *) echo "confirm_live_gmail must be READINESS_ONLY, RUN_S01, RUN_TRANSPORT_SMOKE, RUN_SEMI_AUTO_CORE, or RUN_SEMI_AUTO_CANARY"; exit 1 ;;
+            READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_SEMI_AUTO_CORE|RUN_SEMI_AUTO_CANARY|RUN_READONLY_FORENSICS) ;;
+            *) echo "confirm_live_gmail must be READINESS_ONLY, RUN_S01, RUN_TRANSPORT_SMOKE, RUN_SEMI_AUTO_CORE, RUN_SEMI_AUTO_CANARY, or RUN_READONLY_FORENSICS"; exit 1 ;;
           esac
           git fetch origin main
           if ! git merge-base --is-ancestor "${GITHUB_SHA}" FETCH_HEAD; then
@@ -327,6 +348,35 @@ jobs:
             --tenant-id TENANT_LIVE_EVAL \
             --app-base-url "$LIVE_EVAL_APP_BASE_URL" \
             --confirm-external
+
+      - name: Live Gmail read-only forensics
+        id: run_readonly_forensics
+        if: inputs.confirm_live_gmail == 'RUN_READONLY_FORENSICS'
+        env:
+          LIVE_EVAL_MAX_GMAIL_SENDS: "0"
+          LIVE_EVAL_MAX_GMAIL_REPLIES: "0"
+          FULL_SYSTEM_TESTBOT_CAMPAIGN_ALLOWED: "no"
+        run: |
+          if [ -z "${{ inputs.forensics_evaluation_run_id }}" ] || [ -z "${{ inputs.forensics_scenario_id }}" ]; then
+            echo "forensics_evaluation_run_id and forensics_scenario_id are required" >&2
+            exit 1
+          fi
+          python scripts/run_live_gmail_readonly_forensics.py \
+            --evaluation-run-id "${{ inputs.forensics_evaluation_run_id }}" \
+            --scenario-id "${{ inputs.forensics_scenario_id }}" \
+            --job-id "${{ inputs.forensics_job_id }}" \
+            --source-workflow-run "${{ inputs.forensics_source_workflow_run }}" \
+            --runtime-sha "$BUILD_GIT_SHA" \
+            --report-md "${RUNNER_TEMP}/live_gmail_forensics_report.md" \
+            --json | tee "${RUNNER_TEMP}/live_gmail_forensics_report.json"
+
+      - name: Upload read-only forensics report
+        if: always() && inputs.confirm_live_gmail == 'RUN_READONLY_FORENSICS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-gmail-readonly-forensics-${{ github.sha }}
+          path: ${{ runner.temp }}/live_gmail_forensics_report.md
+          if-no-files-found: warn
 
       - name: Semi-auto canary (TBSM01 + TBSM04)
         id: run_semi_auto_canary
