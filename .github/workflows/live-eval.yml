@@ -14,6 +14,7 @@ on:
           - RUN_S01
           - RUN_TRANSPORT_SMOKE
           - RUN_SEMI_AUTO_CORE
+          - RUN_SEMI_AUTO_CANARY
 
 permissions:
   contents: read
@@ -136,8 +137,8 @@ jobs:
       - name: Verify live Gmail authorization
         run: |
           case "${{ inputs.confirm_live_gmail }}" in
-            READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_SEMI_AUTO_CORE) ;;
-            *) echo "confirm_live_gmail must be READINESS_ONLY, RUN_S01, RUN_TRANSPORT_SMOKE, or RUN_SEMI_AUTO_CORE"; exit 1 ;;
+            READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_SEMI_AUTO_CORE|RUN_SEMI_AUTO_CANARY) ;;
+            *) echo "confirm_live_gmail must be READINESS_ONLY, RUN_S01, RUN_TRANSPORT_SMOKE, RUN_SEMI_AUTO_CORE, or RUN_SEMI_AUTO_CANARY"; exit 1 ;;
           esac
           git fetch origin main
           if ! git merge-base --is-ancestor "${GITHUB_SHA}" FETCH_HEAD; then
@@ -305,7 +306,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Full-system testbot semi-auto readiness
-        if: inputs.confirm_live_gmail == 'RUN_SEMI_AUTO_CORE'
+        if: contains(fromJSON('["RUN_SEMI_AUTO_CORE","RUN_SEMI_AUTO_CANARY"]'), inputs.confirm_live_gmail)
         env:
           LIVE_EVAL_MAX_GMAIL_REPLIES: "1"
         run: |
@@ -328,8 +329,21 @@ jobs:
             --app-base-url "$LIVE_EVAL_APP_BASE_URL" \
             --confirm-external
 
+      - name: Semi-auto canary (TBSM01 + TBSM04)
+        id: run_semi_auto_canary
+        if: inputs.confirm_live_gmail == 'RUN_SEMI_AUTO_CANARY'
+        env:
+          LIVE_EVAL_MAX_GMAIL_REPLIES: "1"
+        run: |
+          python scripts/run_full_system_testbot_campaign.py run \
+            --campaign-type semi-auto-core \
+            --tenant-id TENANT_LIVE_EVAL \
+            --app-base-url "$LIVE_EVAL_APP_BASE_URL" \
+            --confirm-external \
+            --scenario-ids TBSM01_lead_approve_reply,TBSM04_lead_reject
+
       - name: Upload semi-auto report
-        if: always() && inputs.confirm_live_gmail == 'RUN_SEMI_AUTO_CORE'
+        if: always() && contains(fromJSON('["RUN_SEMI_AUTO_CORE","RUN_SEMI_AUTO_CANARY"]'), inputs.confirm_live_gmail)
         uses: actions/upload-artifact@v4
         with:
           name: full-system-testbot-semi-auto-report-${{ github.sha }}

@@ -77,6 +77,7 @@ def _run_campaign(
     tenant_id: str,
     app_base_url: str,
     confirm_external: bool,
+    scenario_ids: tuple[str, ...] | None = None,
 ) -> int:
     if not confirm_external:
         print("ERROR: live campaign requires --confirm-external")
@@ -107,6 +108,7 @@ def _run_campaign(
             base_url=base_url,
             admin_api_key=admin_key,
             report_path=report_path,
+            scenario_ids=scenario_ids,
         )
     else:
         result = run_observe_campaign(
@@ -164,6 +166,11 @@ def main() -> int:
     )
     run_parser.add_argument("--campaign-type", default="transport-smoke")
     run_parser.add_argument("--confirm-external", action="store_true")
+    run_parser.add_argument(
+        "--scenario-ids",
+        default="",
+        help="Comma-separated campaign scenario ids (canary subset)",
+    )
 
     args = parser.parse_args()
 
@@ -178,11 +185,17 @@ def main() -> int:
     if args.command == "dry-run":
         return _dry_run_campaign(args.campaign_type, args.tenant_id)
     if args.command == "run":
+        scenario_ids = tuple(
+            item.strip()
+            for item in str(getattr(args, "scenario_ids", "") or "").split(",")
+            if item.strip()
+        ) or None
         return _run_campaign(
             args.campaign_type,
             args.tenant_id,
             args.app_base_url,
             args.confirm_external,
+            scenario_ids=scenario_ids,
         )
     return 1
 
