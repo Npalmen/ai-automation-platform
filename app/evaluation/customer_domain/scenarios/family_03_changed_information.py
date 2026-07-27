@@ -104,10 +104,14 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
                 confidence=0.9,
                 reason="Illegal overwrite attempt",
             )
-            ctx.act_add_fact(db, customer_id, overwrite, new_id())
-            result.fail("AI overwrite should be blocked or not become current")
-        except EndCustomerCommandError:
+        except ValidationError:
             pass
+        else:
+            try:
+                ctx.act_add_fact(db, customer_id, overwrite, new_id())
+                result.fail("AI overwrite should be blocked or not become current")
+            except EndCustomerCommandError:
+                pass
 
         result.semantic_payload = {
             "current_phone": "+46702222222",
