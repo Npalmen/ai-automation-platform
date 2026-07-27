@@ -27,6 +27,18 @@ def test_parse_subject_token_ignores_unrelated_subjects():
     assert parse_subject_token("Normal customer email") is None
 
 
+def test_parse_subject_token_handles_reply_prefix():
+    subject = build_subject_with_token(
+        evaluation_run_id="550e8400-e29b-41d4-a716-446655440000",
+        scenario_id="TBSM01_lead_approve_reply",
+        attempt_id=1,
+        base_subject="Offert laddbox villa semi-auto",
+    )
+    parsed = parse_subject_token(f"Re: {subject}")
+    assert parsed is not None
+    assert parsed.scenario_id == "TBSM01_lead_approve_reply"
+
+
 def test_body_marker_is_not_authoritative_for_scenario():
     marker = parse_body_marker(
         "KROWOLF_EVAL:evaluation_run_id=550e8400-e29b-41d4-a716-446655440000"

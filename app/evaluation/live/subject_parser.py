@@ -16,6 +16,31 @@ _BODY_RE = re.compile(
     re.IGNORECASE,
 )
 
+_REPLY_PREFIXES = (
+    "re:",
+    "fw:",
+    "fwd:",
+    "sv:",
+    "aw:",
+    "antw:",
+    "vs:",
+)
+
+
+def _strip_reply_prefixes(subject: str) -> str:
+    text = (subject or "").strip()
+    while text:
+        lowered = text.lower()
+        stripped = False
+        for prefix in _REPLY_PREFIXES:
+            if lowered.startswith(prefix):
+                text = text[len(prefix) :].lstrip()
+                stripped = True
+                break
+        if not stripped:
+            break
+    return text
+
 
 @dataclass(frozen=True)
 class ParsedCorrelation:
@@ -25,7 +50,7 @@ class ParsedCorrelation:
 
 
 def parse_subject_token(subject: str) -> ParsedCorrelation | None:
-    subject = (subject or "").strip()
+    subject = _strip_reply_prefixes(subject or "")
     if SUBJECT_TOKEN_PREFIX not in subject:
         return None
     for part in subject.split("|"):

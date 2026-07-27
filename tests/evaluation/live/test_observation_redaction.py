@@ -40,8 +40,8 @@ def test_decision_metadata_redacts_nested_tokens(db, live_eval_env):
         "app.evaluation.live.observation.DecisionRecordRepository.list_for_job",
         return_value=[record],
     ), patch(
-        "app.evaluation.live.observation.has_pending_approval",
-        return_value=True,
+        "app.evaluation.live.observation.count_pending_approvals_for_job",
+        return_value=1,
     ):
         observation = build_job_observation(db, "TENANT_LIVE_EVAL", "job-obs-1")
 

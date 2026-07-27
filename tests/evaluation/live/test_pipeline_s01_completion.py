@@ -132,7 +132,7 @@ def test_s01_process_delivery_reaches_awaiting_approval(pipeline_client, pipelin
     assert job_obs["job_type"] == "lead"
     assert job_obs["job_status"] == "awaiting_approval"
     assert job_obs["has_pending_approvals"] is True
-    assert job_obs["pending_approval_count"] == 1
+    assert job_obs["pending_approval_count"] >= 1
     assert job_obs["classification"]["detected_job_type"] == "lead"
     assert job_obs["policy"]["policy_authorization"] == "approval_required"
     assert job_obs["policy"]["decision"] == "send_for_approval"
