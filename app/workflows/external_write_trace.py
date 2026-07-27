@@ -30,24 +30,53 @@ _UNRESOLVED_STATUSES = frozenset({
 
 
 def _adapter_outcome_metadata(result: dict[str, Any], *, action: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Normalize adapter/Gmail metadata for DecisionRecord and live-eval telemetry."""
     metadata: dict[str, Any] = {"adapter_status": str(result.get("status"))}
-    payload = result.get("payload") or {}
-    provider_message_id = None
-    if isinstance(payload, dict):
-        provider_message_id = payload.get("google_message_id")
+
+    integration = result.get("integration_result")
+    integration_payload: dict[str, Any] = {}
+    if isinstance(integration, dict):
+        raw_integration_payload = integration.get("payload")
+        if isinstance(raw_integration_payload, dict):
+            integration_payload = raw_integration_payload
+
+    top_payload = result.get("payload") if isinstance(result.get("payload"), dict) else {}
+
+    provider_message_id = integration_payload.get("google_message_id")
+    if not provider_message_id and isinstance(integration, dict):
+        provider_message_id = integration.get("external_id")
+    if not provider_message_id:
+        provider_message_id = top_payload.get("google_message_id")
     if not provider_message_id:
         provider_message_id = result.get("external_id")
     if provider_message_id:
         metadata["provider_message_id"] = str(provider_message_id)
-    provider_rfc_message_id = None
-    if isinstance(payload, dict):
-        provider_rfc_message_id = payload.get("rfc_message_id") or payload.get("internet_message_id")
+
+    provider_rfc_message_id = integration_payload.get("rfc_message_id") or integration_payload.get(
+        "internet_message_id"
+    )
+    if not provider_rfc_message_id:
+        provider_rfc_message_id = top_payload.get("rfc_message_id") or top_payload.get(
+            "internet_message_id"
+        )
     if provider_rfc_message_id:
         metadata["provider_rfc_message_id"] = str(provider_rfc_message_id)
+
+    provider_thread_id = integration_payload.get("thread_id")
+    if provider_thread_id:
+        metadata["provider_thread_id"] = str(provider_thread_id)
+
+    if isinstance(integration, dict) and integration.get("status"):
+        metadata["provider_status"] = str(integration.get("status"))
+
     if action is not None:
         recipient = str(action.get("to") or "").strip().lower()
         if recipient:
             metadata["adapter_recipient"] = recipient[:120]
+        sender = str(action.get("from_email") or "").strip().lower()
+        if sender:
+            metadata["adapter_sender"] = sender[:120]
+
     return metadata
 
 

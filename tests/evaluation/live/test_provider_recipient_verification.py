@@ -61,6 +61,28 @@ def test_extract_provider_execution_outcome_from_decision_record():
     assert outcome.provider_rfc_message_id == "<provider-rfc@mail.test>"
 
 
+def test_provider_execution_outcome_ready_with_nested_persisted_metadata():
+    """Regression H5-B: metadata persisted from integration_result shape."""
+    observation = {
+        "job": {
+            "decision_records": [
+                {
+                    "record_type": "execution_outcome",
+                    "execution_status": "succeeded",
+                    "metadata": {
+                        "provider_message_id": "gmail-nested-456",
+                        "adapter_recipient": "sender@eval.test",
+                        "adapter_status": "executed",
+                        "provider_status": "success",
+                        "provider_thread_id": "thread-789",
+                    },
+                }
+            ]
+        }
+    }
+    assert provider_execution_outcome_ready(observation) is True
+
+
 def test_provider_execution_outcome_ready_requires_adapter_recipient():
     observation = {
         "job": {

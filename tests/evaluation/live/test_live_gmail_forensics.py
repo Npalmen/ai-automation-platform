@@ -81,6 +81,59 @@ def test_adapter_outcome_metadata_persists_provider_ids():
     assert metadata["adapter_recipient"] == "sender@eval.test"
 
 
+def test_adapter_outcome_metadata_unwraps_build_email_result_shape():
+    """Regression: production path nests Gmail IDs under integration_result."""
+    metadata = _adapter_outcome_metadata(
+        {
+            "type": "send_email",
+            "status": "executed",
+            "payload": {
+                "to": "sender@eval.test",
+                "subject": "reply",
+                "body": "hello",
+            },
+            "integration_result": {
+                "status": "success",
+                "external_id": "gmail-nested-456",
+                "payload": {
+                    "google_message_id": "gmail-nested-456",
+                    "thread_id": "thread-789",
+                },
+            },
+        },
+        action={
+            "to": "sender@eval.test",
+            "from_email": "app@eval.test",
+        },
+    )
+    assert metadata["provider_message_id"] == "gmail-nested-456"
+    assert metadata["provider_thread_id"] == "thread-789"
+    assert metadata["provider_status"] == "success"
+    assert metadata["adapter_status"] == "executed"
+    assert metadata["adapter_recipient"] == "sender@eval.test"
+    assert metadata["adapter_sender"] == "app@eval.test"
+    assert "provider_rfc_message_id" not in metadata
+
+
+def test_adapter_outcome_metadata_validate_metadata_allowlist():
+    from app.workflows.decision_record import validate_metadata
+
+    metadata = _adapter_outcome_metadata(
+        {
+            "status": "executed",
+            "integration_result": {
+                "status": "success",
+                "external_id": "gmail-allowlist",
+                "payload": {"google_message_id": "gmail-allowlist", "thread_id": "t1"},
+            },
+        },
+        action={"to": "sender@eval.test", "from_email": "app@eval.test"},
+    )
+    validated = validate_metadata(metadata)
+    assert validated["provider_message_id"] == "gmail-allowlist"
+    assert validated["provider_thread_id"] == "t1"
+
+
 def test_provider_message_id_from_events():
     from app.evaluation.live.runner import _provider_message_id_from_observation
 
