@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from app.core.auth import get_verified_tenant
 from app.core.settings import get_settings
 from app.domain.customer.api_schemas import (
+    CustomerCurrentState,
     DuplicateCandidateListViewResponse,
     EndCustomerCardDetailResponse,
     EndCustomerListViewResponse,
@@ -135,6 +136,7 @@ class TestTenantApi:
                 updated_at=now,
             ),
             identities=[],
+            current_state=CustomerCurrentState(),
         )
         with patch.object(EndCustomerReadService, "get_customer_card", return_value=card):
             response = client.get("/end-customers/cust-1")
