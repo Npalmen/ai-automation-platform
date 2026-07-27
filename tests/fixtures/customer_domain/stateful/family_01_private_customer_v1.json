@@ -1,0 +1,26 @@
+{
+  "schema_version": "customer_domain_stateful_scenario_v1",
+  "scenario_id": "family_01_new_private_customer_fixture",
+  "family": "family_01",
+  "tenant_id": "eval_cd_family01_fixture",
+  "description": "Metadata fixture for new private customer family",
+  "steps": [
+    {
+      "step_id": "create_private",
+      "phase": "act",
+      "action": "create_private_customer",
+      "payload": {
+        "display_name": "Eval Private A",
+        "email": "fam01.private@example.invalid"
+      },
+      "idempotency_key": "fam01-create-key",
+      "expected_outcome": "created",
+      "expected_invariants": ["single_customer"]
+    }
+  ],
+  "expected_final_invariants": [
+    "single_customer",
+    "deterministic_current_state",
+    "idempotency_replay"
+  ]
+}
