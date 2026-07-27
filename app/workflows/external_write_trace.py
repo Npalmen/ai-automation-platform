@@ -29,7 +29,7 @@ _UNRESOLVED_STATUSES = frozenset({
 })
 
 
-def _adapter_outcome_metadata(result: dict[str, Any]) -> dict[str, Any]:
+def _adapter_outcome_metadata(result: dict[str, Any], *, action: dict[str, Any] | None = None) -> dict[str, Any]:
     metadata: dict[str, Any] = {"adapter_status": str(result.get("status"))}
     payload = result.get("payload") or {}
     provider_message_id = None
@@ -39,6 +39,15 @@ def _adapter_outcome_metadata(result: dict[str, Any]) -> dict[str, Any]:
         provider_message_id = result.get("external_id")
     if provider_message_id:
         metadata["provider_message_id"] = str(provider_message_id)
+    provider_rfc_message_id = None
+    if isinstance(payload, dict):
+        provider_rfc_message_id = payload.get("rfc_message_id") or payload.get("internet_message_id")
+    if provider_rfc_message_id:
+        metadata["provider_rfc_message_id"] = str(provider_rfc_message_id)
+    if action is not None:
+        recipient = str(action.get("to") or "").strip().lower()
+        if recipient:
+            metadata["adapter_recipient"] = recipient[:120]
     return metadata
 
 
@@ -203,7 +212,7 @@ def execute_external_write_with_trace(
             fingerprint=fingerprint,
             key_version=key_version,
             status=ExecutionStatus.SUCCEEDED,
-            metadata=_adapter_outcome_metadata(result),
+            metadata=_adapter_outcome_metadata(result, action=action),
         )
     except Exception as persist_exc:
         logger.error(
@@ -247,7 +256,7 @@ def execute_external_write_with_trace(
             action_operation_id=operation_id,
             snapshot=live_eval_snap,
             job_input_data=getattr(job, "input_data", None),
-            metadata={"adapter_status": str(result.get("status"))},
+            metadata=_adapter_outcome_metadata(result, action=action),
         )
 
     result["action_operation_id"] = operation_id

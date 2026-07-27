@@ -120,7 +120,14 @@ def _provider_message_id_from_observation(observation: dict[str, Any]) -> str | 
     outcome = trace.get("execution_outcome") or {}
     metadata = outcome.get("metadata") or {}
     message_id = metadata.get("provider_message_id")
-    return str(message_id) if message_id else None
+    if message_id:
+        return str(message_id)
+    for event in observation.get("events") or []:
+        event_metadata = event.get("metadata") or {}
+        message_id = event_metadata.get("provider_message_id")
+        if message_id:
+            return str(message_id)
+    return None
 
 
 @dataclass

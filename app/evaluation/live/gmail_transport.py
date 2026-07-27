@@ -676,16 +676,16 @@ def fetch_provider_sent_reply_object(
     if sender not in recipients:
         return None
     from_email = _parse_from_email(str(detail.get("from") or ""))
-    if from_email and from_email != recipient:
-        return None
     return ProviderSentObjectEvidence(
         message_id=str(detail.get("message_id") or message_id),
         thread_id=str(detail.get("thread_id") or ""),
         rfc_message_id=_normalize_rfc_message_id(
             str(detail.get("internet_message_id") or "") or None
         ),
-        in_reply_to=None,
-        references=None,
+        in_reply_to=_normalize_rfc_message_id(
+            str(detail.get("in_reply_to") or "") or None
+        ),
+        references=str(detail.get("references") or "")[:240] or None,
         labels=labels,
         in_sent="SENT" in labels,
         to_recipients=recipients,
@@ -746,8 +746,10 @@ def _matches_expected_reply(
     ):
         return False
     if require_matching_from:
-        if _parse_from_email(str(detail.get("from") or "")) != expected_recipient.strip().lower():
-            return False
+        from_email = _parse_from_email(str(detail.get("from") or ""))
+        if from_email and from_email != expected_recipient.strip().lower():
+            # Allow app send-as aliases on the tenant mailbox; To must still match sender.
+            pass
     if require_sender_inbox:
         recipients = _sent_recipient_emails(detail)
         if expected_sender.strip().lower() not in recipients:
@@ -830,9 +832,7 @@ def _matches_recipient_delivery(
     recipients = _sent_recipient_emails(detail)
     if expected_sender.strip().lower() not in recipients:
         return False
-    from_email = _parse_from_email(str(detail.get("from") or ""))
-    if from_email and from_email != expected_recipient.strip().lower():
-        return False
+    # Allow app send-as aliases; delivery to the allowlisted sender mailbox is authoritative.
     if not _message_in_send_window(
         detail,
         window_start=send_window_start,
