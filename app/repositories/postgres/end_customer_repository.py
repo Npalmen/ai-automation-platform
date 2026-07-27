@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import update
+from sqlalchemy import case, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -766,18 +766,153 @@ class EndCustomerRepository:
         return EndCustomerRepository._to_identity(record)
 
     @staticmethod
+    def _identity_order_columns():
+        verification_rank = case(
+            (EndCustomerIdentityRecord.verification_status == VerificationStatus.VERIFIED.value, 0),
+            (EndCustomerIdentityRecord.verification_status == VerificationStatus.PROPOSED.value, 1),
+            (EndCustomerIdentityRecord.verification_status == VerificationStatus.UNVERIFIED.value, 2),
+            (EndCustomerIdentityRecord.verification_status == VerificationStatus.REJECTED.value, 3),
+            else_=99,
+        )
+        fact_state_rank = case(
+            (EndCustomerIdentityRecord.fact_state == FactState.VERIFIED.value, 0),
+            (EndCustomerIdentityRecord.fact_state == FactState.PROPOSED.value, 1),
+            (EndCustomerIdentityRecord.fact_state == FactState.CONFLICTING.value, 2),
+            (EndCustomerIdentityRecord.fact_state == FactState.KNOWN.value, 3),
+            (EndCustomerIdentityRecord.fact_state == FactState.HISTORICAL.value, 4),
+            (EndCustomerIdentityRecord.fact_state == FactState.REJECTED.value, 5),
+            else_=99,
+        )
+        return verification_rank, fact_state_rank
+
+    @staticmethod
     def list_identities_for_owner(
         db: Session,
         tenant_id: str,
         owner_type: EntityOwnerType,
         owner_id: str,
     ) -> list[CustomerIdentity]:
+        verification_rank, fact_state_rank = EndCustomerRepository._identity_order_columns()
         records = (
             db.query(EndCustomerIdentityRecord)
             .filter_by(tenant_id=tenant_id, owner_type=owner_type.value, owner_id=owner_id)
+            .order_by(
+                verification_rank.asc(),
+                fact_state_rank.asc(),
+                EndCustomerIdentityRecord.last_seen_at.desc().nullslast(),
+                EndCustomerIdentityRecord.first_seen_at.desc().nullslast(),
+                EndCustomerIdentityRecord.identity_id.asc(),
+            )
             .all()
         )
         return [EndCustomerRepository._to_identity(r) for r in records]
+
+    @staticmethod
+    def list_identities_for_owners(
+        db: Session,
+        tenant_id: str,
+        owners: list[tuple[EntityOwnerType, str]],
+    ) -> list[CustomerIdentity]:
+        if not owners:
+            return []
+        seen: set[tuple[str, str]] = set()
+        unique_owners: list[tuple[EntityOwnerType, str]] = []
+        for owner_type, owner_id in owners:
+            key = (owner_type.value, owner_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_owners.append((owner_type, owner_id))
+        verification_rank, fact_state_rank = EndCustomerRepository._identity_order_columns()
+        from sqlalchemy import and_, or_
+
+        owner_filters = [
+            and_(
+                EndCustomerIdentityRecord.owner_type == owner_type.value,
+                EndCustomerIdentityRecord.owner_id == owner_id,
+            )
+            for owner_type, owner_id in unique_owners
+        ]
+        records = (
+            db.query(EndCustomerIdentityRecord)
+            .filter(EndCustomerIdentityRecord.tenant_id == tenant_id)
+            .filter(or_(*owner_filters))
+            .order_by(
+                EndCustomerIdentityRecord.owner_type.asc(),
+                EndCustomerIdentityRecord.owner_id.asc(),
+                verification_rank.asc(),
+                fact_state_rank.asc(),
+                EndCustomerIdentityRecord.last_seen_at.desc().nullslast(),
+                EndCustomerIdentityRecord.first_seen_at.desc().nullslast(),
+                EndCustomerIdentityRecord.identity_id.asc(),
+            )
+            .all()
+        )
+        return [EndCustomerRepository._to_identity(r) for r in records]
+
+    @staticmethod
+    def list_facts_for_subjects(
+        db: Session,
+        tenant_id: str,
+        subjects: list[tuple[EntityOwnerType, str]],
+    ) -> list[CustomerSourceFact]:
+        if not subjects:
+            return []
+        seen: set[tuple[str, str]] = set()
+        unique_subjects: list[tuple[EntityOwnerType, str]] = []
+        for subject_type, subject_id in subjects:
+            key = (subject_type.value, subject_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_subjects.append((subject_type, subject_id))
+        from sqlalchemy import and_, or_
+
+        subject_filters = [
+            and_(
+                EndCustomerSourceFactRecord.subject_type == subject_type.value,
+                EndCustomerSourceFactRecord.subject_id == subject_id,
+            )
+            for subject_type, subject_id in unique_subjects
+        ]
+        records = (
+            db.query(EndCustomerSourceFactRecord)
+            .filter(EndCustomerSourceFactRecord.tenant_id == tenant_id)
+            .filter(or_(*subject_filters))
+            .order_by(
+                EndCustomerSourceFactRecord.subject_type.asc(),
+                EndCustomerSourceFactRecord.subject_id.asc(),
+                EndCustomerSourceFactRecord.recorded_at.asc(),
+                EndCustomerSourceFactRecord.fact_id.asc(),
+            )
+            .all()
+        )
+        return [EndCustomerRepository._to_source_fact(r) for r in records]
+
+    @staticmethod
+    def list_facts_for_customer_aggregate(
+        db: Session,
+        tenant_id: str,
+        customer_id: str,
+    ) -> list[CustomerSourceFact]:
+        refs = EndCustomerRepository._customer_subject_refs(db, tenant_id, customer_id)
+        return EndCustomerRepository.list_facts_for_subjects(db, tenant_id, refs)
+
+    @staticmethod
+    def list_relationships_for_customer(
+        db: Session,
+        tenant_id: str,
+        customer_id: str,
+    ) -> list[CustomerRelationship]:
+        records = (
+            db.query(EndCustomerRelationshipRecord)
+            .filter_by(tenant_id=tenant_id, customer_id=customer_id)
+            .order_by(
+                EndCustomerRelationshipRecord.relationship_id.asc(),
+            )
+            .all()
+        )
+        return [EndCustomerRepository._to_relationship(r) for r in records]
 
     @staticmethod
     def find_candidate_identities(

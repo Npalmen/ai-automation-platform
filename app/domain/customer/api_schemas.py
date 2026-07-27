@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -154,11 +155,130 @@ class SafeCustomerIdentityView(BaseModel):
     fact_state: FactState
 
 
+class CurrentStateResolutionIssueCode(str, Enum):
+    SUPERSESSION_CYCLE = "supersession_cycle"
+    ORPHAN_SUPERSESSION = "orphan_supersession"
+    MULTIPLE_VERIFIED_HEADS = "multiple_verified_heads"
+    UNSUPPORTED_FACT_STATE = "unsupported_fact_state"
+
+
+class ResolvedCustomerValue(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    fact_id: str
+    field_name: str
+    display_value: str | None = None
+    normalized_value: str | None = None
+    state: FactState
+    subject_type: EntityOwnerType
+    subject_id: str
+    source_type: SourceType
+    source_fact_id: str
+    observed_at: datetime | None = None
+    verified_at: datetime | None = None
+    confidence: float = Field(ge=0.0, le=1.0)
+    canonical_field_category: str | None = None
+    is_current: bool = False
+
+
+class CustomerPendingValue(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    fact_id: str
+    field_name: str
+    display_value: str | None = None
+    normalized_value: str | None = None
+    state: FactState
+    subject_type: EntityOwnerType
+    subject_id: str
+    source_type: SourceType
+    source_fact_id: str
+    observed_at: datetime | None = None
+    confidence: float = Field(ge=0.0, le=1.0)
+    canonical_field_category: str | None = None
+
+
+class CustomerValueConflict(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    fact_id: str
+    field_name: str
+    display_value: str | None = None
+    state: FactState
+    subject_type: EntityOwnerType
+    subject_id: str
+    source_type: SourceType
+    conflicting_fact_ids: list[str] = Field(default_factory=list)
+    issue_code: CurrentStateResolutionIssueCode | None = None
+
+
+class CustomerHistoricalValue(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    fact_id: str
+    field_name: str
+    display_value: str | None = None
+    state: FactState
+    subject_type: EntityOwnerType
+    subject_id: str
+    source_type: SourceType
+    superseded_by_fact_id: str | None = None
+
+
+class CustomerResolutionIssue(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: CurrentStateResolutionIssueCode
+    field_name: str | None = None
+    subject_type: EntityOwnerType | None = None
+    subject_id: str | None = None
+    fact_ids: list[str] = Field(default_factory=list)
+
+
+class ResolvedIdentityValueView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    identity_id: str
+    identity_type: IdentityType
+    raw_value: str
+    normalized_value: str | None = None
+    verification_status: VerificationStatus
+    fact_state: FactState
+    source_fact_id: str | None = None
+    is_current: bool = False
+
+
+class SubjectCurrentStateView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject_type: EntityOwnerType
+    subject_id: str
+    is_primary: bool = False
+    current_values: list[ResolvedCustomerValue] = Field(default_factory=list)
+    pending_values: list[CustomerPendingValue] = Field(default_factory=list)
+    conflicts: list[CustomerValueConflict] = Field(default_factory=list)
+    historical_values: list[CustomerHistoricalValue] = Field(default_factory=list)
+    current_identities: list[ResolvedIdentityValueView] = Field(default_factory=list)
+    alternate_identities: list[ResolvedIdentityValueView] = Field(default_factory=list)
+
+
+class CustomerCurrentState(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_values: list[ResolvedCustomerValue] = Field(default_factory=list)
+    pending_values: list[CustomerPendingValue] = Field(default_factory=list)
+    conflicts: list[CustomerValueConflict] = Field(default_factory=list)
+    historical_values: list[CustomerHistoricalValue] = Field(default_factory=list)
+    resolution_issues: list[CustomerResolutionIssue] = Field(default_factory=list)
+    subjects: list[SubjectCurrentStateView] = Field(default_factory=list)
+
+
 class EndCustomerCardDetailResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     card: EndCustomerCardView
     identities: list[SafeCustomerIdentityView] = Field(default_factory=list)
+    current_state: CustomerCurrentState = Field(default_factory=CustomerCurrentState)
 
 
 class EndCustomerTimelineEventView(BaseModel):
