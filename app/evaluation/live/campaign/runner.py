@@ -254,6 +254,7 @@ def run_semi_automatic_campaign(
     base_url: str,
     admin_api_key: str,
     report_path: str | None = None,
+    scenario_ids: tuple[str, ...] | None = None,
 ) -> ObserveCampaignResult:
     if not campaign_enabled():
         raise LiveEvalSafetyError("FULL_SYSTEM_TESTBOT_CAMPAIGN_ALLOWED=yes required")
@@ -282,6 +283,14 @@ def run_semi_automatic_campaign(
         raise LiveEvalSafetyError("exactly one allowlisted sender and recipient required")
 
     scenarios = list_campaign_scenarios(campaign_type=campaign_type)
+    if scenario_ids:
+        allowed = frozenset(scenario_ids)
+        scenarios = [scenario for scenario in scenarios if scenario.scenario_id in allowed]
+        missing = sorted(allowed - {scenario.scenario_id for scenario in scenarios})
+        if missing:
+            raise LiveEvalSafetyError(
+                f"unknown or unavailable campaign scenarios: {', '.join(missing)}"
+            )
     if not scenarios:
         raise LiveEvalSafetyError(f"no scenarios for campaign_type={campaign_type!r}")
 
