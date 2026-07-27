@@ -317,6 +317,37 @@ Steps:
 
 ---
 
+## Customer card domain — closure gate (2026-07-27)
+
+Targeted regression (no full historical re-run required for closure):
+
+```bash
+python -m pytest tests/test_customer_domain_schemas.py \
+  tests/test_customer_current_state.py \
+  tests/test_customer_identity_matching.py \
+  tests/test_customer_timeline_provenance.py \
+  tests/test_customer_api_contracts.py \
+  tests/test_end_customer_command_service.py \
+  tests/test_end_customer_read_service.py -q
+
+python -m pytest tests/test_end_customer_migration_pg.py \
+  tests/test_end_customer_repository_pg.py \
+  tests/test_end_customer_idempotency_pg.py \
+  tests/test_end_customer_api.py \
+  tests/test_admin_end_customer_api.py \
+  tests/test_admin_end_customer_write_api.py -m pg_eval -q
+
+python -m pytest tests/evaluation/customer_domain -q
+```
+
+**Stateful eval evidence:** PASS @ `cc4ecfe` (5 scenarios, all controls, determinism). Re-run full CLI eval only if customer-domain production paths change after that SHA.
+
+**Closure doc:** `docs/customer-card-domain/closure.md`
+
+**Activation:** Not part of closure — requires separate operator gate (flags default `false`).
+
+---
+
 ## What must pass before first customer
 
 The following gate criteria must all be green before pilot go-live:

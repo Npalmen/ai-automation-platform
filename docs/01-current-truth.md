@@ -8,6 +8,8 @@
 
 ## Last verified date
 
+2026-07-27 (Customer card domain closure — end-customer persistence/API/eval documented closed; eval @ `cc4ecfe`; closure main `4afb0b71`; flags default disabled; not activated. See `docs/customer-card-domain/closure.md`.)
+
 2026-07-22 (Super-admin role hierarchy fix — merged to `main` @ `b196132` / fix commit `245fafa`; pilot RC `krowolf-app:rc-b196132ff683` digest `sha256:cd4a9cda0f665bcc2316305689dfac4a25613a2c9b4884efd4efed1f966b43cb`; tenant `T_NIKLAS_DEMO_001`; super_admin session smoke PASS — usage/system/onboarding/operator-actions; scheduler `paused`; jobs=0; approvals=0; credentials unchanged; external side effects 0; Gmail soak not resumed.)
 
 2026-07-22 (Slice C — merged to `main` @ `a725471`; pilot RC `krowolf-app:rc-a72547176d8c`; tenant `T_NIKLAS_DEMO_001`; Customer Settings API gates PASS on pilot; backfill dry-run `tenant_data_changed=false`; scheduler `paused`; credentials unchanged; external side effects 0; Gmail soak not resumed.)
@@ -1377,6 +1379,29 @@ These have caused real failures and are preserved from the README:
 - Whether `GET /pilot/readiness` returns a passing state for the pilot tenant. *(deferred)*
 - Whether `GET /integrations/health` reflects real Gmail and Monday state. *(deferred)*
 - Whether scheduler `run_mode` is set correctly for the pilot tenant. *(deferred)*
+
+---
+
+## End-customer domain (customer card) — closed 2026-07-27
+
+> **Closure document:** `docs/customer-card-domain/closure.md`  
+> **Status:** Implemented and evaluated; **not activated** in default runtime.
+
+| Area | Status | Notes |
+|------|--------|-------|
+| Persistence | `Verified (code + PG tests)` | Migrations `022_end_customer_foundation.sql`, `023_end_customer_idempotency.sql`; `LATEST_MIGRATION_VERSION=023` |
+| Domain package | `Verified (code)` | `app/domain/customer/` — models, matching, current-state resolver, API schemas |
+| Read API | `Verified (code + tests)` | `app/api/routes/end_customers.py`; flag `END_CUSTOMER_READ_API_ENABLED` default **false** |
+| Operator writes | `Verified (code + tests)` | `app/api/routes/end_customer_writes.py`; flag `END_CUSTOMER_WRITE_API_ENABLED` default **false**; no tenant writes |
+| Command / read services | `Verified (code + tests)` | `EndCustomerCommandService`, `EndCustomerReadService` |
+| Matching | `Verified (code + tests)` | Pure `assess_customer_match()`; `automatic_link_allowed=false`, `automatic_merge_allowed=false` |
+| Duplicate handling | `Verified (code + tests)` | `reject_merge`, `resolve_without_merge` only; `approve_merge` forbidden |
+| Stateful evaluation | `Verified (local eval @ cc4ecfe)` | 5/5 families PASS; controls PASS; `external_side_effects=0`; synthetic data only |
+| Gmail / workflow coupling | `Verified absent` | No end-customer create/link in intake or workflows |
+| UI (end-customer cards) | `Not implemented` | Operator `/ops/customers` = tenant directory, not end-customer CRM |
+| Production activation | `Not activated` | Flags false; no rollout in closure |
+
+**Evaluated SHA:** `cc4ecfe3834948e2d22214ab17c09ef0a6b7aeee`. **Closure baseline:** `4afb0b71` — no customer-domain code changes between eval SHA and closure main.
 
 ---
 

@@ -28,10 +28,10 @@ todos:
     status: completed
   - id: customer-domain-i-stateful-evaluation
     content: Testa återkommande syntetiska kunder, tidslinje och deduplicering
-    status: in_progress
+    status: completed
   - id: customer-domain-j-closure
     content: Slutverifiera kundkortet och dokumentera produktgränser
-    status: pending
+    status: completed
 isProject: true
 ---
 
@@ -41,7 +41,7 @@ isProject: true
 **Planversion:** `customer-card-domain-plan-v1`  
 **Designbranch:** `design/customer-card-domain`  
 **Normalläge:** Tenantisolerat, append-only där det är relevant, fail-closed och utan runtimeintegration  
-**Implementationsstatus:** Blockerad till och med todo G  
+**Implementationsstatus:** Closure complete (todos A–J); feature flags default disabled — not activated. See `docs/customer-card-domain/closure.md`.  
 **Startbaseline:** Ska registreras i den lokala exekveringsrapporten vid första körningen och får inte skrivas in genom senare tekniska ändringar i denna plan.
 
 ---

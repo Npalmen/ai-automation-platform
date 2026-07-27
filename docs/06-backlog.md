@@ -6,6 +6,16 @@
 
 ---
 
+### Customer card domain (end-customer) — closed 2026-07-27
+
+- [x] **Todos A–G** — design, contracts, implementation gate (`docs/customer-card-domain/`).
+- [x] **Todo H — implementation** — migrations 022/023, ORM, repositories, read/write services, flag-gated APIs (#62, #67, #70, #74).
+- [x] **Todo I — stateful evaluation** — isolated eval package; 5 families PASS @ `cc4ecfe` (#75, #79, #80).
+- [x] **Todo J — closure** — `docs/customer-card-domain/closure.md`; current-truth/backlog/testing alignment.
+- [ ] **Activation** — separate gate; flags remain default `false`; see closure §10.
+
+---
+
 ### Stabilization chapter — pilot baseline (2026-07-20)
 
 - [x] **Del A preflight script** — `scripts/ops/stabilization_preflight.py` (health, tenant whitelist, scheduler, OAuth source, backup).
