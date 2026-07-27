@@ -148,6 +148,7 @@ def test_live_eval_workflow_contract():
         "RUN_S01",
         "RUN_TRANSPORT_SMOKE",
         "RUN_SEMI_AUTO_CORE",
+        "RUN_SEMI_AUTO_CANARY",
     ]
 
     operator_gate = data["jobs"]["operator-gate"]
@@ -155,7 +156,7 @@ def test_live_eval_workflow_contract():
     gate_step = _step_by_name(operator_gate["steps"], "Verify live Gmail authorization")
     gate_run = gate_step.get("run") or ""
     assert "merge-base --is-ancestor" in gate_run
-    assert "READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_SEMI_AUTO_CORE" in gate_run
+    assert "READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_SEMI_AUTO_CORE|RUN_SEMI_AUTO_CANARY" in gate_run
     assert 'test "${GITHUB_REF}" = "refs/heads/main"' not in gate_run
     assert 'test "${{ inputs.confirm_live_gmail }}" = "RUN_S01"' not in gate_run
 
@@ -187,6 +188,12 @@ def test_live_eval_workflow_contract():
 
     semi_auto_step = _step_by_name(steps, "Semi-auto campaign (TBSM01-TBSM08)")
     assert semi_auto_step.get("if") == "inputs.confirm_live_gmail == 'RUN_SEMI_AUTO_CORE'"
+
+    canary_step = _step_by_name(steps, "Semi-auto canary (TBSM01 + TBSM04)")
+    assert canary_step.get("if") == "inputs.confirm_live_gmail == 'RUN_SEMI_AUTO_CANARY'"
+    assert "--scenario-ids TBSM01_lead_approve_reply,TBSM04_lead_reject" in (
+        canary_step.get("run") or ""
+    )
 
     run_step = _step_by_name(steps, "Live Gmail S01 scenario")
     assert run_step.get("if") == "inputs.confirm_live_gmail == 'RUN_S01'"
