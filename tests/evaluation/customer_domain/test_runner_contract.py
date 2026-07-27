@@ -133,6 +133,15 @@ def test_report_schema_fields():
     assert report["credentials_exposed"] is False
 
 
+def test_audit_idempotency_scan_ignores_masked_reference():
+    from app.evaluation.customer_domain.controls import _audit_contains_raw_idempotency_key
+
+    assert not _audit_contains_raw_idempotency_key(
+        {"idempotency_reference": "sha256:abcdef"}
+    )
+    assert _audit_contains_raw_idempotency_key({"idempotency_key": "raw-key"})
+
+
 def test_eval_environment_requires_allowlisted_env(monkeypatch):
     monkeypatch.setenv("ENV", "production")
     from app.core.settings import get_settings

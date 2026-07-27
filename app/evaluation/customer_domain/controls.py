@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import os
 import threading
 from typing import Any
@@ -21,8 +22,22 @@ from app.domain.customer.api_schemas import (
 from app.domain.customer.enums import CustomerType
 from app.evaluation.customer_domain.actions import EvalContext, new_id
 from app.evaluation.customer_domain.guards import EVAL_TENANT_PREFIX
-from app.services.end_customer_command_service import EndCustomerCommandService
+from app.domain.customer.enums import DuplicateStatus
+from app.repositories.postgres.end_customer_repository import EndCustomerRepository
+from app.services.end_customer_command_service import EndCustomerCommandError, EndCustomerCommandService
 from app.services.end_customer_read_service import EndCustomerReadService
+
+
+def _audit_contains_raw_idempotency_key(details: Any) -> bool:
+    if isinstance(details, str):
+        try:
+            parsed = json.loads(details)
+        except json.JSONDecodeError:
+            return "idempotency_key" in details.lower()
+        details = parsed
+    if isinstance(details, dict):
+        return "idempotency_key" in details
+    return False
 
 
 def run_tenant_controls(engine, tenant_a: str, tenant_b: str) -> dict[str, Any]:
@@ -73,7 +88,7 @@ def run_tenant_controls(engine, tenant_a: str, tenant_b: str) -> dict[str, Any]:
         card_b = ctx_b.read_customer_card(session, customer_b)
         if card_a is None or card_b is None:
             failures.append("cross-tenant card read failed")
-        elif card_a.customer_id == card_b.customer_id:
+        elif card_a.card.customer_id == card_b.card.customer_id:
             failures.append("cross-tenant card ids leaked")
 
         cross_read = EndCustomerReadService.get_customer_card(session, tenant_a, customer_b)
@@ -91,6 +106,17 @@ def run_tenant_controls(engine, tenant_a: str, tenant_b: str) -> dict[str, Any]:
 
 
 def _concurrent_create(engine, tenant_id: str) -> dict[str, Any]:
+    from app.evaluation.customer_domain.db import ensure_eval_tenant
+
+    idempotency_key = "concurrent-create-key"
+
+    session = sessionmaker(bind=engine)()
+    try:
+        ensure_eval_tenant(session, tenant_id, tenant_id.lower())
+        session.commit()
+    finally:
+        session.close()
+
     barrier = threading.Barrier(2)
     outcomes: list[str] = []
     errors: list[str] = []
@@ -109,7 +135,7 @@ def _concurrent_create(engine, tenant_id: str) -> dict[str, Any]:
                 tenant_id,
                 {"id": "op", "display_name": "Op", "role": "admin"},
                 request,
-                "concurrent-create-key",
+                idempotency_key,
             )
             session.commit()
             outcomes.append("ok")
@@ -137,11 +163,24 @@ def _concurrent_create(engine, tenant_id: str) -> dict[str, Any]:
             ),
             {"tenant_id": tenant_id},
         ).scalar()
-        ok = int(count or 0) == 1 and int(timeline or 0) >= 1
+        replay_timeline = session.execute(
+            text(
+                "SELECT COUNT(*) FROM end_customer_timeline_events "
+                "WHERE tenant_id = :tenant_id AND replay_identity_key LIKE :replay"
+            ),
+            {"tenant_id": tenant_id, "replay": f"%create:{idempotency_key}"},
+        ).scalar()
+        ok = (
+            int(count or 0) == 1
+            and int(timeline or 0) >= 1
+            and int(replay_timeline or 0) == 1
+            and len(outcomes) >= 1
+        )
         return {
-            "result": "PASS" if ok and outcomes else "FAIL",
+            "result": "PASS" if ok else "FAIL",
             "customer_count": int(count or 0),
             "timeline_count": int(timeline or 0),
+            "timeline_replay_count": int(replay_timeline or 0),
             "errors": errors,
         }
     finally:
@@ -219,18 +258,110 @@ def _concurrent_update(engine, tenant_id: str) -> dict[str, Any]:
         session.close()
 
 
+def _concurrent_duplicate_decision(engine, tenant_id: str) -> dict[str, Any]:
+    from app.evaluation.customer_domain.actions import EvalContext, new_id
+    from app.evaluation.customer_domain.db import ensure_eval_tenant
+
+    session = sessionmaker(bind=engine)()
+    try:
+        ensure_eval_tenant(session, tenant_id, tenant_id.lower())
+        session.commit()
+        ctx = EvalContext(engine=engine, tenant_id=tenant_id)
+        first = ctx.act_create_private_customer(
+            session,
+            display_name="Dup A",
+            email="dup-a@example.invalid",
+            idempotency_key=new_id(),
+        )
+        second = ctx.act_create_private_customer(
+            session,
+            display_name="Dup B",
+            email="dup-b@example.invalid",
+            idempotency_key=new_id(),
+        )
+        customer_a = first["body"]["customer_id"]
+        customer_b = second["body"]["customer_id"]
+        candidate_id = ctx.arrange_duplicate_candidate(session, customer_a, customer_b)
+        candidate = EndCustomerRepository.get_duplicate_candidate(session, tenant_id, candidate_id)
+        if candidate is None:
+            return {"result": "FAIL", "error": "candidate missing"}
+        expected_version = candidate.version
+    finally:
+        session.close()
+
+    barrier = threading.Barrier(2)
+    results: list[str] = []
+
+    def worker(idempotency_key: str) -> None:
+        db = sessionmaker(bind=engine)()
+        try:
+            barrier.wait()
+            EndCustomerCommandService.duplicate_decision(
+                db,
+                tenant_id,
+                candidate_id,
+                {"id": "op", "display_name": "Op", "role": "admin"},
+                "reject_merge",
+                expected_version,
+                "concurrent duplicate decision",
+                idempotency_key,
+            )
+            db.commit()
+            results.append("ok")
+        except EndCustomerCommandError as exc:
+            results.append(exc.code)
+        except Exception as exc:
+            results.append(type(exc).__name__)
+        finally:
+            db.close()
+
+    threads = [
+        threading.Thread(target=worker, args=(new_id(),)),
+        threading.Thread(target=worker, args=(new_id(),)),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    session = sessionmaker(bind=engine)()
+    try:
+        candidate = EndCustomerRepository.get_duplicate_candidate(session, tenant_id, candidate_id)
+        resolved = candidate is not None and candidate.status == DuplicateStatus.REJECTED
+        ok = (
+            resolved
+            and sum(1 for result in results if result == "ok") == 1
+            and sum(1 for result in results if result == "DUPLICATE_DECISION_CONFLICT") == 1
+        )
+        return {
+            "result": "PASS" if ok else "FAIL",
+            "candidate_status": candidate.status.value if candidate else None,
+            "worker_results": results,
+        }
+    finally:
+        session.close()
+
+
 def run_concurrency_controls(engine, tenant_id: str) -> dict[str, Any]:
     create_result = _concurrent_create(engine, tenant_id)
     update_result = _concurrent_update(engine, f"{tenant_id}_update")
+    duplicate_result = _concurrent_duplicate_decision(engine, f"{tenant_id}_dup")
     overall = (
         "PASS"
-        if create_result.get("result") == "PASS" and update_result.get("result") == "PASS"
+        if create_result.get("result") == "PASS"
+        and update_result.get("result") == "PASS"
+        and duplicate_result.get("result") == "PASS"
         else "FAIL"
     )
     return {
         "result": overall,
         "concurrent_create": create_result,
         "concurrent_update": update_result,
+        "concurrent_duplicate_decision": duplicate_result,
+        "concurrent_timeline_replay": {
+            "result": create_result.get("result"),
+            "timeline_replay_count": create_result.get("timeline_replay_count"),
+        },
     }
 
 
@@ -334,8 +465,7 @@ def run_security_controls(engine, tenant_id: str) -> dict[str, Any]:
             {"tenant_id": tenant_id},
         ).fetchall()
         raw_idem_in_audit = any(
-            "idempotency" in str(row).lower() and "key" in str(row).lower()
-            for row in audit_rows
+            _audit_contains_raw_idempotency_key(row[0]) for row in audit_rows
         )
         return {
             "result": "PASS" if not leaked and not raw_idem_in_audit else "FAIL",

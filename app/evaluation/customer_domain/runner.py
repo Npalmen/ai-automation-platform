@@ -126,26 +126,27 @@ def run_evaluation(
         initialize_database(engine)
         non_eval_before = count_non_eval_rows(engine)
 
-        cleanup_eval_tenants(engine)
-        run1 = _run_families(engine, scenario_filter)
-        hashes1 = {r.scenario_id: r.to_report()["semantic_result_hash"] for r in run1}
-
-        cleanup_eval_tenants(engine)
-        run2 = _run_families(engine, scenario_filter)
-        hashes2 = {r.scenario_id: r.to_report()["semantic_result_hash"] for r in run2}
-        repeat_ok = hashes1 == hashes2
-
-        tenant_a, tenant_b = tenant_control_ids("iso")
-        tenant_controls = run_tenant_controls(engine, tenant_a, tenant_b)
-        concurrency_controls = run_concurrency_controls(engine, _tenant_id("concurrency"))
-        feature_flag_controls = run_feature_flag_controls()
-        security_controls = run_security_controls(engine, _tenant_id("security"))
-
-        non_eval_after = count_non_eval_rows(engine)
-        non_eval_changed = max(0, non_eval_after - non_eval_before)
-
-        if not keep_data:
+        try:
             cleanup_eval_tenants(engine)
+            run1 = _run_families(engine, scenario_filter)
+            hashes1 = {r.scenario_id: r.to_report()["semantic_result_hash"] for r in run1}
+
+            cleanup_eval_tenants(engine)
+            run2 = _run_families(engine, scenario_filter)
+            hashes2 = {r.scenario_id: r.to_report()["semantic_result_hash"] for r in run2}
+            repeat_ok = hashes1 == hashes2
+
+            tenant_a, tenant_b = tenant_control_ids("iso")
+            tenant_controls = run_tenant_controls(engine, tenant_a, tenant_b)
+            concurrency_controls = run_concurrency_controls(engine, _tenant_id("concurrency"))
+            feature_flag_controls = run_feature_flag_controls()
+            security_controls = run_security_controls(engine, _tenant_id("security"))
+
+            non_eval_after = count_non_eval_rows(engine)
+            non_eval_changed = max(0, non_eval_after - non_eval_before)
+        finally:
+            if not keep_data:
+                cleanup_eval_tenants(engine)
 
     completed = datetime.now(timezone.utc)
     scenarios = [r.to_report() for r in run1]
