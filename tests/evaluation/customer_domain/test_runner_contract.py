@@ -142,6 +142,14 @@ def test_audit_idempotency_scan_ignores_masked_reference():
     assert _audit_contains_raw_idempotency_key({"idempotency_key": "raw-key"})
 
 
+def test_credential_scan_ignores_security_flag_keys():
+    from app.evaluation.customer_domain.reporting import _scan_for_credentials
+
+    assert not _scan_for_credentials(
+        {"security_controls": {"response_leaked_secrets": False, "raw_idempotency_in_audit": False}}
+    )
+
+
 def test_eval_environment_requires_allowlisted_env(monkeypatch):
     monkeypatch.setenv("ENV", "production")
     from app.core.settings import get_settings
