@@ -222,7 +222,7 @@ def build_full_system_testbot_readiness(
 
         from pathlib import Path
 
-        script_root = Path(__file__).resolve().parents[3] / "scripts"
+        script_root = Path(__file__).resolve().parents[4] / "scripts"
         for script_name in (
             "snapshot_live_eval_tenant_config.py",
             "restore_live_eval_automatic_canary.py",
@@ -232,13 +232,13 @@ def build_full_system_testbot_readiness(
 
         from app.evaluation.live.campaign.tenant_automation_lifecycle import (
             snapshot_tenant_config,
-            verify_automation_not_broadly_enabled,
+            verify_canary_automation_active,
         )
 
         try:
             tenant_snapshot = snapshot_tenant_config(tenant_id=tenant_id)
             gates["tenant_automation_snapshot_hash"] = tenant_snapshot.config_hash
-            issues.extend(verify_automation_not_broadly_enabled(tenant_snapshot.auto_actions))
+            issues.extend(verify_canary_automation_active(tenant_snapshot.auto_actions))
         except Exception as exc:
             issues.append(f"tenant automation snapshot failed: {exc}")
 
