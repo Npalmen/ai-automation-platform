@@ -151,6 +151,7 @@ def run_observe_campaign(
     base_url: str,
     admin_api_key: str,
     report_path: str | None = None,
+    scenario_ids: tuple[str, ...] | None = None,
 ) -> ObserveCampaignResult:
     if not campaign_enabled():
         raise LiveEvalSafetyError("FULL_SYSTEM_TESTBOT_CAMPAIGN_ALLOWED=yes required")
@@ -172,7 +173,14 @@ def run_observe_campaign(
     if len(senders) != 1 or len(recipients) != 1:
         raise LiveEvalSafetyError("exactly one allowlisted sender and recipient required")
 
-    scenarios = list_campaign_scenarios(campaign_type=campaign_type)
+    selected_budget = build_selected_scenario_budget(
+        campaign_type=campaign_type,
+        selected_scenario_ids=scenario_ids,
+    )
+    scenarios = [
+        get_campaign_scenario(scenario_id)
+        for scenario_id in selected_budget.selected_scenario_ids
+    ]
     if not scenarios:
         raise LiveEvalSafetyError(f"no scenarios for campaign_type={campaign_type!r}")
 
@@ -231,7 +239,7 @@ def run_observe_campaign(
         results.append(result)
 
     passed = sum(1 for r in results if r.status == "passed")
-    overall = "passed" if passed == len(scenarios) and len(scenarios) == 5 else "failed"
+    overall = "passed" if passed == len(scenarios) and len(scenarios) > 0 else "failed"
     if sends != len(scenarios):
         safety_violations.append(f"send count mismatch: {sends} != {len(scenarios)}")
 
@@ -244,6 +252,7 @@ def run_observe_campaign(
         approval_resolutions=0,
         external_writes=0,
         safety_violations=safety_violations,
+        selected_scenario_budget=selected_budget,
         main_sha=_git_sha("HEAD"),
         server_sha=os.environ.get("BUILD_GIT_SHA"),
     )

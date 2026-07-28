@@ -13,6 +13,7 @@ on:
           - READINESS_ONLY
           - RUN_S01
           - RUN_TRANSPORT_SMOKE
+          - RUN_OBSERVE_CANARY
           - RUN_SEMI_AUTO_CORE
           - RUN_SEMI_AUTO_CANARY
           - RUN_READONLY_FORENSICS
@@ -158,8 +159,8 @@ jobs:
       - name: Verify live Gmail authorization
         run: |
           case "${{ inputs.confirm_live_gmail }}" in
-            READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_SEMI_AUTO_CORE|RUN_SEMI_AUTO_CANARY|RUN_READONLY_FORENSICS) ;;
-            *) echo "confirm_live_gmail must be READINESS_ONLY, RUN_S01, RUN_TRANSPORT_SMOKE, RUN_SEMI_AUTO_CORE, RUN_SEMI_AUTO_CANARY, or RUN_READONLY_FORENSICS"; exit 1 ;;
+            READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_OBSERVE_CANARY|RUN_SEMI_AUTO_CORE|RUN_SEMI_AUTO_CANARY|RUN_READONLY_FORENSICS) ;;
+            *) echo "confirm_live_gmail must be READINESS_ONLY, RUN_S01, RUN_TRANSPORT_SMOKE, RUN_OBSERVE_CANARY, RUN_SEMI_AUTO_CORE, RUN_SEMI_AUTO_CANARY, or RUN_READONLY_FORENSICS"; exit 1 ;;
           esac
           git fetch origin main
           if ! git merge-base --is-ancestor "${GITHUB_SHA}" FETCH_HEAD; then
@@ -323,6 +324,36 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: full-system-testbot-report-${{ github.sha }}
+          path: storage/status/full_system_testbot_report.json
+          if-no-files-found: warn
+
+      - name: Full-system testbot observe canary readiness
+        if: inputs.confirm_live_gmail == 'RUN_OBSERVE_CANARY'
+        run: |
+          python scripts/full_system_testbot_readiness.py \
+            --campaign-type transport-smoke \
+            --tenant-id TENANT_LIVE_EVAL \
+            --app-base-url "$LIVE_EVAL_APP_BASE_URL" \
+            --server-sha "$BUILD_GIT_SHA" \
+            --scenario-ids TBS03_invoice_observe,TBS04_unknown_observe \
+            --json
+
+      - name: Observe canary (TBS03 + TBS04)
+        id: run_observe_canary
+        if: inputs.confirm_live_gmail == 'RUN_OBSERVE_CANARY'
+        run: |
+          python scripts/run_full_system_testbot_campaign.py run \
+            --campaign-type transport-smoke \
+            --tenant-id TENANT_LIVE_EVAL \
+            --app-base-url "$LIVE_EVAL_APP_BASE_URL" \
+            --confirm-external \
+            --scenario-ids TBS03_invoice_observe,TBS04_unknown_observe
+
+      - name: Upload observe canary report
+        if: always() && inputs.confirm_live_gmail == 'RUN_OBSERVE_CANARY'
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-system-testbot-observe-canary-report-${{ github.sha }}
           path: storage/status/full_system_testbot_report.json
           if-no-files-found: warn
 
