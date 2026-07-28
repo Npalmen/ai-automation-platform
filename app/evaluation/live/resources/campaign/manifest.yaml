@@ -31,3 +31,9 @@ campaigns:
       - TBSM06_duplicate_approve.yaml
       - TBSM07_stale_approve.yaml
       - TBSM08_unknown_negative_hold.yaml
+
+  automatic-gmail-canary:
+    default_mode: automatic
+    scenarios:
+      - TBA01_safe_lead_auto_reply.yaml
+      - TBA02_unknown_auto_hold.yaml

@@ -21,7 +21,15 @@ from app.evaluation.live.campaign.gates import (
 from app.evaluation.live.campaign.modes import CAMPAIGN_TYPE_DEFAULT_MODE
 from app.evaluation.live.campaign.readiness import build_full_system_testbot_readiness
 from app.evaluation.live.campaign.registry import list_campaign_scenarios
-from app.evaluation.live.campaign.runner import run_observe_campaign, run_semi_automatic_campaign
+from app.evaluation.live.campaign.automatic_action_contract import (
+    AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE,
+    AUTOMATIC_GMAIL_CANARY_WORKFLOW_CONFIRMATION,
+)
+from app.evaluation.live.campaign.runner import (
+    run_automatic_campaign,
+    run_observe_campaign,
+    run_semi_automatic_campaign,
+)
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.live.registry import new_evaluation_run_id
@@ -84,6 +92,8 @@ def _run_campaign(
     app_base_url: str,
     confirm_external: bool,
     scenario_ids: tuple[str, ...] | None = None,
+    workflow_confirmation: str | None = None,
+    tenant_lifecycle: dict | None = None,
 ) -> int:
     if not confirm_external:
         print("ERROR: live campaign requires --confirm-external")
@@ -107,7 +117,18 @@ def _run_campaign(
         return 2
 
     report_path = Path("storage/status/full_system_testbot_report.json")
-    if campaign_type == "semi-auto-core":
+    if campaign_type == AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE:
+        result = run_automatic_campaign(
+            campaign_type=campaign_type,
+            workflow_confirmation=workflow_confirmation or AUTOMATIC_GMAIL_CANARY_WORKFLOW_CONFIRMATION,
+            tenant_id=tenant_id,
+            base_url=base_url,
+            admin_api_key=admin_key,
+            report_path=report_path,
+            scenario_ids=scenario_ids,
+            tenant_lifecycle=tenant_lifecycle,
+        )
+    elif campaign_type == "semi-auto-core":
         result = run_semi_automatic_campaign(
             campaign_type=campaign_type,
             tenant_id=tenant_id,
@@ -177,6 +198,11 @@ def main() -> int:
         parents=[common],
     )
     run_parser.add_argument("--campaign-type", default="transport-smoke")
+    run_parser.add_argument(
+        "--workflow-confirmation",
+        default="",
+        help="Workflow confirmation token (required for automatic-gmail-canary)",
+    )
     run_parser.add_argument("--confirm-external", action="store_true")
     run_parser.add_argument(
         "--scenario-ids",
@@ -214,6 +240,7 @@ def main() -> int:
             args.app_base_url,
             args.confirm_external,
             scenario_ids=scenario_ids,
+            workflow_confirmation=str(getattr(args, "workflow_confirmation", "") or "").strip() or None,
         )
     return 1
 

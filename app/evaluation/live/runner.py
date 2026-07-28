@@ -13,6 +13,8 @@ import httpx
 
 from app.evaluation.live.assertions import (
     _count_unique_succeeded_operation_keys,
+    assert_automatic_campaign_pipeline,
+    assert_automatic_execution_chain,
     assert_duplicate_approve_execution_chain,
     assert_expected_sender_reply,
     assert_no_unexpected_reply,
@@ -27,6 +29,9 @@ from app.evaluation.live.assertions import (
 from app.evaluation.live.campaign.approval_observation import (
     count_contract_pending_external_write_approvals,
     is_legacy_job_level_approval,
+)
+from app.evaluation.live.campaign.automatic_expected_outcomes import (
+    AutomaticExpectedOutcome,
 )
 from app.evaluation.live.campaign.expected_outcomes import ObserveExpectedOutcome
 from app.evaluation.live.campaign.reply_metrics import (
@@ -152,6 +157,8 @@ class LiveEvalRunner:
         observe_expected_outcome: ObserveExpectedOutcome | None = None,
         use_semi_automatic_assertions: bool = False,
         semi_automatic_expected_outcome: SemiAutomaticExpectedOutcome | None = None,
+        use_automatic_assertions: bool = False,
+        automatic_expected_outcome: AutomaticExpectedOutcome | None = None,
         reply_budget_remaining: int = 0,
         campaign_scenario: Any | None = None,
         campaign_run_id: str | None = None,
@@ -174,6 +181,8 @@ class LiveEvalRunner:
         self.observe_expected_outcome = observe_expected_outcome
         self.use_semi_automatic_assertions = use_semi_automatic_assertions
         self.semi_automatic_expected_outcome = semi_automatic_expected_outcome
+        self.use_automatic_assertions = use_automatic_assertions
+        self.automatic_expected_outcome = automatic_expected_outcome
         self.reply_budget_remaining = reply_budget_remaining
         self.campaign_scenario = campaign_scenario
         self.campaign_run_id = campaign_run_id
@@ -280,7 +289,9 @@ class LiveEvalRunner:
 
     def _validate_static_config(self) -> None:
         campaign_mode = (
-            self.use_observe_assertions or self.use_semi_automatic_assertions
+            self.use_observe_assertions
+            or self.use_semi_automatic_assertions
+            or self.use_automatic_assertions
         )
         issues = validate_config_readiness(self.config, campaign_mode=campaign_mode)
         if issues:
@@ -610,6 +621,18 @@ class LiveEvalRunner:
             )
             observation = self._run_pre_operator_gate(ctx)
             observation = self._run_semi_automatic_operator_phase(observation, ctx)
+        elif self.use_automatic_assertions and self.automatic_expected_outcome:
+            outcome = self.automatic_expected_outcome
+            observation = self._wait_for_pipeline(
+                success_statuses=outcome.success_terminal_statuses,
+            )
+            if outcome.expected_reply:
+                observation = self.observer.poll_until_provider_execution_outcome(
+                    self.evaluation_run_id,
+                    timeout_seconds=min(120, self.config.max_runtime_minutes * 60),
+                )
+                if not provider_execution_outcome_ready(observation):
+                    raise LiveEvalSafetyError("provider_metadata_not_persisted")
         else:
             observation = self._wait_for_pipeline()
         self._transition("pipeline_completed")
@@ -622,9 +645,16 @@ class LiveEvalRunner:
 
         reply_evidence = None
         if not (
-            self.use_semi_automatic_assertions
-            and self.semi_automatic_expected_outcome
-            and self.semi_automatic_expected_outcome.expected_reply
+            (
+                self.use_semi_automatic_assertions
+                and self.semi_automatic_expected_outcome
+                and self.semi_automatic_expected_outcome.expected_reply
+            )
+            or (
+                self.use_automatic_assertions
+                and self.automatic_expected_outcome
+                and self.automatic_expected_outcome.expected_reply
+            )
         ):
             reply_evidence = observe_unexpected_sender_reply(
                 evaluation_run_id=self.evaluation_run_id,
@@ -649,9 +679,16 @@ class LiveEvalRunner:
             )
 
         if (
-            self.use_semi_automatic_assertions
-            and self.semi_automatic_expected_outcome
-            and self.semi_automatic_expected_outcome.expected_reply
+            (
+                self.use_semi_automatic_assertions
+                and self.semi_automatic_expected_outcome
+                and self.semi_automatic_expected_outcome.expected_reply
+            )
+            or (
+                self.use_automatic_assertions
+                and self.automatic_expected_outcome
+                and self.automatic_expected_outcome.expected_reply
+            )
         ):
             expected = observe_expected_sender_reply(
                 evaluation_run_id=self.evaluation_run_id,
@@ -685,6 +722,32 @@ class LiveEvalRunner:
             )
             if (
                 self.semi_automatic_expected_outcome.expected_reply
+                and self.reply_metrics.adapter_send_count > 0
+                and self.reply_metrics.recipient_verified_reply_count == 0
+                and self.reply_metrics.provider_outcome_unknown_count == 0
+                and self.reply_metrics.provider_accepted_count > 0
+            ):
+                violations = [
+                    "provider_accepted_without_recipient_verification: "
+                    "provider_accepted_recipient_not_observed"
+                ]
+                self._transition("asserting", violations=violations)
+                self._set_primary_failure(
+                    EXIT_ASSERTION,
+                    category="provider_accepted_recipient_not_observed",
+                )
+                self._abort_run()
+                self._write_report("failed", violations, ctx)
+                return
+        elif self.use_automatic_assertions and self.automatic_expected_outcome:
+            self.reply_metrics = build_scenario_reply_metrics(
+                expected_reply=self.automatic_expected_outcome.expected_reply,
+                observation=observation,
+                recipient_verified=ctx.expected_reply is not None,
+                unauthorized=ctx.unexpected_reply is not None,
+            )
+            if (
+                self.automatic_expected_outcome.expected_reply
                 and self.reply_metrics.adapter_send_count > 0
                 and self.reply_metrics.recipient_verified_reply_count == 0
                 and self.reply_metrics.provider_outcome_unknown_count == 0
@@ -1116,6 +1179,40 @@ class LiveEvalRunner:
                 stale = ctx.operator_results[-1]
                 if not stale.get("conflict") and not stale.get("idempotent"):
                     violations.append("stale operator action must be denied with conflict")
+        elif self.use_automatic_assertions and self.automatic_expected_outcome:
+            outcome = self.automatic_expected_outcome
+            violations.extend(
+                assert_automatic_campaign_pipeline(
+                    observation,
+                    expected_job_type=self.expected_job_type,
+                    expected_job_status=outcome.final_job_status,
+                    expected_policy_authorization=outcome.policy_authorization,
+                    expect_pending_approval=outcome.expect_pending_approval,
+                    decision_subsequence=outcome.decision_subsequence,
+                    expect_execution_intent=outcome.expect_execution_intent,
+                )
+            )
+            violations.extend(
+                assert_automatic_execution_chain(
+                    observation,
+                    expect_execution_outcome=outcome.expected_reply,
+                )
+            )
+            expected_reply_count = 1 if outcome.expected_reply else 0
+            violations.extend(
+                assert_semi_automatic_telemetry(
+                    self.testbot_events,
+                    observation.get("events") or [],
+                    expected_reply_count=expected_reply_count,
+                    app_summary=observation.get("telemetry_summary") or {},
+                )
+            )
+            violations.extend(
+                assert_expected_sender_reply(
+                    ctx.expected_reply,
+                    required=outcome.expected_reply,
+                )
+            )
         elif not ctx.unexpected_reply:
             violations.extend(assert_no_unexpected_reply(ctx.unexpected_reply))
         elif self.use_observe_assertions:
@@ -1138,7 +1235,7 @@ class LiveEvalRunner:
                     ),
                 )
             )
-        elif not self.use_semi_automatic_assertions:
+        elif not self.use_semi_automatic_assertions and not self.use_automatic_assertions:
             violations.extend(assert_s01_pipeline(observation))
             events = observation.get("events") or []
             violations.extend(

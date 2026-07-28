@@ -1,0 +1,42 @@
+scenario_id: TBA01_safe_lead_auto_reply
+scenario_version: v1
+mode: automatic
+job_type: lead
+service_profile: electrical
+synthetic_customer_id: family-lead-auto-001
+thread_id: thread-lead-auto-001
+label: krowolf-live-eval
+
+email:
+  subject: Offert laddbox automatic canary
+  message_text: |
+    Hej, jag vill installera en laddbox i garaget.
+    Adress: Testgatan 1, 12345 Teststad.
+    Telefon: 070-1234567
+  sender:
+    name: Testbot Anna
+    email: testbot-anna@eval.test
+
+expected_classification:
+  job_type: lead
+
+expected_routing:
+  job_status: completed
+  policy_authorization: execution_allowed
+  final_job_status: completed
+
+expected_approval:
+  operator_action: none
+  expected_reply: true
+  test_variant: automatic_safe
+  expected_automation:
+    authorization: auto_execute
+  expected_actions:
+    - action_type: send_customer_auto_reply
+      materialization: materialized_executed
+      operator_role: none
+
+budgets:
+  gmail_sends: 1
+  gmail_replies: 1
+  external_writes: 0

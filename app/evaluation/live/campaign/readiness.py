@@ -15,6 +15,14 @@ from app.evaluation.live.campaign.gates import (
     validate_no_production_resources,
 )
 from app.evaluation.live.campaign.modes import CAMPAIGN_TYPE_SEND_BUDGET
+from app.evaluation.live.campaign.automatic_action_contract import (
+    AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE,
+    AUTOMATIC_GMAIL_CANARY_WORKFLOW_CONFIRMATION,
+    validate_automatic_campaign_qualification,
+)
+from app.evaluation.live.campaign.automatic_reply_contract import (
+    validate_automatic_reply_contract,
+)
 from app.evaluation.live.campaign.operator_contract import validate_semi_auto_operator_contract
 from app.evaluation.live.campaign.reply_contract import validate_semi_auto_reply_contract
 from app.evaluation.live.campaign.registry import (
@@ -138,6 +146,12 @@ def build_full_system_testbot_readiness(
                         issues.append(
                             f"selected scenario {scenario.scenario_id!r} is not observe mode"
                         )
+            if campaign_type == AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE:
+                for scenario in scenarios:
+                    if scenario.mode != "automatic":
+                        issues.append(
+                            f"selected scenario {scenario.scenario_id!r} is not automatic mode"
+                        )
     else:
         scenarios = list_campaign_scenarios(campaign_type=campaign_type)
         expected_budget = CAMPAIGN_TYPE_SEND_BUDGET.get(campaign_type)
@@ -189,6 +203,46 @@ def build_full_system_testbot_readiness(
             "internal_notification_email": tenant_ctx.internal_notification_email,
             "internal_handoff_enabled": tenant_ctx.internal_handoff_enabled,
         }
+
+    if campaign_type == AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE:
+        issues.extend(
+            validate_automatic_campaign_qualification(
+                campaign_type=campaign_type,
+                scenario_ids=selected_scenario_ids,
+                raise_on_failure=False,
+            )
+        )
+        contract_issues, contract_matrix = validate_automatic_reply_contract(
+            campaign_type=campaign_type,
+            config=config,
+            selected_scenario_ids=selected_scenario_ids,
+        )
+        issues.extend(contract_issues)
+        gates["automatic_reply_contract"] = contract_matrix
+
+        from pathlib import Path
+
+        script_root = Path(__file__).resolve().parents[3] / "scripts"
+        for script_name in (
+            "snapshot_live_eval_tenant_config.py",
+            "restore_live_eval_automatic_canary.py",
+        ):
+            if not (script_root / script_name).is_file():
+                issues.append(f"missing required script: {script_name}")
+
+        from app.evaluation.live.campaign.tenant_automation_lifecycle import (
+            snapshot_tenant_config,
+            verify_automation_not_broadly_enabled,
+        )
+
+        try:
+            tenant_snapshot = snapshot_tenant_config(tenant_id=tenant_id)
+            gates["tenant_automation_snapshot_hash"] = tenant_snapshot.config_hash
+            issues.extend(verify_automation_not_broadly_enabled(tenant_snapshot.auto_actions))
+        except Exception as exc:
+            issues.append(f"tenant automation snapshot failed: {exc}")
+
+        gates["workflow_confirmation"] = AUTOMATIC_GMAIL_CANARY_WORKFLOW_CONFIRMATION
 
     required_secrets = [
         "LIVE_EVAL_SENDER_GMAIL_REFRESH_TOKEN",

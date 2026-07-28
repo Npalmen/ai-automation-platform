@@ -66,6 +66,25 @@ def observe_env(monkeypatch):
     get_live_eval_config.cache_clear()
 
 
+def test_automatic_gmail_canary_budget(semi_auto_env):
+    budget = build_selected_scenario_budget(
+        campaign_type="automatic-gmail-canary",
+        selected_scenario_ids=("TBA01_safe_lead_auto_reply", "TBA02_unknown_auto_hold"),
+    )
+    assert budget.inbound_send_budget == 2
+    assert budget.expected_reply_count == 1
+    assert budget.non_gmail_write_budget == 0
+
+
+def test_automatic_gmail_canary_readiness_includes_contract(semi_auto_env):
+    report = build_full_system_testbot_readiness(
+        campaign_type="automatic-gmail-canary",
+        selected_scenario_ids=("TBA01_safe_lead_auto_reply", "TBA02_unknown_auto_hold"),
+    )
+    assert "automatic_reply_contract" in report.gates
+    assert report.gates["automatic_reply_contract"]["scenario_expected_reply_total"] == 1
+
+
 def test_canary_subset_expected_replies_is_one(semi_auto_env):
     budget = build_selected_scenario_budget(
         campaign_type="semi-auto-core",

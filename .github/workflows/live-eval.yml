@@ -16,6 +16,7 @@ on:
           - RUN_OBSERVE_CANARY
           - RUN_SEMI_AUTO_CORE
           - RUN_SEMI_AUTO_CANARY
+          - RUN_AUTOMATIC_GMAIL_CANARY
           - RUN_READONLY_FORENSICS
       forensics_evaluation_run_id:
         description: "Evaluation run ID for RUN_READONLY_FORENSICS"
@@ -159,8 +160,8 @@ jobs:
       - name: Verify live Gmail authorization
         run: |
           case "${{ inputs.confirm_live_gmail }}" in
-            READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_OBSERVE_CANARY|RUN_SEMI_AUTO_CORE|RUN_SEMI_AUTO_CANARY|RUN_READONLY_FORENSICS) ;;
-            *) echo "confirm_live_gmail must be READINESS_ONLY, RUN_S01, RUN_TRANSPORT_SMOKE, RUN_OBSERVE_CANARY, RUN_SEMI_AUTO_CORE, RUN_SEMI_AUTO_CANARY, or RUN_READONLY_FORENSICS"; exit 1 ;;
+            READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_OBSERVE_CANARY|RUN_SEMI_AUTO_CORE|RUN_SEMI_AUTO_CANARY|RUN_AUTOMATIC_GMAIL_CANARY|RUN_READONLY_FORENSICS) ;;
+            *) echo "confirm_live_gmail must be READINESS_ONLY, RUN_S01, RUN_TRANSPORT_SMOKE, RUN_OBSERVE_CANARY, RUN_SEMI_AUTO_CORE, RUN_SEMI_AUTO_CANARY, RUN_AUTOMATIC_GMAIL_CANARY, or RUN_READONLY_FORENSICS"; exit 1 ;;
           esac
           git fetch origin main
           if ! git merge-base --is-ancestor "${GITHUB_SHA}" FETCH_HEAD; then
@@ -427,6 +428,72 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: full-system-testbot-semi-auto-report-${{ github.sha }}
+          path: storage/status/full_system_testbot_report.json
+          if-no-files-found: warn
+
+      - name: Snapshot tenant automation config
+        if: inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'
+        run: |
+          mkdir -p storage/ci-live-eval
+          python scripts/snapshot_live_eval_tenant_config.py \
+            --tenant-id TENANT_LIVE_EVAL \
+            --output "${RUNNER_TEMP}/automatic_canary_tenant_snapshot.json"
+          echo "LIVE_EVAL_AUTOMATIC_CANARY_SNAPSHOT_PATH=${RUNNER_TEMP}/automatic_canary_tenant_snapshot.json" >> "$GITHUB_ENV"
+
+      - name: Activate automatic Gmail canary automation
+        if: inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'
+        run: |
+          python scripts/seed_live_eval_automatic_canary.py \
+            --tenant-id TENANT_LIVE_EVAL \
+            --apply
+
+      - name: Full-system testbot automatic Gmail canary readiness
+        if: inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'
+        env:
+          LIVE_EVAL_MAX_GMAIL_REPLIES: "1"
+        run: |
+          python scripts/full_system_testbot_readiness.py \
+            --campaign-type automatic-gmail-canary \
+            --tenant-id TENANT_LIVE_EVAL \
+            --app-base-url "$LIVE_EVAL_APP_BASE_URL" \
+            --server-sha "$BUILD_GIT_SHA" \
+            --scenario-ids TBA01_safe_lead_auto_reply,TBA02_unknown_auto_hold \
+            --json
+
+      - name: Automatic Gmail canary (TBA01 + TBA02)
+        id: run_automatic_gmail_canary
+        if: inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'
+        env:
+          LIVE_EVAL_MAX_GMAIL_REPLIES: "1"
+        run: |
+          python scripts/run_full_system_testbot_campaign.py run \
+            --campaign-type automatic-gmail-canary \
+            --workflow-confirmation RUN_AUTOMATIC_GMAIL_CANARY \
+            --tenant-id TENANT_LIVE_EVAL \
+            --app-base-url "$LIVE_EVAL_APP_BASE_URL" \
+            --confirm-external \
+            --scenario-ids TBA01_safe_lead_auto_reply,TBA02_unknown_auto_hold
+
+      - name: Pause automatic Gmail canary automation
+        if: always() && inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'
+        run: |
+          python scripts/pause_live_eval_automatic_canary.py \
+            --tenant-id TENANT_LIVE_EVAL \
+            --apply
+
+      - name: Restore tenant automation config
+        if: always() && inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'
+        run: |
+          python scripts/restore_live_eval_automatic_canary.py \
+            --tenant-id TENANT_LIVE_EVAL \
+            --snapshot "$LIVE_EVAL_AUTOMATIC_CANARY_SNAPSHOT_PATH" \
+            --apply
+
+      - name: Upload automatic Gmail canary report
+        if: always() && inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-system-testbot-automatic-gmail-canary-report-${{ github.sha }}
           path: storage/status/full_system_testbot_report.json
           if-no-files-found: warn
 

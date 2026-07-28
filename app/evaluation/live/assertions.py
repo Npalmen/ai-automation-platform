@@ -50,6 +50,16 @@ SEMI_AUTO_POST_APPROVAL_INTERLEAVED: frozenset[str] = frozenset({
     "execution_outcome",
 })
 
+AUTOMATIC_AUTO_EXECUTE_INTERLEAVED: frozenset[str] = frozenset({
+    "pipeline_run_started",
+    "classification",
+    "decisioning_recommendation",
+    "policy_authorization",
+    "action_authorization",
+    "execution_intent",
+    "execution_outcome",
+})
+
 
 def _assert_decision_subsequence(
     types: list[str],
@@ -500,6 +510,134 @@ def assert_target_scoped_execution_chain(
                 violations.append(
                     f"target reject must not create {record_type}, got {count}"
                 )
+
+    return violations
+
+
+def assert_automatic_campaign_pipeline(
+    observation: dict[str, Any],
+    *,
+    expected_job_type: str | None,
+    expected_job_status: str,
+    expected_policy_authorization: str,
+    expect_pending_approval: bool,
+    decision_subsequence: tuple[str, ...] | None = None,
+    expect_execution_intent: bool = False,
+) -> list[str]:
+    """Automatic canary assertions: terminal state without operator involvement."""
+    violations: list[str] = []
+    job = observation.get("job") or {}
+    if not job.get("job_id"):
+        violations.append("expected job_id in observation")
+
+    observed_status = job.get("job_status")
+    if observed_status != expected_job_status:
+        violations.append(
+            f"expected job_status {expected_job_status!r}, got {observed_status!r}"
+        )
+
+    if expect_pending_approval:
+        if not job.get("has_pending_approvals"):
+            violations.append("expected pending approval")
+    elif job.get("has_pending_approvals"):
+        violations.append("unexpected pending approval")
+
+    if expected_job_type:
+        classification = job.get("classification") or {}
+        detected = classification.get("detected_job_type")
+        if detected != expected_job_type:
+            violations.append(
+                f"expected classification {expected_job_type!r}, got {detected!r}"
+            )
+
+    policy = job.get("policy") or {}
+    observed_auth = policy.get("policy_authorization")
+    if observed_auth != expected_policy_authorization:
+        violations.append(
+            f"expected policy_authorization {expected_policy_authorization!r}, "
+            f"got {observed_auth!r}"
+        )
+
+    records = job.get("decision_records") or []
+    types = [
+        r.get("record_type")
+        for r in sorted(records, key=lambda x: int(x.get("event_sequence") or 0))
+    ]
+    interleaved = (
+        AUTOMATIC_AUTO_EXECUTE_INTERLEAVED if expect_execution_intent else None
+    )
+    violations.extend(
+        _assert_decision_subsequence(
+            types,
+            required=decision_subsequence or REQUIRED_DECISION_SUBSEQUENCE,
+            interleaved=interleaved,
+        )
+    )
+
+    if "action_approval_resolution" in types:
+        violations.append("automatic canary must not create action_approval_resolution")
+
+    if expect_execution_intent:
+        if types.count("execution_intent") != 1:
+            violations.append(
+                f"automatic canary requires exactly one execution_intent, "
+                f"got {types.count('execution_intent')}"
+            )
+        if types.count("execution_outcome") != 1:
+            violations.append(
+                f"automatic canary requires exactly one execution_outcome, "
+                f"got {types.count('execution_outcome')}"
+            )
+    else:
+        for forbidden in ("execution_intent", "execution_outcome"):
+            if forbidden in types:
+                violations.append(
+                    f"automatic hold scenario must not create {forbidden}"
+                )
+
+    return violations
+
+
+def assert_automatic_execution_chain(
+    observation: dict[str, Any],
+    *,
+    expect_execution_outcome: bool,
+) -> list[str]:
+    """Assert auto-execute path observed intent/outcome without approval resolution."""
+    violations: list[str] = []
+    records = (observation.get("job") or {}).get("decision_records") or []
+    intent_rows = _records_for_operation(records, record_type="execution_intent", action_operation_id=None)
+    outcome_rows = _records_for_operation(records, record_type="execution_outcome", action_operation_id=None)
+    resolution_rows = _records_for_operation(
+        records,
+        record_type="action_approval_resolution",
+        action_operation_id=None,
+    )
+
+    if resolution_rows:
+        violations.append(
+            f"automatic canary requires zero action_approval_resolution, got {len(resolution_rows)}"
+        )
+
+    if expect_execution_outcome:
+        if len(intent_rows) != 1:
+            violations.append(
+                f"automatic canary requires exactly one execution_intent, got {len(intent_rows)}"
+            )
+        if len(outcome_rows) != 1:
+            violations.append(
+                f"automatic canary requires exactly one execution_outcome, got {len(outcome_rows)}"
+            )
+        elif outcome_rows[0].get("execution_status") != "succeeded":
+            violations.append(
+                "automatic execution_outcome must be succeeded, got "
+                f"{outcome_rows[0].get('execution_status')!r}"
+            )
+    else:
+        if intent_rows or outcome_rows:
+            violations.append(
+                "automatic hold scenario must not create execution intent/outcome"
+            )
 
     return violations
 

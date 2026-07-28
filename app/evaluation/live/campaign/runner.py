@@ -7,6 +7,14 @@ import subprocess
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.evaluation.live.campaign.automatic_action_contract import (
+    AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE,
+    AUTOMATIC_GMAIL_CANARY_WORKFLOW_CONFIRMATION,
+    validate_automatic_campaign_qualification,
+)
+from app.evaluation.live.campaign.automatic_expected_outcomes import (
+    resolve_automatic_expected_outcome,
+)
 from app.evaluation.live.campaign.expected_outcomes import resolve_observe_expected_outcome
 from app.evaluation.live.campaign.generator import build_campaign_send_payload
 from app.evaluation.live.campaign.gates import (
@@ -481,6 +489,215 @@ def run_semi_automatic_campaign(
             approvals=campaign_result.approval_resolutions,
             overall_status=campaign_result.overall_status,
             reply_totals=reply_totals.to_dict() if reply_totals is not None else None,
+        )
+        write_campaign_report(report_path, report)
+
+    return campaign_result
+
+
+def run_automatic_campaign(
+    *,
+    campaign_type: str = AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE,
+    workflow_confirmation: str = AUTOMATIC_GMAIL_CANARY_WORKFLOW_CONFIRMATION,
+    tenant_id: str = "TENANT_LIVE_EVAL",
+    base_url: str,
+    admin_api_key: str,
+    report_path: str | None = None,
+    scenario_ids: tuple[str, ...] | None = None,
+    tenant_lifecycle: dict[str, Any] | None = None,
+) -> ObserveCampaignResult:
+    validate_automatic_campaign_qualification(
+        campaign_type=campaign_type,
+        workflow_confirmation=workflow_confirmation,
+        scenario_ids=scenario_ids,
+    )
+
+    if not campaign_enabled():
+        raise LiveEvalSafetyError("FULL_SYSTEM_TESTBOT_CAMPAIGN_ALLOWED=yes required")
+
+    config = get_live_eval_config()
+    budget_issues = validate_campaign_budget_config(campaign_type=campaign_type, config=config)
+    if budget_issues:
+        raise LiveEvalSafetyError("; ".join(budget_issues))
+
+    reply_ceiling = CAMPAIGN_TYPE_REPLY_BUDGET.get(campaign_type, 0)
+    if reply_ceiling and config.max_gmail_replies_per_run < 1:
+        raise LiveEvalSafetyError(
+            "LIVE_EVAL_MAX_GMAIL_REPLIES must be >= 1 for automatic Gmail canary"
+        )
+
+    prod_issues = validate_no_production_resources(
+        app_base_url=base_url,
+        tenant_id=tenant_id,
+    )
+    if prod_issues:
+        raise LiveEvalSafetyError("; ".join(prod_issues))
+
+    selected_budget = build_selected_scenario_budget(
+        campaign_type=campaign_type,
+        selected_scenario_ids=scenario_ids,
+    )
+    scenarios = [
+        get_campaign_scenario(scenario_id)
+        for scenario_id in selected_budget.selected_scenario_ids
+    ]
+
+    senders = sorted(config.sender_emails)
+    recipients = sorted(config.recipient_emails)
+    if len(senders) != 1 or len(recipients) != 1:
+        raise LiveEvalSafetyError("exactly one allowlisted sender and recipient required")
+
+    campaign_run_id = new_evaluation_run_id()
+    results: list[ScenarioResult] = []
+    safety_violations: list[str] = []
+    sends = 0
+    reply_budget_remaining = selected_budget.max_reply_count
+    scenario_reply_metrics: list[ScenarioReplyMetrics] = []
+
+    for scenario in scenarios:
+        if scenario.mode != "automatic":
+            raise LiveEvalSafetyError(
+                f"scenario {scenario.scenario_id!r} is not automatic mode"
+            )
+
+        run_id = new_evaluation_run_id()
+        payload = build_campaign_send_payload(
+            scenario=scenario,
+            evaluation_run_id=run_id,
+            campaign_run_id=campaign_run_id,
+        )
+        expected_outcome = resolve_automatic_expected_outcome(scenario)
+        operator_reply_budget = reply_budget_remaining
+        if expected_outcome.expected_reply:
+            if reply_budget_remaining < 1:
+                raise LiveEvalSafetyError(
+                    f"reply budget exhausted before scenario {scenario.scenario_id!r}"
+                )
+            reply_budget_remaining -= 1
+
+        runner = LiveEvalRunner(
+            base_url=base_url,
+            admin_api_key=admin_api_key,
+            tenant_id=tenant_id,
+            scenario_id=scenario.scenario_id,
+            expected_sender=senders[0],
+            expected_recipient=recipients[0],
+            evaluation_run_id=run_id,
+            message_body=payload["body"],
+            base_subject=scenario.email.subject,
+            expected_job_type=_expected_job_type(scenario),
+            use_automatic_assertions=True,
+            automatic_expected_outcome=expected_outcome,
+            reply_budget_remaining=operator_reply_budget,
+            campaign_scenario=scenario,
+            campaign_run_id=campaign_run_id,
+        )
+        exit_code = runner.run()
+        sends += 1
+
+        observation: dict[str, Any] = {}
+        try:
+            observation = runner.observer.get_observation(run_id)
+        except Exception:
+            observation = {}
+
+        job = observation.get("job") or {}
+        violations = []
+        if exit_code != 0:
+            violations.append(f"runner exit_code={exit_code}")
+
+        metrics = runner.reply_metrics
+        if metrics is not None:
+            scenario_reply_metrics.append(metrics)
+
+        observed_approval_status = "none"
+        if job.get("has_pending_approvals"):
+            observed_approval_status = "pending"
+
+        result = ScenarioResult(
+            scenario_id=scenario.scenario_id,
+            scenario_version=scenario.scenario_version,
+            evaluation_run_id=run_id,
+            correlation_token_redacted=_redact_token(run_id, scenario.scenario_id),
+            exit_code=exit_code,
+            status="passed" if exit_code == 0 else "failed",
+            job_id=job.get("job_id"),
+            classification=dict(job.get("classification") or {}),
+            job_status=job.get("job_status"),
+            approval_status=observed_approval_status,
+            violations=violations,
+            reply_metrics=metrics,
+        )
+        results.append(result)
+
+    reply_totals = (
+        CampaignReplyTotals.from_scenarios(scenario_reply_metrics)
+        if scenario_reply_metrics
+        else None
+    )
+    replies = reply_totals.recipient_verified_reply_count if reply_totals is not None else 0
+
+    passed = sum(1 for r in results if r.status == "passed")
+    expected_count = len(scenarios)
+    overall = "passed" if passed == expected_count else "failed"
+    if sends != expected_count:
+        safety_violations.append(f"send count mismatch: {sends} != {expected_count}")
+    expected_reply_budget = selected_budget.expected_reply_count
+    expected_recipient_verified = selected_budget.expected_reply_count
+    if reply_totals is not None:
+        if reply_totals.expected_reply_count != expected_reply_budget:
+            safety_violations.append(
+                "expected_reply_count mismatch: "
+                f"{reply_totals.expected_reply_count} != {expected_reply_budget}"
+            )
+        if reply_totals.recipient_verified_reply_count != expected_recipient_verified:
+            safety_violations.append(
+                "recipient_verified_reply_count mismatch: "
+                f"{reply_totals.recipient_verified_reply_count} != {expected_recipient_verified}"
+            )
+        if reply_totals.unauthorized_reply_count != 0:
+            safety_violations.append(
+                f"unauthorized_reply_count must be 0, got {reply_totals.unauthorized_reply_count}"
+            )
+        if reply_totals.recipient_verified_reply_count > selected_budget.max_reply_count:
+            safety_violations.append(
+                "reply budget exceeded: "
+                f"{reply_totals.recipient_verified_reply_count} > {selected_budget.max_reply_count}"
+            )
+    elif replies > selected_budget.max_reply_count:
+        safety_violations.append(
+            f"reply budget exceeded: {replies} > {selected_budget.max_reply_count}"
+        )
+
+    campaign_result = ObserveCampaignResult(
+        campaign_type=campaign_type,
+        overall_status=overall if not safety_violations else "failed",
+        scenario_results=results,
+        sends=len(scenarios),
+        replies=replies,
+        approval_resolutions=0,
+        external_writes=0,
+        safety_violations=safety_violations,
+        reply_totals=reply_totals,
+        selected_scenario_budget=selected_budget,
+        main_sha=_git_sha("HEAD"),
+        server_sha=os.environ.get("BUILD_GIT_SHA"),
+    )
+
+    if report_path:
+        cleanup = dict(tenant_lifecycle or {})
+        report = CampaignReport(
+            campaign_type=campaign_type,
+            mode="automatic",
+            main_sha=campaign_result.main_sha,
+            server_sha=campaign_result.server_sha,
+            scenario_versions=[s.scenario_version for s in scenarios],
+            sends=campaign_result.sends,
+            replies=campaign_result.replies,
+            approvals=0,
+            overall_status=campaign_result.overall_status,
+            reply_totals=reply_totals.to_dict() if reply_totals is not None else None,
+            cleanup=cleanup,
         )
         write_campaign_report(report_path, report)
 

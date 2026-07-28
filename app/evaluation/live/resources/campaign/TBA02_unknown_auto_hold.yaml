@@ -1,0 +1,38 @@
+scenario_id: TBA02_unknown_auto_hold
+scenario_version: v1
+mode: automatic
+job_type: unknown
+service_profile: null
+synthetic_customer_id: family-unknown-auto-001
+thread_id: thread-unknown-auto-001
+label: krowolf-live-eval
+
+email:
+  subject: Random inquiry automatic negative hold
+  message_text: |
+    Hej, jag fick ert nummer av en kompis men vet inte riktigt vad ni gör.
+    Kan ni hjälpa mig?
+  sender:
+    name: Testbot Unknown
+    email: testbot-unknown@eval.test
+
+expected_classification:
+  job_type: unknown
+
+expected_routing:
+  job_status: manual_review
+  policy_authorization: hold_for_review
+  final_job_status: manual_review
+
+expected_approval:
+  operator_action: none
+  expected_reply: false
+  test_variant: negative_hold
+  negative_control: true
+  expected_automation:
+    expected_reply: false
+
+budgets:
+  gmail_sends: 1
+  gmail_replies: 0
+  external_writes: 0
