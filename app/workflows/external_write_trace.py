@@ -28,6 +28,31 @@ _UNRESOLVED_STATUSES = frozenset({
     ExecutionStatus.RECONCILIATION_REQUIRED.value,
 })
 
+_STUB_PROVIDERS = frozenset({"internal_stub", "internal", "none"})
+
+
+def is_real_provider_execution_result(result: dict[str, Any]) -> bool:
+    """True only when adapter result represents a real external provider attempt/success."""
+    if not isinstance(result, dict):
+        return False
+    if str(result.get("status") or "").strip().lower() == "skipped":
+        return False
+
+    integration = result.get("integration_result")
+    if isinstance(integration, dict):
+        if integration.get("skipped"):
+            return False
+        provider = str(integration.get("provider") or "").strip().lower()
+        if provider in _STUB_PROVIDERS:
+            return False
+        if str(integration.get("status") or "").strip().lower() == "stubbed":
+            return False
+
+    top_provider = str(result.get("provider") or "").strip().lower()
+    if top_provider in _STUB_PROVIDERS:
+        return False
+    return True
+
 
 def _adapter_outcome_metadata(result: dict[str, Any], *, action: dict[str, Any] | None = None) -> dict[str, Any]:
     """Normalize adapter/Gmail metadata for DecisionRecord and live-eval telemetry."""
@@ -68,6 +93,14 @@ def _adapter_outcome_metadata(result: dict[str, Any], *, action: dict[str, Any] 
 
     if isinstance(integration, dict) and integration.get("status"):
         metadata["provider_status"] = str(integration.get("status"))
+
+    provider_name = None
+    if isinstance(integration, dict) and integration.get("provider"):
+        provider_name = str(integration.get("provider"))
+    elif result.get("provider"):
+        provider_name = str(result.get("provider"))
+    if provider_name:
+        metadata["adapter_provider"] = provider_name[:80]
 
     if action is not None:
         recipient = str(action.get("to") or "").strip().lower()

@@ -111,8 +111,15 @@ def resolve_google_mail_connection_config(
                 "credential_source": "tenant_oauth",
                 "metadata_json": meta,
             }
+        return {
+            **base,
+            "access_token": "",
+            "user_id": "me",
+            "refresh_token": "",
+            "credential_source": "tenant_missing",
+        }
 
-    # Platform-level fallback (legacy)
+    # Platform-level fallback (legacy) — only when no DB session is available.
     return {
         **base,
         "access_token": settings.GOOGLE_MAIL_ACCESS_TOKEN,

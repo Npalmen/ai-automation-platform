@@ -116,6 +116,8 @@ def _apply_post_resolution_job_status(
     delivery: dict[str, Any],
     approval_id: str,
 ) -> Job:
+    from app.workflows.external_write_trace import is_real_provider_execution_result
+
     result = dict(job.result or {})
 
     if pending_count > 0:
@@ -123,7 +125,14 @@ def _apply_post_resolution_job_status(
         return job
 
     action_type = str(delivery.get("type") or "")
-    send_succeeded = bool(send_result and send_result.get("status") == "executed")
+    send_succeeded = bool(
+        send_result
+        and send_result.get("status") == "executed"
+        and (
+            action_type not in ("send_customer_auto_reply", "send_email")
+            or is_real_provider_execution_result(send_result)
+        )
+    )
 
     if not approved:
         job.status = JobStatus.MANUAL_REVIEW

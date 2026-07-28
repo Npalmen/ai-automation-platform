@@ -87,7 +87,7 @@ def _build_stub_result(
     }
 
 
-def _build_email_result(action: dict[str, Any]) -> dict[str, Any]:
+def _build_email_result(action: dict[str, Any], *, db: "Session | None" = None) -> dict[str, Any]:
     tenant_id = _get_tenant_id(action)
     to = _ensure_str(action.get("to"), "to")
     subject = _ensure_str(action.get("subject"), "subject")
@@ -119,6 +119,7 @@ def _build_email_result(action: dict[str, Any]) -> dict[str, Any]:
     connection_config = get_integration_connection_config(
         tenant_id=tenant_id,
         integration_type=IntegrationType.GOOGLE_MAIL,
+        db=db,
     )
 
     if not is_integration_configured(connection_config):
@@ -400,7 +401,7 @@ def execute_action(
 
     def _run_adapter() -> dict[str, Any]:
         if action_type in ("send_email", "send_customer_auto_reply", "send_internal_handoff"):
-            result = _build_email_result(action)
+            result = _build_email_result(action, db=db)
             result["type"] = action_type
             return result
 

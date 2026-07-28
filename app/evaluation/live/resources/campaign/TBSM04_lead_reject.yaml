@@ -24,6 +24,7 @@ expected_routing:
   job_status: awaiting_approval
   policy_authorization: approval_required
   final_job_status: awaiting_approval
+  post_operator_final_job_status: manual_review
 
 expected_approval:
   operator_action: reject
