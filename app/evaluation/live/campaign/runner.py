@@ -51,6 +51,7 @@ class ScenarioResult:
     violations: list[str] = field(default_factory=list)
     safety_violations: list[str] = field(default_factory=list)
     reply_metrics: ScenarioReplyMetrics | None = None
+    phase_provenance: dict[str, Any] | None = None
 
 
 @dataclass
@@ -97,6 +98,7 @@ class ObserveCampaignResult:
                     "reply_metrics": (
                         r.reply_metrics.to_dict() if r.reply_metrics is not None else None
                     ),
+                    "phase_provenance": r.phase_provenance,
                 }
                 for r in self.scenario_results
             ],
@@ -394,6 +396,11 @@ def run_semi_automatic_campaign(
             approval_status=observed_approval_status,
             violations=violations,
             reply_metrics=metrics,
+            phase_provenance=(
+                runner._phase_provenance.to_dict()
+                if getattr(runner, "_phase_provenance", None) is not None
+                else None
+            ),
         )
         results.append(result)
 
