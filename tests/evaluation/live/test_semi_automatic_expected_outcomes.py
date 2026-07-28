@@ -6,6 +6,7 @@ import pytest
 
 from app.evaluation.live.assertions import (
     REQUIRED_DECISION_SUBSEQUENCE,
+    assert_post_reject_terminal_contract,
     assert_semi_automatic_campaign_pipeline,
     assert_semi_automatic_telemetry,
     assert_target_scoped_execution_chain,
@@ -13,6 +14,7 @@ from app.evaluation.live.assertions import (
 from app.evaluation.live.campaign.registry import clear_campaign_registry_cache, get_campaign_scenario
 from app.evaluation.live.campaign.semi_automatic_expected_outcomes import (
     resolve_semi_automatic_expected_outcome,
+    validate_post_operator_final_job_status_contract,
 )
 
 
@@ -29,10 +31,12 @@ def test_tbsm01_lead_approve_reply_expectations():
     assert outcome.operator_action == "approve"
     assert outcome.expected_reply is True
     assert outcome.final_job_status == "awaiting_approval"
+    assert outcome.post_operator_final_job_status == "completed"
     assert outcome.final_success_statuses == frozenset({"awaiting_approval"})
     assert outcome.expect_approval_resolution is True
     assert outcome.decision_subsequence == REQUIRED_DECISION_SUBSEQUENCE
     assert outcome.operator_plan[0].action_type == "send_customer_auto_reply"
+    assert validate_post_operator_final_job_status_contract(scenario, outcome) == []
 
 
 def test_tbsm04_lead_reject_expectations():
@@ -41,6 +45,58 @@ def test_tbsm04_lead_reject_expectations():
     assert outcome.operator_action == "reject"
     assert outcome.expected_reply is False
     assert outcome.final_job_status == "awaiting_approval"
+    assert outcome.post_operator_final_job_status == "manual_review"
+    assert outcome.is_post_reject_terminal is True
+    assert validate_post_operator_final_job_status_contract(scenario, outcome) == []
+
+
+@pytest.mark.parametrize(
+    "scenario_id",
+    ["TBSM05_support_reject", "TBSM07_stale_approve"],
+)
+def test_reject_scenarios_post_operator_manual_review(scenario_id: str):
+    scenario = get_campaign_scenario(scenario_id)
+    outcome = resolve_semi_automatic_expected_outcome(scenario)
+    assert outcome.post_operator_final_job_status == "manual_review"
+    assert validate_post_operator_final_job_status_contract(scenario, outcome) == []
+
+
+def test_post_reject_manual_review_passes_contract():
+    observation = {
+        "job": {
+            "job_id": "job-1",
+            "job_status": "manual_review",
+            "pending_approval_count": 0,
+            "decision_records": [
+                {"record_type": "action_approval_resolution"},
+            ],
+        },
+        "events": [],
+    }
+    assert assert_post_reject_terminal_contract(
+        observation,
+        operator_decision_observed="reject",
+        expected_reply_count=0,
+    ) == []
+
+
+def test_post_reject_requires_zero_intents_and_outcomes():
+    observation = {
+        "job": {
+            "job_status": "manual_review",
+            "pending_approval_count": 0,
+            "decision_records": [
+                {"record_type": "action_approval_resolution"},
+                {"record_type": "execution_intent"},
+            ],
+        },
+        "events": [],
+    }
+    violations = assert_post_reject_terminal_contract(
+        observation,
+        operator_decision_observed="reject",
+    )
+    assert any("execution_intent" in v for v in violations)
 
 
 def test_tbsm06_duplicate_approve_variant():

@@ -81,4 +81,20 @@ def provider_execution_outcome_ready(observation: dict[str, Any]) -> bool:
     if not (outcome.adapter_recipient or "").strip():
         return False
     status = (outcome.adapter_status or "").strip().lower()
-    return status in ("executed", "succeeded", "success")
+    if status not in ("executed", "succeeded", "success"):
+        return False
+
+    job = observation.get("job") or {}
+    for row in job.get("decision_records") or []:
+        if row.get("record_type") != "execution_outcome":
+            continue
+        metadata = row.get("metadata") or {}
+        provider = str(metadata.get("adapter_provider") or "").strip().lower()
+        if provider in ("internal_stub", "internal", "none"):
+            return False
+
+    trace_metadata = (job.get("execution_trace") or {}).get("execution_outcome", {}).get("metadata") or {}
+    provider = str(trace_metadata.get("adapter_provider") or "").strip().lower()
+    if provider in ("internal_stub", "internal", "none"):
+        return False
+    return True

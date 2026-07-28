@@ -18,6 +18,9 @@ from app.evaluation.live.campaign.schemas import CampaignScenario
 _APPROVAL_FIRST_PRE = frozenset({"awaiting_approval"})
 _SAFE_HOLD_PRE = frozenset({"manual_review"})
 _TERMINAL_WITH_SECONDARY_PENDING = frozenset({"awaiting_approval"})
+_VALID_POST_OPERATOR_STATUSES = frozenset(
+    {"awaiting_approval", "completed", "manual_review", "cancelled", "rejected"}
+)
 
 
 @dataclass(frozen=True)
@@ -27,6 +30,7 @@ class SemiAutomaticExpectedOutcome:
     test_variant: str
     pre_action_job_status: str
     final_job_status: str
+    post_operator_final_job_status: str
     expect_pending_approval_pre: bool
     policy_authorization: str
     allow_operator_action: bool
@@ -50,6 +54,16 @@ class SemiAutomaticExpectedOutcome:
             return None
         return self.operator_plan[0].action_type
 
+    @property
+    def is_post_reject_terminal(self) -> bool:
+        if not self.operator_plan:
+            return False
+        return (
+            self.operator_plan[0].decision == "reject"
+            and not self.expected_reply
+            and self.post_operator_final_job_status == "manual_review"
+        )
+
 
 def _approval_block(scenario: CampaignScenario) -> dict:
     return dict(scenario.expected_approval or {})
@@ -64,6 +78,76 @@ def _derive_legacy_operator_action(plan: tuple[OperatorPlanStep, ...]) -> str:
     if first == "reject":
         return "reject"
     return "none"
+
+
+def _derive_post_operator_final_job_status(
+    *,
+    routing: dict,
+    contract_operator_plan: tuple[OperatorPlanStep, ...],
+    expected_reply: bool,
+    has_secondary_pending: bool,
+    test_variant: str,
+) -> str:
+    explicit = str(routing.get("post_operator_final_job_status") or "").strip()
+    if explicit:
+        return explicit
+    if not contract_operator_plan:
+        return str(routing.get("final_job_status") or "manual_review")
+    if has_secondary_pending:
+        return "awaiting_approval"
+    first = contract_operator_plan[0]
+    if first.decision == "reject" and not expected_reply:
+        return "manual_review"
+    if first.decision == "approve" and expected_reply:
+        return "completed"
+    if test_variant == "negative_hold":
+        return "manual_review"
+    return str(routing.get("final_job_status") or "awaiting_approval")
+
+
+def validate_post_operator_final_job_status_contract(
+    scenario: CampaignScenario,
+    outcome: SemiAutomaticExpectedOutcome,
+) -> list[str]:
+    """Fail-closed readiness: post-operator status must match operator decision and budgets."""
+    issues: list[str] = []
+    scenario_id = scenario.scenario_id
+    post_status = outcome.post_operator_final_job_status
+
+    if post_status not in _VALID_POST_OPERATOR_STATUSES:
+        issues.append(f"{scenario_id}: invalid post_operator_final_job_status {post_status!r}")
+
+    if not outcome.operator_plan:
+        return issues
+
+    first = outcome.operator_plan[0]
+    reply_budget = int(scenario.budgets.gmail_replies or 0)
+
+    if first.decision == "reject" and not outcome.expected_reply:
+        if post_status != "manual_review":
+            issues.append(
+                f"{scenario_id}: reject scenario requires post_operator_final_job_status "
+                f"manual_review, got {post_status!r}"
+            )
+        if reply_budget != 0:
+            issues.append(f"{scenario_id}: reject scenario requires gmail_replies budget 0")
+    elif first.decision == "approve" and outcome.expected_reply:
+        if post_status not in {"completed", "awaiting_approval"}:
+            issues.append(
+                f"{scenario_id}: approve+reply scenario requires post_operator_final_job_status "
+                f"completed or awaiting_approval, got {post_status!r}"
+            )
+        if reply_budget != 1:
+            issues.append(f"{scenario_id}: approve+reply scenario requires gmail_replies budget 1")
+
+    explicit_yaml = str((scenario.expected_routing or {}).get("post_operator_final_job_status") or "").strip()
+    if explicit_yaml and explicit_yaml != post_status:
+        issues.append(
+            f"{scenario_id}: derived post_operator_final_job_status {post_status!r} "
+            f"does not match YAML {explicit_yaml!r}"
+        )
+
+    return issues
 
 
 def resolve_semi_automatic_expected_outcome(
@@ -101,6 +185,7 @@ def resolve_semi_automatic_expected_outcome(
         expect_dup = False
         expect_stale = False
         final_status = str(routing.get("final_job_status") or "manual_review")
+        post_operator_final = str(routing.get("post_operator_final_job_status") or "manual_review")
     elif contract.operator_plan:
         pre_status = pre_status or "awaiting_approval"
         policy_authorization = policy_authorization or "approval_required"
@@ -120,6 +205,13 @@ def resolve_semi_automatic_expected_outcome(
             step.decision == "approve" and step.expected_http_status == 409
             for step in contract.operator_plan[1:]
         )
+        post_operator_final = _derive_post_operator_final_job_status(
+            routing=routing,
+            contract_operator_plan=contract.operator_plan,
+            expected_reply=expected_reply,
+            has_secondary_pending=has_secondary_pending,
+            test_variant=test_variant,
+        )
     else:
         pre_status = pre_status or "awaiting_approval"
         policy_authorization = policy_authorization or "approval_required"
@@ -132,6 +224,13 @@ def resolve_semi_automatic_expected_outcome(
         expect_resolution = False
         expect_dup = False
         expect_stale = False
+        post_operator_final = _derive_post_operator_final_job_status(
+            routing=routing,
+            contract_operator_plan=contract.operator_plan,
+            expected_reply=expected_reply,
+            has_secondary_pending=has_secondary_pending,
+            test_variant=test_variant,
+        )
 
     return SemiAutomaticExpectedOutcome(
         operator_action=operator_action,
@@ -139,6 +238,7 @@ def resolve_semi_automatic_expected_outcome(
         test_variant=test_variant,
         pre_action_job_status=pre_status,
         final_job_status=final_status,
+        post_operator_final_job_status=post_operator_final,
         expect_pending_approval_pre=expect_pending_pre,
         policy_authorization=policy_authorization,
         allow_operator_action=allow_operator,

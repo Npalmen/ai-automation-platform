@@ -364,7 +364,7 @@ class TestActionExecutorEmailRouting:
 
         captured: dict = {}
 
-        def fake_get_config(tenant_id, integration_type):
+        def fake_get_config(tenant_id, integration_type, db=None):
             captured["integration_type"] = integration_type
             return {}  # unconfigured → falls to stub, no network call
 

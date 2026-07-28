@@ -336,6 +336,20 @@ def validate_semi_auto_operator_contract(
         if not row["expected_reply"] and row["reply_budget"] != 0:
             issues.append(f"{scenario_id}: no-reply scenario must have gmail_replies budget 0")
 
+        from app.evaluation.live.campaign.semi_automatic_expected_outcomes import (
+            resolve_semi_automatic_expected_outcome,
+            validate_post_operator_final_job_status_contract,
+        )
+
+        scenario = next(
+            (s for s in list_campaign_scenarios(campaign_type=campaign_type) if s.scenario_id == scenario_id),
+            None,
+        )
+        if scenario is not None:
+            outcome = resolve_semi_automatic_expected_outcome(scenario)
+            issues.extend(validate_post_operator_final_job_status_contract(scenario, outcome))
+            row["post_operator_final_job_status"] = outcome.post_operator_final_job_status
+
     if config.max_gmail_replies_per_run != 1:
         issues.append("LIVE_EVAL_MAX_GMAIL_REPLIES must be 1 per scenario for semi-auto campaigns")
 

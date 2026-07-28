@@ -23,6 +23,7 @@ ALLOWED_METADATA_KEYS = frozenset({
     "adapter_status",
     "adapter_recipient",
     "adapter_sender",
+    "adapter_provider",
     "provider_message_id",
     "provider_rfc_message_id",
     "provider_status",

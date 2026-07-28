@@ -1033,13 +1033,23 @@ class LiveEvalRunner:
                 assert_semi_automatic_campaign_pipeline(
                     observation_for_assert,
                     expected_job_type=self.expected_job_type,
-                    expected_job_status=outcome.final_job_status,
+                    expected_job_status=outcome.post_operator_final_job_status,
                     expected_policy_authorization=outcome.policy_authorization,
                     expect_pending_approval=expect_pending_post,
                     decision_subsequence=outcome.decision_subsequence,
                     expect_approval_resolution_record=outcome.expect_approval_resolution,
                 )
             )
+            if outcome.is_post_reject_terminal:
+                from app.evaluation.live.assertions import assert_post_reject_terminal_contract
+
+                violations.extend(
+                    assert_post_reject_terminal_contract(
+                        observation_for_assert,
+                        operator_decision_observed=outcome.operator_action,
+                        expected_reply_count=0,
+                    )
+                )
             target_operation_id = (
                 ctx.operator_execution.target_action_operation_id
                 if ctx.operator_execution is not None

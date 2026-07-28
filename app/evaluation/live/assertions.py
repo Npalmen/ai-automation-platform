@@ -298,6 +298,56 @@ def assert_semi_automatic_telemetry(
     return violations
 
 
+def _count_decision_records(observation: dict[str, Any], record_type: str) -> int:
+    job = observation.get("job") or {}
+    records = job.get("decision_records") or []
+    return sum(1 for row in records if str(row.get("record_type") or "") == record_type)
+
+
+def assert_post_reject_terminal_contract(
+    observation: dict[str, Any],
+    *,
+    operator_decision_observed: str,
+    expected_reply_count: int = 0,
+) -> list[str]:
+    """Accept manual_review post-reject only when reject terminal contract is fully proven."""
+    violations: list[str] = []
+    job = observation.get("job") or {}
+
+    if operator_decision_observed != "reject":
+        violations.append("post_reject_contract requires operator reject")
+        return violations
+
+    if str(job.get("job_status") or "") != "manual_review":
+        violations.append("post_reject_contract requires job_status manual_review")
+
+    pending = int(job.get("pending_approval_count") or 0)
+    if pending != 0:
+        violations.append(f"post_reject_contract requires pending_approval_count 0, got {pending}")
+
+    if _count_decision_records(observation, "action_approval_resolution") != 1:
+        violations.append("post_reject_contract requires exactly one action_approval_resolution")
+
+    if _count_decision_records(observation, "execution_intent") != 0:
+        violations.append("post_reject_contract requires zero execution_intent records")
+
+    if _count_decision_records(observation, "execution_outcome") != 0:
+        violations.append("post_reject_contract requires zero execution_outcome records")
+
+    reply_events = sum(
+        1
+        for event in observation.get("events") or []
+        if str(event.get("category") or "") == "app_gmail_reply"
+        and str(event.get("outcome") or "") == "succeeded"
+    )
+    if reply_events != expected_reply_count:
+        violations.append(
+            f"post_reject_contract requires gmail reply events {expected_reply_count}, got {reply_events}"
+        )
+
+    return violations
+
+
 def assert_semi_automatic_campaign_pipeline(
     observation: dict[str, Any],
     *,
