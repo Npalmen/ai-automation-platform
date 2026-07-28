@@ -42,7 +42,6 @@ from app.evaluation.live.campaign.test_operator import (
     execute_test_operator_actions,
     list_job_approvals,
 )
-from app.evaluation.live.cleanup import cleanup_recipient_message, cleanup_unexpected_reply
 from app.evaluation.live.cleanup_phase import resolve_cleanup_phase
 from app.evaluation.live.cleanup_resolver import resolve_recipient_from_journal
 from app.evaluation.live.config import get_live_eval_config
@@ -107,6 +106,13 @@ from app.evaluation.live.provider_recipient_verification import (
     provider_execution_outcome_ready,
 )
 from app.evaluation.live.schemas import LiveEvalReport
+from app.evaluation.live.semi_auto_phase import (
+    SemiAutoPhaseProvenance,
+    assert_phase_monotonicity,
+    poll_post_operator_observation,
+    poll_pre_operator_readiness,
+)
+from app.evaluation.live.cleanup import cleanup_recipient_message, cleanup_unexpected_reply
 
 
 def _provider_message_id_from_observation(observation: dict[str, Any]) -> str | None:
@@ -198,6 +204,7 @@ class LiveEvalRunner:
         self._timeout_reason: str | None = None
         self._timeout_job_snapshot: dict[str, Any] | None = None
         self._poll_attempts: int | None = None
+        self._phase_provenance: SemiAutoPhaseProvenance | None = None
         self._poll_duration_seconds: float | None = None
         self.reply_metrics: ScenarioReplyMetrics | None = None
 
@@ -493,7 +500,10 @@ class LiveEvalRunner:
         except LiveEvalSafetyError as exc:
             self._last_error = exc
             msg = str(exc)
-            if "send_outcome_unresolved" in msg:
+            if "approval_bypass_or_phase_order_violation" in msg:
+                self.failure_category = "approval_bypass_or_phase_order_violation"
+                self._set_primary_failure(EXIT_ASSERTION, category=self.failure_category)
+            elif "send_outcome_unresolved" in msg:
                 self._set_primary_failure(EXIT_UNRESOLVED_SEND, category="send_outcome_unresolved")
                 self._send_state = "outcome_unknown"
             elif self.failure_category == "sender_scope_unverifiable":
@@ -590,9 +600,18 @@ class LiveEvalRunner:
                     pipeline_run_id=None,
                 )
 
-        observation = self._wait_for_pipeline()
-        if self.use_semi_automatic_assertions and self.semi_automatic_expected_outcome:
+        if (
+            self.use_semi_automatic_assertions
+            and self.semi_automatic_expected_outcome
+            and not self.semi_automatic_expected_outcome.is_negative_hold
+        ):
+            self._phase_provenance = SemiAutoPhaseProvenance(
+                evaluation_run_id=self.evaluation_run_id,
+            )
+            observation = self._run_pre_operator_gate(ctx)
             observation = self._run_semi_automatic_operator_phase(observation, ctx)
+        else:
+            observation = self._wait_for_pipeline()
         self._transition("pipeline_completed")
 
         registry = self._load_registry_run()
@@ -853,12 +872,41 @@ class LiveEvalRunner:
             success_statuses=success_statuses,
         )
 
+    def _run_pre_operator_gate(self, ctx: _RunContext) -> dict[str, Any]:
+        outcome = self.semi_automatic_expected_outcome
+        provenance = self._phase_provenance
+        if outcome is None or provenance is None:
+            raise LiveEvalSafetyError("semi-auto pre-operator gate requires expected outcome")
+
+        self._transition("pre_operator_gate_started")
+        observation, _target = poll_pre_operator_readiness(
+            lambda: self.observer.get_observation(self.evaluation_run_id),
+            lambda job_id: list_job_approvals(
+                base_url=self.base_url,
+                admin_api_key=self.observer.admin_api_key,
+                tenant_id=self.tenant_id,
+                job_id=job_id,
+            ),
+            outcome=outcome,
+            evaluation_run_id=self.evaluation_run_id,
+            timeout_seconds=min(600, self.config.max_runtime_minutes * 60),
+            provenance=provenance,
+        )
+        self._transition(
+            "pre_operator_gate_passed",
+            job_id=provenance.job_id,
+            target_approval_id=provenance.target_approval_id,
+            target_action_operation_id=provenance.target_action_operation_id,
+        )
+        return observation
+
     def _run_semi_automatic_operator_phase(
         self,
         observation: dict[str, Any],
         ctx: _RunContext,
     ) -> dict[str, Any]:
         outcome = self.semi_automatic_expected_outcome
+        provenance = self._phase_provenance
         if outcome is None:
             return observation
 
@@ -866,12 +914,16 @@ class LiveEvalRunner:
             return observation
 
         job = observation.get("job") or {}
-        job_id = job.get("job_id")
+        job_id = job.get("job_id") or (provenance.job_id if provenance else None)
         if not job_id:
             raise LiveEvalSafetyError("semi-auto operator phase requires job_id")
 
         if self.campaign_scenario is None:
             raise LiveEvalSafetyError("semi-auto operator phase requires campaign scenario")
+
+        if provenance is not None:
+            provenance.operator_started_at = datetime.now(timezone.utc).isoformat()
+        self._transition("operator_started", job_id=job_id)
 
         operator_execution = execute_test_operator_actions(
             base_url=self.base_url,
@@ -898,11 +950,31 @@ class LiveEvalRunner:
             for result in operator_execution.results
         ]
 
-        observation = self.observer.poll_pipeline(
-            self.evaluation_run_id,
+        if provenance is not None:
+            provenance.operator_completed_at = datetime.now(timezone.utc).isoformat()
+            if operator_execution.target_approval_id:
+                provenance.target_approval_id = operator_execution.target_approval_id
+            if operator_execution.target_action_operation_id:
+                provenance.target_action_operation_id = (
+                    operator_execution.target_action_operation_id
+                )
+        self._transition("operator_completed", job_id=job_id)
+
+        if provenance is None:
+            raise LiveEvalSafetyError("semi-auto post-operator poll requires phase provenance")
+
+        post_result = poll_post_operator_observation(
+            lambda: self.observer.get_observation(self.evaluation_run_id),
+            outcome=outcome,
+            evaluation_run_id=self.evaluation_run_id,
             timeout_seconds=min(600, self.config.max_runtime_minutes * 60),
-            success_statuses=outcome.final_success_statuses,
+            provenance=provenance,
         )
+        observation = post_result.observation
+        phase_violations = assert_phase_monotonicity(provenance)
+        if phase_violations:
+            raise LiveEvalSafetyError(phase_violations[0])
+
         if outcome.expect_approval_resolution:
             observation = self.observer.poll_until_decision_record(
                 self.evaluation_run_id,
@@ -1125,7 +1197,14 @@ class LiveEvalRunner:
             recipient_gmail_message_id=(
                 (ctx.confirmed or {}).get("message_id") if ctx and ctx.confirmed else None
             ),
-            redacted_diagnostics={"unexpected_reply": ctx.unexpected_reply} if ctx and ctx.unexpected_reply else {},
+            redacted_diagnostics={
+                **({"unexpected_reply": ctx.unexpected_reply} if ctx and ctx.unexpected_reply else {}),
+                **(
+                    {"phase_provenance": self._phase_provenance.to_dict()}
+                    if self._phase_provenance is not None
+                    else {}
+                ),
+            },
             failure_summary=self._last_failure_summary,
         )
         write_report_atomic(self.evaluation_run_id, report)
