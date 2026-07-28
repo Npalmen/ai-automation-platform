@@ -10,9 +10,14 @@ from app.evaluation.live.campaign.modes import (
     CAMPAIGN_TYPE_SEND_BUDGET,
 )
 from app.evaluation.live.campaign.registry import get_campaign_scenario, list_campaign_scenarios
+from app.evaluation.live.campaign.automatic_expected_outcomes import (
+    resolve_automatic_expected_outcome,
+)
 from app.evaluation.live.campaign.semi_automatic_expected_outcomes import (
     resolve_semi_automatic_expected_outcome,
 )
+
+_AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE = "automatic-gmail-canary"
 from app.evaluation.live.errors import LiveEvalSafetyError
 
 
@@ -106,7 +111,10 @@ def build_selected_scenario_budget(
     expected_reply_count = 0
     non_gmail_write_budget = 0
     for scenario in scenarios:
-        outcome = resolve_semi_automatic_expected_outcome(scenario)
+        if campaign_type == _AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE:
+            outcome = resolve_automatic_expected_outcome(scenario)
+        else:
+            outcome = resolve_semi_automatic_expected_outcome(scenario)
         reply_budget = scenario.budgets.gmail_replies
         per_scenario_reply_budget[scenario.scenario_id] = reply_budget
         expected_reply_count += 1 if outcome.expected_reply else 0

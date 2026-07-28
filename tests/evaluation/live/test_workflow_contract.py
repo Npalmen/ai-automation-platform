@@ -150,6 +150,7 @@ def test_live_eval_workflow_contract():
         "RUN_OBSERVE_CANARY",
         "RUN_SEMI_AUTO_CORE",
         "RUN_SEMI_AUTO_CANARY",
+        "RUN_AUTOMATIC_GMAIL_CANARY",
         "RUN_READONLY_FORENSICS",
     ]
 
@@ -160,7 +161,7 @@ def test_live_eval_workflow_contract():
     assert "merge-base --is-ancestor" in gate_run
     assert (
         "READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_OBSERVE_CANARY|RUN_SEMI_AUTO_CORE|"
-        "RUN_SEMI_AUTO_CANARY|RUN_READONLY_FORENSICS"
+        "RUN_SEMI_AUTO_CANARY|RUN_AUTOMATIC_GMAIL_CANARY|RUN_READONLY_FORENSICS"
     ) in gate_run
     assert 'test "${GITHUB_REF}" = "refs/heads/main"' not in gate_run
     assert 'test "${{ inputs.confirm_live_gmail }}" = "RUN_S01"' not in gate_run
@@ -210,6 +211,29 @@ def test_live_eval_workflow_contract():
     assert canary_step.get("if") == "inputs.confirm_live_gmail == 'RUN_SEMI_AUTO_CANARY'"
     assert "--scenario-ids TBSM01_lead_approve_reply,TBSM04_lead_reject" in (
         canary_step.get("run") or ""
+    )
+
+    automatic_readiness_step = _step_by_name(
+        steps, "Full-system testbot automatic Gmail canary readiness"
+    )
+    assert automatic_readiness_step.get("if") == (
+        "inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'"
+    )
+    assert "--scenario-ids TBA01_safe_lead_auto_reply,TBA02_unknown_auto_hold" in (
+        automatic_readiness_step.get("run") or ""
+    )
+
+    automatic_canary_step = _step_by_name(steps, "Automatic Gmail canary (TBA01 + TBA02)")
+    assert automatic_canary_step.get("if") == (
+        "inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'"
+    )
+    assert "--workflow-confirmation RUN_AUTOMATIC_GMAIL_CANARY" in (
+        automatic_canary_step.get("run") or ""
+    )
+
+    restore_step = _step_by_name(steps, "Restore tenant automation config")
+    assert restore_step.get("if") == (
+        "always() && inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'"
     )
 
     forensics_step = _step_by_name(steps, "Live Gmail read-only forensics")

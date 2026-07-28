@@ -16,7 +16,7 @@ todos:
     status: completed
   - id: testbot-e-automatic-campaign
     content: Testa automatiskt läge endast för allowlistade actions mot isolerade testresurser och verifiera policy, budgets, resultat, cleanup och fail-closed behavior
-    status: pending
+    status: in_progress
   - id: testbot-f-customer-card-stateful
     content: Testa skapande, uppdatering, deduplicering, tidslinje och historik för syntetiska kundkort genom flermejls- och flertrådsscenarier
     status: pending

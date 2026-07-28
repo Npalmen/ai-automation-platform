@@ -136,6 +136,12 @@ def validate_campaign_scenario_mode(
             issues.append(
                 f"semi_automatic scenario {scenario_id!r} gmail_replies exceeds campaign ceiling"
             )
+    if scenario.mode == "automatic":
+        reply_ceiling = CAMPAIGN_TYPE_REPLY_BUDGET.get(scenario.campaign_type, 0)
+        if scenario.budgets.gmail_replies > reply_ceiling and reply_ceiling:
+            issues.append(
+                f"automatic scenario {scenario_id!r} gmail_replies exceeds campaign ceiling"
+            )
     return issues
 
 

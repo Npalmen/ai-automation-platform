@@ -17,6 +17,7 @@ CAMPAIGN_TYPES = frozenset({
     "transport-smoke",
     "observe-core",
     "semi-auto-core",
+    "automatic-gmail-canary",
     "auto-safe-actions",
     "customer-card-stateful",
     "integration-sandbox",
@@ -28,6 +29,7 @@ CAMPAIGN_TYPE_DEFAULT_MODE: dict[str, str] = {
     "transport-smoke": "observe",
     "observe-core": "observe",
     "semi-auto-core": "semi_automatic",
+    "automatic-gmail-canary": "automatic",
     "auto-safe-actions": "automatic",
     "customer-card-stateful": "customer_card_stateful",
     "integration-sandbox": "integration_sandbox",
@@ -39,6 +41,7 @@ CAMPAIGN_TYPE_SEND_BUDGET: dict[str, int] = {
     "transport-smoke": 5,
     "observe-core": 5,
     "semi-auto-core": 8,
+    "automatic-gmail-canary": 2,
     "auto-safe-actions": 10,
     "customer-card-stateful": 30,
     "integration-sandbox": 10,
@@ -48,4 +51,5 @@ CAMPAIGN_TYPE_SEND_BUDGET: dict[str, int] = {
 # Reply budget ceilings per campaign type (app Gmail replies to testbot sender)
 CAMPAIGN_TYPE_REPLY_BUDGET: dict[str, int] = {
     "semi-auto-core": 4,
+    "automatic-gmail-canary": 1,
 }
