@@ -17,7 +17,12 @@ from app.evaluation.live.campaign.gates import (
 from app.evaluation.live.campaign.modes import CAMPAIGN_TYPE_SEND_BUDGET
 from app.evaluation.live.campaign.operator_contract import validate_semi_auto_operator_contract
 from app.evaluation.live.campaign.reply_contract import validate_semi_auto_reply_contract
-from app.evaluation.live.campaign.registry import list_campaign_scenarios, load_campaign_manifest
+from app.evaluation.live.campaign.registry import (
+    get_campaign_scenario,
+    list_campaign_scenarios,
+    load_campaign_manifest,
+)
+from app.evaluation.live.campaign.scenario_budget import build_selected_scenario_budget
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.readiness import run_offline_readiness_checks
 from app.evaluation.live.safety import validate_config_readiness
@@ -109,17 +114,44 @@ def build_full_system_testbot_readiness(
     )
 
     manifest = load_campaign_manifest()
-    scenarios = list_campaign_scenarios(campaign_type=campaign_type)
     manifest_version = str(manifest.get("manifest_version") or "")
+    scenarios = []
+
+    if selected_scenario_ids:
+        try:
+            selected_budget = build_selected_scenario_budget(
+                campaign_type=campaign_type,
+                selected_scenario_ids=selected_scenario_ids,
+            )
+        except Exception as exc:
+            issues.append(str(exc))
+            selected_budget = None
+        if selected_budget is not None:
+            scenarios = [
+                get_campaign_scenario(scenario_id)
+                for scenario_id in selected_budget.selected_scenario_ids
+            ]
+            gates["selected_scenario_budget"] = selected_budget.to_dict()
+            if campaign_type in ("transport-smoke", "observe-core"):
+                for scenario in scenarios:
+                    if scenario.mode != "observe":
+                        issues.append(
+                            f"selected scenario {scenario.scenario_id!r} is not observe mode"
+                        )
+    else:
+        scenarios = list_campaign_scenarios(campaign_type=campaign_type)
+        expected_budget = CAMPAIGN_TYPE_SEND_BUDGET.get(campaign_type)
+        if (
+            expected_budget
+            and len(scenarios) != expected_budget
+            and campaign_type == "transport-smoke"
+        ):
+            warnings.append(
+                f"transport-smoke expects {expected_budget} scenarios, found {len(scenarios)}"
+            )
 
     if not scenarios:
         issues.append(f"no scenarios registered for campaign_type={campaign_type!r}")
-
-    expected_budget = CAMPAIGN_TYPE_SEND_BUDGET.get(campaign_type)
-    if expected_budget and len(scenarios) != expected_budget and campaign_type == "transport-smoke":
-        warnings.append(
-            f"transport-smoke expects {expected_budget} scenarios, found {len(scenarios)}"
-        )
 
     gates["campaign_enabled"] = campaign_enabled(config)
     gates["gmail_enabled"] = config.gmail_enabled

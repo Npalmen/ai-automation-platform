@@ -123,6 +123,7 @@ def _run_campaign(
             base_url=base_url,
             admin_api_key=admin_key,
             report_path=report_path,
+            scenario_ids=scenario_ids,
         )
     print(json.dumps(result.to_dict(), indent=2, ensure_ascii=False))
 

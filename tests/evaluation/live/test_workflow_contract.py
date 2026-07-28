@@ -147,6 +147,7 @@ def test_live_eval_workflow_contract():
         "READINESS_ONLY",
         "RUN_S01",
         "RUN_TRANSPORT_SMOKE",
+        "RUN_OBSERVE_CANARY",
         "RUN_SEMI_AUTO_CORE",
         "RUN_SEMI_AUTO_CANARY",
         "RUN_READONLY_FORENSICS",
@@ -158,7 +159,7 @@ def test_live_eval_workflow_contract():
     gate_run = gate_step.get("run") or ""
     assert "merge-base --is-ancestor" in gate_run
     assert (
-        "READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_SEMI_AUTO_CORE|"
+        "READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_OBSERVE_CANARY|RUN_SEMI_AUTO_CORE|"
         "RUN_SEMI_AUTO_CANARY|RUN_READONLY_FORENSICS"
     ) in gate_run
     assert 'test "${GITHUB_REF}" = "refs/heads/main"' not in gate_run
@@ -189,6 +190,18 @@ def test_live_eval_workflow_contract():
 
     transport_step = _step_by_name(steps, "Transport-smoke observe campaign (TBS01-TBS05)")
     assert transport_step.get("if") == "inputs.confirm_live_gmail == 'RUN_TRANSPORT_SMOKE'"
+
+    observe_canary_step = _step_by_name(steps, "Observe canary (TBS03 + TBS04)")
+    assert observe_canary_step.get("if") == "inputs.confirm_live_gmail == 'RUN_OBSERVE_CANARY'"
+    assert "--scenario-ids TBS03_invoice_observe,TBS04_unknown_observe" in (
+        observe_canary_step.get("run") or ""
+    )
+
+    observe_readiness_step = _step_by_name(steps, "Full-system testbot observe canary readiness")
+    assert observe_readiness_step.get("if") == "inputs.confirm_live_gmail == 'RUN_OBSERVE_CANARY'"
+    assert "--scenario-ids TBS03_invoice_observe,TBS04_unknown_observe" in (
+        observe_readiness_step.get("run") or ""
+    )
 
     semi_auto_step = _step_by_name(steps, "Semi-auto campaign (TBSM01-TBSM08)")
     assert semi_auto_step.get("if") == "inputs.confirm_live_gmail == 'RUN_SEMI_AUTO_CORE'"

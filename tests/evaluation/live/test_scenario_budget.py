@@ -45,6 +45,27 @@ def semi_auto_env(monkeypatch):
     get_live_eval_config.cache_clear()
 
 
+@pytest.fixture
+def observe_env(monkeypatch):
+    monkeypatch.setenv("ENV", "test")
+    monkeypatch.setenv("LIVE_EVAL_ALLOWED", "yes")
+    monkeypatch.setenv("FULL_SYSTEM_TESTBOT_CAMPAIGN_ALLOWED", "yes")
+    monkeypatch.setenv("LIVE_GMAIL_EVAL_ALLOWED", "yes")
+    monkeypatch.setenv("LIVE_EVAL_TENANT_IDS", "TENANT_LIVE_EVAL")
+    monkeypatch.setenv("LIVE_EVAL_SENDER_EMAILS", "sender@eval.test")
+    monkeypatch.setenv("LIVE_EVAL_RECIPIENT_EMAILS", "recipient@eval.test")
+    monkeypatch.setenv("LIVE_EVAL_MAX_SCENARIOS_PER_RUN", "1")
+    monkeypatch.setenv("LIVE_EVAL_MAX_GMAIL_SENDS", "1")
+    monkeypatch.setenv("LIVE_EVAL_MAX_GMAIL_REPLIES", "0")
+    from app.core.settings import get_settings
+
+    get_settings.cache_clear()
+    get_live_eval_config.cache_clear()
+    yield
+    get_settings.cache_clear()
+    get_live_eval_config.cache_clear()
+
+
 def test_canary_subset_expected_replies_is_one(semi_auto_env):
     budget = build_selected_scenario_budget(
         campaign_type="semi-auto-core",
@@ -157,6 +178,26 @@ def test_full_campaign_budget_remains_four(semi_auto_env):
     issues, matrix = validate_semi_auto_reply_contract()
     assert issues == []
     assert matrix["workflow_reply_budget"] == 4
+
+
+def test_observe_subset_budget_two_sends_zero_replies(semi_auto_env):
+    budget = build_selected_scenario_budget(
+        campaign_type="transport-smoke",
+        selected_scenario_ids=("TBS03_invoice_observe", "TBS04_unknown_observe"),
+    )
+    assert budget.inbound_send_budget == 2
+    assert budget.expected_reply_count == 0
+    assert budget.max_reply_count == 0
+
+
+def test_observe_readiness_scenario_count_reflects_subset(observe_env):
+    report = build_full_system_testbot_readiness(
+        campaign_type="transport-smoke",
+        selected_scenario_ids=("TBS03_invoice_observe", "TBS04_unknown_observe"),
+    )
+    assert report.ready is True
+    assert report.scenario_count == 2
+    assert report.gates["selected_scenario_budget"]["inbound_send_budget"] == 2
 
 
 def test_canary_readiness_passes_with_subset_budget(semi_auto_env):
