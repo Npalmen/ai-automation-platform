@@ -16,13 +16,13 @@ todos:
     status: completed
   - id: auto-core-e-delivery
     content: Kör regressioner, PR, squash-merge och post-merge Release Gate
-    status: pending
+    status: completed
   - id: auto-core-f-live
     content: Kör exakt en åttascenario automatic Gmail core-kampanj
-    status: pending
+    status: completed
   - id: auto-core-g-closure
     content: Bedöm testbot E closure och stoppa före nästa testbotkapitel
-    status: pending
+    status: completed
 isProject: true
 ---
 
