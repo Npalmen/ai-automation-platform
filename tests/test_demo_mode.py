@@ -47,12 +47,14 @@ def test_scheduler_skips_inbox_and_digest_in_demo_mode():
     }
     now = datetime(2026, 5, 6, 10, 0, 0, tzinfo=timezone.utc)
 
+    mock_settings = MagicMock()
+    mock_settings.PRODUCTION_PILOT_GLOBAL_SCHEDULER_PAUSE = False
     with (
         patch(f"{_REPO}.get_settings", return_value=ctrl),
         patch(f"{_REPO}.update_settings") as mock_save,
         patch("app.main._run_gmail_inbox_sync") as mock_sync,
         patch("app.main.dispatch_action") as mock_dispatch,
-        patch("app.main.get_settings"),
+        patch("app.main.get_settings", return_value=mock_settings),
     ):
         result = _run_scheduler_pass("T_DEMO", db, now)
 

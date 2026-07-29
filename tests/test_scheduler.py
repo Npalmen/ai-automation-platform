@@ -71,6 +71,7 @@ def _make_record(tenant_id: str):
 def _mock_settings(gmail: bool = True):
     s = MagicMock()
     s.GOOGLE_MAIL_ACCESS_TOKEN = "tok" if gmail else ""
+    s.PRODUCTION_PILOT_GLOBAL_SCHEDULER_PAUSE = False
     return s
 
 

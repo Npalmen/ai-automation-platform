@@ -3354,7 +3354,6 @@ def _run_scheduler_pass(tenant_id: str, db: "Session", now_utc: "datetime") -> d
         if demo_mode:
             inbox_sync_result = {"skipped": True, "reason": "demo_mode"}
         elif run_mode == "scheduled":
-            from app.core.settings import get_settings
             from app.internal_pilot.gates import (
                 PilotGateViolation,
                 enforce_pilot_scheduler_sync,
@@ -3366,8 +3365,7 @@ def _run_scheduler_pass(tenant_id: str, db: "Session", now_utc: "datetime") -> d
                 is_production_pilot_tenant,
             )
 
-            pilot_settings = get_settings()
-            if pilot_settings.PRODUCTION_PILOT_GLOBAL_SCHEDULER_PAUSE:
+            if s.PRODUCTION_PILOT_GLOBAL_SCHEDULER_PAUSE:
                 inbox_sync_result = {"skipped": True, "reason": "global_scheduler_pause"}
             elif is_pilot_tenant(tenant_id):
                 try:
