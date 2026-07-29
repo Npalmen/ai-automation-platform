@@ -101,7 +101,6 @@ _RISK_KEYWORDS: dict[str, tuple[str, ...]] = {
         "vad kostar",
         "pris på",
         "pris för",
-        "offert på",
         "bindande offert",
         "boka tid",
         "boka besök",

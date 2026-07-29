@@ -151,6 +151,7 @@ def test_live_eval_workflow_contract():
         "RUN_SEMI_AUTO_CORE",
         "RUN_SEMI_AUTO_CANARY",
         "RUN_AUTOMATIC_GMAIL_CANARY",
+        "RUN_AUTOMATIC_GMAIL_CORE",
         "RUN_READONLY_FORENSICS",
     ]
 
@@ -161,7 +162,7 @@ def test_live_eval_workflow_contract():
     assert "merge-base --is-ancestor" in gate_run
     assert (
         "READINESS_ONLY|RUN_S01|RUN_TRANSPORT_SMOKE|RUN_OBSERVE_CANARY|RUN_SEMI_AUTO_CORE|"
-        "RUN_SEMI_AUTO_CANARY|RUN_AUTOMATIC_GMAIL_CANARY|RUN_READONLY_FORENSICS"
+        "RUN_SEMI_AUTO_CANARY|RUN_AUTOMATIC_GMAIL_CANARY|RUN_AUTOMATIC_GMAIL_CORE|RUN_READONLY_FORENSICS"
     ) in gate_run
     assert 'test "${GITHUB_REF}" = "refs/heads/main"' not in gate_run
     assert 'test "${{ inputs.confirm_live_gmail }}" = "RUN_S01"' not in gate_run
@@ -248,6 +249,29 @@ def test_live_eval_workflow_contract():
     )
     assert verify_restored_step.get("env", {}).get("LIVE_EVAL_MAX_GMAIL_REPLIES") == "1"
     assert "|| true" not in (verify_restored_step.get("run") or "")
+
+    automatic_core_readiness_step = _step_by_name(
+        steps, "Pre-seed automatic Gmail core readiness"
+    )
+    assert automatic_core_readiness_step.get("if") == (
+        "inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CORE'"
+    )
+    assert "--campaign-type automatic-gmail-core" in (
+        automatic_core_readiness_step.get("run") or ""
+    )
+
+    automatic_core_step = _step_by_name(steps, "Automatic Gmail core (TBA01-TBA08)")
+    assert automatic_core_step.get("if") == (
+        "inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CORE'"
+    )
+    assert "--workflow-confirmation RUN_AUTOMATIC_GMAIL_CORE" in (
+        automatic_core_step.get("run") or ""
+    )
+
+    automatic_core_restore_step = _step_by_name(steps, "Restore tenant automation config (core)")
+    assert automatic_core_restore_step.get("if") == (
+        "always() && inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CORE'"
+    )
 
     forensics_step = _step_by_name(steps, "Live Gmail read-only forensics")
     assert forensics_step.get("if") == "inputs.confirm_live_gmail == 'RUN_READONLY_FORENSICS'"
