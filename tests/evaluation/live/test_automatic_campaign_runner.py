@@ -66,3 +66,38 @@ def test_automatic_hold_rejects_execution_records():
         observation,
         expect_execution_outcome=False,
     ) == []
+
+
+def test_automatic_customer_inquiry_hold_allows_decisioning_without_execution():
+    observation = {
+        "job": {
+            "job_id": "job-hold-complaint",
+            "job_status": "manual_review",
+            "has_pending_approvals": False,
+            "classification": {"detected_job_type": "customer_inquiry"},
+            "policy": {"policy_authorization": "hold_for_review"},
+            "decision_records": [
+                {"record_type": "pipeline_run_started", "event_sequence": 1},
+                {"record_type": "classification", "event_sequence": 2},
+                {"record_type": "decisioning_recommendation", "event_sequence": 3},
+                {"record_type": "policy_authorization", "event_sequence": 4},
+                {"record_type": "action_authorization", "event_sequence": 5},
+            ],
+        },
+        "events": [],
+    }
+    from app.evaluation.live.assertions import (
+        AUTOMATIC_HOLD_INTERLEAVED,
+        AUTOMATIC_HOLD_WITH_DECISIONING_SUBSEQUENCE,
+    )
+
+    assert assert_automatic_campaign_pipeline(
+        observation,
+        expected_job_type="customer_inquiry",
+        expected_job_status="manual_review",
+        expected_policy_authorization="hold_for_review",
+        expect_pending_approval=False,
+        decision_subsequence=AUTOMATIC_HOLD_WITH_DECISIONING_SUBSEQUENCE,
+        interleaved_decision_types=AUTOMATIC_HOLD_INTERLEAVED,
+        expect_execution_intent=False,
+    ) == []

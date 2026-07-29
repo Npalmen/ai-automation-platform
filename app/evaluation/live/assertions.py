@@ -37,6 +37,17 @@ OBSERVE_DECISION_SUBSEQUENCE_NO_DECISIONING = (
     "policy_authorization",
 )
 
+AUTOMATIC_HOLD_WITH_DECISIONING_SUBSEQUENCE = (
+    "pipeline_run_started",
+    "classification",
+    "decisioning_recommendation",
+    "policy_authorization",
+)
+
+AUTOMATIC_HOLD_INTERLEAVED: frozenset[str] = frozenset({
+    "action_authorization",
+})
+
 ALLOWED_INTERLEAVED_DECISION_TYPES: frozenset[str] = frozenset()
 
 SEMI_AUTO_POST_APPROVAL_INTERLEAVED: frozenset[str] = frozenset({
@@ -522,6 +533,7 @@ def assert_automatic_campaign_pipeline(
     expected_policy_authorization: str,
     expect_pending_approval: bool,
     decision_subsequence: tuple[str, ...] | None = None,
+    interleaved_decision_types: frozenset[str] | None = None,
     expect_execution_intent: bool = False,
 ) -> list[str]:
     """Automatic canary assertions: terminal state without operator involvement."""
@@ -564,7 +576,9 @@ def assert_automatic_campaign_pipeline(
         for r in sorted(records, key=lambda x: int(x.get("event_sequence") or 0))
     ]
     interleaved = (
-        AUTOMATIC_AUTO_EXECUTE_INTERLEAVED if expect_execution_intent else None
+        AUTOMATIC_AUTO_EXECUTE_INTERLEAVED
+        if expect_execution_intent
+        else interleaved_decision_types
     )
     violations.extend(
         _assert_decision_subsequence(

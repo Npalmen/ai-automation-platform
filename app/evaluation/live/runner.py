@@ -1193,6 +1193,7 @@ class LiveEvalRunner:
                     expected_policy_authorization=outcome.policy_authorization,
                     expect_pending_approval=outcome.expect_pending_approval,
                     decision_subsequence=outcome.decision_subsequence,
+                    interleaved_decision_types=outcome.interleaved_decision_types,
                     expect_execution_intent=outcome.expect_execution_intent,
                 )
             )

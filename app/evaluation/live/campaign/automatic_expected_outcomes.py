@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.evaluation.live.assertions import (
+    AUTOMATIC_HOLD_INTERLEAVED,
+    AUTOMATIC_HOLD_WITH_DECISIONING_SUBSEQUENCE,
     OBSERVE_DECISION_SUBSEQUENCE_NO_DECISIONING,
     REQUIRED_DECISION_SUBSEQUENCE,
 )
@@ -22,6 +24,7 @@ class AutomaticExpectedOutcome:
     final_job_status: str
     expect_pending_approval: bool
     decision_subsequence: tuple[str, ...]
+    interleaved_decision_types: frozenset[str]
     expect_execution_intent: bool
     expect_approval_resolution: bool
     automation_authorization: str
@@ -59,6 +62,13 @@ def resolve_automatic_expected_outcome(
     ).strip()
 
     if test_variant == "negative_hold":
+        job_type = str(scenario.job_type or "").strip().lower()
+        if job_type in ("lead", "customer_inquiry"):
+            decision_subsequence = AUTOMATIC_HOLD_WITH_DECISIONING_SUBSEQUENCE
+            interleaved_decision_types = AUTOMATIC_HOLD_INTERLEAVED
+        else:
+            decision_subsequence = OBSERVE_DECISION_SUBSEQUENCE_NO_DECISIONING
+            interleaved_decision_types = frozenset()
         return AutomaticExpectedOutcome(
             expected_reply=False,
             test_variant=test_variant,
@@ -67,7 +77,8 @@ def resolve_automatic_expected_outcome(
             ),
             final_job_status=str(routing.get("final_job_status") or "manual_review"),
             expect_pending_approval=False,
-            decision_subsequence=OBSERVE_DECISION_SUBSEQUENCE_NO_DECISIONING,
+            decision_subsequence=decision_subsequence,
+            interleaved_decision_types=interleaved_decision_types,
             expect_execution_intent=False,
             expect_approval_resolution=False,
             automation_authorization=automation_authorization,
@@ -83,6 +94,7 @@ def resolve_automatic_expected_outcome(
         final_job_status=str(routing.get("final_job_status") or "completed"),
         expect_pending_approval=False,
         decision_subsequence=REQUIRED_DECISION_SUBSEQUENCE,
+        interleaved_decision_types=frozenset(),
         expect_execution_intent=True,
         expect_approval_resolution=False,
         automation_authorization=automation_authorization,
