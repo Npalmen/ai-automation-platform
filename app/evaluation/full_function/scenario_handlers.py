@@ -442,7 +442,7 @@ def run_tbg10(ctx: EvalContext) -> ScenarioRunResult:
     try:
         job_id = str(uuid4())
         job = _seed_job_record(db, ctx.tenant_id, job_id)
-        trace = create_trace_session(job, source=PipelineRunSource.MANUAL, db=db)
+        trace = create_trace_session(job, source=PipelineRunSource.INTAKE, db=db)
         action = {
             "type": "send_customer_auto_reply",
             "to": "customer@example.com",
