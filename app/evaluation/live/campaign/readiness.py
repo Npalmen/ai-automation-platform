@@ -229,6 +229,7 @@ def build_full_system_testbot_readiness(
             automation_phase=automation_phase,
             tenant_id=tenant_id,
             campaign_type=campaign_type,
+            selected_scenario_ids=selected_scenario_ids,
         )
         issues.extend(auto_issues)
         gates["automatic_automation_readiness"] = auto_matrix
