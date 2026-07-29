@@ -25,6 +25,7 @@ jobs:
       ENV: test
       EVAL_HARNESS_PG_ALLOWED: yes
       EVAL_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_platform_customer_domain_eval
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
         with:
