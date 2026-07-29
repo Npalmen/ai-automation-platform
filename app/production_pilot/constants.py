@@ -23,7 +23,7 @@ P1_MIN_INBOUND_MESSAGES = 25
 ACTIVATION_STAGES = ("P0", "P1", "P2", "P3")
 DEFAULT_ACTIVATION_STAGE = "P0"
 
-MIGRATION_HEAD = "024_end_customer_shadow_ledger"
+MIGRATION_HEAD = "025_production_pilot_message_reviews"
 CAPABILITY_REGISTRY_VERSION = "full_function_matrix_v1"
 QUALIFICATION_REGISTRY_VERSION = "continuous_regression_v1"
 

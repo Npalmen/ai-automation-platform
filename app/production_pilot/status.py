@@ -34,6 +34,29 @@ def evaluate_release_status(
     }
 
 
+PRODUCTION_PILOT_P1_OPERATIONAL_READY = "PRODUCTION_PILOT_P1_OPERATIONAL_READY"
+
+
+def evaluate_operational_ready_status(
+    *,
+    readiness: dict[str, Any],
+    runtime_readiness: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    registered: list[str] = []
+    blocked: list[str] = []
+    if readiness.get("overall_status") != "ready_for_p1_activation":
+        blocked.append("readiness_blockers")
+    elif not runtime_readiness or runtime_readiness.get("overall_status") != "ready_for_operational_attach":
+        blocked.append("runtime_readiness_pending")
+    else:
+        registered.append(PRODUCTION_PILOT_P1_OPERATIONAL_READY)
+    return {
+        "registered": registered,
+        "blocked": blocked,
+        "p2_status": "NO-GO",
+    }
+
+
 def evaluate_p1_status(
     *,
     readiness: dict[str, Any],

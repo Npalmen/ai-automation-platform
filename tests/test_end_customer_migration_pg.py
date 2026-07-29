@@ -56,7 +56,7 @@ def test_migration_022_forward_on_empty_database():
 
         state = read_migration_state(engine)
         assert state["latest_version"] == LATEST_MIGRATION_VERSION
-        assert ORDERED_MIGRATION_FILES[-1] == "024_end_customer_shadow_ledger.sql"
+        assert ORDERED_MIGRATION_FILES[-1] == "025_production_pilot_message_reviews.sql"
     finally:
         engine.dispose()
 
