@@ -68,7 +68,12 @@ def http_client(pg_engine):
         with TestClient(app) as client:
             yield client, tenant_id
         app.dependency_overrides.clear()
+    os.environ["END_CUSTOMER_READ_API_ENABLED"] = "false"
+    os.environ["END_CUSTOMER_WRITE_API_ENABLED"] = "false"
     get_settings.cache_clear()
+    import app.main as main_mod
+
+    importlib.reload(main_mod)
 
 
 @pytest.fixture()
@@ -83,7 +88,12 @@ def disabled_http_client(pg_engine):
     ):
         with TestClient(app) as client:
             yield client, tenant_id
+    os.environ["END_CUSTOMER_READ_API_ENABLED"] = "false"
+    os.environ["END_CUSTOMER_WRITE_API_ENABLED"] = "false"
     get_settings.cache_clear()
+    import app.main as main_mod
+
+    importlib.reload(main_mod)
 
 
 def _admin_headers(idempotency_key: str = "http-idem-1") -> dict[str, str]:
