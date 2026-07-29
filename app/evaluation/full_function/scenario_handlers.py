@@ -863,6 +863,7 @@ def run_tbg23(ctx: EvalContext) -> ScenarioRunResult:
                 message_text="Dup body",
                 sender_email="dup@example.com",
                 sender_name="Dup Sender",
+                sender_phone=None,
             )
             first = act_shadow_intake(ctx, db, message=message)
             second = act_shadow_intake(ctx, db, message=message)
