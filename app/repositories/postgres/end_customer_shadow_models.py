@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, String, Text
+from sqlalchemy import Boolean, DateTime, Float, JSON, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.repositories.postgres.database import Base
 
-_JSONB = JSONB
+_JSONB = JSON().with_variant(JSONB(), "postgresql")
 
 
 class EndCustomerShadowObservationRecord(Base):
