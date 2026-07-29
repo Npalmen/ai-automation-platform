@@ -31,3 +31,18 @@ def test_tba02_expects_hold_without_reply():
     assert outcome.expected_reply is False
     assert outcome.is_negative_hold is True
     assert outcome.expect_execution_intent is False
+
+
+def test_tba06_hold_allows_decisioning_subsequence():
+    scenario = get_campaign_scenario("TBA06_support_complaint_auto_hold")
+    outcome = resolve_automatic_expected_outcome(scenario)
+    assert outcome.is_negative_hold is True
+    assert "decisioning_recommendation" in outcome.decision_subsequence
+    assert "action_authorization" in outcome.interleaved_decision_types
+
+
+def test_tba07_hold_allows_decisioning_subsequence():
+    scenario = get_campaign_scenario("TBA07_price_booking_commitment_hold")
+    outcome = resolve_automatic_expected_outcome(scenario)
+    assert outcome.is_negative_hold is True
+    assert "decisioning_recommendation" in outcome.decision_subsequence
