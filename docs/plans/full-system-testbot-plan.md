@@ -576,7 +576,9 @@ OPERATOR ACTION REQUIRED — Auktorisera automatisk testkampanj
 
 **Todo:** `testbot-f-customer-card-stateful` — **in_progress**
 
-**F1/F1b qualification (2026-07-29):** `CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED` and `CUSTOMER_CARD_HTTP_CONTRACT_QUALIFIED` registered @ SHA `b433cba` (DEC-039). TBF01–TBF10 10/10 PASS via formal runner (workflow `30456678196`). F1b HTTP contract evidence from Release Gate `30454617643` + supplement. Full testbot F closure (`CUSTOMER_CARD_PASS`) awaits F2 shadow-pipeline operator authorization — intake/Gmail does not write end-customer domain today.
+**F1/F1b qualification (2026-07-29):** `CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED` and `CUSTOMER_CARD_HTTP_CONTRACT_QUALIFIED` registered @ SHA `b433cba` (DEC-039). TBF01–TBF10 10/10 PASS via formal runner (workflow `30456678196`). F1b HTTP contract evidence from Release Gate `30454617643` + supplement.
+
+**F2 shadow pipeline (2026-07-29):** Implementation delivered per `docs/plans/testbot-f-f2-shadow-pipeline-plan.md` (DEC-040): shadow ledger migration 024, TBF2-01–TBF2-10, campaigns `tbf2`/`tbf2b`. Formal F2a/F2b qualification and `CUSTOMER_CARD_PASS` closure pending workflow PASS.
 
 ## Mål
 

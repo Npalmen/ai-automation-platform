@@ -19,6 +19,10 @@ from app.repositories.postgres.migration_runner import (
 from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
 
 END_CUSTOMER_TABLES: tuple[str, ...] = (
+    "end_customer_shadow_match_proposals",
+    "end_customer_shadow_fact_proposals",
+    "end_customer_shadow_identity_signals",
+    "end_customer_shadow_observations",
     "end_customer_idempotency_records",
     "end_customer_duplicate_candidates",
     "end_customer_timeline_events",

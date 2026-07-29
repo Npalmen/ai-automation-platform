@@ -131,6 +131,11 @@ class Settings(BaseSettings):
     END_CUSTOMER_READ_API_ENABLED: bool = False
     END_CUSTOMER_WRITE_API_ENABLED: bool = False
 
+    END_CUSTOMER_SHADOW_INTAKE_ENABLED: bool = False
+    END_CUSTOMER_SHADOW_MATCHING_ENABLED: bool = False
+    END_CUSTOMER_SHADOW_PROMOTION_ENABLED: bool = False
+    END_CUSTOMER_SHADOW_TENANT_ALLOWLIST: str = ""
+
     # Kapitel 2C — decision trace
     APP_CODE_VERSION: str = "dev-local"
     DECISION_RECORD_HMAC_KEY: str = ""

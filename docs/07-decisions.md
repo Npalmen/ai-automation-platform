@@ -648,6 +648,23 @@ Reference: `app/admin/customer_settings/`, `frontend/src/features/customerSettin
 
 ---
 
+## DEC-040 — Testbot F F2 shadow pipeline gates (2026-07-29)
+
+**Status:** Active — implementation on branch `feat/testbot-f2-shadow-pipeline`
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **Separate shadow ledger** | Unlinked observations persist outside verified customer domain; no automatic link/merge/verify |
+| 2 | **Three shadow flags, all default false** | `END_CUSTOMER_SHADOW_INTAKE_ENABLED`, `END_CUSTOMER_SHADOW_MATCHING_ENABLED`, `END_CUSTOMER_SHADOW_PROMOTION_ENABLED`; tenant allowlist required |
+| 3 | **F2a formal runner** | `--campaign tbf2` emits `CUSTOMER_CARD_SHADOW_DOMAIN_QUALIFIED` on TBF2-01–TBF2-10 PASS |
+| 4 | **F2b mock-intake runner** | `--campaign tbf2b` uses real extraction processor + shadow boundary; emits `CUSTOMER_CARD_SHADOW_PIPELINE_QUALIFIED` |
+| 5 | **F2c is optional** | Live Gmail observe-canary requires separate operator authorization; not closure requirement |
+| 6 | **`CUSTOMER_CARD_PASS`** | Requires F1 + F1b + F2a + F2b qualified; shadow flags remain default false; no automatic verified facts from shadow |
+
+Reference: `docs/plans/testbot-f-f2-shadow-pipeline-plan.md`, `app/evaluation/customer_domain/runner.py`.
+
+---
+
 ## DEC-2F1-TRUST — Live-eval trust anchor at API boundary
 
 **Status:** Locked (2F.1 merge hardening)  

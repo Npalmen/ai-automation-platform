@@ -49,6 +49,7 @@ from app.evaluation.customer_domain.scenarios.family_05_ambiguous_identity impor
 from app.evaluation.customer_domain.scenarios._common import ScenarioRunResult
 from app.evaluation.customer_domain.actions import EvalContext
 from app.evaluation.customer_domain.registry import load_tbf_runners, validate_manifest
+from app.evaluation.customer_domain.tbf2_registry import load_tbf2_runners, validate_manifest as validate_tbf2_manifest
 from app.evaluation.customer_domain.semantic_hash import semantic_hash
 from app.evaluation.customer_domain.campaign import (
     CampaignRun,
@@ -130,6 +131,46 @@ def _run_tbf_campaign(engine, scenario_filter: str = "all") -> tuple[list[Scenar
     return results, campaign
 
 
+def _run_tbf2_campaign(
+    engine,
+    scenario_filter: str = "all",
+    *,
+    pipeline_mode: bool = False,
+) -> tuple[list[ScenarioRunResult], CampaignRun]:
+    campaign = CampaignRun()
+    runners = load_tbf2_runners()
+    manifest_failures = validate_tbf2_manifest()
+    if manifest_failures:
+        blocked = ScenarioRunResult(
+            scenario_id="TBF2_MANIFEST",
+            family="tbf2",
+            tenant_id="eval_cd_manifest",
+            result="BLOCKED",
+            failures=manifest_failures,
+        )
+        return [blocked], campaign
+
+    results: list[ScenarioRunResult] = []
+    for scenario_id, runner in runners.items():
+        if scenario_filter != "all" and scenario_filter != scenario_id:
+            continue
+        tenant_id = tenant_id_for_scenario(campaign, scenario_id.replace("-", "").lower())
+        campaign.register_tenant(tenant_id, scenario_id)
+        _prepare_tenant(engine, tenant_id)
+        ctx = EvalContext(
+            engine=engine,
+            tenant_id=tenant_id,
+            campaign=campaign,
+            scenario_id=scenario_id,
+            pipeline_mode=pipeline_mode,
+        )
+        results.append(runner(ctx))
+    campaign.pre_run_snapshot = {
+        "normalized_hash": semantic_hash(snapshot_campaign_state(engine, campaign.registered_tenants)),
+    }
+    return results, campaign
+
+
 def _run_families(engine, scenario_filter: str = "all") -> list[ScenarioRunResult]:
     runners = [
         (run_family_01, _tenant_id("family01"), "family_01"),
@@ -192,6 +233,27 @@ def run_evaluation(
                 )
                 if cleanup_result.get("cleanup_status") != "restored":
                     repeat_ok = False
+            elif campaign in {"tbf2", "tbf2b"}:
+                pipeline_mode = campaign == "tbf2b"
+                run1, campaign_run = _run_tbf2_campaign(
+                    engine, scenario_filter, pipeline_mode=pipeline_mode
+                )
+                hashes1 = {r.scenario_id: r.to_report()["semantic_result_hash"] for r in run1}
+
+                cleanup_eval_tenants(engine)
+                run2, _ = _run_tbf2_campaign(
+                    engine, scenario_filter, pipeline_mode=pipeline_mode
+                )
+                hashes2 = {r.scenario_id: r.to_report()["semantic_result_hash"] for r in run2}
+                repeat_ok = hashes1 == hashes2
+                cleanup_result = verify_campaign_cleanup(engine, campaign_run)
+                campaign_oracle = build_campaign_oracle(
+                    campaign=campaign_run,
+                    scenario_results=[r.to_report() for r in run1],
+                    cleanup_result=cleanup_result,
+                )
+                if cleanup_result.get("cleanup_status") != "restored":
+                    repeat_ok = False
             else:
                 campaign_run = None
                 campaign_oracle = None
@@ -240,6 +302,10 @@ def run_evaluation(
     )
     if campaign == "tbf" and report["overall_result"] == "PASS":
         report["qualification"] = "CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED"
+    if campaign == "tbf2" and report["overall_result"] == "PASS":
+        report["qualification"] = "CUSTOMER_CARD_SHADOW_DOMAIN_QUALIFIED"
+    if campaign == "tbf2b" and report["overall_result"] == "PASS":
+        report["qualification"] = "CUSTOMER_CARD_SHADOW_PIPELINE_QUALIFIED"
     write_json_report(Path(report_json), report)
     write_markdown_report(Path(report_markdown), report)
     return report
@@ -257,7 +323,7 @@ def main(argv: list[str] | None = None) -> int:
         default="storage/status/customer-domain-stateful-eval.md",
     )
     parser.add_argument("--scenario", default="all")
-    parser.add_argument("--campaign", default="families", choices=["families", "tbf"])
+    parser.add_argument("--campaign", default="families", choices=["families", "tbf", "tbf2", "tbf2b"])
     parser.add_argument("--keep-data", action="store_true", default=False)
     args = parser.parse_args(argv)
     os.environ.setdefault("ENV", "test")

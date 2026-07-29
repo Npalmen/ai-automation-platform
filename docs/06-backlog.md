@@ -14,7 +14,9 @@
 - [x] **Todo J — closure** — `docs/customer-card-domain/closure.md`; current-truth/backlog/testing alignment.
 - [x] **Testbot F F1 — direct-domain TBF qualification** — formal runner `--campaign tbf` @ `b433cba`; TBF01–TBF10 10/10 PASS; `CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED` (workflow `30456678196`, run-id `rg-f1-20260729`).
 - [x] **Testbot F F1b — HTTP contract qualification** — Release Gate `30454617643` + targeted supplement `30456678196`; `CUSTOMER_CARD_HTTP_CONTRACT_QUALIFIED`.
-- [ ] **Testbot F F2 — shadow pipeline** — pending operator authorization; no implementation without separate gate (DEC-039).
+- [x] **Testbot F F2 — shadow pipeline implementation** — migration 024, shadow ledger/services, TBF2-01–TBF2-10, mock-intake boundary; plan `docs/plans/testbot-f-f2-shadow-pipeline-plan.md`.
+- [ ] **Testbot F F2a/F2b — formal qualification** — `CUSTOMER_CARD_SHADOW_DOMAIN_QUALIFIED` + `CUSTOMER_CARD_SHADOW_PIPELINE_QUALIFIED` via workflow `customer-domain-f2-qualification`.
+- [ ] **Testbot F closure — `CUSTOMER_CARD_PASS`** — pending F2a/F2b PASS + operator closure decision (F2c optional).
 - [ ] **Activation** — separate gate; flags remain default `false`; see closure §10.
 
 ---

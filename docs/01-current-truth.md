@@ -8,6 +8,8 @@
 
 ## Last verified date
 
+2026-07-29 (Testbot F F2 shadow pipeline — migration `024_end_customer_shadow_ledger.sql`; shadow observation ledger + services + TBF2-01–TBF2-10 scenarios; campaigns `--campaign tbf2` / `tbf2b`; flags default disabled; formal qualification pending workflow run.)
+
 2026-07-29 (Testbot F F1/F1b qualification — runtime SHA `b433cba679bbc944d38faf128e651c1ad9de4f43` PR #98; formal F1 campaign workflow `30456678196` run-id `rg-f1-20260729`; TBF01–TBF10 10/10 PASS; `CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED`; F1b evidence Release Gate `30454617643` + supplement `30456678196`; `CUSTOMER_CARD_HTTP_CONTRACT_QUALIFIED`; flags default disabled; not activated; testbot F remains `in_progress` pending F2 operator authorization.)
 
 2026-07-27 (Customer card domain closure — end-customer persistence/API/eval documented closed; eval @ `cc4ecfe`; closure main `4afb0b71`; flags default disabled; not activated. See `docs/customer-card-domain/closure.md`.)
@@ -1416,8 +1418,22 @@ These have caused real failures and are preserved from the README:
 | F1 qualification | `Registered` | `CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED` |
 | F1b HTTP contract | `Verified PASS` | pg_eval + hermetic tests @ `30454617643`; supplement pytest + HTTP identity create @ `30456678196` |
 | F1b qualification | `Registered` | `CUSTOMER_CARD_HTTP_CONTRACT_QUALIFIED` (isolated eval-process flags only) |
-| Testbot F closure | `Not qualified` | `testbot-f-customer-card-stateful` remains `in_progress`; F2 shadow pipeline requires separate operator authorization |
-| **Not qualified** | `Documented` | Gmail/intake → customer facts; shadow pipeline / workflow proposed facts; production activation; automatic verify/merge; customer-card UI; live customer data |
+| Testbot F closure | `Not qualified` | `testbot-f-customer-card-stateful` remains `in_progress`; F2 implemented — formal F2a/F2b qualification pending |
+| **Not qualified** | `Documented` | Production activation; automatic verify/merge; customer-card UI; live customer data; F2c live Gmail canary |
+
+### Testbot F F2 shadow pipeline (2026-07-29)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Plan | `Locked` | `docs/plans/testbot-f-f2-shadow-pipeline-plan.md` |
+| Migration | `Verified (code)` | `024_end_customer_shadow_ledger.sql`; `LATEST_MIGRATION_VERSION=024` |
+| Shadow ledger | `Verified (code)` | `end_customer_shadow_observations`, identity signals, fact proposals, match proposals |
+| Services | `Verified (code)` | `ShadowObservationCommandService`, `ShadowMatchProposalService`, `ShadowReadService`, `ShadowPromotionService`, `shadow_intake_boundary` |
+| Feature flags | `Default false` | `END_CUSTOMER_SHADOW_INTAKE_ENABLED`, `END_CUSTOMER_SHADOW_MATCHING_ENABLED`, `END_CUSTOMER_SHADOW_PROMOTION_ENABLED` |
+| TBF2 scenarios | `Implemented` | TBF2-01–TBF2-10; campaigns `tbf2` (F2a) and `tbf2b` (mock-intake pipeline) |
+| F2a qualification | `Pending` | `CUSTOMER_CARD_SHADOW_DOMAIN_QUALIFIED` — formal runner `--campaign tbf2` |
+| F2b qualification | `Pending` | `CUSTOMER_CARD_SHADOW_PIPELINE_QUALIFIED` — formal runner `--campaign tbf2b` |
+| F2c live Gmail | `Not in scope` | Separate operator decision per plan |
 
 ---
 
