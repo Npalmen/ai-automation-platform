@@ -49,8 +49,8 @@ def main() -> int:
     parser.add_argument(
         "--automation-phase",
         default="",
-        choices=["", "pre_seed", "active_canary", "restored"],
-        help="Automatic Gmail canary automation phase gate",
+        choices=["", "pre_seed", "active_canary", "active_core", "restored"],
+        help="Automatic Gmail campaign automation phase gate",
     )
     args = parser.parse_args()
 

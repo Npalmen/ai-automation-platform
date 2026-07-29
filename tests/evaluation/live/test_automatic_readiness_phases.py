@@ -195,3 +195,25 @@ def test_cleanup_restores_hash_after_readiness_failure(monkeypatch, tmp_path):
     report = run_lifecycle_cleanup(path)
     assert report.restoration_status == "restored"
     assert report.post_run_config_hash == report.pre_run_config_hash
+
+
+def test_readiness_cli_accepts_active_core_automation_phase():
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[3]
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "scripts/full_system_testbot_readiness.py",
+            "--campaign-type",
+            "automatic-gmail-core",
+            "--automation-phase",
+            "active_core",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=repo_root,
+    )
+    assert "invalid choice: 'active_core'" not in (proc.stderr or "")
