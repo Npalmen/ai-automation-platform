@@ -588,7 +588,7 @@ def run_tbg13(ctx: EvalContext) -> ScenarioRunResult:
     db = ctx.session()
     try:
         job = Job(
-            job_id=str(uuid4()),
+            job_id=f"{ctx.tenant_id}-sheets-row",
             tenant_id=ctx.tenant_id,
             job_type=JobType.LEAD,
             status=JobStatus.COMPLETED,

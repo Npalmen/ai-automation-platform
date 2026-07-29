@@ -43,8 +43,5 @@ def test_tbg_full_campaign_passes(pg_engine, tmp_path):
     )
     assert report["overall_result"] == "PASS"
     assert report.get("qualification") == "FULL_FUNCTION_MATRIX_PASS"
-    assert report["repeat_run_consistent"] is True, {
-        "repeat_hash_mismatches": report.get("repeat_hash_mismatches"),
-        "cleanup_result": report.get("cleanup_result"),
-    }
+    assert report["repeat_run_consistent"] is True, sorted((report.get("repeat_hash_mismatches") or {}).keys())
     assert report["new_live_external_writes"] == 0
