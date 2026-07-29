@@ -1,0 +1,204 @@
+version: 1
+qualifications:
+  - id: OBSERVE_CAMPAIGN_QUALIFIED
+    chapter: C
+    scope: observe intake/classification without outbound writes
+    source_workflow_run: testbot-c
+    source_sha: historical
+    contract_version: live_campaign_v1
+    evidence_schema: live_eval_campaign_v1
+    allowed_reuse: true
+    incompatible_changes:
+      - action registry rename without requalification
+      - classification contract version bump without requalification
+    expiry_policy: stale_on_contract_change
+    default_production_activation: false
+    live_external_write_type: none
+    status: VALID
+    compatible_capabilities:
+      - intake.gmail.message
+      - classification.lead
+      - classification.support
+      - classification.invoice
+      - classification.unknown
+
+  - id: SEMI_AUTOMATIC_CAMPAIGN_QUALIFIED
+    chapter: D
+    scope: semi-automatic approval lifecycle without automatic outbound writes
+    source_workflow_run: testbot-d
+    source_sha: historical
+    contract_version: live_campaign_v1
+    evidence_schema: live_eval_campaign_v1
+    allowed_reuse: true
+    incompatible_changes:
+      - approval CAS semantics change
+      - action operation id semantics change
+    expiry_policy: stale_on_contract_change
+    default_production_activation: false
+    live_external_write_type: none
+    status: VALID
+    compatible_capabilities:
+      - approval.lifecycle
+      - action.send_internal_handoff
+
+  - id: AUTOMATIC_GMAIL_CANARY_QUALIFIED
+    chapter: E
+    scope: single-scenario automatic Gmail canary
+    source_workflow_run: local-canary
+    source_sha: historical
+    contract_version: automatic_gmail_v1
+    evidence_schema: live_eval_campaign_v1
+    allowed_reuse: true
+    incompatible_changes:
+      - pre-write safety contract change
+      - recipient verification contract change
+    expiry_policy: stale_on_contract_change
+    default_production_activation: false
+    live_external_write_type: gmail_reply
+    status: VALID
+    compatible_capabilities:
+      - action.send_customer_auto_reply
+
+  - id: AUTOMATIC_GMAIL_CORE_QUALIFIED
+    chapter: E
+    scope: automatic Gmail safe acknowledgement core scenarios
+    source_workflow_run: "30435651905"
+    source_sha: historical
+    contract_version: automatic_gmail_v1
+    evidence_schema: live_eval_campaign_v1
+    allowed_reuse: true
+    incompatible_changes:
+      - pre-write safety contract change
+      - exact-once dispatch semantics change
+    expiry_policy: stale_on_contract_change
+    default_production_activation: false
+    live_external_write_type: gmail_reply
+    status: VALID
+    compatible_capabilities:
+      - action.send_customer_auto_reply
+      - policy.pre_write_reply_safety
+
+  - id: CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED
+    chapter: F
+    scope: customer-card direct domain TBF01-TBF10
+    source_workflow_run: "30456678196"
+    source_sha: b433cba679bbc944d38faf128e651c1ad9de4f43
+    contract_version: customer_domain_stateful_eval_v2
+    evidence_schema: customer_domain_stateful_eval_v2
+    allowed_reuse: true
+    incompatible_changes:
+      - end-customer schema migration without requalification
+      - customer state machine change
+    expiry_policy: stale_on_contract_change
+    default_production_activation: false
+    live_external_write_type: none
+    status: VALID
+    compatible_capabilities:
+      - customer_card.direct_domain
+
+  - id: CUSTOMER_CARD_HTTP_CONTRACT_QUALIFIED
+    chapter: F
+    scope: customer-card HTTP contract F1b
+    source_workflow_run: "30456678196"
+    source_sha: b433cba679bbc944d38faf128e651c1ad9de4f43
+    contract_version: customer_domain_http_v1
+    evidence_schema: customer_domain_http_v1
+    allowed_reuse: true
+    incompatible_changes:
+      - end-customer API contract change
+    expiry_policy: stale_on_contract_change
+    default_production_activation: false
+    live_external_write_type: none
+    status: VALID
+    compatible_capabilities:
+      - customer_card.direct_domain
+
+  - id: CUSTOMER_CARD_SHADOW_DOMAIN_QUALIFIED
+    chapter: F
+    scope: shadow observation domain TBF2-01-TBF2-10 F2a
+    source_workflow_run: "30466634575"
+    source_sha: db7ca19
+    contract_version: customer_domain_shadow_v1
+    evidence_schema: customer_domain_shadow_v1
+    allowed_reuse: true
+    incompatible_changes:
+      - shadow ledger schema change
+      - automatic link/merge enablement
+    expiry_policy: stale_on_contract_change
+    default_production_activation: false
+    live_external_write_type: none
+    status: VALID
+    compatible_capabilities:
+      - customer_card.shadow_pipeline
+
+  - id: CUSTOMER_CARD_SHADOW_PIPELINE_QUALIFIED
+    chapter: F
+    scope: mock-intake to shadow pipeline F2b
+    source_workflow_run: "30466634575"
+    source_sha: db7ca19
+    contract_version: customer_domain_shadow_pipeline_v1
+    evidence_schema: customer_domain_shadow_pipeline_v1
+    allowed_reuse: true
+    incompatible_changes:
+      - extraction processor contract change
+      - shadow write boundary change
+    expiry_policy: stale_on_contract_change
+    default_production_activation: false
+    live_external_write_type: none
+    status: VALID
+    compatible_capabilities:
+      - customer_card.shadow_pipeline
+
+  - id: CUSTOMER_CARD_PASS
+    chapter: F
+    scope: customer-card closure aggregate F1+F1b+F2a+F2b
+    source_workflow_run: "30466634575"
+    source_sha: db7ca19
+    contract_version: customer_card_pass_v1
+    evidence_schema: customer_card_pass_v1
+    allowed_reuse: true
+    incompatible_changes:
+      - any F chapter contract change without requalification
+    expiry_policy: stale_on_contract_change
+    default_production_activation: false
+    live_external_write_type: none
+    status: VALID
+    compatible_capabilities:
+      - customer_card.direct_domain
+      - customer_card.shadow_pipeline
+
+  - id: FULL_FUNCTION_MATRIX_PASS
+    chapter: G
+    scope: full-function matrix TBG01-TBG25 without new live writes
+    source_workflow_run: "30474812807"
+    source_sha: 99636608226fdb77a4f8b769c7026c7de5b1ce6a
+    contract_version: full_function_matrix_eval_v1
+    evidence_schema: full_function_matrix_eval_v1
+    allowed_reuse: true
+    incompatible_changes:
+      - capability registry contract change
+      - TBG manifest change without requalification
+    expiry_policy: stale_on_contract_change
+    default_production_activation: false
+    live_external_write_type: none
+    status: VALID
+    compatible_capabilities:
+      - intake.gmail.message
+      - classification.lead
+      - classification.support
+      - classification.invoice
+      - classification.unknown
+      - policy.pre_write_reply_safety
+      - action.send_customer_auto_reply
+      - action.send_internal_handoff
+      - action.create_monday_item
+      - integration.google_sheets.export
+      - integration.visma.oauth
+      - approval.lifecycle
+      - operator.recovery
+      - customer_card.direct_domain
+      - customer_card.shadow_pipeline
+      - tenant.isolation
+      - observability.audit
+      - automation.pause
+      - scheduler.pause
