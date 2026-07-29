@@ -37,8 +37,9 @@ class CampaignRun:
 
 
 def tenant_id_for_scenario(campaign: CampaignRun, scenario_id: str) -> str:
-    short = campaign.campaign_run_id.replace("-", "")[:8]
-    return f"{EVAL_TENANT_PREFIX}{short}_{scenario_id.lower()}"
+    # Stable per scenario so repeat-run semantic hashes stay comparable across campaigns.
+    normalized = scenario_id.replace("-", "").lower()
+    return f"{EVAL_TENANT_PREFIX}{normalized}"
 
 
 def snapshot_campaign_state(engine: Engine, tenants: list[str]) -> dict[str, Any]:
