@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-29 (Production pilot P0 release readiness — runtime SHA pending PR merge; `TENANT_PRODUCTION_PILOT_01` baseline at P0; `PRODUCTION_PILOT_RELEASE_READY` via hermetic P0 preflight; no P1 traffic; no live Gmail replies; Sheets/Monday/Visma OFF; production activation not implied.)
+2026-07-29 (Production pilot P0 release readiness — runtime SHA `af99856` PR #108; post-merge Release Gate `30483315068`; Regression Main `30483309218`; P0 qualification workflow `30484065150`; `TENANT_PRODUCTION_PILOT_01` baseline at P0; `PRODUCTION_PILOT_RELEASE_READY`; no P1 traffic; no live Gmail replies; Sheets/Monday/Visma OFF; production activation not implied.)
 
 2026-07-29 (Testbot H closure — runtime SHA `58751e6` PR #106; post-merge Release Gate `30478651883`; Regression Main `30478651703`; H qualification workflow `30479403620`; TBR01–TBR20 PASS; `CONTINUOUS_REGRESSION_QUALIFIED` + `TESTBOT_SYSTEM_CLOSED` registered; `testbot-h-continuous-regression` `completed`; new live external writes = 0; live-eval remains manual; production activation not implied.)
 
@@ -1479,8 +1479,10 @@ These have caused real failures and are preserved from the README:
 | Item | Status | Notes |
 |------|--------|-------|
 | Plan | `Locked` | `docs/plans/production-pilot-release-activation-plan.md` |
-| Release version | `Registered` | `pilot-v0.1.0` |
-| Pilot tenant | `Configured (P0 baseline)` | `TENANT_PRODUCTION_PILOT_01`; single tenant policy |
+| Runtime SHA | `Verified` | `af99856a132c8c9ad08ba30198be523f02ea266b` (PR #108 merge) |
+| Post-merge Release Gate | `Verified PASS` | `30483315068` |
+| Regression Main | `Verified PASS` | `30483309218` |
+| P0 qualification | `Verified PASS` | Workflow `30484065150` |
 | Activation stage | `P0` | Gmail intake OFF; scheduler PAUSED; external writes 0 |
 | P0 preflight | `Verified (hermetic)` | Synthetic inbound ≤2; replies 0; non-Gmail writes 0 |
 | Release readiness | `Registered` | `PRODUCTION_PILOT_RELEASE_READY` (not `PRODUCTION_PILOT_ACTIVE`) |
