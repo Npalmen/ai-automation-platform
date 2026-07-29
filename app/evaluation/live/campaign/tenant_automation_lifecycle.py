@@ -94,6 +94,29 @@ def verify_automation_not_broadly_enabled(
     return issues
 
 
+def verify_canary_automation_active(
+    auto_actions: dict[str, Any] | None,
+) -> list[str]:
+    """Fail unless only lead is auto and all other canary job types are manual."""
+    issues: list[str] = []
+    actions = auto_actions or {}
+    for job_type, expected in CANARY_AUTO_ACTIONS.items():
+        actual = actions.get(job_type)
+        if str(actual) != expected:
+            issues.append(
+                f"canary automation mismatch for {job_type!r}: "
+                f"expected {expected!r}, got {actual!r}"
+            )
+    for job_type, raw in sorted(actions.items()):
+        if job_type in CANARY_AUTO_ACTIONS:
+            continue
+        if normalize_automation_mode(raw) == FULL_AUTO:
+            issues.append(
+                f"unexpected automatic Gmail action enabled for job_type={job_type!r}"
+            )
+    return issues
+
+
 def snapshot_tenant_config(
     tenant_id: str = LIVE_EVAL_TENANT_ID,
 ) -> TenantAutomationSnapshot:

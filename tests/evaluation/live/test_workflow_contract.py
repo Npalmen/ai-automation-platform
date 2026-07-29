@@ -214,14 +214,20 @@ def test_live_eval_workflow_contract():
     )
 
     automatic_readiness_step = _step_by_name(
-        steps, "Full-system testbot automatic Gmail canary readiness"
+        steps, "Pre-seed automatic Gmail canary readiness"
     )
     assert automatic_readiness_step.get("if") == (
         "inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'"
     )
-    assert "--scenario-ids TBA01_safe_lead_auto_reply,TBA02_unknown_auto_hold" in (
-        automatic_readiness_step.get("run") or ""
+    assert "--automation-phase pre_seed" in (automatic_readiness_step.get("run") or "")
+
+    automatic_readiness_step = _step_by_name(
+        steps, "Post-seed automatic Gmail canary readiness"
     )
+    assert automatic_readiness_step.get("if") == (
+        "inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'"
+    )
+    assert "--automation-phase active_canary" in (automatic_readiness_step.get("run") or "")
 
     automatic_canary_step = _step_by_name(steps, "Automatic Gmail canary (TBA01 + TBA02)")
     assert automatic_canary_step.get("if") == (
