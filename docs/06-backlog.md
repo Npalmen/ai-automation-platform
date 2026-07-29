@@ -20,6 +20,9 @@
 - [x] **Testbot G — full-function matrix implementation** — capability registry + matrix + TBG01–TBG25 harness; plan `docs/plans/testbot-g-full-function-matrix-plan.md`; PR #104 @ `9963660`.
 - [x] **Testbot G — formal qualification** — workflow `30474812807`; TBG01–TBG25 25/25 PASS; `FULL_FUNCTION_MATRIX_PASS`; post-merge Release Gate `30474014405`; new live external writes = 0.
 - [x] **Testbot G closure** — `testbot-g-full-function-matrix` `completed`; F2c not started; production activation not implied.
+- [x] **Testbot H — continuous regression implementation** — regression/qualification registries, H1/H2/H3 workflows, TBR01–TBR20; plan `docs/plans/testbot-h-continuous-regression-plan.md`; PR #106 @ `58751e6`.
+- [x] **Testbot H — formal qualification** — workflow `30479403620`; TBR01–TBR20 PASS; `CONTINUOUS_REGRESSION_QUALIFIED`; post-merge Release Gate `30478651883`; new live external writes = 0.
+- [x] **Testbot H closure — `TESTBOT_SYSTEM_CLOSED`** — `testbot-h-continuous-regression` `completed`; live-eval remains manual; production activation not implied.
 - [ ] **Activation** — separate gate; flags remain default `false`; see closure §10.
 
 ---

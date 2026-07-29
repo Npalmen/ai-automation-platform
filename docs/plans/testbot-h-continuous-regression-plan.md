@@ -19,10 +19,10 @@ todos:
     status: completed
   - id: testbot-h-f-delivery
     content: Kör regressioner, PR, squash-merge och post-merge validering
-    status: in_progress
+    status: completed
   - id: testbot-h-g-closure
     content: Kör formell continuous-regression-kvalificering och registrera TESTBOT_SYSTEM_CLOSED vid full PASS
-    status: pending
+    status: completed
 isProject: true
 ---
 
@@ -64,7 +64,7 @@ Testbot H får inte:
 | Testbot E — automatic Gmail | completed |
 | Testbot F — customer-card stateful | completed |
 | Testbot G — full-function matrix | completed |
-| Testbot H — continuous regression | pending |
+| Testbot H — continuous regression | completed |
 
 ### Testbot G
 

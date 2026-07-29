@@ -682,6 +682,23 @@ Reference: `docs/plans/testbot-g-full-function-matrix-plan.md`, `app/evaluation/
 
 ---
 
+## DEC-042 — Testbot H continuous regression gates (2026-07-29)
+
+**Status:** Active — qualification registered at runtime SHA `58751e6` (PR #106)
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **Regression registry + tiers** | H1 PR fast, H2 PostgreSQL/main, H3 nightly, H4 manual live-eval isolation; external write budget 0 for H1–H3 |
+| 2 | **Qualification drift audit** | Registered A–G qualifications must remain valid; scope expansion without new qualification blocks |
+| 3 | **Formal runner** | `app.evaluation.regression.runner` emits `CONTINUOUS_REGRESSION_QUALIFIED` on H3 PASS |
+| 4 | **No automated live writes** | No schedule-triggered live Gmail; `live-eval.yml` remains manual with explicit confirmation |
+| 5 | **Flakiness policy** | No blind retry; security-critical tests cannot be quarantined; first failure artifact preserved |
+| 6 | **`TESTBOT_SYSTEM_CLOSED`** | Requires H1/H2/H3/H4 PASS, TBR01–TBR20 PASS, post-merge Release Gate PASS, and formal qualification workflow PASS |
+
+Reference: `docs/plans/testbot-h-continuous-regression-plan.md`, `app/evaluation/regression/runner.py`.
+
+---
+
 ## DEC-2F1-TRUST — Live-eval trust anchor at API boundary
 
 **Status:** Locked (2F.1 merge hardening)  

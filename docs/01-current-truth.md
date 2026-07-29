@@ -8,6 +8,8 @@
 
 ## Last verified date
 
+2026-07-29 (Testbot H closure — runtime SHA `58751e6` PR #106; post-merge Release Gate `30478651883`; Regression Main `30478651703`; H qualification workflow `30479403620`; TBR01–TBR20 PASS; `CONTINUOUS_REGRESSION_QUALIFIED` + `TESTBOT_SYSTEM_CLOSED` registered; `testbot-h-continuous-regression` `completed`; new live external writes = 0; live-eval remains manual; production activation not implied.)
+
 2026-07-29 (Testbot G closure — runtime SHA `9963660` PR #104; post-merge Release Gate `30474014405`; G qualification workflow `30474812807`; TBG01–TBG25 25/25 PASS; `FULL_FUNCTION_MATRIX_PASS` registered; `testbot-g-full-function-matrix` `completed`; new live external writes = 0; Monday/Visma blocked; Sheets sandbox-only; F2c not started; production activation not implied.)
 
 2026-07-29 (Testbot F closure — runtime SHA `db7ca19` PR #102; post-merge Release Gate `30465944471`; F2 qualification workflow `30466634575`; TBF2-01–TBF2-10 10/10 PASS (F2a + F2b); `CUSTOMER_CARD_SHADOW_DOMAIN_QUALIFIED` + `CUSTOMER_CARD_SHADOW_PIPELINE_QUALIFIED`; `CUSTOMER_CARD_PASS` registered; `testbot-f-customer-card-stateful` `completed`; shadow flags default disabled; F2c not started.)
@@ -1452,8 +1454,23 @@ These have caused real failures and are preserved from the README:
 | G qualification | `Registered` | `FULL_FUNCTION_MATRIX_PASS` |
 | Live Gmail evidence | `Bound (prior)` | `AUTOMATIC_GMAIL_CORE_QUALIFIED@30435651905` — no new live runs in G |
 | Integration scope | `Documented` | Monday `BLOCKED_BY_POLICY`; Visma `BLOCKED_BY_POLICY`; Sheets `SANDBOX_ONLY` |
-| Testbot G closure | `Registered` | `testbot-g-full-function-matrix` `completed`; Testbot H not started |
+| Testbot G closure | `Registered` | `testbot-g-full-function-matrix` `completed` |
 | **Not qualified** | `Documented` | Production activation; live Sheets/Monday/Visma writes; F2c live Gmail canary |
+
+### Testbot H continuous regression (2026-07-29)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Plan | `Locked` | `docs/plans/testbot-h-continuous-regression-plan.md` |
+| Runtime SHA | `Verified` | `58751e68d5b2df254b5eb46e884742721e2fd113` (PR #106 merge) |
+| Post-merge Release Gate | `Verified PASS` | `30478651883` |
+| Regression Main (H1+H2) | `Verified PASS` | Workflow `30478651703` |
+| Formal H qualification | `Verified PASS` | Workflow `30479403620`; H1 dry-run + H3 nightly + H4 isolation |
+| TBR scenarios | `Verified PASS` | TBR01–TBR20 PASS; external writes = 0; network forbidden in H1–H3 |
+| H qualification | `Registered` | `CONTINUOUS_REGRESSION_QUALIFIED` |
+| Testbot system closure | `Registered` | `TESTBOT_SYSTEM_CLOSED`; `testbot-h-continuous-regression` `completed` |
+| Live-eval isolation | `Verified` | `live-eval.yml` manual-only; no schedule in H4 contract |
+| **Not qualified** | `Documented` | Production GA; automatic tenant activation; live Sheets/Monday/Visma; F2c live Gmail canary |
 
 ---
 
