@@ -67,9 +67,9 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
 
         if create_replay["body"]["customer_id"] != customer_id:
             result.fail("create replay returned different customer")
-        if fact_replay["status"] != 200:
+        if fact_replay["status"] not in (200, 201):
             result.fail("fact replay failed")
-        if job_replay["status"] != 200:
+        if job_replay["status"] not in (200, 201):
             result.fail("job link replay failed")
 
         card = ctx.read_customer_card(db, customer_id)

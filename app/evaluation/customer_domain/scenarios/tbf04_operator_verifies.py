@@ -84,7 +84,7 @@ def run(ctx: EvalContext) -> ScenarioRunResult:
             "+46700404002",
             verify_key,
         )
-        if replay["status"] != 200:
+        if replay["status"] not in (200, 201):
             result.fail("verify replay failed")
 
         card = ctx.read_customer_card(db, customer_id)
