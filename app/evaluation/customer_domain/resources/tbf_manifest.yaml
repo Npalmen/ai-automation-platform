@@ -1,0 +1,53 @@
+schema_version: customer_card_tbf_manifest_v1
+campaign_type: customer-card-stateful
+scenarios:
+  - scenario_id: TBF01
+    module: tbf01_new_private_customer
+    family: tbf01
+    variant: new_private_customer
+    description: Create private customer with proposed AI facts and job link
+  - scenario_id: TBF02
+    module: tbf02_returning_same_email
+    family: tbf02
+    variant: returning_same_email
+    description: Returning customer matched by email without duplicate creation
+  - scenario_id: TBF03
+    module: tbf03_changed_phone_proposed
+    family: tbf03
+    variant: changed_phone_proposed
+    description: Verified phone unchanged while proposed phone stays pending
+  - scenario_id: TBF04
+    module: tbf04_operator_verifies
+    family: tbf04
+    variant: operator_verifies
+    description: Operator verify creates successor current fact with idempotent replay
+  - scenario_id: TBF05
+    module: tbf05_conflicting_identity
+    family: tbf05
+    variant: conflicting_identity
+    description: Conflicting verified facts expose resolution issues without wrong current value
+  - scenario_id: TBF06
+    module: tbf06_company_contacts
+    family: tbf06
+    variant: company_contacts
+    description: Company with multiple contacts and separate facts per contact
+  - scenario_id: TBF07
+    module: tbf07_ambiguous_identity
+    family: tbf07
+    variant: ambiguous_identity
+    description: Weak match signals create duplicate candidate without auto-link
+  - scenario_id: TBF08
+    module: tbf08_duplicate_resolution
+    family: tbf08
+    variant: duplicate_resolution
+    description: Duplicate decisions idempotent; approve_merge blocked
+  - scenario_id: TBF09
+    module: tbf09_thread_continuation
+    family: tbf09
+    variant: thread_continuation
+    description: Thread continuation links job without identity proof
+  - scenario_id: TBF10
+    module: tbf10_replay_intake
+    family: tbf10
+    variant: replay_intake
+    description: Replay idempotency keys without extra rows

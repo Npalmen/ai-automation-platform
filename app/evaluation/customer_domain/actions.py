@@ -33,6 +33,7 @@ from app.domain.customer.matching import assess_customer_match
 from app.domain.customer.schemas import (
     CustomerMatchInput,
     CustomerMatchSubject,
+    CustomerSourceFact,
     IdentityMatchItem,
 )
 from app.repositories.postgres.end_customer_repository import EndCustomerRepository
@@ -54,6 +55,8 @@ def new_id() -> str:
 class EvalContext:
     engine: Engine
     tenant_id: str
+    campaign: Any | None = None
+    scenario_id: str | None = None
     operator: OperatorIdentity = field(
         default_factory=lambda: {
             "id": "eval-operator",
@@ -66,6 +69,16 @@ class EvalContext:
 
     def session(self) -> Session:
         return sessionmaker(bind=self.engine)()
+
+    def step_idempotency_key(self, step: str) -> str:
+        if self.campaign is not None and self.scenario_id:
+            return self.campaign.stable_idempotency_key(self.scenario_id, step)
+        return new_id()
+
+    def source_event_id(self, step: str) -> str:
+        if self.campaign is not None and self.scenario_id:
+            return self.campaign.source_event_id(self.scenario_id, step)
+        return f"src:{step}"
 
     def act_create_private_customer(
         self,
@@ -330,6 +343,12 @@ class EvalContext:
         )
         db.commit()
         return job_id
+
+    def arrange_fact(self, db: Session, fact: CustomerSourceFact) -> str:
+        self.arrangements.append("repository.append_fact")
+        EndCustomerRepository.append_fact(db, fact)
+        db.commit()
+        return fact.fact_id
 
     def build_match_subject(
         self,

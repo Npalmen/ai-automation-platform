@@ -48,6 +48,15 @@ from app.evaluation.customer_domain.scenarios.family_04_company_contacts import 
 from app.evaluation.customer_domain.scenarios.family_05_ambiguous_identity import run as run_family_05
 from app.evaluation.customer_domain.scenarios._common import ScenarioRunResult
 from app.evaluation.customer_domain.actions import EvalContext
+from app.evaluation.customer_domain.registry import load_tbf_runners, validate_manifest
+from app.evaluation.customer_domain.semantic_hash import semantic_hash
+from app.evaluation.customer_domain.campaign import (
+    CampaignRun,
+    build_campaign_oracle,
+    snapshot_campaign_state,
+    tenant_id_for_scenario,
+    verify_campaign_cleanup,
+)
 
 
 DEFERRED_CAPABILITIES = [
@@ -87,6 +96,40 @@ def _prepare_tenant(engine, tenant_id: str) -> None:
         session.close()
 
 
+def _run_tbf_campaign(engine, scenario_filter: str = "all") -> tuple[list[ScenarioRunResult], CampaignRun]:
+    campaign = CampaignRun()
+    runners = load_tbf_runners()
+    manifest_failures = validate_manifest()
+    if manifest_failures:
+        blocked = ScenarioRunResult(
+            scenario_id="TBF_MANIFEST",
+            family="tbf",
+            tenant_id="eval_cd_manifest",
+            result="BLOCKED",
+            failures=manifest_failures,
+        )
+        return [blocked], campaign
+
+    results: list[ScenarioRunResult] = []
+    for scenario_id, runner in runners.items():
+        if scenario_filter != "all" and scenario_filter != scenario_id:
+            continue
+        tenant_id = tenant_id_for_scenario(campaign, scenario_id)
+        campaign.register_tenant(tenant_id, scenario_id)
+        _prepare_tenant(engine, tenant_id)
+        ctx = EvalContext(
+            engine=engine,
+            tenant_id=tenant_id,
+            campaign=campaign,
+            scenario_id=scenario_id,
+        )
+        results.append(runner(ctx))
+    campaign.pre_run_snapshot = {
+        "normalized_hash": semantic_hash(snapshot_campaign_state(engine, campaign.registered_tenants)),
+    }
+    return results, campaign
+
+
 def _run_families(engine, scenario_filter: str = "all") -> list[ScenarioRunResult]:
     runners = [
         (run_family_01, _tenant_id("family01"), "family_01"),
@@ -112,11 +155,16 @@ def run_evaluation(
     report_markdown: str,
     keep_data: bool = False,
     scenario_filter: str = "all",
+    campaign: str = "families",
 ) -> dict[str, Any]:
     started = datetime.now(timezone.utc)
     assert_eval_environment()
     db_fingerprint = assert_eval_database_url(database_url)
     guard = ExternalSideEffectGuard()
+
+    campaign_oracle: dict[str, Any] | None = None
+    cleanup_result: dict[str, Any] | None = None
+    run1: list[ScenarioRunResult] = []
 
     with ExitStack() as stack:
         for module, attr, replacement in install_external_guards(guard):
@@ -128,13 +176,33 @@ def run_evaluation(
 
         try:
             cleanup_eval_tenants(engine)
-            run1 = _run_families(engine, scenario_filter)
-            hashes1 = {r.scenario_id: r.to_report()["semantic_result_hash"] for r in run1}
+            if campaign == "tbf":
+                run1, campaign_run = _run_tbf_campaign(engine, scenario_filter)
+                hashes1 = {r.scenario_id: r.to_report()["semantic_result_hash"] for r in run1}
 
-            cleanup_eval_tenants(engine)
-            run2 = _run_families(engine, scenario_filter)
-            hashes2 = {r.scenario_id: r.to_report()["semantic_result_hash"] for r in run2}
-            repeat_ok = hashes1 == hashes2
+                cleanup_eval_tenants(engine)
+                run2, _ = _run_tbf_campaign(engine, scenario_filter)
+                hashes2 = {r.scenario_id: r.to_report()["semantic_result_hash"] for r in run2}
+                repeat_ok = hashes1 == hashes2
+                cleanup_result = verify_campaign_cleanup(engine, campaign_run)
+                campaign_oracle = build_campaign_oracle(
+                    campaign=campaign_run,
+                    scenario_results=[r.to_report() for r in run1],
+                    cleanup_result=cleanup_result,
+                )
+                if cleanup_result.get("cleanup_status") != "restored":
+                    repeat_ok = False
+            else:
+                campaign_run = None
+                campaign_oracle = None
+                cleanup_result = None
+                run1 = _run_families(engine, scenario_filter)
+                hashes1 = {r.scenario_id: r.to_report()["semantic_result_hash"] for r in run1}
+
+                cleanup_eval_tenants(engine)
+                run2 = _run_families(engine, scenario_filter)
+                hashes2 = {r.scenario_id: r.to_report()["semantic_result_hash"] for r in run2}
+                repeat_ok = hashes1 == hashes2
 
             tenant_a, tenant_b = tenant_control_ids("iso")
             tenant_controls = run_tenant_controls(engine, tenant_a, tenant_b)
@@ -166,7 +234,12 @@ def run_evaluation(
         h_gap_findings=[],
         started_at=started,
         completed_at=completed,
+        campaign_type=campaign,
+        campaign_oracle=campaign_oracle,
+        cleanup_result=cleanup_result,
     )
+    if campaign == "tbf" and report["overall_result"] == "PASS":
+        report["qualification"] = "CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED"
     write_json_report(Path(report_json), report)
     write_markdown_report(Path(report_markdown), report)
     return report
@@ -183,7 +256,8 @@ def main(argv: list[str] | None = None) -> int:
         "--report-markdown",
         default="storage/status/customer-domain-stateful-eval.md",
     )
-    parser.add_argument("--scenario", default="all", choices=list(FAMILY_RUNNERS.keys()))
+    parser.add_argument("--scenario", default="all")
+    parser.add_argument("--campaign", default="families", choices=["families", "tbf"])
     parser.add_argument("--keep-data", action="store_true", default=False)
     args = parser.parse_args(argv)
     os.environ.setdefault("ENV", "test")
@@ -194,6 +268,7 @@ def main(argv: list[str] | None = None) -> int:
             report_markdown=args.report_markdown,
             keep_data=args.keep_data,
             scenario_filter=args.scenario,
+            campaign=args.campaign,
         )
         print(report["overall_result"])
         return 0 if report["overall_result"] == "PASS" else 1

@@ -22,6 +22,7 @@ class ScenarioRunResult:
     database_counts: dict[str, int] = field(default_factory=dict)
     audit_counts: int = 0
     semantic_payload: dict[str, Any] = field(default_factory=dict)
+    oracle: dict[str, Any] = field(default_factory=dict)
 
     def fail(self, message: str) -> None:
         self.failures.append(message)
@@ -38,6 +39,7 @@ class ScenarioRunResult:
             "database_counts": self.database_counts,
             "audit_counts": self.audit_counts,
             "semantic_result_hash": semantic_hash(self.semantic_payload),
+            "oracle": self.oracle,
             "result": self.result,
             "failures": self.failures,
             "arrangements": self.arrangements,
