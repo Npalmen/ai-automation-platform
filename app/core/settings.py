@@ -128,6 +128,9 @@ class Settings(BaseSettings):
     # Operator alert email (Kapitel 10) — platform allowlist only; empty = in-app only.
     OPERATOR_ALERT_RECIPIENT: str = ""
 
+    # Production pilot — global scheduler pause kill switch (default false).
+    PRODUCTION_PILOT_GLOBAL_SCHEDULER_PAUSE: bool = False
+
     END_CUSTOMER_READ_API_ENABLED: bool = False
     END_CUSTOMER_WRITE_API_ENABLED: bool = False
 

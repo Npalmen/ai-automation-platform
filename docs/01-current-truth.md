@@ -8,6 +8,8 @@
 
 ## Last verified date
 
+2026-07-29 (Production pilot P0 release readiness — runtime SHA pending PR merge; `TENANT_PRODUCTION_PILOT_01` baseline at P0; `PRODUCTION_PILOT_RELEASE_READY` via hermetic P0 preflight; no P1 traffic; no live Gmail replies; Sheets/Monday/Visma OFF; production activation not implied.)
+
 2026-07-29 (Testbot H closure — runtime SHA `58751e6` PR #106; post-merge Release Gate `30478651883`; Regression Main `30478651703`; H qualification workflow `30479403620`; TBR01–TBR20 PASS; `CONTINUOUS_REGRESSION_QUALIFIED` + `TESTBOT_SYSTEM_CLOSED` registered; `testbot-h-continuous-regression` `completed`; new live external writes = 0; live-eval remains manual; production activation not implied.)
 
 2026-07-29 (Testbot G closure — runtime SHA `9963660` PR #104; post-merge Release Gate `30474014405`; G qualification workflow `30474812807`; TBG01–TBG25 25/25 PASS; `FULL_FUNCTION_MATRIX_PASS` registered; `testbot-g-full-function-matrix` `completed`; new live external writes = 0; Monday/Visma blocked; Sheets sandbox-only; F2c not started; production activation not implied.)
@@ -1471,6 +1473,19 @@ These have caused real failures and are preserved from the README:
 | Testbot system closure | `Registered` | `TESTBOT_SYSTEM_CLOSED`; `testbot-h-continuous-regression` `completed` |
 | Live-eval isolation | `Verified` | `live-eval.yml` manual-only; no schedule in H4 contract |
 | **Not qualified** | `Documented` | Production GA; automatic tenant activation; live Sheets/Monday/Visma; F2c live Gmail canary |
+
+### Production pilot P0 release readiness (2026-07-29)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Plan | `Locked` | `docs/plans/production-pilot-release-activation-plan.md` |
+| Release version | `Registered` | `pilot-v0.1.0` |
+| Pilot tenant | `Configured (P0 baseline)` | `TENANT_PRODUCTION_PILOT_01`; single tenant policy |
+| Activation stage | `P0` | Gmail intake OFF; scheduler PAUSED; external writes 0 |
+| P0 preflight | `Verified (hermetic)` | Synthetic inbound ≤2; replies 0; non-Gmail writes 0 |
+| Release readiness | `Registered` | `PRODUCTION_PILOT_RELEASE_READY` (not `PRODUCTION_PILOT_ACTIVE`) |
+| Kill switches | `Implemented` | Global scheduler pause env + per-tenant support console actions |
+| **Not activated** | `Documented` | P1 observe-only traffic; live Gmail replies; Sheets/Monday/Visma; automatic verify/link/merge |
 
 ---
 

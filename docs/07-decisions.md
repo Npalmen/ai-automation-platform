@@ -699,6 +699,23 @@ Reference: `docs/plans/testbot-h-continuous-regression-plan.md`, `app/evaluation
 
 ---
 
+## DEC-043 — Production pilot P0 release gates (2026-07-29)
+
+**Status:** Active — P0 release readiness registered; P1 not authorized
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **Single pilot tenant** | Exactly `TENANT_PRODUCTION_PILOT_01`; no broad tenant activation |
+| 2 | **P0 dry run** | Gmail intake OFF; scheduler PAUSED; external write budget 0 |
+| 3 | **Stage machine** | P0→P1→P2→P3 advances one step at a time with operator approval |
+| 4 | **Kill switches** | Global scheduler pause + per-tenant automation/Gmail/shadow disables without code change |
+| 5 | **Blocked capabilities** | No Sheets/Monday/Visma; no automatic verify/link/merge |
+| 6 | **`PRODUCTION_PILOT_RELEASE_READY`** | Requires hermetic P0 preflight PASS; does not imply `PRODUCTION_PILOT_ACTIVE` |
+
+Reference: `docs/plans/production-pilot-release-activation-plan.md`, `app/production_pilot/preflight.py`.
+
+---
+
 ## DEC-2F1-TRUST — Live-eval trust anchor at API boundary
 
 **Status:** Locked (2F.1 merge hardening)  

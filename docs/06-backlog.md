@@ -23,6 +23,8 @@
 - [x] **Testbot H — continuous regression implementation** — regression/qualification registries, H1/H2/H3 workflows, TBR01–TBR20; plan `docs/plans/testbot-h-continuous-regression-plan.md`; PR #106 @ `58751e6`.
 - [x] **Testbot H — formal qualification** — workflow `30479403620`; TBR01–TBR20 PASS; `CONTINUOUS_REGRESSION_QUALIFIED`; post-merge Release Gate `30478651883`; new live external writes = 0.
 - [x] **Testbot H closure — `TESTBOT_SYSTEM_CLOSED`** — `testbot-h-continuous-regression` `completed`; live-eval remains manual; production activation not implied.
+- [x] **Production pilot P0 — release readiness** — `app/production_pilot/` + P0 preflight; `TENANT_PRODUCTION_PILOT_01` baseline; `PRODUCTION_PILOT_RELEASE_READY`; plan `docs/plans/production-pilot-release-activation-plan.md`.
+- [ ] **Production pilot P1** — observe-only pilot traffic; requires explicit operator authorization; not started.
 - [ ] **Activation** — separate gate; flags remain default `false`; see closure §10.
 
 ---
