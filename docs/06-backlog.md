@@ -17,6 +17,9 @@
 - [x] **Testbot F F2 — shadow pipeline implementation** — migration 024, shadow ledger/services, TBF2-01–TBF2-10, mock-intake boundary; plan `docs/plans/testbot-f-f2-shadow-pipeline-plan.md`.
 - [x] **Testbot F F2a/F2b — formal qualification** — workflow `30466634575`; TBF2-01–TBF2-10 10/10 PASS; `CUSTOMER_CARD_SHADOW_DOMAIN_QUALIFIED` + `CUSTOMER_CARD_SHADOW_PIPELINE_QUALIFIED` @ `db7ca19`.
 - [x] **Testbot F closure — `CUSTOMER_CARD_PASS`** — F1 + F1b + F2a + F2b qualified; `testbot-f-customer-card-stateful` `completed`; F2c optional and not started.
+- [x] **Testbot G — full-function matrix implementation** — capability registry + matrix + TBG01–TBG25 harness; plan `docs/plans/testbot-g-full-function-matrix-plan.md`; PR #104 @ `9963660`.
+- [x] **Testbot G — formal qualification** — workflow `30474812807`; TBG01–TBG25 25/25 PASS; `FULL_FUNCTION_MATRIX_PASS`; post-merge Release Gate `30474014405`; new live external writes = 0.
+- [x] **Testbot G closure** — `testbot-g-full-function-matrix` `completed`; F2c not started; production activation not implied.
 - [ ] **Activation** — separate gate; flags remain default `false`; see closure §10.
 
 ---

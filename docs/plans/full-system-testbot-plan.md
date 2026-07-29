@@ -22,7 +22,7 @@ todos:
     status: completed
   - id: testbot-g-full-function-matrix
     content: Testa varje faktiskt implementerad funktion och integration i rätt test- eller sandboxmiljö och dokumentera saknade eller ofullständiga produktförmågor
-    status: pending
+    status: completed
   - id: testbot-h-continuous-regression
     content: Etablera återkörbara kampanjer, kvalitetsrapporter, failure triage och closurebeslut för fortsatt intern användning och senare kundpilot
     status: pending
@@ -642,7 +642,9 @@ Om kundkort finns helt eller delvis ska följande testas.
 
 # G. Full funktionsmatris
 
-**Todo:** `testbot-g-full-function-matrix`
+**Todo:** `testbot-g-full-function-matrix` — **completed** (2026-07-29)
+
+**Testbot G closure (2026-07-29):** Implementation + qualification @ SHA `9963660` (PR #104, DEC-041). TBG01–TBG25 25/25 PASS via formal runner (workflow `30474812807`). `FULL_FUNCTION_MATRIX_PASS` registered. Post-merge Release Gate `30474014405`. New live external writes in G campaign = 0; compatible prior Gmail evidence bound via `AUTOMATIC_GMAIL_CORE_QUALIFIED@30435651905`. Monday/Visma blocked; Sheets `SANDBOX_ONLY`. F2c not started; production activation not implied.
 
 ## Mål
 
