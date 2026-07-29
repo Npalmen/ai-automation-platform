@@ -10,7 +10,7 @@ from app.workflows.action_executor import SUPPORTED_ACTIONS
 from app.workflows.reply_candidate_safety import REPLY_SAFETY_FAILED
 from app.workflows.tenant_automation import allows_direct_external_execution, resolve_automation_mode
 
-_CUSTOMER_REPLY_ACTIONS = frozenset({"send_customer_auto_reply", "send_email"})
+_CUSTOMER_REPLY_ACTIONS = frozenset({"send_customer_auto_reply"})
 
 
 class ActionEffect(str, Enum):

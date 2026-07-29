@@ -460,7 +460,7 @@ class TestServiceContextProfileRouting:
         """New solar installation → roof type and annual consumption questions are appropriate."""
         job = self._run_lead(
             "Solceller till villan",
-            "Hej, vi vill installera solceller på taket av vår villa. Vad kostar det?",
+            "Hej, vi vill installera solceller på taket av vår villa och vill veta mer om förutsättningarna.",
         )
         payload = get_latest_processor_payload(job, "lead_analyzer_processor")
         assert payload.get("service_profile_type") == "solar_installation"
