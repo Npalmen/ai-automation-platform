@@ -1559,6 +1559,10 @@ def _run_gmail_inbox_sync(
         PilotGateViolation,
         enforce_pilot_inbox_gates,
     )
+    from app.production_pilot.gates import (
+        ProductionPilotGateViolation,
+        enforce_production_pilot_inbox_gates,
+    )
 
     try:
         query_used = enforce_pilot_inbox_gates(
@@ -1568,7 +1572,12 @@ def _run_gmail_inbox_sync(
             dry_run=dry_run,
             settings=ctrl_settings,
         ) or query_used
-    except PilotGateViolation as exc:
+        enforce_production_pilot_inbox_gates(
+            tenant_id=tenant_id,
+            dry_run=dry_run,
+            settings=ctrl_settings,
+        )
+    except (PilotGateViolation, ProductionPilotGateViolation) as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
     connection_config = get_integration_connection_config(
@@ -3350,14 +3359,28 @@ def _run_scheduler_pass(tenant_id: str, db: "Session", now_utc: "datetime") -> d
                 enforce_pilot_scheduler_sync,
                 is_pilot_tenant,
             )
+            from app.production_pilot.gates import (
+                ProductionPilotGateViolation,
+                enforce_production_pilot_scheduler_sync,
+                is_production_pilot_tenant,
+            )
 
-            if is_pilot_tenant(tenant_id):
+            if s.PRODUCTION_PILOT_GLOBAL_SCHEDULER_PAUSE:
+                inbox_sync_result = {"skipped": True, "reason": "global_scheduler_pause"}
+            elif is_pilot_tenant(tenant_id):
                 try:
                     enforce_pilot_scheduler_sync(tenant_id=tenant_id, settings=ctrl)
                 except PilotGateViolation as exc:
                     inbox_sync_result = {"skipped": True, "reason": str(exc)}
                 else:
                     inbox_sync_result = {"skipped": True, "reason": "pilot_scheduler_forbidden"}
+            elif is_production_pilot_tenant(tenant_id):
+                try:
+                    enforce_production_pilot_scheduler_sync(tenant_id=tenant_id, settings=ctrl)
+                except ProductionPilotGateViolation as exc:
+                    inbox_sync_result = {"skipped": True, "reason": str(exc)}
+                else:
+                    inbox_sync_result = {"skipped": True, "reason": "production_pilot_scheduler_forbidden"}
             elif not s.GOOGLE_MAIL_ACCESS_TOKEN:
                 inbox_sync_result = {"skipped": True, "reason": "gmail_not_configured"}
             else:
