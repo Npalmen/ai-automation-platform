@@ -29,6 +29,15 @@ _CONTROL_CHAR_RE = re.compile(r"[\x00-\x1f\x7f]")
 _MIN_FACT_CONFIDENCE = 0.35
 
 
+def _normalized_email(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    result = normalize_email(raw)
+    if result is None:
+        return None
+    return result[0]
+
+
 @dataclass
 class ShadowIntakeEvent:
     tenant_id: str
@@ -83,9 +92,9 @@ class ShadowObservationCommandService:
             "message_text_len": len(event.message_text or ""),
         }
         normalized_payload = {
-            "email": normalize_email(event.sender_email) if event.sender_email else None,
+            "email": _normalized_email(event.sender_email),
             "phone": normalize_phone(event.sender_phone) if event.sender_phone else None,
-            "reply_to": normalize_email(event.reply_to_email) if event.reply_to_email else None,
+            "reply_to": _normalized_email(event.reply_to_email),
             "company_name": (event.company_name or "").strip().lower() or None,
             "thread_id": event.source_thread_id,
         }
@@ -180,7 +189,7 @@ class ShadowObservationCommandService:
     ) -> list[Any]:
         signals: list[Any] = []
         if event.sender_email:
-            norm = normalize_email(event.sender_email)
+            norm = _normalized_email(event.sender_email)
             signals.append(
                 EndCustomerShadowRepository.create_identity_signal(
                     db,
@@ -259,7 +268,7 @@ class ShadowObservationCommandService:
                     observation_id=observation_id,
                     signal_type=ShadowSignalType.REPLY_TO.value,
                     raw_value_redacted=_redact(event.reply_to_email),
-                    normalized_value=normalize_email(event.reply_to_email),
+                    normalized_value=_normalized_email(event.reply_to_email),
                     confidence=event.confidence,
                     source_path="sender.reply_to",
                     trust_level=ShadowTrustLevel.UNTRUSTED.value,
@@ -288,7 +297,7 @@ class ShadowObservationCommandService:
                 continue
             normalized = raw.strip().lower() if field_name in {"customer_name", "company_name", "address"} else raw
             if field_name == "email":
-                normalized = normalize_email(raw) or raw
+                normalized = _normalized_email(raw) or raw
             if field_name == "phone":
                 normalized = normalize_phone(raw) or raw
             proposals.append(
