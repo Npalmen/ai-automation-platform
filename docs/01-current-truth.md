@@ -8,7 +8,7 @@
 
 ## Last verified date
 
-2026-07-29 (Production pilot P1 observe-only — implementation pending PR merge; `TENANT_PRODUCTION_PILOT_01` @ P1; `PRODUCTION_PILOT_P1_OBSERVE_QUALIFIED` + `PRODUCTION_PILOT_ACTIVE`; Gmail replies 0; external writes 0; P2 not authorized.)
+2026-07-29 (Production pilot P1 observe-only — runtime SHA `a7409c9` PR #110; post-merge Release Gate `30488429460`; Regression Main `30488429425`; P1 qualification workflow `30489173208`; `TENANT_PRODUCTION_PILOT_01` @ P1; `PRODUCTION_PILOT_P1_OBSERVE_QUALIFIED` + `PRODUCTION_PILOT_ACTIVE`; Gmail replies 0; external writes 0; P2 not authorized.)
 
 2026-07-29 (Production pilot P0 release readiness — runtime SHA `af99856` PR #108; post-merge Release Gate `30483315068`; Regression Main `30483309218`; P0 qualification workflow `30484065150`; `TENANT_PRODUCTION_PILOT_01` baseline at P0; `PRODUCTION_PILOT_RELEASE_READY`; no P1 traffic; no live Gmail replies; Sheets/Monday/Visma OFF; production activation not implied.)
 
@@ -1499,8 +1499,11 @@ These have caused real failures and are preserved from the README:
 |------|--------|-------|
 | Plan | `Locked` | `docs/plans/production-pilot-p1-observe-only-plan.md` |
 | Pilot tenant | `P1 active (observe-only)` | `TENANT_PRODUCTION_PILOT_01`; single tenant policy |
+| Runtime SHA | `Verified` | `a7409c9f1197c2d163ab724e050d02aebb6d2a49` (PR #110 merge) |
+| Post-merge Release Gate | `Verified PASS` | `30488429460` |
+| Regression Main | `Verified PASS` | `30488429425` |
+| P1 qualification | `Verified PASS` | Workflow `30489173208`; `PRODUCTION_PILOT_P1_OBSERVE_QUALIFIED` + `PRODUCTION_PILOT_ACTIVE` |
 | Activation stage | `P1` | Gmail intake ON; observe/manual review ON; replies 0 |
-| P1 qualification | `Registered` | `PRODUCTION_PILOT_P1_OBSERVE_QUALIFIED` + `PRODUCTION_PILOT_ACTIVE` |
 | External writes | `0` | Gmail replies 0; Sheets/Monday/Visma OFF |
 | Shadow pipeline | `Observe-only` | intake/matching ON; promotion OFF |
 | **Not activated** | `Documented` | P2 approval-based Gmail replies; automatic Gmail; production GA |
