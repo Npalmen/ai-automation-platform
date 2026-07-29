@@ -20,12 +20,13 @@ from app.repositories.postgres.migration_runner import (
 )
 
 CAMPAIGN_TABLES: tuple[str, ...] = (
-  "action_executions",
-  "approval_requests",
-  "jobs",
-  "audit_events",
-  "integration_events",
-  *END_CUSTOMER_TABLES,
+    "decision_records",
+    "action_executions",
+    "approval_requests",
+    "jobs",
+    "audit_events",
+    "integration_events",
+    *END_CUSTOMER_TABLES,
 )
 
 

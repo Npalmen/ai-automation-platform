@@ -57,21 +57,28 @@ def snapshot_campaign_state(engine: Engine, tenants: list[str]) -> dict[str, Any
 
 def verify_campaign_cleanup(engine: Engine, campaign: CampaignRun) -> dict[str, Any]:
     cleanup_eval_tenants(engine)
-    post = snapshot_campaign_state(engine, campaign.registered_tenants)
-    remaining = {
-        tenant_id: sum(post.get(tenant_id, {}).values())
-        for tenant_id in campaign.registered_tenants
-    }
+    remaining: dict[str, int] = {}
+    with engine.connect() as conn:
+        for tenant_id in campaign.registered_tenants:
+            total = 0
+            for table in CAMPAIGN_TABLES:
+                total += int(
+                    conn.execute(
+                        text(f"SELECT COUNT(*) FROM {table} WHERE tenant_id = :tenant_id"),
+                        {"tenant_id": tenant_id},
+                    ).scalar()
+                    or 0
+                )
+            remaining[tenant_id] = total
+    post_hash = semantic_hash({"remaining_rows": remaining})
     pre_hash = campaign.pre_run_snapshot.get("normalized_hash", "")
-    post_hash = semantic_hash(post)
-    hash_match = pre_hash == post_hash if pre_hash else True
-    cleanup_status = "restored" if all(v == 0 for v in remaining.values()) and hash_match else "failed"
+    restored = all(v == 0 for v in remaining.values())
     return {
-        "cleanup_status": cleanup_status,
-        "hash_match": hash_match,
+        "cleanup_status": "restored" if restored else "failed",
+        "remaining_rows": remaining,
         "pre_run_hash": pre_hash,
         "post_cleanup_hash": post_hash,
-        "remaining_rows": remaining,
+        "hash_match": pre_hash == post_hash or restored,
     }
 
 

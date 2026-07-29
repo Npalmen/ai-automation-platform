@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from hashlib import sha256
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from app.core import settings
+from app.core.settings import get_settings
+from app.domain.workflows.enums import JobType
+from app.domain.workflows.models import Job
 from app.evaluation.customer_domain.shadow_eval_support import act_shadow_intake, shadow_eval_flags
 from app.evaluation.full_function.actions import EvalContext
 from app.evaluation.full_function.evidence import bind_live_evidence, validate_tbg05_evidence
@@ -16,10 +19,86 @@ from app.evaluation.full_function.oracles import attach_oracle
 from app.evaluation.full_function.scenarios._common import ScenarioRunResult, finalize_result
 from app.integrations.enums import IntegrationType
 from app.integrations.policies import is_external_write_enabled_for_integration
+from app.repositories.postgres.approval_models import ApprovalRequestRecord
+from app.repositories.postgres.job_models import JobRecord
 from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
 from app.workflows.action_authorization import ActionAuthorization, authorize_action
+from app.workflows.pipeline_run_context import PipelineRunSource, create_trace_session
 from app.workflows.processors.action_dispatch_processor import _is_no_reply_email
 from app.workflows.reply_candidate_safety import assess_reply_candidate_safety
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _seed_job_record(db: Session, tenant_id: str, job_id: str, *, status: str = "awaiting_approval") -> Job:
+    now = _utcnow()
+    db.add(
+        JobRecord(
+            job_id=job_id,
+            tenant_id=tenant_id,
+            job_type="lead",
+            status=status,
+            input_data={"subject": "eval"},
+            result={"processor_history": []},
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    db.commit()
+    return Job(job_id=job_id, tenant_id=tenant_id, job_type=JobType.LEAD, input_data={})
+
+
+def _seed_approval_record(
+    db: Session,
+    *,
+    tenant_id: str,
+    job_id: str,
+    operation_id: str,
+    delivery: dict,
+) -> ApprovalRequestRecord:
+    approval_id = f"act_{uuid4().hex[:12]}"
+    now = _utcnow()
+    record = ApprovalRequestRecord(
+        approval_id=approval_id,
+        tenant_id=tenant_id,
+        job_id=job_id,
+        job_type="lead",
+        state="pending",
+        channel="dashboard",
+        title="Action",
+        summary="Pending",
+        next_on_approve="action_execute",
+        request_payload={
+            "approval_id": approval_id,
+            "state": "pending",
+            "action_operation_id": operation_id,
+            "action_type": delivery["type"],
+        },
+        delivery_payload=delivery,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(record)
+    db.commit()
+    return record
+
+
+def _seed_authorization(db: Session, job: Job, action: dict, operation_id: str) -> None:
+    from app.workflows.decision_record_service import record_action_authorization
+
+    trace = create_trace_session(job, source=PipelineRunSource.INTAKE, db=db)
+    action_payload = dict(action)
+    action_payload["_action_operation_id"] = operation_id
+    record_action_authorization(
+        db,
+        trace,
+        job,
+        action_payload,
+        authorization="approval_required",
+    )
+    db.commit()
 
 
 def _base_payload(
@@ -233,38 +312,24 @@ def run_tbg06(ctx: EvalContext) -> ScenarioRunResult:
 
 
 def _seed_approval(db: Session, tenant_id: str):
-    from app.repositories.postgres.approval_models import ApprovalRequestRecord
-    from app.repositories.postgres.job_models import JobRecord
-
     job_id = str(uuid4())
     operation_id = str(uuid4())
-    db.add(
-        JobRecord(
-            job_id=job_id,
-            tenant_id=tenant_id,
-            job_type="lead",
-            status="awaiting_approval",
-            input_data={},
-            result={},
-        )
-    )
-    approval = ApprovalRequestRecord(
-        approval_id=str(uuid4()),
+    delivery = {
+        "type": "send_customer_auto_reply",
+        "to": "customer@example.com",
+        "subject": "Hej",
+        "body": "Tack för ditt meddelande.",
+        "tenant_id": tenant_id,
+    }
+    job = _seed_job_record(db, tenant_id, job_id)
+    _seed_authorization(db, job, delivery, operation_id)
+    approval = _seed_approval_record(
+        db,
         tenant_id=tenant_id,
         job_id=job_id,
-        action_type="send_customer_auto_reply",
-        state="pending",
         operation_id=operation_id,
-        delivery={
-            "type": "send_customer_auto_reply",
-            "to": "customer@example.com",
-            "subject": "Hej",
-            "body": "Tack för ditt meddelande.",
-            "tenant_id": tenant_id,
-        },
+        delivery=delivery,
     )
-    db.add(approval)
-    db.commit()
     return approval, job_id, operation_id
 
 
@@ -369,37 +434,14 @@ def run_tbg09(ctx: EvalContext) -> ScenarioRunResult:
 
 
 def run_tbg10(ctx: EvalContext) -> ScenarioRunResult:
-    from app.domain.workflows.enums import JobType
-    from app.domain.workflows.models import Job
-    from app.domain.workflows.statuses import JobStatus
-    from app.repositories.postgres.job_models import JobRecord
     from app.workflows.decision_record import ExecutionStatus
     from app.workflows.decision_trace_errors import ReconciliationRequired
     from app.workflows.external_write_trace import execute_external_write_with_trace
-    from app.workflows.pipeline_run_context import PipelineRunSource, create_trace_session
 
     db = ctx.session()
     try:
         job_id = str(uuid4())
-        job = Job(
-            job_id=job_id,
-            tenant_id=ctx.tenant_id,
-            job_type=JobType.LEAD,
-            status=JobStatus.AWAITING_APPROVAL,
-            input_data={},
-            result={},
-        )
-        db.add(
-            JobRecord(
-                job_id=job_id,
-                tenant_id=ctx.tenant_id,
-                job_type="lead",
-                status="awaiting_approval",
-                input_data={},
-                result={},
-            )
-        )
-        db.commit()
+        job = _seed_job_record(db, ctx.tenant_id, job_id)
         trace = create_trace_session(job, source=PipelineRunSource.MANUAL, db=db)
         action = {
             "type": "send_customer_auto_reply",
@@ -558,16 +600,21 @@ def run_tbg14(ctx: EvalContext) -> ScenarioRunResult:
 
     db = ctx.session()
     try:
-        adapter = get_integration_adapter(IntegrationType.VISMA, connection_config={})
+        blocked = False
+        try:
+            adapter = get_integration_adapter(IntegrationType.VISMA, connection_config={})
+            blocked = adapter is None
+        except ValueError:
+            blocked = True
         payload = _base_payload(
             ctx,
             capability_ids=["integration.visma.oauth"],
             authorization="blocked",
             external_writes_by_type={},
         )
-        if adapter is None:
+        if not blocked:
             result = ScenarioRunResult(ctx.scenario_id or "TBG14", "integration", ctx.tenant_id)
-            result.fail("visma adapter must exist for sandbox contract")
+            result.fail("visma must fail closed without credentials")
             return _result(ctx, db, "integration", payload)
         return _result(ctx, db, "integration", payload)
     finally:
@@ -625,22 +672,11 @@ def run_tbg16(ctx: EvalContext) -> ScenarioRunResult:
 
 def run_tbg17(ctx: EvalContext) -> ScenarioRunResult:
     from app.admin.recovery_actions import retry_job
-    from app.repositories.postgres.job_models import JobRecord
 
     db = ctx.session()
     try:
         job_id = str(uuid4())
-        db.add(
-            JobRecord(
-                job_id=job_id,
-                tenant_id=f"{ctx.tenant_id}_owner",
-                job_type="lead",
-                status="failed",
-                input_data={},
-                result={},
-            )
-        )
-        db.commit()
+        _seed_job_record(db, f"{ctx.tenant_id}_owner", job_id, status="failed")
         outcome = retry_job(db, ctx.tenant_id, job_id, actor="eval")
         blocked = outcome.get("status") == "failed"
         payload = _base_payload(
@@ -665,19 +701,7 @@ def run_tbg18(ctx: EvalContext) -> ScenarioRunResult:
     try:
         other_tenant = f"{ctx.tenant_id}_other"
         job_id = str(uuid4())
-        from app.repositories.postgres.job_models import JobRecord
-
-        db.add(
-            JobRecord(
-                job_id=job_id,
-                tenant_id=other_tenant,
-                job_type="lead",
-                status="completed",
-                input_data={},
-                result={},
-            )
-        )
-        db.commit()
+        _seed_job_record(db, other_tenant, job_id, status="completed")
         cross = JobRepository.get_job_by_id(db, ctx.tenant_id, job_id)
         payload = _base_payload(
             ctx,
@@ -704,7 +728,7 @@ def run_tbg19(ctx: EvalContext) -> ScenarioRunResult:
         campaign=ctx.campaign,
         scenario_id="TBF02",
     )
-    with shadow_eval_flags([ctx.tenant_id]):
+    with shadow_eval_flags(ctx.tenant_id):
         tbf_result = tbf02(cd_ctx)
     db = ctx.session()
     try:
@@ -740,7 +764,7 @@ def run_tbg20(ctx: EvalContext) -> ScenarioRunResult:
         scenario_id="TBF2-01",
         pipeline_mode=False,
     )
-    with shadow_eval_flags([ctx.tenant_id]):
+    with shadow_eval_flags(ctx.tenant_id):
         tbf2_result = tbf2_01(cd_ctx)
     db = ctx.session()
     try:
@@ -787,7 +811,7 @@ def run_tbg21(ctx: EvalContext) -> ScenarioRunResult:
             authorization=auth.value,
             external_writes_by_type={},
         )
-        if settings.END_CUSTOMER_WRITE_API_ENABLED:
+        if get_settings().END_CUSTOMER_WRITE_API_ENABLED:
             result = ScenarioRunResult(ctx.scenario_id or "TBG21", "safety", ctx.tenant_id)
             result.fail("prompt injection must not change flags")
             return _result(ctx, db, "safety", payload)
@@ -829,7 +853,7 @@ def run_tbg23(ctx: EvalContext) -> ScenarioRunResult:
 
     db = ctx.session()
     try:
-        with shadow_eval_flags([ctx.tenant_id]):
+        with shadow_eval_flags(ctx.tenant_id):
             msg_id = ctx.source_event_id("dup")
             message = MockIntakeMessage(
                 tenant_id=ctx.tenant_id,
@@ -888,12 +912,13 @@ def run_tbg24(ctx: EvalContext) -> ScenarioRunResult:
 def run_tbg25(ctx: EvalContext) -> ScenarioRunResult:
     db = ctx.session()
     try:
+        current = get_settings()
         defaults = {
-            "END_CUSTOMER_READ_API_ENABLED": settings.END_CUSTOMER_READ_API_ENABLED,
-            "END_CUSTOMER_WRITE_API_ENABLED": settings.END_CUSTOMER_WRITE_API_ENABLED,
-            "END_CUSTOMER_SHADOW_INTAKE_ENABLED": settings.END_CUSTOMER_SHADOW_INTAKE_ENABLED,
-            "END_CUSTOMER_SHADOW_MATCHING_ENABLED": settings.END_CUSTOMER_SHADOW_MATCHING_ENABLED,
-            "END_CUSTOMER_SHADOW_PROMOTION_ENABLED": settings.END_CUSTOMER_SHADOW_PROMOTION_ENABLED,
+            "END_CUSTOMER_READ_API_ENABLED": current.END_CUSTOMER_READ_API_ENABLED,
+            "END_CUSTOMER_WRITE_API_ENABLED": current.END_CUSTOMER_WRITE_API_ENABLED,
+            "END_CUSTOMER_SHADOW_INTAKE_ENABLED": current.END_CUSTOMER_SHADOW_INTAKE_ENABLED,
+            "END_CUSTOMER_SHADOW_MATCHING_ENABLED": current.END_CUSTOMER_SHADOW_MATCHING_ENABLED,
+            "END_CUSTOMER_SHADOW_PROMOTION_ENABLED": current.END_CUSTOMER_SHADOW_PROMOTION_ENABLED,
         }
         payload = _base_payload(
             ctx,
