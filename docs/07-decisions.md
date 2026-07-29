@@ -632,6 +632,22 @@ Reference: `app/admin/customer_settings/`, `frontend/src/features/customerSettin
 
 ---
 
+## DEC-039 — Testbot F F1/F1b qualification gates (2026-07-29)
+
+**Status:** Active — qualifications registered at runtime SHA `b433cba679bbc944d38faf128e651c1ad9de4f43` (PR #98)
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **F1 requires the formal campaign runner** | `python -m app.evaluation.customer_domain.runner --campaign tbf` is the only path that emits `CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED` |
+| 2 | **F1b reuses Release Gate pg_eval where sufficient** | Hermetic tenant/operator isolation tests from the same gate count as supplemental evidence; at most one targeted F1b supplement for gaps (HTTP identity create @ `30456678196`) |
+| 3 | **Qualifications are narrow** | F1/F1b prove isolated direct-domain state + HTTP contract behavior in eval; they do **not** prove intake coupling, shadow pipeline, production rollout, automatic verify/merge, or customer UI |
+| 4 | **F2 is a separate operator gate** | Shadow pipeline / workflow → proposed customer facts requires explicit operator authorization before planning or implementation |
+| 5 | **Testbot F remains open** | `CUSTOMER_CARD_PASS` and testbot F closure are **not** registered; `testbot-f-customer-card-stateful` stays `in_progress` |
+
+**Evidence:** F1 workflow `30456678196` (run-id `rg-f1-20260729`); F1b Release Gate `30454617643` + supplement `30456678196`. Reference: `docs/01-current-truth.md` (End-customer domain § Testbot F F1/F1b).
+
+---
+
 ## DEC-2F1-TRUST — Live-eval trust anchor at API boundary
 
 **Status:** Locked (2F.1 merge hardening)  

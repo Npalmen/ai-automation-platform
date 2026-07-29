@@ -297,5 +297,6 @@ Default deployment: no end-customer routes in OpenAPI; no startup backfill; no s
 | Stateful eval (initial) | #75 | `aaf3932ca0a82924817dff5299481d3352324926` | `app/evaluation/customer_domain/` | `pg_eval` + contract tests |
 | Eval runner hardening | #79 | `9039801becc3d2b5588cefe2b3911c6baa44d9de` | `controls.py`, `runner.py` | Full CLI PASS + PG control tests |
 | Credential scan fix | #80 | `cc4ecfe3834948e2d22214ab17c09ef0a6b7aeee` | `reporting.py` | `credentials_exposed=false` in reports |
+| Testbot F TBF eval (post-closure) | #98 | `b433cba679bbc944d38faf128e651c1ad9de4f43` | `app/evaluation/customer_domain/` TBF scenarios | F1 formal runner PASS; F1b HTTP contract PASS (DEC-039); does not change `CUSTOMER_DOMAIN_CLOSED` or activate production |
 
 **Closure documentation:** this file + `docs/01-current-truth.md`, `docs/06-backlog.md`, `docs/09-testing-and-release.md` updates.
