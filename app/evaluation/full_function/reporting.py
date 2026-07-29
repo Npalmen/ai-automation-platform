@@ -59,6 +59,7 @@ def build_report(
     matrix_status_summary: dict[str, int],
     external_side_effects: int,
     repeat_run_consistent: bool,
+    repeat_hash_mismatches: dict[str, Any] | None = None,
     started_at: datetime,
     completed_at: datetime,
 ) -> dict[str, Any]:
@@ -78,6 +79,7 @@ def build_report(
         "external_side_effects": external_side_effects,
         "credentials_exposed": _scan_for_credentials(scenarios),
         "repeat_run_consistent": repeat_run_consistent,
+        "repeat_hash_mismatches": repeat_hash_mismatches or {},
         "started_at": started_at.isoformat(),
         "completed_at": completed_at.isoformat(),
         "new_live_external_writes": 0,

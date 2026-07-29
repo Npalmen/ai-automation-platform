@@ -141,6 +141,11 @@ def run_evaluation(
             run2, _ = _run_tbg_campaign(engine, scenario_filter)
             hashes2 = {r.scenario_id: r.to_report()["semantic_result_hash"] for r in run2}
             repeat_ok = hashes1 == hashes2
+            repeat_hash_mismatches = {
+                scenario_id: {"run1": hashes1[scenario_id], "run2": hashes2.get(scenario_id)}
+                for scenario_id in hashes1
+                if hashes1[scenario_id] != hashes2.get(scenario_id)
+            }
             cleanup_result = verify_campaign_cleanup(engine, campaign_run)
             campaign_oracle = build_campaign_oracle(
                 campaign=campaign_run,
@@ -166,6 +171,7 @@ def run_evaluation(
         matrix_status_summary=matrix_status_summary(),
         external_side_effects=guard.count,
         repeat_run_consistent=repeat_ok,
+        repeat_hash_mismatches=repeat_hash_mismatches if scenario_filter == "all" else {},
         started_at=started,
         completed_at=completed,
     )
