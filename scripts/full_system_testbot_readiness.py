@@ -46,6 +46,12 @@ def main() -> int:
         default="",
         help="Comma-separated campaign scenario ids for selected-scenario budget",
     )
+    parser.add_argument(
+        "--automation-phase",
+        default="",
+        choices=["", "pre_seed", "active_canary", "restored"],
+        help="Automatic Gmail canary automation phase gate",
+    )
     args = parser.parse_args()
 
     selected_scenario_ids = tuple(
@@ -60,6 +66,7 @@ def main() -> int:
         app_base_url=args.app_base_url,
         server_sha=args.server_sha or None,
         selected_scenario_ids=selected_scenario_ids,
+        automation_phase=str(getattr(args, "automation_phase", "") or "").strip() or None,
     )
 
     if args.json:

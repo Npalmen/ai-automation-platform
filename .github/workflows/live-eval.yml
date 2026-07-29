@@ -431,6 +431,20 @@ jobs:
           path: storage/status/full_system_testbot_report.json
           if-no-files-found: warn
 
+      - name: Pre-seed automatic Gmail canary readiness
+        if: inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'
+        env:
+          LIVE_EVAL_MAX_GMAIL_REPLIES: "1"
+        run: |
+          python scripts/full_system_testbot_readiness.py \
+            --campaign-type automatic-gmail-canary \
+            --tenant-id TENANT_LIVE_EVAL \
+            --app-base-url "$LIVE_EVAL_APP_BASE_URL" \
+            --server-sha "$BUILD_GIT_SHA" \
+            --scenario-ids TBA01_safe_lead_auto_reply,TBA02_unknown_auto_hold \
+            --automation-phase pre_seed \
+            --json
+
       - name: Snapshot tenant automation config
         if: inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'
         run: |
@@ -447,7 +461,7 @@ jobs:
             --tenant-id TENANT_LIVE_EVAL \
             --apply
 
-      - name: Full-system testbot automatic Gmail canary readiness
+      - name: Post-seed automatic Gmail canary readiness
         if: inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'
         env:
           LIVE_EVAL_MAX_GMAIL_REPLIES: "1"
@@ -458,6 +472,7 @@ jobs:
             --app-base-url "$LIVE_EVAL_APP_BASE_URL" \
             --server-sha "$BUILD_GIT_SHA" \
             --scenario-ids TBA01_safe_lead_auto_reply,TBA02_unknown_auto_hold \
+            --automation-phase active_canary \
             --json
 
       - name: Automatic Gmail canary (TBA01 + TBA02)
@@ -488,6 +503,18 @@ jobs:
             --tenant-id TENANT_LIVE_EVAL \
             --snapshot "$LIVE_EVAL_AUTOMATIC_CANARY_SNAPSHOT_PATH" \
             --apply
+
+      - name: Verify restored automation config
+        if: always() && inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'
+        run: |
+          python scripts/full_system_testbot_readiness.py \
+            --campaign-type automatic-gmail-canary \
+            --tenant-id TENANT_LIVE_EVAL \
+            --app-base-url "$LIVE_EVAL_APP_BASE_URL" \
+            --server-sha "$BUILD_GIT_SHA" \
+            --scenario-ids TBA01_safe_lead_auto_reply,TBA02_unknown_auto_hold \
+            --automation-phase restored \
+            --json || true
 
       - name: Upload automatic Gmail canary report
         if: always() && inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'

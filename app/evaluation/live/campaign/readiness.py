@@ -83,6 +83,7 @@ def build_full_system_testbot_readiness(
     app_base_url: str = "",
     server_sha: str | None = None,
     selected_scenario_ids: tuple[str, ...] | None = None,
+    automation_phase: str | None = None,
 ) -> TestbotReadinessReport:
     settings = get_settings()
     config = get_live_eval_config()
@@ -220,27 +221,17 @@ def build_full_system_testbot_readiness(
         issues.extend(contract_issues)
         gates["automatic_reply_contract"] = contract_matrix
 
-        from pathlib import Path
-
-        script_root = Path(__file__).resolve().parents[4] / "scripts"
-        for script_name in (
-            "snapshot_live_eval_tenant_config.py",
-            "restore_live_eval_automatic_canary.py",
-        ):
-            if not (script_root / script_name).is_file():
-                issues.append(f"missing required script: {script_name}")
-
-        from app.evaluation.live.campaign.tenant_automation_lifecycle import (
-            snapshot_tenant_config,
-            verify_canary_automation_active,
+        from app.evaluation.live.campaign.automatic_readiness import (
+            build_automatic_campaign_readiness_gates,
         )
 
-        try:
-            tenant_snapshot = snapshot_tenant_config(tenant_id=tenant_id)
-            gates["tenant_automation_snapshot_hash"] = tenant_snapshot.config_hash
-            issues.extend(verify_canary_automation_active(tenant_snapshot.auto_actions))
-        except Exception as exc:
-            issues.append(f"tenant automation snapshot failed: {exc}")
+        auto_issues, auto_matrix = build_automatic_campaign_readiness_gates(
+            automation_phase=automation_phase,
+            tenant_id=tenant_id,
+            campaign_type=campaign_type,
+        )
+        issues.extend(auto_issues)
+        gates["automatic_automation_readiness"] = auto_matrix
 
         gates["workflow_confirmation"] = AUTOMATIC_GMAIL_CANARY_WORKFLOW_CONFIRMATION
 

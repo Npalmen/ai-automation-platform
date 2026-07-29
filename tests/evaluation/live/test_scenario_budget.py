@@ -76,10 +76,34 @@ def test_automatic_gmail_canary_budget(semi_auto_env):
     assert budget.non_gmail_write_budget == 0
 
 
-def test_automatic_gmail_canary_readiness_includes_contract(semi_auto_env):
+def test_automatic_gmail_canary_readiness_includes_contract(semi_auto_env, monkeypatch):
+    _mock_tenant = {
+        "lead": "auto",
+        "customer_inquiry": "manual",
+        "invoice": "manual",
+        "unknown": "manual",
+    }
+
+    class _Row:
+        auto_actions = _mock_tenant
+        settings = {}
+        allowed_integrations = ["google_mail"]
+
+    row = _Row()
+
+    monkeypatch.setattr(
+        "app.evaluation.live.campaign.tenant_automation_lifecycle._read_auto_actions",
+        lambda tenant_id: dict(_mock_tenant),
+    )
+    monkeypatch.setattr(
+        "app.evaluation.live.campaign.automatic_readiness._read_tenant_record",
+        lambda tenant_id: row,
+    )
+
     report = build_full_system_testbot_readiness(
         campaign_type="automatic-gmail-canary",
         selected_scenario_ids=("TBA01_safe_lead_auto_reply", "TBA02_unknown_auto_hold"),
+        automation_phase="active_canary",
     )
     assert "automatic_reply_contract" in report.gates
     assert report.gates["automatic_reply_contract"]["scenario_expected_reply_total"] == 1
