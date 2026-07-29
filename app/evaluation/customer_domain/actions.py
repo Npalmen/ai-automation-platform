@@ -57,6 +57,7 @@ class EvalContext:
     tenant_id: str
     campaign: Any | None = None
     scenario_id: str | None = None
+    pipeline_mode: bool = False
     operator: OperatorIdentity = field(
         default_factory=lambda: {
             "id": "eval-operator",

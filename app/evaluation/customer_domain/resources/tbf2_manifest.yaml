@@ -1,0 +1,53 @@
+schema_version: customer_card_tbf2_manifest_v1
+campaign_type: customer-card-shadow
+scenarios:
+  - scenario_id: TBF2-01
+    module: tbf2_01_new_sender
+    family: tbf2_01
+    variant: new_sender
+    description: New sender creates one shadow observation without verified facts
+  - scenario_id: TBF2-02
+    module: tbf2_02_returning_exact_email
+    family: tbf2_02
+    variant: returning_exact_email
+    description: Exact email creates match proposal without automatic link
+  - scenario_id: TBF2-03
+    module: tbf2_03_changed_phone
+    family: tbf2_03
+    variant: changed_phone
+    description: Changed phone stays shadow; verified current unchanged
+  - scenario_id: TBF2-04
+    module: tbf2_04_conflicting_identity
+    family: tbf2_04
+    variant: conflicting_identity
+    description: Conflicting identity requires manual review
+  - scenario_id: TBF2-05
+    module: tbf2_05_company_multi_contact
+    family: tbf2_05
+    variant: company_multi_contact
+    description: Company contacts remain separate
+  - scenario_id: TBF2-06
+    module: tbf2_06_ambiguous_match
+    family: tbf2_06
+    variant: ambiguous_match
+    description: Ambiguous match creates no link
+  - scenario_id: TBF2-07
+    module: tbf2_07_thread_continuation
+    family: tbf2_07
+    variant: thread_continuation
+    description: Thread continuation is provenance only
+  - scenario_id: TBF2-08
+    module: tbf2_08_duplicate_replay
+    family: tbf2_08
+    variant: duplicate_replay
+    description: Duplicate intake is exact-once
+  - scenario_id: TBF2-09
+    module: tbf2_09_low_confidence
+    family: tbf2_09
+    variant: low_confidence
+    description: Low-confidence observation does not promote facts
+  - scenario_id: TBF2-10
+    module: tbf2_10_prompt_injection
+    family: tbf2_10
+    variant: prompt_injection
+    description: Prompt injection treated as data only

@@ -47,6 +47,10 @@ def snapshot_campaign_state(engine: Engine, tenants: list[str]) -> dict[str, Any
         for tenant_id in tenants:
             counts[tenant_id] = {}
             for table in (
+                "end_customer_shadow_match_proposals",
+                "end_customer_shadow_fact_proposals",
+                "end_customer_shadow_identity_signals",
+                "end_customer_shadow_observations",
                 "end_customers",
                 "end_customer_contacts",
                 "end_customer_source_facts",
@@ -73,6 +77,10 @@ def verify_campaign_cleanup(engine: Engine, campaign: CampaignRun) -> dict[str, 
         for tenant_id in campaign.registered_tenants:
             total = 0
             for table in (
+                "end_customer_shadow_match_proposals",
+                "end_customer_shadow_fact_proposals",
+                "end_customer_shadow_identity_signals",
+                "end_customer_shadow_observations",
                 "end_customers",
                 "end_customer_contacts",
                 "end_customer_source_facts",
