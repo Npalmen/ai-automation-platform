@@ -25,7 +25,7 @@ todos:
     status: completed
   - id: testbot-h-continuous-regression
     content: Etablera återkörbara kampanjer, kvalitetsrapporter, failure triage och closurebeslut för fortsatt intern användning och senare kundpilot
-    status: pending
+    status: completed
 isProject: true
 ---
 
@@ -683,7 +683,9 @@ En funktion får inte kallas PASS om den endast har unit test. Den måste ha rep
 
 # H. Kontinuerlig regression och closure
 
-**Todo:** `testbot-h-continuous-regression`
+**Todo:** `testbot-h-continuous-regression` — **completed** (2026-07-29)
+
+**Testbot H closure (2026-07-29):** Implementation + qualification @ SHA `58751e6` (PR #106, DEC-042). TBR01–TBR20 PASS via formal runner (workflow `30479403620`). `CONTINUOUS_REGRESSION_QUALIFIED` + `TESTBOT_SYSTEM_CLOSED` registered. Post-merge Release Gate `30478651883`; Regression Main `30478651703`. New live external writes in H campaign = 0; `live-eval.yml` remains manual-only. Production activation not implied.
 
 ## Mål
 
