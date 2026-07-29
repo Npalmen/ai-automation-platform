@@ -25,6 +25,7 @@
 - [x] **Testbot H closure — `TESTBOT_SYSTEM_CLOSED`** — `testbot-h-continuous-regression` `completed`; live-eval remains manual; production activation not implied.
 - [x] **Production pilot P0 — release readiness** — `app/production_pilot/` + P0 preflight; `TENANT_PRODUCTION_PILOT_01` baseline; `PRODUCTION_PILOT_RELEASE_READY`; plan `docs/plans/production-pilot-release-activation-plan.md`.
 - [x] **Production pilot P1 — observe-only qualification** — P1 activation/preflight/evaluation harness; `PRODUCTION_PILOT_P1_OBSERVE_QUALIFIED` + `PRODUCTION_PILOT_ACTIVE`; plan `docs/plans/production-pilot-p1-observe-only-plan.md`.
+- [x] **Production pilot P1 — observability fix** — live daily report, ground-truth reviews, operational evaluator, runtime readiness; migration 025; `PRODUCTION_PILOT_P1_OPERATIONAL_READY`; PR #112+#113 @ `86c32f1`; plan `docs/plans/production-pilot-p1-observability-fix-plan.md`.
 - [ ] **Production pilot P2** — approval-based Gmail replies; requires explicit operator authorization; not started.
 - [ ] **Activation** — separate gate; flags remain default `false`; see closure §10.
 

@@ -733,6 +733,22 @@ Reference: `docs/plans/production-pilot-p1-observe-only-plan.md`, `app/productio
 
 ---
 
+## DEC-045 — Production pilot P1 operational observability (2026-07-29)
+
+**Status:** Active — operational tooling ready; observation window not started; P2 NO-GO
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **`PRODUCTION_PILOT_P1_OPERATIONAL_READY`** | Observability/review/readiness implemented; does not imply observation period complete |
+| 2 | **New release baseline** | Post-observability-fix SHA `86c32f1` is runtime target; `a7409c9` is historical technical evidence only |
+| 3 | **Live reporting** | P1 daily report reads authoritative DB records; no P0 proxy |
+| 4 | **Ground truth** | One review per message ref; tenant-isolated; no raw email bodies |
+| 5 | **P2 remains blocked** | `NO_GO_FOR_P2_APPROVAL_GMAIL` until ≥3 operational days and ≥25 reviewed real messages |
+
+Reference: `docs/plans/production-pilot-p1-observability-fix-plan.md`, `app/production_pilot/observability/`.
+
+---
+
 ## DEC-2F1-TRUST — Live-eval trust anchor at API boundary
 
 **Status:** Locked (2F.1 merge hardening)  
