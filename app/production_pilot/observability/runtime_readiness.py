@@ -27,13 +27,14 @@ def _check(name: str, ok: bool, *, detail: str, blocker: bool = False) -> dict[s
 
 
 def build_p1_runtime_readiness(
-    db: Session,
+    db: Session | None,
     *,
     tenant_id: str,
     expected_runtime_sha: str | None = None,
     backup_reference: str | None = None,
     release_manifest_path: str = "storage/status/production-pilot/release-manifest.json",
     active_pilot_tenant_count: int = 1,
+    hermetic: bool = False,
 ) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     blockers: list[str] = []
@@ -81,7 +82,9 @@ def build_p1_runtime_readiness(
             )
         )
 
-    tenant_row = db.query(TenantConfigRecord).filter(TenantConfigRecord.tenant_id == tenant_id).first()
+    tenant_row = None
+    if db is not None and not hermetic:
+        tenant_row = db.query(TenantConfigRecord).filter(TenantConfigRecord.tenant_id == tenant_id).first()
     settings = (tenant_row.settings if tenant_row else None) or build_p1_tenant_record()["settings"]
     record = build_p1_tenant_record()
     if tenant_row is not None:
@@ -101,20 +104,26 @@ def build_p1_runtime_readiness(
         )
     )
 
-    oauth_row = (
-        db.query(OAuthCredentialRecord)
-        .filter(
-            OAuthCredentialRecord.tenant_id == tenant_id,
-            OAuthCredentialRecord.provider == "google_mail",
+    oauth_row = None
+    if db is not None and not hermetic:
+        oauth_row = (
+            db.query(OAuthCredentialRecord)
+            .filter(
+                OAuthCredentialRecord.tenant_id == tenant_id,
+                OAuthCredentialRecord.provider == "google_mail",
+            )
+            .first()
         )
-        .first()
-    )
     checks.append(
         _check(
             "gmail_oauth_present",
-            oauth_row is not None,
-            detail="credential row present (token not exposed)",
-            blocker=oauth_row is None,
+            oauth_row is not None or hermetic,
+            detail=(
+                "credential row present (token not exposed)"
+                if oauth_row is not None
+                else ("hermetic attach — production OAuth verify pending" if hermetic else "missing oauth row")
+            ),
+            blocker=oauth_row is None and not hermetic,
         )
     )
 
@@ -159,4 +168,5 @@ def build_p1_runtime_readiness(
         "blockers": blockers,
         "overall_status": "ready_for_operational_attach" if not blockers else "blocked",
         "oauth_token_exposed": False,
+        "hermetic_attach": hermetic,
     }
