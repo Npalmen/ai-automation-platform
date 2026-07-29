@@ -114,11 +114,16 @@ def load_campaign_manifest() -> dict[str, Any]:
 
 
 @lru_cache
-def _load_registry() -> tuple[dict[str, CampaignScenario], dict[str, list[str]]]:
+def _load_registry() -> tuple[
+    dict[str, CampaignScenario],
+    dict[str, list[str]],
+    dict[str, frozenset[str]],
+]:
     manifest = load_campaign_manifest()
     campaigns_raw = manifest.get("campaigns") or {}
     scenarios: dict[str, CampaignScenario] = {}
     campaign_index: dict[str, list[str]] = {}
+    membership_sets: dict[str, set[str]] = {}
 
     for campaign_type, spec in campaigns_raw.items():
         if campaign_type not in CAMPAIGN_TYPES:
@@ -138,22 +143,63 @@ def _load_registry() -> tuple[dict[str, CampaignScenario], dict[str, list[str]]]
                     )
             else:
                 scenarios[scenario.scenario_id] = scenario
+            membership_sets.setdefault(scenario.scenario_id, set()).add(campaign_type)
             scenario_ids.append(scenario.scenario_id)
         campaign_index[campaign_type] = scenario_ids
 
+    scenario_membership = {
+        scenario_id: frozenset(sorted(types))
+        for scenario_id, types in membership_sets.items()
+    }
+    for scenario_id, scenario in scenarios.items():
+        types = scenario_membership.get(scenario_id, frozenset({scenario.campaign_type}))
+        scenarios[scenario_id] = CampaignScenario(
+            scenario_id=scenario.scenario_id,
+            scenario_version=scenario.scenario_version,
+            mode=scenario.mode,
+            campaign_type=sorted(types)[0],
+            campaign_types=types,
+            job_type=scenario.job_type,
+            service_profile=scenario.service_profile,
+            synthetic_customer_id=scenario.synthetic_customer_id,
+            thread_id=scenario.thread_id,
+            label=scenario.label,
+            email=scenario.email,
+            expected_classification=dict(scenario.expected_classification),
+            expected_entities=dict(scenario.expected_entities),
+            expected_routing=dict(scenario.expected_routing),
+            expected_approval=dict(scenario.expected_approval),
+            expected_customer_card=dict(scenario.expected_customer_card),
+            expected_external_actions=list(scenario.expected_external_actions),
+            budgets=scenario.budgets,
+            content_hash=scenario.content_hash,
+        )
+
     if not scenarios:
         raise CampaignRegistryError("campaign manifest contains no scenarios")
-    return scenarios, campaign_index
+    return scenarios, campaign_index, scenario_membership
 
 
 @lru_cache
 def _load_all_scenarios() -> dict[str, CampaignScenario]:
-    scenarios, _ = _load_registry()
+    scenarios, _, _ = _load_registry()
     return scenarios
 
 
+def get_scenario_campaign_membership(scenario_id: str) -> frozenset[str]:
+    _, _, membership = _load_registry()
+    types = membership.get(scenario_id)
+    if types is None:
+        raise CampaignRegistryError(f"campaign scenario not found: {scenario_id!r}")
+    return types
+
+
+def scenario_belongs_to_campaign(scenario_id: str, campaign_type: str) -> bool:
+    return campaign_type in get_scenario_campaign_membership(scenario_id)
+
+
 def list_campaign_scenarios(*, campaign_type: str | None = None, mode: str | None = None) -> list[CampaignScenario]:
-    scenarios, campaign_index = _load_registry()
+    scenarios, campaign_index, _ = _load_registry()
     if campaign_type:
         ids = campaign_index.get(campaign_type)
         if ids is None:
@@ -181,3 +227,8 @@ def clear_campaign_registry_cache() -> None:
     load_campaign_manifest.cache_clear()
     _load_registry.cache_clear()
     _load_all_scenarios.cache_clear()
+
+
+def get_campaign_membership_index() -> dict[str, frozenset[str]]:
+    _, _, membership = _load_registry()
+    return dict(membership)

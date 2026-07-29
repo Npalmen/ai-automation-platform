@@ -1,0 +1,38 @@
+scenario_id: TBA05_invoice_auto_hold
+scenario_version: v1
+mode: automatic
+job_type: invoice
+service_profile: accounting
+synthetic_customer_id: family-invoice-auto-hold-001
+thread_id: thread-invoice-auto-hold-001
+label: krowolf-live-eval
+
+email:
+  subject: Fråga om faktura 2026-TEST-042
+  message_text: |
+    Hej, jag har fått faktura 2026-TEST-042 men beloppet stämmer inte med vad vi kom överens om.
+    Kan ni kontrollera och återkomma?
+  sender:
+    name: Testbot Maria Invoice
+    email: testbot-maria-invoice@eval.test
+
+expected_classification:
+  job_type: invoice
+
+expected_routing:
+  job_status: manual_review
+  policy_authorization: hold_for_review
+  final_job_status: manual_review
+
+expected_approval:
+  operator_action: none
+  expected_reply: false
+  test_variant: negative_hold
+  negative_control: true
+  expected_automation:
+    expected_reply: false
+
+budgets:
+  gmail_sends: 1
+  gmail_replies: 0
+  external_writes: 0

@@ -18,6 +18,7 @@ CAMPAIGN_TYPES = frozenset({
     "observe-core",
     "semi-auto-core",
     "automatic-gmail-canary",
+    "automatic-gmail-core",
     "auto-safe-actions",
     "customer-card-stateful",
     "integration-sandbox",
@@ -30,6 +31,7 @@ CAMPAIGN_TYPE_DEFAULT_MODE: dict[str, str] = {
     "observe-core": "observe",
     "semi-auto-core": "semi_automatic",
     "automatic-gmail-canary": "automatic",
+    "automatic-gmail-core": "automatic",
     "auto-safe-actions": "automatic",
     "customer-card-stateful": "customer_card_stateful",
     "integration-sandbox": "integration_sandbox",
@@ -42,6 +44,7 @@ CAMPAIGN_TYPE_SEND_BUDGET: dict[str, int] = {
     "observe-core": 5,
     "semi-auto-core": 8,
     "automatic-gmail-canary": 2,
+    "automatic-gmail-core": 8,
     "auto-safe-actions": 10,
     "customer-card-stateful": 30,
     "integration-sandbox": 10,
@@ -52,4 +55,5 @@ CAMPAIGN_TYPE_SEND_BUDGET: dict[str, int] = {
 CAMPAIGN_TYPE_REPLY_BUDGET: dict[str, int] = {
     "semi-auto-core": 4,
     "automatic-gmail-canary": 1,
+    "automatic-gmail-core": 3,
 }

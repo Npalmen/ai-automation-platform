@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from app.evaluation.live.campaign.automatic_action_contract import CANARY_AUTO_ACTIONS
+from app.evaluation.live.campaign.automatic_action_contract_core import CORE_AUTO_ACTIONS
 from app.repositories.postgres.database import SessionLocal
 from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 from app.workflows.tenant_automation import FULL_AUTO, normalize_automation_mode
@@ -97,18 +98,33 @@ def verify_automation_not_broadly_enabled(
 def verify_canary_automation_active(
     auto_actions: dict[str, Any] | None,
 ) -> list[str]:
-    """Fail unless only lead is auto and all other canary job types are manual."""
+    """Fail unless only canary profile job types match expected modes."""
+    return verify_profile_automation_active(auto_actions, CANARY_AUTO_ACTIONS)
+
+
+def verify_core_automation_active(
+    auto_actions: dict[str, Any] | None,
+) -> list[str]:
+    """Fail unless only core profile job types match expected modes."""
+    return verify_profile_automation_active(auto_actions, CORE_AUTO_ACTIONS)
+
+
+def verify_profile_automation_active(
+    auto_actions: dict[str, Any] | None,
+    expected_profile: dict[str, str],
+) -> list[str]:
+    """Fail unless only expected profile job types are auto and others are manual."""
     issues: list[str] = []
     actions = auto_actions or {}
-    for job_type, expected in CANARY_AUTO_ACTIONS.items():
+    for job_type, expected in expected_profile.items():
         actual = actions.get(job_type)
         if str(actual) != expected:
             issues.append(
-                f"canary automation mismatch for {job_type!r}: "
+                f"automation mismatch for {job_type!r}: "
                 f"expected {expected!r}, got {actual!r}"
             )
     for job_type, raw in sorted(actions.items()):
-        if job_type in CANARY_AUTO_ACTIONS:
+        if job_type in expected_profile:
             continue
         if normalize_automation_mode(raw) == FULL_AUTO:
             issues.append(
@@ -158,10 +174,18 @@ def activate_canary_automation(
     return snapshot_tenant_config(tenant_id)
 
 
+def activate_core_automation(
+    tenant_id: str = LIVE_EVAL_TENANT_ID,
+) -> TenantAutomationSnapshot:
+    _write_auto_actions(tenant_id, dict(CORE_AUTO_ACTIONS))
+    return snapshot_tenant_config(tenant_id)
+
+
 def pause_automation(
     tenant_id: str = LIVE_EVAL_TENANT_ID,
 ) -> TenantAutomationSnapshot:
-    paused = {job_type: "manual" for job_type in CANARY_AUTO_ACTIONS}
+    paused_keys = set(CANARY_AUTO_ACTIONS) | set(CORE_AUTO_ACTIONS)
+    paused = {job_type: "manual" for job_type in paused_keys}
     _write_auto_actions(tenant_id, paused)
     return snapshot_tenant_config(tenant_id)
 

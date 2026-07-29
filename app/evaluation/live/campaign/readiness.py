@@ -18,7 +18,11 @@ from app.evaluation.live.campaign.modes import CAMPAIGN_TYPE_SEND_BUDGET
 from app.evaluation.live.campaign.automatic_action_contract import (
     AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE,
     AUTOMATIC_GMAIL_CANARY_WORKFLOW_CONFIRMATION,
-    validate_automatic_campaign_qualification,
+)
+from app.evaluation.live.campaign.automatic_action_contract_core import (
+    AUTOMATIC_GMAIL_CORE_CAMPAIGN_TYPE,
+    AUTOMATIC_GMAIL_CORE_WORKFLOW_CONFIRMATION,
+    resolve_automatic_campaign_qualification,
 )
 from app.evaluation.live.campaign.automatic_reply_contract import (
     validate_automatic_reply_contract,
@@ -147,7 +151,10 @@ def build_full_system_testbot_readiness(
                         issues.append(
                             f"selected scenario {scenario.scenario_id!r} is not observe mode"
                         )
-            if campaign_type == AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE:
+            if campaign_type in (
+                AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE,
+                AUTOMATIC_GMAIL_CORE_CAMPAIGN_TYPE,
+            ):
                 for scenario in scenarios:
                     if scenario.mode != "automatic":
                         issues.append(
@@ -205,9 +212,12 @@ def build_full_system_testbot_readiness(
             "internal_handoff_enabled": tenant_ctx.internal_handoff_enabled,
         }
 
-    if campaign_type == AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE:
+    if campaign_type in (
+        AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE,
+        AUTOMATIC_GMAIL_CORE_CAMPAIGN_TYPE,
+    ):
         issues.extend(
-            validate_automatic_campaign_qualification(
+            resolve_automatic_campaign_qualification(
                 campaign_type=campaign_type,
                 scenario_ids=selected_scenario_ids,
                 raise_on_failure=False,
@@ -234,7 +244,11 @@ def build_full_system_testbot_readiness(
         issues.extend(auto_issues)
         gates["automatic_automation_readiness"] = auto_matrix
 
-        gates["workflow_confirmation"] = AUTOMATIC_GMAIL_CANARY_WORKFLOW_CONFIRMATION
+        gates["workflow_confirmation"] = (
+            AUTOMATIC_GMAIL_CORE_WORKFLOW_CONFIRMATION
+            if campaign_type == AUTOMATIC_GMAIL_CORE_CAMPAIGN_TYPE
+            else AUTOMATIC_GMAIL_CANARY_WORKFLOW_CONFIRMATION
+        )
 
     required_secrets = [
         "LIVE_EVAL_SENDER_GMAIL_REFRESH_TOKEN",

@@ -1,0 +1,39 @@
+scenario_id: TBA06_support_complaint_auto_hold
+scenario_version: v1
+mode: automatic
+job_type: customer_inquiry
+service_profile: support
+synthetic_customer_id: family-support-complaint-hold-001
+thread_id: thread-support-complaint-hold-001
+label: krowolf-live-eval
+
+email:
+  subject: Missnöjd med senaste besöket
+  message_text: |
+    Hej, jag är riktigt missnöjd med hur installationen blev.
+    Teknikern lämnade platsen utan att förklara vad som gjorts och jag är inte nöjd med arbetet.
+    Jag vill att någon kontaktar mig.
+  sender:
+    name: Testbot Erik Complaint
+    email: testbot-erik-complaint@eval.test
+
+expected_classification:
+  job_type: customer_inquiry
+
+expected_routing:
+  job_status: manual_review
+  policy_authorization: hold_for_review
+  final_job_status: manual_review
+
+expected_approval:
+  operator_action: none
+  expected_reply: false
+  test_variant: negative_hold
+  negative_control: true
+  expected_automation:
+    expected_reply: false
+
+budgets:
+  gmail_sends: 1
+  gmail_replies: 0
+  external_writes: 0

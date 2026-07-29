@@ -10,7 +10,11 @@ from typing import Any
 from app.evaluation.live.campaign.automatic_action_contract import (
     AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE,
     AUTOMATIC_GMAIL_CANARY_WORKFLOW_CONFIRMATION,
-    validate_automatic_campaign_qualification,
+)
+from app.evaluation.live.campaign.automatic_action_contract_core import (
+    AUTOMATIC_GMAIL_CORE_CAMPAIGN_TYPE,
+    AUTOMATIC_GMAIL_CORE_WORKFLOW_CONFIRMATION,
+    resolve_automatic_campaign_qualification,
 )
 from app.evaluation.live.campaign.automatic_expected_outcomes import (
     resolve_automatic_expected_outcome,
@@ -77,6 +81,9 @@ class ObserveCampaignResult:
     main_sha: str = ""
     server_sha: str | None = None
 
+    skipped_scenario_ids: list[str] = field(default_factory=list)
+    fail_fast_triggered: bool = False
+
     def to_dict(self) -> dict[str, Any]:
         payload = {
             "campaign_type": self.campaign_type,
@@ -86,6 +93,8 @@ class ObserveCampaignResult:
             "approval_resolutions": self.approval_resolutions,
             "external_writes": self.external_writes,
             "safety_violations": self.safety_violations,
+            "skipped_scenario_ids": self.skipped_scenario_ids,
+            "fail_fast_triggered": self.fail_fast_triggered,
             "main_sha": self.main_sha,
             "server_sha": self.server_sha,
             "scenarios": [
@@ -506,11 +515,17 @@ def run_automatic_campaign(
     scenario_ids: tuple[str, ...] | None = None,
     tenant_lifecycle: dict[str, Any] | None = None,
 ) -> ObserveCampaignResult:
-    validate_automatic_campaign_qualification(
+    resolve_automatic_campaign_qualification(
         campaign_type=campaign_type,
         workflow_confirmation=workflow_confirmation,
         scenario_ids=scenario_ids,
     )
+
+    if campaign_type not in (
+        AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE,
+        AUTOMATIC_GMAIL_CORE_CAMPAIGN_TYPE,
+    ):
+        raise LiveEvalSafetyError(f"unsupported automatic campaign_type={campaign_type!r}")
 
     if not campaign_enabled():
         raise LiveEvalSafetyError("FULL_SYSTEM_TESTBOT_CAMPAIGN_ALLOWED=yes required")
@@ -521,9 +536,9 @@ def run_automatic_campaign(
         raise LiveEvalSafetyError("; ".join(budget_issues))
 
     reply_ceiling = CAMPAIGN_TYPE_REPLY_BUDGET.get(campaign_type, 0)
-    if reply_ceiling and config.max_gmail_replies_per_run < 1:
+    if reply_ceiling and config.max_gmail_replies_per_run < reply_ceiling:
         raise LiveEvalSafetyError(
-            "LIVE_EVAL_MAX_GMAIL_REPLIES must be >= 1 for automatic Gmail canary"
+            f"LIVE_EVAL_MAX_GMAIL_REPLIES must be >= {reply_ceiling} for {campaign_type}"
         )
 
     prod_issues = validate_no_production_resources(
@@ -553,8 +568,25 @@ def run_automatic_campaign(
     sends = 0
     reply_budget_remaining = selected_budget.max_reply_count
     scenario_reply_metrics: list[ScenarioReplyMetrics] = []
+    skipped_scenario_ids: list[str] = []
+    fail_fast_triggered = False
 
     for scenario in scenarios:
+        if fail_fast_triggered:
+            skipped_scenario_ids.append(scenario.scenario_id)
+            results.append(
+                ScenarioResult(
+                    scenario_id=scenario.scenario_id,
+                    scenario_version=scenario.scenario_version,
+                    evaluation_run_id="",
+                    correlation_token_redacted=_redact_token("", scenario.scenario_id),
+                    exit_code=0,
+                    status="skipped_after_failure",
+                    violations=["campaign stopped after prior scenario failure"],
+                )
+            )
+            continue
+
         if scenario.mode != "automatic":
             raise LiveEvalSafetyError(
                 f"scenario {scenario.scenario_id!r} is not automatic mode"
@@ -630,6 +662,13 @@ def run_automatic_campaign(
         )
         results.append(result)
 
+        if exit_code != 0 or violations:
+            fail_fast_triggered = True
+            safety_violations.append(
+                f"fail-fast stop after scenario {scenario.scenario_id!r}: "
+                + "; ".join(violations or [f"exit_code={exit_code}"])
+            )
+
     reply_totals = (
         CampaignReplyTotals.from_scenarios(scenario_reply_metrics)
         if scenario_reply_metrics
@@ -639,8 +678,11 @@ def run_automatic_campaign(
 
     passed = sum(1 for r in results if r.status == "passed")
     expected_count = len(scenarios)
-    overall = "passed" if passed == expected_count else "failed"
-    if sends != expected_count:
+    overall = "passed" if passed == expected_count and not fail_fast_triggered else "failed"
+    if fail_fast_triggered:
+        if sends > sum(1 for r in results if r.status != "skipped_after_failure"):
+            safety_violations.append("fail-fast violated: extra sends after stop")
+    elif sends != expected_count:
         safety_violations.append(f"send count mismatch: {sends} != {expected_count}")
     expected_reply_budget = selected_budget.expected_reply_count
     expected_recipient_verified = selected_budget.expected_reply_count
@@ -673,7 +715,7 @@ def run_automatic_campaign(
         campaign_type=campaign_type,
         overall_status=overall if not safety_violations else "failed",
         scenario_results=results,
-        sends=len(scenarios),
+        sends=sends,
         replies=replies,
         approval_resolutions=0,
         external_writes=0,
@@ -682,6 +724,8 @@ def run_automatic_campaign(
         selected_scenario_budget=selected_budget,
         main_sha=_git_sha("HEAD"),
         server_sha=os.environ.get("BUILD_GIT_SHA"),
+        skipped_scenario_ids=skipped_scenario_ids,
+        fail_fast_triggered=fail_fast_triggered,
     )
 
     if report_path:

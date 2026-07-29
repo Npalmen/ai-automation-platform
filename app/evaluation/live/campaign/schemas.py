@@ -33,6 +33,7 @@ class CampaignScenario:
     thread_id: str
     label: str
     email: CampaignEmailInput
+    campaign_types: frozenset[str] = field(default_factory=frozenset)
     expected_classification: dict[str, Any] = field(default_factory=dict)
     expected_entities: dict[str, Any] = field(default_factory=dict)
     expected_routing: dict[str, Any] = field(default_factory=dict)
@@ -48,6 +49,7 @@ class CampaignScenario:
             "scenario_version": self.scenario_version,
             "mode": self.mode,
             "campaign_type": self.campaign_type,
+            "campaign_types": sorted(self.campaign_types),
             "job_type": self.job_type,
             "service_profile": self.service_profile,
             "synthetic_customer_id": self.synthetic_customer_id,

@@ -9,7 +9,11 @@ from app.evaluation.live.campaign.modes import (
     CAMPAIGN_TYPE_REPLY_BUDGET,
     CAMPAIGN_TYPE_SEND_BUDGET,
 )
-from app.evaluation.live.campaign.registry import get_campaign_scenario, list_campaign_scenarios
+from app.evaluation.live.campaign.registry import (
+    get_campaign_scenario,
+    list_campaign_scenarios,
+    scenario_belongs_to_campaign,
+)
 from app.evaluation.live.campaign.automatic_expected_outcomes import (
     resolve_automatic_expected_outcome,
 )
@@ -18,6 +22,11 @@ from app.evaluation.live.campaign.semi_automatic_expected_outcomes import (
 )
 
 _AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE = "automatic-gmail-canary"
+_AUTOMATIC_GMAIL_CORE_CAMPAIGN_TYPE = "automatic-gmail-core"
+_AUTOMATIC_CAMPAIGN_TYPES = frozenset({
+    _AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE,
+    _AUTOMATIC_GMAIL_CORE_CAMPAIGN_TYPE,
+})
 from app.evaluation.live.errors import LiveEvalSafetyError
 
 
@@ -92,9 +101,9 @@ def build_selected_scenario_budget(
                 raise LiveEvalSafetyError(
                     f"unknown or unavailable campaign scenario: {scenario_id}"
                 ) from exc
-            if scenarios[-1].campaign_type != campaign_type:
+            if not scenario_belongs_to_campaign(scenario_id, campaign_type):
                 raise LiveEvalSafetyError(
-                    f"scenario {scenario_id!r} is not part of campaign_type={campaign_type!r}"
+                    f"scenario {scenario_id!r} is not registered for campaign_type={campaign_type!r}"
                 )
         selected_ids = explicit_ids
     else:
@@ -111,7 +120,7 @@ def build_selected_scenario_budget(
     expected_reply_count = 0
     non_gmail_write_budget = 0
     for scenario in scenarios:
-        if campaign_type == _AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE:
+        if campaign_type in _AUTOMATIC_CAMPAIGN_TYPES:
             outcome = resolve_automatic_expected_outcome(scenario)
         else:
             outcome = resolve_semi_automatic_expected_outcome(scenario)

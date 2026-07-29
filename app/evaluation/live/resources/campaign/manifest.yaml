@@ -37,3 +37,15 @@ campaigns:
     scenarios:
       - TBA01_safe_lead_auto_reply.yaml
       - TBA02_unknown_auto_hold.yaml
+
+  automatic-gmail-core:
+    default_mode: automatic
+    scenarios:
+      - TBA01_safe_lead_auto_reply.yaml
+      - TBA02_unknown_auto_hold.yaml
+      - TBA03_safe_general_inquiry_auto_reply.yaml
+      - TBA04_noisy_lead_auto_reply.yaml
+      - TBA05_invoice_auto_hold.yaml
+      - TBA06_support_complaint_auto_hold.yaml
+      - TBA07_price_booking_commitment_hold.yaml
+      - TBA08_sensitive_safety_hold.yaml

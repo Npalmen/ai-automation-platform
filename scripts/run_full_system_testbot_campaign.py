@@ -25,6 +25,10 @@ from app.evaluation.live.campaign.automatic_action_contract import (
     AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE,
     AUTOMATIC_GMAIL_CANARY_WORKFLOW_CONFIRMATION,
 )
+from app.evaluation.live.campaign.automatic_action_contract_core import (
+    AUTOMATIC_GMAIL_CORE_CAMPAIGN_TYPE,
+    AUTOMATIC_GMAIL_CORE_WORKFLOW_CONFIRMATION,
+)
 from app.evaluation.live.campaign.runner import (
     run_automatic_campaign,
     run_observe_campaign,
@@ -117,10 +121,18 @@ def _run_campaign(
         return 2
 
     report_path = Path("storage/status/full_system_testbot_report.json")
-    if campaign_type == AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE:
+    if campaign_type in (
+        AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE,
+        AUTOMATIC_GMAIL_CORE_CAMPAIGN_TYPE,
+    ):
+        default_confirmation = (
+            AUTOMATIC_GMAIL_CORE_WORKFLOW_CONFIRMATION
+            if campaign_type == AUTOMATIC_GMAIL_CORE_CAMPAIGN_TYPE
+            else AUTOMATIC_GMAIL_CANARY_WORKFLOW_CONFIRMATION
+        )
         result = run_automatic_campaign(
             campaign_type=campaign_type,
-            workflow_confirmation=workflow_confirmation or AUTOMATIC_GMAIL_CANARY_WORKFLOW_CONFIRMATION,
+            workflow_confirmation=workflow_confirmation or default_confirmation,
             tenant_id=tenant_id,
             base_url=base_url,
             admin_api_key=admin_key,
@@ -201,7 +213,7 @@ def main() -> int:
     run_parser.add_argument(
         "--workflow-confirmation",
         default="",
-        help="Workflow confirmation token (required for automatic-gmail-canary)",
+        help="Workflow confirmation token (required for automatic Gmail campaigns)",
     )
     run_parser.add_argument("--confirm-external", action="store_true")
     run_parser.add_argument(
