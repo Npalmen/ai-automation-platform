@@ -12,6 +12,9 @@
 - [x] **Todo H — implementation** — migrations 022/023, ORM, repositories, read/write services, flag-gated APIs (#62, #67, #70, #74).
 - [x] **Todo I — stateful evaluation** — isolated eval package; 5 families PASS @ `cc4ecfe` (#75, #79, #80).
 - [x] **Todo J — closure** — `docs/customer-card-domain/closure.md`; current-truth/backlog/testing alignment.
+- [x] **Testbot F F1 — direct-domain TBF qualification** — formal runner `--campaign tbf` @ `b433cba`; TBF01–TBF10 10/10 PASS; `CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED` (workflow `30456678196`, run-id `rg-f1-20260729`).
+- [x] **Testbot F F1b — HTTP contract qualification** — Release Gate `30454617643` + targeted supplement `30456678196`; `CUSTOMER_CARD_HTTP_CONTRACT_QUALIFIED`.
+- [ ] **Testbot F F2 — shadow pipeline** — pending operator authorization; no implementation without separate gate (DEC-039).
 - [ ] **Activation** — separate gate; flags remain default `false`; see closure §10.
 
 ---

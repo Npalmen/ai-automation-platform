@@ -8,6 +8,8 @@
 
 ## Last verified date
 
+2026-07-29 (Testbot F F1/F1b qualification — runtime SHA `b433cba679bbc944d38faf128e651c1ad9de4f43` PR #98; formal F1 campaign workflow `30456678196` run-id `rg-f1-20260729`; TBF01–TBF10 10/10 PASS; `CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED`; F1b evidence Release Gate `30454617643` + supplement `30456678196`; `CUSTOMER_CARD_HTTP_CONTRACT_QUALIFIED`; flags default disabled; not activated; testbot F remains `in_progress` pending F2 operator authorization.)
+
 2026-07-27 (Customer card domain closure — end-customer persistence/API/eval documented closed; eval @ `cc4ecfe`; closure main `4afb0b71`; flags default disabled; not activated. See `docs/customer-card-domain/closure.md`.)
 
 2026-07-22 (Super-admin role hierarchy fix — merged to `main` @ `b196132` / fix commit `245fafa`; pilot RC `krowolf-app:rc-b196132ff683` digest `sha256:cd4a9cda0f665bcc2316305689dfac4a25613a2c9b4884efd4efed1f966b43cb`; tenant `T_NIKLAS_DEMO_001`; super_admin session smoke PASS — usage/system/onboarding/operator-actions; scheduler `paused`; jobs=0; approvals=0; credentials unchanged; external side effects 0; Gmail soak not resumed.)
@@ -1396,12 +1398,26 @@ These have caused real failures and are preserved from the README:
 | Command / read services | `Verified (code + tests)` | `EndCustomerCommandService`, `EndCustomerReadService` |
 | Matching | `Verified (code + tests)` | Pure `assess_customer_match()`; `automatic_link_allowed=false`, `automatic_merge_allowed=false` |
 | Duplicate handling | `Verified (code + tests)` | `reject_merge`, `resolve_without_merge` only; `approve_merge` forbidden |
-| Stateful evaluation | `Verified (local eval @ cc4ecfe)` | 5/5 families PASS; controls PASS; `external_side_effects=0`; synthetic data only |
+| Stateful evaluation | `Verified (eval @ cc4ecfe; TBF @ b433cba)` | 5/5 families PASS @ `cc4ecfe`; Testbot F TBF01–TBF10 10/10 PASS @ `b433cba` (formal runner); controls PASS; `external_side_effects=0`; synthetic data only |
 | Gmail / workflow coupling | `Verified absent` | No end-customer create/link in intake or workflows |
 | UI (end-customer cards) | `Not implemented` | Operator `/ops/customers` = tenant directory, not end-customer CRM |
 | Production activation | `Not activated` | Flags false; no rollout in closure |
 
 **Evaluated SHA:** `cc4ecfe3834948e2d22214ab17c09ef0a6b7aeee`. **Closure baseline:** `4afb0b71` — no customer-domain code changes between eval SHA and closure main.
+
+### Testbot F F1/F1b qualification (2026-07-29)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Runtime SHA | `Verified` | `b433cba679bbc944d38faf128e651c1ad9de4f43` (PR #98 merge) |
+| Post-merge Release Gate | `Verified PASS` | `30454617643` |
+| F1 formal campaign | `Verified PASS` | Workflow `30456678196`; run-id `rg-f1-20260729`; campaign run `419f7f09-f792-4b8e-ac5f-b05a635f2128`; schema `customer_domain_stateful_eval_v2` |
+| F1 scenarios | `Verified PASS` | TBF01–TBF10 10/10 PASS; `repeat_run_consistent=true`; cleanup `restored`; `cross_tenant_findings=[]` |
+| F1 qualification | `Registered` | `CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED` |
+| F1b HTTP contract | `Verified PASS` | pg_eval + hermetic tests @ `30454617643`; supplement pytest + HTTP identity create @ `30456678196` |
+| F1b qualification | `Registered` | `CUSTOMER_CARD_HTTP_CONTRACT_QUALIFIED` (isolated eval-process flags only) |
+| Testbot F closure | `Not qualified` | `testbot-f-customer-card-stateful` remains `in_progress`; F2 shadow pipeline requires separate operator authorization |
+| **Not qualified** | `Documented` | Gmail/intake → customer facts; shadow pipeline / workflow proposed facts; production activation; automatic verify/merge; customer-card UI; live customer data |
 
 ---
 
