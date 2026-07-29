@@ -43,8 +43,8 @@ def pg_engine():
 
 
 def test_migration_023_registered():
-    assert LATEST_MIGRATION_VERSION == "024"
-    assert ORDERED_MIGRATION_FILES[-1] == "024_end_customer_shadow_ledger.sql"
+    assert LATEST_MIGRATION_VERSION == "025"
+    assert ORDERED_MIGRATION_FILES[-1] == "025_production_pilot_message_reviews.sql"
 
 
 def test_idempotency_table_exists(pg_engine):

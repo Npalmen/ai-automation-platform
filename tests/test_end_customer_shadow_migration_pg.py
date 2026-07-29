@@ -27,6 +27,6 @@ def test_shadow_tables_exist_after_migration_chain():
                     {"name": f"public.{table}"},
                 ).scalar()
                 assert exists is not None, table
-        assert LATEST_MIGRATION_VERSION == "024"
+        assert LATEST_MIGRATION_VERSION == "025"
     finally:
         engine.dispose()

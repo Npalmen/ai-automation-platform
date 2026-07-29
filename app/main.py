@@ -8543,9 +8543,11 @@ from app.admin.onboarding.routes import router as onboarding_router
 from app.admin.tenant_lifecycle.invitation_routes import admin_router as integration_invitations_admin_router
 from app.admin.tenant_lifecycle.invitation_routes import public_router as integration_invitations_public_router
 from app.admin.tenant_lifecycle.routes import router as tenant_lifecycle_router
+from app.admin.production_pilot.routes import router as production_pilot_router
 
 app.include_router(onboarding_router)
 app.include_router(tenant_lifecycle_router)
+app.include_router(production_pilot_router)
 app.include_router(integration_invitations_admin_router)
 app.include_router(integration_invitations_public_router)
 

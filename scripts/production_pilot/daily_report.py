@@ -15,7 +15,7 @@ if str(ROOT) not in sys.path:
 
 from app.production_pilot.constants import PILOT_TENANT_ID
 from app.production_pilot.daily_report import build_daily_pilot_report
-from app.production_pilot.tenant_baseline import build_p0_tenant_record
+from app.production_pilot.p1_activation import build_p1_tenant_record
 
 
 def _git_sha() -> str:
@@ -32,7 +32,7 @@ def main(argv: list[str] | None = None) -> int:
         default="storage/status/production-pilot/daily-report.json",
     )
     args = parser.parse_args(argv)
-    record = build_p0_tenant_record()
+    record = build_p1_tenant_record()
     report = build_daily_pilot_report(
         tenant_id=PILOT_TENANT_ID,
         settings=record["settings"],
