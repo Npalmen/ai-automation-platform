@@ -24,6 +24,12 @@ SCENARIO_BUNDLE_MAP: dict[str, str] = {
     "TBSM08_unknown_negative_hold": "k2f_bundle_tbs04",
     "TBA01_safe_lead_auto_reply": "k2f_bundle_tba01",
     "TBA02_unknown_auto_hold": "k2f_bundle_tba02",
+    "TBA03_safe_general_inquiry_auto_reply": "k2f_bundle_tba03",
+    "TBA04_noisy_lead_auto_reply": "k2f_bundle_tba04",
+    "TBA05_invoice_auto_hold": "k2f_bundle_tba05",
+    "TBA06_support_complaint_auto_hold": "k2f_bundle_tba06",
+    "TBA07_price_booking_commitment_hold": "k2f_bundle_tba07",
+    "TBA08_sensitive_safety_hold": "k2f_bundle_tba08",
 }
 
 ALLOWLISTED_BUNDLE_IDS = frozenset(SCENARIO_BUNDLE_MAP.values())
@@ -152,6 +158,188 @@ BUNDLE_FIXTURES: dict[str, dict[str, dict[str, Any]]] = {
             },
             "reasons": ["automatic_canary"],
             "confidence": 0.45,
+        },
+    },
+    "k2f_bundle_tba03": {
+        "classification_v1": {
+            "detected_job_type": "customer_inquiry",
+            "confidence": 0.88,
+            "reasons": ["automatic_core", "tba03_general_inquiry"],
+        },
+        "entity_extraction_v1": {
+            "entities": {"customer_name": "Testbot Lisa"},
+            "confidence": 0.85,
+        },
+        "lead_scoring_v1": {
+            "lead_score": 35,
+            "priority": "low",
+            "routing": "support_queue",
+            "reasons": ["automatic_core"],
+            "confidence": 0.8,
+        },
+        "decisioning_v1": {
+            "decision": "auto_route",
+            "target_queue": "support_queue",
+            "action_flags": {
+                "create_crm_lead": False,
+                "notify_human": False,
+                "request_missing_data": True,
+            },
+            "reasons": ["automatic_core"],
+            "confidence": 0.85,
+        },
+    },
+    "k2f_bundle_tba04": {
+        "classification_v1": {
+            "detected_job_type": "lead",
+            "confidence": 0.78,
+            "reasons": ["automatic_core", "tba04_noisy_lead"],
+        },
+        "entity_extraction_v1": {
+            "entities": {
+                "customer_name": "Testbot Noisy Lead",
+                "phone": "0709988776",
+                "address": "Testgatan 9, 12345 Teststad",
+            },
+            "confidence": 0.72,
+        },
+        "lead_scoring_v1": {
+            "lead_score": 58,
+            "priority": "medium",
+            "routing": "sales_queue",
+            "reasons": ["automatic_core"],
+            "confidence": 0.75,
+        },
+        "decisioning_v1": {
+            "decision": "auto_route",
+            "target_queue": "sales_queue",
+            "action_flags": {
+                "create_crm_lead": False,
+                "notify_human": False,
+                "request_missing_data": True,
+            },
+            "reasons": ["automatic_core"],
+            "confidence": 0.75,
+        },
+    },
+    "k2f_bundle_tba05": {
+        "classification_v1": {
+            "detected_job_type": "invoice",
+            "confidence": 0.9,
+            "reasons": ["automatic_core", "tba05_invoice"],
+        },
+        "entity_extraction_v1": {
+            "entities": {"customer_name": "Testbot Maria Invoice"},
+            "confidence": 0.85,
+        },
+        "lead_scoring_v1": {
+            "lead_score": 25,
+            "priority": "low",
+            "routing": "accounting_queue",
+            "reasons": ["automatic_core"],
+            "confidence": 0.8,
+        },
+        "decisioning_v1": {
+            "decision": "auto_route",
+            "target_queue": "accounting_queue",
+            "action_flags": {
+                "create_crm_lead": False,
+                "notify_human": True,
+                "request_missing_data": False,
+            },
+            "reasons": ["automatic_core"],
+            "confidence": 0.85,
+        },
+    },
+    "k2f_bundle_tba06": {
+        "classification_v1": {
+            "detected_job_type": "customer_inquiry",
+            "confidence": 0.86,
+            "reasons": ["automatic_core", "tba06_support"],
+        },
+        "entity_extraction_v1": {
+            "entities": {"customer_name": "Testbot Erik Complaint"},
+            "confidence": 0.8,
+        },
+        "lead_scoring_v1": {
+            "lead_score": 30,
+            "priority": "medium",
+            "routing": "support_queue",
+            "reasons": ["automatic_core"],
+            "confidence": 0.8,
+        },
+        "decisioning_v1": {
+            "decision": "auto_route",
+            "target_queue": "support_queue",
+            "action_flags": {
+                "create_crm_lead": False,
+                "notify_human": True,
+                "request_missing_data": False,
+            },
+            "reasons": ["automatic_core"],
+            "confidence": 0.85,
+        },
+    },
+    "k2f_bundle_tba07": {
+        "classification_v1": {
+            "detected_job_type": "lead",
+            "confidence": 0.88,
+            "reasons": ["automatic_core", "tba07_lead"],
+        },
+        "entity_extraction_v1": {
+            "entities": {
+                "customer_name": "Testbot Price Booking",
+                "phone": "070-1122334",
+                "address": "Testvägen 3, 12345 Teststad",
+            },
+            "confidence": 0.85,
+        },
+        "lead_scoring_v1": {
+            "lead_score": 65,
+            "priority": "medium",
+            "routing": "sales_queue",
+            "reasons": ["automatic_core"],
+            "confidence": 0.85,
+        },
+        "decisioning_v1": {
+            "decision": "auto_route",
+            "target_queue": "sales_queue",
+            "action_flags": {
+                "create_crm_lead": False,
+                "notify_human": False,
+                "request_missing_data": True,
+            },
+            "reasons": ["automatic_core"],
+            "confidence": 0.85,
+        },
+    },
+    "k2f_bundle_tba08": {
+        "classification_v1": {
+            "detected_job_type": "customer_inquiry",
+            "confidence": 0.84,
+            "reasons": ["automatic_core", "tba08_sensitive"],
+        },
+        "entity_extraction_v1": {
+            "entities": {"customer_name": "Testbot Safety Synthetic"},
+            "confidence": 0.8,
+        },
+        "lead_scoring_v1": {
+            "lead_score": 20,
+            "priority": "high",
+            "routing": "support_queue",
+            "reasons": ["automatic_core"],
+            "confidence": 0.85,
+        },
+        "decisioning_v1": {
+            "decision": "auto_route",
+            "target_queue": "support_queue",
+            "action_flags": {
+                "create_crm_lead": False,
+                "notify_human": True,
+                "request_missing_data": False,
+            },
+            "reasons": ["automatic_core"],
+            "confidence": 0.85,
         },
     },
 }

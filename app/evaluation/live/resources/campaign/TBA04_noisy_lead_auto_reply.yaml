@@ -1,0 +1,44 @@
+scenario_id: TBA04_noisy_lead_auto_reply
+scenario_version: v1
+mode: automatic
+job_type: lead
+service_profile: electrical
+synthetic_customer_id: family-noisy-lead-auto-001
+thread_id: thread-noisy-lead-auto-001
+label: krowolf-live-eval
+
+email:
+  subject: laddbox??? hjälp
+  message_text: |
+    hej hej
+    vi ska fixa laddbox hemma i garaget typ
+    adress testgatan 9 12345 teststad
+    tel 0709988776
+    (skickar från jobbet så förlåt rörigt mejl)
+  sender:
+    name: Testbot Noisy Lead
+    email: testbot-noisy-lead@eval.test
+
+expected_classification:
+  job_type: lead
+
+expected_routing:
+  job_status: completed
+  policy_authorization: execution_allowed
+  final_job_status: completed
+
+expected_approval:
+  operator_action: none
+  expected_reply: true
+  test_variant: automatic_safe
+  expected_automation:
+    authorization: auto_execute
+  expected_actions:
+    - action_type: send_customer_auto_reply
+      materialization: materialized_executed
+      operator_role: none
+
+budgets:
+  gmail_sends: 1
+  gmail_replies: 1
+  external_writes: 0

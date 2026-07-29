@@ -1,0 +1,41 @@
+scenario_id: TBA07_price_booking_commitment_hold
+scenario_version: v1
+mode: automatic
+job_type: lead
+service_profile: electrical
+synthetic_customer_id: family-price-booking-hold-001
+thread_id: thread-price-booking-hold-001
+label: krowolf-live-eval
+
+email:
+  subject: Offert och bokad tid för laddbox
+  message_text: |
+    Hej, vad kostar det att installera en laddbox i garaget?
+    Kan ni boka en tid nästa vecka och skicka en bindande offert?
+    Jag godkänner arbetet om priset är rimligt.
+    Adress: Testvägen 3, 12345 Teststad
+    Tel: 070-1122334
+  sender:
+    name: Testbot Price Booking
+    email: testbot-price-booking@eval.test
+
+expected_classification:
+  job_type: lead
+
+expected_routing:
+  job_status: manual_review
+  policy_authorization: hold_for_review
+  final_job_status: manual_review
+
+expected_approval:
+  operator_action: none
+  expected_reply: false
+  test_variant: negative_hold
+  negative_control: true
+  expected_automation:
+    expected_reply: false
+
+budgets:
+  gmail_sends: 1
+  gmail_replies: 0
+  external_writes: 0

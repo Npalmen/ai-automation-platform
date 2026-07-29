@@ -1,4 +1,4 @@
-"""Automatic Gmail canary reply contract validation."""
+"""Automatic Gmail campaign reply contract validation."""
 
 from __future__ import annotations
 
@@ -10,10 +10,57 @@ from app.evaluation.live.campaign.automatic_action_contract import (
     validate_automatic_campaign_budgets,
     validate_automatic_campaign_qualification,
 )
+from app.evaluation.live.campaign.automatic_action_contract_core import (
+    AUTOMATIC_GMAIL_CORE_CAMPAIGN_TYPE,
+    AUTOMATIC_GMAIL_CORE_SCENARIO_IDS,
+    CORE_EXPECTED_REPLY_COUNT,
+    validate_automatic_core_campaign_budgets,
+    validate_automatic_core_campaign_qualification,
+)
 from app.evaluation.live.campaign.automatic_expected_outcomes import (
     resolve_automatic_expected_outcome,
 )
 from app.evaluation.live.config import LiveEvalConfig, get_live_eval_config
+
+
+def _default_scenario_ids(campaign_type: str) -> tuple[str, ...]:
+    if campaign_type == AUTOMATIC_GMAIL_CORE_CAMPAIGN_TYPE:
+        return AUTOMATIC_GMAIL_CORE_SCENARIO_IDS
+    return AUTOMATIC_GMAIL_CANARY_SCENARIO_IDS
+
+
+def _validate_budgets(
+    *,
+    campaign_type: str,
+    selected_scenario_ids: tuple[str, ...] | None,
+) -> tuple[list[str], dict[str, Any]]:
+    if campaign_type == AUTOMATIC_GMAIL_CORE_CAMPAIGN_TYPE:
+        return validate_automatic_core_campaign_budgets(
+            campaign_type=campaign_type,
+            selected_scenario_ids=selected_scenario_ids,
+        )
+    return validate_automatic_campaign_budgets(
+        campaign_type=campaign_type,
+        selected_scenario_ids=selected_scenario_ids,
+    )
+
+
+def _validate_qualification(
+    *,
+    campaign_type: str,
+    selected_scenario_ids: tuple[str, ...] | None,
+) -> list[str]:
+    if campaign_type == AUTOMATIC_GMAIL_CORE_CAMPAIGN_TYPE:
+        return validate_automatic_core_campaign_qualification(
+            campaign_type=campaign_type,
+            scenario_ids=selected_scenario_ids,
+            raise_on_failure=False,
+        )
+    return validate_automatic_campaign_qualification(
+        campaign_type=campaign_type,
+        scenario_ids=selected_scenario_ids,
+        raise_on_failure=False,
+    )
 
 
 def build_automatic_reply_contract_matrix(
@@ -26,8 +73,8 @@ def build_automatic_reply_contract_matrix(
     from app.evaluation.live.campaign.registry import get_campaign_scenario
 
     config = config or get_live_eval_config()
-    scenario_ids = selected_scenario_ids or AUTOMATIC_GMAIL_CANARY_SCENARIO_IDS
-    budget_issues, budget_matrix = validate_automatic_campaign_budgets(
+    scenario_ids = selected_scenario_ids or _default_scenario_ids(campaign_type)
+    budget_issues, budget_matrix = _validate_budgets(
         campaign_type=campaign_type,
         selected_scenario_ids=scenario_ids,
     )
@@ -64,14 +111,13 @@ def validate_automatic_reply_contract(
     config: LiveEvalConfig | None = None,
     selected_scenario_ids: tuple[str, ...] | None = None,
 ) -> tuple[list[str], dict[str, Any]]:
-    """Validate automatic Gmail canary reply contract (readiness gate)."""
+    """Validate automatic Gmail reply contract (readiness gate)."""
     config = config or get_live_eval_config()
-    issues = validate_automatic_campaign_qualification(
+    issues = _validate_qualification(
         campaign_type=campaign_type,
-        scenario_ids=selected_scenario_ids,
-        raise_on_failure=False,
+        selected_scenario_ids=selected_scenario_ids,
     )
-    budget_issues, _ = validate_automatic_campaign_budgets(
+    budget_issues, _ = _validate_budgets(
         campaign_type=campaign_type,
         selected_scenario_ids=selected_scenario_ids,
     )
@@ -83,13 +129,21 @@ def validate_automatic_reply_contract(
         selected_scenario_ids=selected_scenario_ids,
     )
 
-    if config.max_gmail_replies_per_run < 1:
+    expected_replies = (
+        CORE_EXPECTED_REPLY_COUNT
+        if campaign_type == AUTOMATIC_GMAIL_CORE_CAMPAIGN_TYPE
+        else 1
+    )
+    min_replies_env = 1 if campaign_type == AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE else expected_replies
+
+    if config.max_gmail_replies_per_run < min_replies_env:
         issues.append(
-            "LIVE_EVAL_MAX_GMAIL_REPLIES must be >= 1 for automatic Gmail canary"
+            f"LIVE_EVAL_MAX_GMAIL_REPLIES must be >= {min_replies_env} for {campaign_type}"
         )
-    if matrix["scenario_expected_reply_total"] != 1:
+    if matrix["scenario_expected_reply_total"] != expected_replies:
         issues.append(
-            "automatic canary requires exactly one expected reply across scenarios"
+            f"{campaign_type} requires exactly {expected_replies} expected replies "
+            f"across scenarios, got {matrix['scenario_expected_reply_total']}"
         )
 
     return issues, matrix

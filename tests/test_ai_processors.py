@@ -25,7 +25,7 @@ def _build_lead_job() -> Job:
         job_type=JobType.LEAD,
         input_data={
             "subject": "Vill ha offert på laddbox och elcentral",
-            "message_text": "Hej, vi vill ha pris på ny elcentral och laddbox. Ring gärna 0701234567.",
+            "message_text": "Hej, vi vill ha offert på ny elcentral och laddbox. Ring gärna 0701234567.",
             "sender": {
                 "name": "Niklas Palm",
                 "email": "niklas@example.com",

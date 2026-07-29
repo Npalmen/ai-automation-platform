@@ -14,6 +14,18 @@ REQUIRED_AUTOMATIC_CANARY_SCRIPTS: tuple[str, ...] = (
     "restore_live_eval_automatic_canary.py",
 )
 
+REQUIRED_AUTOMATIC_CORE_SCRIPTS: tuple[str, ...] = (
+    "snapshot_live_eval_tenant_config.py",
+    "seed_live_eval_automatic_core.py",
+    "pause_live_eval_automatic_core.py",
+    "restore_live_eval_automatic_core.py",
+)
+
+REQUIRED_AUTOMATIC_CAMPAIGN_SCRIPTS: dict[str, tuple[str, ...]] = {
+    "automatic-gmail-canary": REQUIRED_AUTOMATIC_CANARY_SCRIPTS,
+    "automatic-gmail-core": REQUIRED_AUTOMATIC_CORE_SCRIPTS,
+}
+
 
 @lru_cache
 def resolve_repository_root() -> Path:

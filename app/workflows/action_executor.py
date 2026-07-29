@@ -131,6 +131,32 @@ def _build_email_result(action: dict[str, Any], *, db: "Session | None" = None) 
             message="Email integration is not configured for this tenant. Falling back to internal stub.",
         )
 
+    approved_hash = action.get("_approved_reply_hash")
+    if approved_hash:
+        from app.workflows.reply_candidate_safety import (
+            verify_sent_reply_matches_approved_candidate,
+        )
+
+        post_write = verify_sent_reply_matches_approved_candidate(
+            approved_hash=str(approved_hash),
+            sent_body=body,
+        )
+        if not post_write.get("passed"):
+            return {
+                "type": action.get("type") or "send_email",
+                "status": "skipped",
+                "skip_reason": "sent_reply_hash_mismatch",
+                "executed_at": _utcnow_iso(),
+                "target": to,
+                "provider": "none",
+                "payload": payload,
+                "integration_result": {
+                    "skipped": True,
+                    "reason": "sent_reply_hash_mismatch",
+                    "post_write_verification": post_write,
+                },
+            }
+
     adapter = get_integration_adapter(
         integration_type=IntegrationType.GOOGLE_MAIL,
         connection_config=connection_config,

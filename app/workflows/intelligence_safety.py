@@ -97,6 +97,22 @@ _RISK_KEYWORDS: dict[str, tuple[str, ...]] = {
         "alla mottagare",
         "hela kundlistan",
     ),
+    "commitment_request": (
+        "vad kostar",
+        "pris på",
+        "pris för",
+        "bindande offert",
+        "boka tid",
+        "boka besök",
+        "bokad tid",
+        "kan ni komma på",
+        "leveranstid",
+        "när kan ni leverera",
+        "godkänner jag",
+        "jag godkänner",
+        "beställer jag",
+        "bekräftar beställning",
+    ),
 }
 
 
