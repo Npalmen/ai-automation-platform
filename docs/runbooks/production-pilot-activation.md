@@ -7,7 +7,29 @@
 - No Sheets, Monday, or Visma writes during pilot
 - No automatic verify, customer link, or merge
 
-## P0 — Production dry run (current)
+## P1 — Observe-only pilot traffic (qualified)
+
+| Control | State |
+|---------|-------|
+| Gmail intake | ON |
+| Observe/manual review | ON |
+| Shadow intake/matching | ON |
+| Shadow promotion | OFF |
+| Approvals (external write) | OFF |
+| Gmail replies | 0 |
+| Automatic Gmail | OFF |
+| Sheets/Monday/Visma | OFF |
+
+Activation:
+
+```bash
+python scripts/production_pilot/activate_p1.py
+python scripts/production_pilot/p1_preflight.py
+```
+
+**Stop** — do not enable P2 without explicit authorization.
+
+## P0 — Production dry run (completed)
 
 | Control | State |
 |---------|-------|

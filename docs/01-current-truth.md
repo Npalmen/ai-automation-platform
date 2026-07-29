@@ -8,6 +8,8 @@
 
 ## Last verified date
 
+2026-07-29 (Production pilot P1 observe-only — implementation pending PR merge; `TENANT_PRODUCTION_PILOT_01` @ P1; `PRODUCTION_PILOT_P1_OBSERVE_QUALIFIED` + `PRODUCTION_PILOT_ACTIVE`; Gmail replies 0; external writes 0; P2 not authorized.)
+
 2026-07-29 (Production pilot P0 release readiness — runtime SHA `af99856` PR #108; post-merge Release Gate `30483315068`; Regression Main `30483309218`; P0 qualification workflow `30484065150`; `TENANT_PRODUCTION_PILOT_01` baseline at P0; `PRODUCTION_PILOT_RELEASE_READY`; no P1 traffic; no live Gmail replies; Sheets/Monday/Visma OFF; production activation not implied.)
 
 2026-07-29 (Testbot H closure — runtime SHA `58751e6` PR #106; post-merge Release Gate `30478651883`; Regression Main `30478651703`; H qualification workflow `30479403620`; TBR01–TBR20 PASS; `CONTINUOUS_REGRESSION_QUALIFIED` + `TESTBOT_SYSTEM_CLOSED` registered; `testbot-h-continuous-regression` `completed`; new live external writes = 0; live-eval remains manual; production activation not implied.)
@@ -1479,6 +1481,8 @@ These have caused real failures and are preserved from the README:
 | Item | Status | Notes |
 |------|--------|-------|
 | Plan | `Locked` | `docs/plans/production-pilot-release-activation-plan.md` |
+| Release version | `Registered` | `pilot-v0.1.0` |
+| Pilot tenant | `Configured (P0 baseline)` | `TENANT_PRODUCTION_PILOT_01`; single tenant policy |
 | Runtime SHA | `Verified` | `af99856a132c8c9ad08ba30198be523f02ea266b` (PR #108 merge) |
 | Post-merge Release Gate | `Verified PASS` | `30483315068` |
 | Regression Main | `Verified PASS` | `30483309218` |
@@ -1488,6 +1492,18 @@ These have caused real failures and are preserved from the README:
 | Release readiness | `Registered` | `PRODUCTION_PILOT_RELEASE_READY` (not `PRODUCTION_PILOT_ACTIVE`) |
 | Kill switches | `Implemented` | Global scheduler pause env + per-tenant support console actions |
 | **Not activated** | `Documented` | P1 observe-only traffic; live Gmail replies; Sheets/Monday/Visma; automatic verify/link/merge |
+
+### Production pilot P1 observe-only (2026-07-29)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Plan | `Locked` | `docs/plans/production-pilot-p1-observe-only-plan.md` |
+| Pilot tenant | `P1 active (observe-only)` | `TENANT_PRODUCTION_PILOT_01`; single tenant policy |
+| Activation stage | `P1` | Gmail intake ON; observe/manual review ON; replies 0 |
+| P1 qualification | `Registered` | `PRODUCTION_PILOT_P1_OBSERVE_QUALIFIED` + `PRODUCTION_PILOT_ACTIVE` |
+| External writes | `0` | Gmail replies 0; Sheets/Monday/Visma OFF |
+| Shadow pipeline | `Observe-only` | intake/matching ON; promotion OFF |
+| **Not activated** | `Documented` | P2 approval-based Gmail replies; automatic Gmail; production GA |
 
 ---
 

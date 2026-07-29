@@ -23,6 +23,7 @@ from app.domain.customer.shadow_state import assert_shadow_observation_transitio
 from app.repositories.postgres.end_customer_shadow_repository import (
     EndCustomerShadowRepository,
 )
+from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
 from app.services.shadow_gate import assert_shadow_intake_allowed
 
 _CONTROL_CHAR_RE = re.compile(r"[\x00-\x1f\x7f]")
@@ -79,7 +80,10 @@ def _redact(value: str | None, *, keep: int = 4) -> str:
 class ShadowObservationCommandService:
     @staticmethod
     def process_intake_event(db: Session, event: ShadowIntakeEvent) -> dict[str, Any]:
-        assert_shadow_intake_allowed(event.tenant_id)
+        assert_shadow_intake_allowed(
+            event.tenant_id,
+            TenantConfigRepository.get_settings(db, event.tenant_id),
+        )
 
         raw_payload = {
             "sender_email": event.sender_email,

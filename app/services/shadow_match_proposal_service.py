@@ -13,6 +13,7 @@ from app.domain.customer.shadow_enums import ShadowMatchProposalState, ShadowObs
 from app.domain.customer.shadow_state import assert_shadow_observation_transition
 from app.repositories.postgres.end_customer_repository import EndCustomerRepository
 from app.repositories.postgres.end_customer_shadow_repository import EndCustomerShadowRepository
+from app.repositories.postgres.tenant_config_repository import TenantConfigRepository
 from app.services.shadow_gate import assert_shadow_matching_allowed
 
 
@@ -94,7 +95,10 @@ class ShadowMatchProposalService:
         customer_name: str | None = None,
         thread_id: str | None = None,
     ) -> list[dict[str, Any]]:
-        assert_shadow_matching_allowed(tenant_id)
+        assert_shadow_matching_allowed(
+            tenant_id,
+            TenantConfigRepository.get_settings(db, tenant_id),
+        )
         observation = EndCustomerShadowRepository.get_observation(db, tenant_id, observation_id)
         if observation is None:
             return []
