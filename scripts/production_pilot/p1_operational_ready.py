@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -41,16 +42,26 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     runtime_sha = _git_sha()
     readiness = build_p1_readiness(runtime_sha=runtime_sha, backup_reference=args.backup_reference)
-    db = SessionLocal()
-    try:
+    hermetic = os.environ.get("ENV", "").strip().lower() == "test"
+    if hermetic:
         runtime_readiness = build_p1_runtime_readiness(
-            db,
+            None,
             tenant_id=readiness["tenant_id"],
             expected_runtime_sha=runtime_sha,
             backup_reference=args.backup_reference,
+            hermetic=True,
         )
-    finally:
-        db.close()
+    else:
+        db = SessionLocal()
+        try:
+            runtime_readiness = build_p1_runtime_readiness(
+                db,
+                tenant_id=readiness["tenant_id"],
+                expected_runtime_sha=runtime_sha,
+                backup_reference=args.backup_reference,
+            )
+        finally:
+            db.close()
     status = evaluate_operational_ready_status(readiness=readiness, runtime_readiness=runtime_readiness)
     report = {
         "runtime_sha": runtime_sha,
