@@ -1,0 +1,241 @@
+version: 1
+suites:
+  - id: regression-registry-contract
+    chapter: H
+    description: Regression and qualification registry contract validation
+    tier:
+      - pr_fast
+      - main_pg
+      - nightly
+    command:
+      - python
+      - -m
+      - pytest
+      - -q
+      - tests/evaluation/regression/test_regression_contract.py
+    required_paths:
+      - app/evaluation/regression/**
+    always_run_paths:
+      - app/evaluation/regression/**
+    database: none
+    network: forbidden
+    external_write_budget: 0
+    artifact_schema: continuous_regression_report_v1
+    timeout_class: short
+    repeat_run: false
+    cleanup_required: false
+    owners:
+      - platform
+    tags:
+      - registry
+
+  - id: tbr-scenarios
+    chapter: H
+    description: TBR01-TBR20 continuous regression scenario contracts
+    tier:
+      - pr_fast
+      - main_pg
+      - nightly
+    command:
+      - python
+      - -m
+      - pytest
+      - -q
+      - tests/evaluation/regression/test_tbr_scenarios.py
+    required_paths:
+      - app/evaluation/regression/**
+    always_run_paths:
+      - app/evaluation/regression/**
+    database: none
+    network: forbidden
+    external_write_budget: 0
+    artifact_schema: continuous_regression_report_v1
+    timeout_class: short
+    repeat_run: false
+    cleanup_required: false
+    owners:
+      - platform
+    tags:
+      - tbr
+
+  - id: full-function-contract
+    chapter: G
+    description: Full-function capability registry and matrix contracts
+    tier:
+      - pr_fast
+      - main_pg
+      - nightly
+    command:
+      - python
+      - -m
+      - pytest
+      - -q
+      - tests/evaluation/full_function/test_full_function_contract.py
+    required_paths:
+      - app/evaluation/full_function/**
+      - app/workflows/**
+    database: none
+    network: forbidden
+    external_write_budget: 0
+    expected_qualification:
+      - FULL_FUNCTION_MATRIX_PASS
+    artifact_schema: full_function_matrix_v1
+    timeout_class: short
+    repeat_run: false
+    cleanup_required: false
+    owners:
+      - platform
+    tags:
+      - capability_matrix
+
+  - id: customer-domain-manifest-contract
+    chapter: F
+    description: Customer-domain TBF and TBF2 manifest contracts
+    tier:
+      - pr_fast
+      - main_pg
+      - nightly
+    command:
+      - python
+      - -m
+      - pytest
+      - -q
+      - tests/evaluation/customer_domain/test_tbf_manifest_contract.py
+      - tests/evaluation/customer_domain/test_tbf2_manifest_contract.py
+    required_paths:
+      - app/evaluation/customer_domain/**
+      - app/domain/customer/**
+    database: none
+    network: forbidden
+    external_write_budget: 0
+    expected_qualification:
+      - CUSTOMER_CARD_PASS
+    artifact_schema: customer_domain_stateful_eval_v2
+    timeout_class: short
+    repeat_run: false
+    cleanup_required: false
+    owners:
+      - platform
+    tags:
+      - customer_card
+
+  - id: workflow-live-eval-contract
+    chapter: H
+    description: Manual live-eval workflow isolation and foundation contract
+    tier:
+      - pr_fast
+      - main_pg
+      - nightly
+    command:
+      - python
+      - -m
+      - pytest
+      - -q
+      - tests/evaluation/live/test_workflow_contract.py
+      - tests/evaluation/regression/test_workflow_regression_contract.py
+    required_paths:
+      - .github/workflows/**
+    always_run_paths:
+      - .github/workflows/**
+    database: none
+    network: forbidden
+    external_write_budget: 0
+    artifact_schema: continuous_regression_report_v1
+    timeout_class: short
+    repeat_run: false
+    cleanup_required: false
+    owners:
+      - platform
+    tags:
+      - workflow_contract
+
+  - id: release-gate-hermetic
+    chapter: H
+    description: Release gate hermetic smoke excluding live and integration_db markers
+    tier:
+      - pr_fast
+      - main_pg
+      - nightly
+    command:
+      - python
+      - -m
+      - scripts.run_release_gate_r1
+      - --verbose
+    required_paths:
+      - app/**
+      - tests/**
+    always_run_paths:
+      - app/workflows/**
+      - app/decisioning/**
+    database: none
+    network: forbidden
+    external_write_budget: 0
+    artifact_schema: continuous_regression_report_v1
+    timeout_class: medium
+    repeat_run: false
+    cleanup_required: false
+    owners:
+      - platform
+    tags:
+      - release_gate
+
+  - id: pg-eval-suite
+    chapter: H
+    description: PostgreSQL evaluation suites for customer domain and full-function campaigns
+    tier:
+      - main_pg
+      - nightly
+    command:
+      - python
+      - -m
+      - pytest
+      - -m
+      - pg_eval
+      - -q
+      - --tb=short
+    required_paths:
+      - app/workflows/**
+      - app/evaluation/**
+      - migrations/**
+      - app/domain/customer/**
+    database: postgres_eval
+    network: forbidden
+    external_write_budget: 0
+    expected_qualification:
+      - FULL_FUNCTION_MATRIX_PASS
+      - CUSTOMER_CARD_PASS
+    artifact_schema: continuous_regression_report_v1
+    timeout_class: long
+    repeat_run: true
+    cleanup_required: true
+    owners:
+      - platform
+    tags:
+      - tenant_isolation
+      - idempotency
+      - cleanup
+
+  - id: migration-chain-bootstrap
+    chapter: H
+    description: Empty PostgreSQL bootstrap and versioned migration chain
+    tier:
+      - main_pg
+      - nightly
+    command:
+      - python
+      - -m
+      - scripts.ci.bootstrap_postgres_schema
+    required_paths:
+      - migrations/**
+      - app/repositories/postgres/**
+    database: postgres
+    network: forbidden
+    external_write_budget: 0
+    artifact_schema: continuous_regression_report_v1
+    timeout_class: medium
+    repeat_run: false
+    cleanup_required: false
+    owners:
+      - platform
+    tags:
+      - migration
