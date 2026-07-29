@@ -716,6 +716,23 @@ Reference: `docs/plans/production-pilot-release-activation-plan.md`, `app/produc
 
 ---
 
+## DEC-044 — Production pilot P1 observe-only gates (2026-07-29)
+
+**Status:** Active — P1 observe-only qualified; P2 not authorized
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **P1 observe-only** | Gmail intake ON; classification/extraction/manual review ON; Gmail replies 0 |
+| 2 | **Shadow observe** | Shadow intake/matching ON for pilot tenant; promotion OFF |
+| 3 | **No external writes** | Approvals for external write OFF; Sheets/Monday/Visma OFF |
+| 4 | **Blocked automation** | Automatic Gmail, verify, link, and merge remain OFF |
+| 5 | **Immediate stop** | Any external write or cross-tenant finding pauses pilot tenant |
+| 6 | **`PRODUCTION_PILOT_ACTIVE`** | Means single observe-only pilot tenant with 0 external writes; not production GA |
+
+Reference: `docs/plans/production-pilot-p1-observe-only-plan.md`, `app/production_pilot/p1_preflight.py`.
+
+---
+
 ## DEC-2F1-TRUST — Live-eval trust anchor at API boundary
 
 **Status:** Locked (2F.1 merge hardening)  

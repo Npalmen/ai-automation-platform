@@ -112,6 +112,33 @@ def apply_p0_baseline(settings: dict[str, Any] | None = None) -> dict[str, Any]:
     return updated
 
 
+def apply_p1_activation(settings: dict[str, Any] | None = None) -> dict[str, Any]:
+    updated = apply_p0_baseline(settings)
+    pilot = dict(updated.get("production_pilot") or {})
+    pilot.update(
+        {
+            "activation_stage": "P1",
+            "pilot_status": "observe_active",
+            "shadow_intake_enabled": True,
+            "shadow_matching_enabled": True,
+            "shadow_promotion_enabled": False,
+            "gmail_reply_kill_switch": True,
+            "write_budgets": {
+                "gmail_replies": 0,
+                "non_gmail_writes": 0,
+                "inbound_reads": None,
+            },
+            "audit_reason": "production_pilot_p1_observe_activation",
+        }
+    )
+    updated["production_pilot"] = pilot
+    updated["production_pilot_intake"] = {"enabled": True}
+    updated["scheduler"] = {"run_mode": "manual"}
+    updated["automation"] = {"demo_mode": False, "automatic_gmail_replies": False}
+    updated["operations"] = {"paused": False}
+    return updated
+
+
 KILL_SWITCH_ACTIONS = {
     "pause_tenant_automation": pause_tenant_automation,
     "disable_scheduler": disable_scheduler,
