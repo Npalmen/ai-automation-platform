@@ -506,6 +506,8 @@ jobs:
 
       - name: Verify restored automation config
         if: always() && inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'
+        env:
+          LIVE_EVAL_MAX_GMAIL_REPLIES: "1"
         run: |
           python scripts/full_system_testbot_readiness.py \
             --campaign-type automatic-gmail-canary \
@@ -514,7 +516,7 @@ jobs:
             --server-sha "$BUILD_GIT_SHA" \
             --scenario-ids TBA01_safe_lead_auto_reply,TBA02_unknown_auto_hold \
             --automation-phase restored \
-            --json || true
+            --json
 
       - name: Upload automatic Gmail canary report
         if: always() && inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'

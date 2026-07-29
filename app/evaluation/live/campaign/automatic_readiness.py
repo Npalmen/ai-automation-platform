@@ -10,6 +10,9 @@ from app.evaluation.live.campaign.automatic_action_contract import (
     AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE,
     CANARY_AUTO_ACTIONS,
 )
+from app.evaluation.live.campaign.automatic_fixture_completeness import (
+    validate_automatic_fixture_bundle_completeness,
+)
 from app.evaluation.live.campaign.repo_paths import (
     REQUIRED_AUTOMATIC_CANARY_SCRIPTS,
     validate_required_scripts,
@@ -204,6 +207,7 @@ def build_automatic_campaign_readiness_gates(
     automation_phase: str | None,
     tenant_id: str = LIVE_EVAL_TENANT_ID,
     campaign_type: str,
+    selected_scenario_ids: tuple[str, ...] | None = None,
 ) -> tuple[list[str], dict[str, Any]]:
     """Entry point for automatic-gmail-canary automation gates."""
     if campaign_type != AUTOMATIC_GMAIL_CANARY_CAMPAIGN_TYPE:
@@ -218,4 +222,10 @@ def build_automatic_campaign_readiness_gates(
         automation_phase=phase,
         tenant_id=tenant_id,
     )
+    if phase in (AUTOMATION_PHASE_PRE_SEED, AUTOMATION_PHASE_ACTIVE_CANARY):
+        bundle_issues, bundle_matrix = validate_automatic_fixture_bundle_completeness(
+            selected_scenario_ids=selected_scenario_ids,
+        )
+        issues.extend(bundle_issues)
+        matrix["fixture_bundle_completeness"] = bundle_matrix
     return issues, matrix

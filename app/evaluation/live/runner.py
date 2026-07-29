@@ -816,18 +816,22 @@ class LiveEvalRunner:
             raise LiveEvalSafetyError("runtime env must be test")
 
     def _register_run(self) -> None:
-        self.observer.register_run(
-            {
-                "evaluation_run_id": self.evaluation_run_id,
-                "tenant_id": self.tenant_id,
-                "scenario_id": self.scenario_id,
-                "attempt_id": self.attempt_id,
-                "transport_mode": "live_gmail",
-                "ai_mode": "fixture_ai",
-                "expected_sender": self.expected_sender,
-                "expected_recipient": self.expected_recipient,
-            }
-        )
+        try:
+            self.observer.register_run(
+                {
+                    "evaluation_run_id": self.evaluation_run_id,
+                    "tenant_id": self.tenant_id,
+                    "scenario_id": self.scenario_id,
+                    "attempt_id": self.attempt_id,
+                    "transport_mode": "live_gmail",
+                    "ai_mode": "fixture_ai",
+                    "expected_sender": self.expected_sender,
+                    "expected_recipient": self.expected_recipient,
+                }
+            )
+        except httpx.HTTPStatusError:
+            self._failed_stage = "campaign_run_creation_failed"
+            raise
 
     def _send_or_reconcile(self) -> SendOutcome:
         checkpoint = self._checkpoint if self.resume else None

@@ -13,6 +13,8 @@ def test_tbs_scenarios_have_fixture_bundles():
         "TBS03_invoice_observe",
         "TBS04_unknown_observe",
         "TBS05_noisy_observe",
+        "TBA01_safe_lead_auto_reply",
+        "TBA02_unknown_auto_hold",
     ):
         bundle_id = resolve_fixture_bundle_id(scenario_id=scenario_id, ai_mode="fixture_ai")
         assert bundle_id is not None

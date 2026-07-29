@@ -22,6 +22,8 @@ SCENARIO_BUNDLE_MAP: dict[str, str] = {
     "TBSM06_duplicate_approve": "k2f_bundle_tbsm06_dup",
     "TBSM07_stale_approve": "k2f_bundle_tbs01",
     "TBSM08_unknown_negative_hold": "k2f_bundle_tbs04",
+    "TBA01_safe_lead_auto_reply": "k2f_bundle_tba01",
+    "TBA02_unknown_auto_hold": "k2f_bundle_tba02",
 }
 
 ALLOWLISTED_BUNDLE_IDS = frozenset(SCENARIO_BUNDLE_MAP.values())
@@ -92,6 +94,65 @@ BUNDLE_FIXTURES: dict[str, dict[str, dict[str, Any]]] = {
         "entity_extraction_v1": {"entities": {"customer_name": "Testbot Noisy", "phone": "070-9998877"}, "confidence": 0.7},
         "lead_scoring_v1": {"lead_score": 55, "priority": "medium", "routing": "sales_queue", "reasons": [], "confidence": 0.75},
         "decisioning_v1": {"decision": "auto_route", "target_queue": "sales_queue", "action_flags": {"create_crm_lead": False, "notify_human": False, "request_missing_data": True}, "reasons": [], "confidence": 0.75},
+    },
+    "k2f_bundle_tba01": {
+        "classification_v1": {
+            "detected_job_type": "lead",
+            "confidence": 0.9,
+            "reasons": ["automatic_canary", "tba01_lead"],
+        },
+        "entity_extraction_v1": {
+            "entities": {
+                "customer_name": "Testbot Anna",
+                "phone": "070-1234567",
+                "address": "Testgatan 1, 12345 Teststad",
+            },
+            "confidence": 0.85,
+        },
+        "lead_scoring_v1": {
+            "lead_score": 70,
+            "priority": "medium",
+            "routing": "crm_update",
+            "reasons": ["automatic_canary"],
+            "confidence": 0.85,
+        },
+        "decisioning_v1": {
+            "decision": "auto_route",
+            "target_queue": "sales_queue",
+            "action_flags": {
+                "create_crm_lead": False,
+                "notify_human": False,
+                "request_missing_data": True,
+            },
+            "reasons": ["automatic_canary"],
+            "confidence": 0.85,
+        },
+    },
+    "k2f_bundle_tba02": {
+        "classification_v1": {
+            "detected_job_type": "unknown",
+            "confidence": 0.45,
+            "reasons": ["automatic_canary", "tba02_unknown"],
+        },
+        "entity_extraction_v1": {"entities": {}, "confidence": 0.35},
+        "lead_scoring_v1": {
+            "lead_score": 10,
+            "priority": "low",
+            "routing": "manual_review",
+            "reasons": ["automatic_canary"],
+            "confidence": 0.45,
+        },
+        "decisioning_v1": {
+            "decision": "send_for_approval",
+            "target_queue": "manual_review",
+            "action_flags": {
+                "create_crm_lead": False,
+                "notify_human": True,
+                "request_missing_data": True,
+            },
+            "reasons": ["automatic_canary"],
+            "confidence": 0.45,
+        },
     },
 }
 

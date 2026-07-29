@@ -242,6 +242,13 @@ def test_live_eval_workflow_contract():
         "always() && inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'"
     )
 
+    verify_restored_step = _step_by_name(steps, "Verify restored automation config")
+    assert verify_restored_step.get("if") == (
+        "always() && inputs.confirm_live_gmail == 'RUN_AUTOMATIC_GMAIL_CANARY'"
+    )
+    assert verify_restored_step.get("env", {}).get("LIVE_EVAL_MAX_GMAIL_REPLIES") == "1"
+    assert "|| true" not in (verify_restored_step.get("run") or "")
+
     forensics_step = _step_by_name(steps, "Live Gmail read-only forensics")
     assert forensics_step.get("if") == "inputs.confirm_live_gmail == 'RUN_READONLY_FORENSICS'"
     forensics_run = forensics_step.get("run") or ""
