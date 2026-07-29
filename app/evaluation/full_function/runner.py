@@ -67,11 +67,18 @@ def _prepare_tenant(engine, tenant_id: str) -> None:
         session.close()
 
 
+DETERMINISTIC_CAMPAIGN_RUN_ID = "00000000-0000-4000-8000-ff0000000001"
+
+
+def _new_campaign() -> CampaignRun:
+    return CampaignRun(campaign_run_id=DETERMINISTIC_CAMPAIGN_RUN_ID)
+
+
 def _run_tbg_campaign(
     engine,
     scenario_filter: str = "all",
 ) -> tuple[list[ScenarioRunResult], CampaignRun]:
-    campaign = CampaignRun()
+    campaign = _new_campaign()
     failures = validate_manifest() + validate_capabilities() + validate_matrix()
     if failures:
         blocked = ScenarioRunResult(
