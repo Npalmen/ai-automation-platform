@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-REPORT_SCHEMA_VERSION = "customer_domain_stateful_eval_v1"
+REPORT_SCHEMA_VERSION = "customer_domain_stateful_eval_v2"
 
 
 def _scan_for_credentials(payload: Any) -> bool:
@@ -102,6 +102,9 @@ def build_report(
     h_gap_findings: list[str],
     started_at: datetime,
     completed_at: datetime,
+    campaign_type: str = "families",
+    campaign_oracle: dict[str, Any] | None = None,
+    cleanup_result: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     passed = sum(1 for s in scenarios if s.get("result") == "PASS")
     failed = sum(1 for s in scenarios if s.get("result") == "FAIL")
@@ -146,6 +149,9 @@ def build_report(
         "feature_flag_controls": feature_flag_controls,
         "deferred_capabilities": deferred_capabilities,
         "h_gap_findings": h_gap_findings,
+        "campaign_type": campaign_type,
+        "campaign_oracle": campaign_oracle or {},
+        "cleanup_result": cleanup_result or {},
     }
     scan_payload = {
         "scenarios": scenarios,
