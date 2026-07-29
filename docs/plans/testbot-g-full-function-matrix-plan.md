@@ -16,13 +16,13 @@ todos:
     status: completed
   - id: testbot-g-e-execution
     content: Kör hermetiska och PostgreSQL-baserade full-function-kampanjer samt endast redan kvalificerade live-canaries
-    status: in_progress
+    status: completed
   - id: testbot-g-f-delivery
     content: Kör regressioner, PR, squash-merge och post-merge Release Gate
-    status: pending
+    status: completed
   - id: testbot-g-g-closure
     content: Registrera FULL_FUNCTION_MATRIX_PASS vid full evidens och stoppa före continuous regression
-    status: pending
+    status: completed
 isProject: true
 ---
 
@@ -58,7 +58,7 @@ Ingen produktionsaktivering följer automatiskt av Testbot G.
 | Testbot D — semi-automatic | completed |
 | Testbot E — automatic Gmail | completed |
 | Testbot F — customer-card stateful | completed |
-| Testbot G — full-function matrix | pending |
+| Testbot G — full-function matrix | completed |
 | Testbot H — continuous regression | pending |
 
 Kvalificerat:

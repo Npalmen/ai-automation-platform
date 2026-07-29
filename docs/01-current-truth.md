@@ -8,6 +8,8 @@
 
 ## Last verified date
 
+2026-07-29 (Testbot G closure — runtime SHA `9963660` PR #104; post-merge Release Gate `30474014405`; G qualification workflow `30474812807`; TBG01–TBG25 25/25 PASS; `FULL_FUNCTION_MATRIX_PASS` registered; `testbot-g-full-function-matrix` `completed`; new live external writes = 0; Monday/Visma blocked; Sheets sandbox-only; F2c not started; production activation not implied.)
+
 2026-07-29 (Testbot F closure — runtime SHA `db7ca19` PR #102; post-merge Release Gate `30465944471`; F2 qualification workflow `30466634575`; TBF2-01–TBF2-10 10/10 PASS (F2a + F2b); `CUSTOMER_CARD_SHADOW_DOMAIN_QUALIFIED` + `CUSTOMER_CARD_SHADOW_PIPELINE_QUALIFIED`; `CUSTOMER_CARD_PASS` registered; `testbot-f-customer-card-stateful` `completed`; shadow flags default disabled; F2c not started.)
 
 2026-07-29 (Testbot F F2 shadow pipeline — migration `024_end_customer_shadow_ledger.sql`; shadow observation ledger + services + TBF2-01–TBF2-10 scenarios; campaigns `--campaign tbf2` / `tbf2b`; flags default disabled; formal qualification pending workflow run.)
@@ -1437,6 +1439,21 @@ These have caused real failures and are preserved from the README:
 | F2b qualification | `Registered` | `CUSTOMER_CARD_SHADOW_PIPELINE_QUALIFIED` — workflow `30466634575`; campaign run `a2cf366c-c343-4e6e-aff0-ea08c268c867` |
 | Post-merge Release Gate | `Verified PASS` | `30465944471` @ SHA `db7ca19` |
 | F2c live Gmail | `Not in scope` | Separate operator decision per plan |
+
+### Testbot G full-function matrix (2026-07-29)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Plan | `Locked` | `docs/plans/testbot-g-full-function-matrix-plan.md` |
+| Runtime SHA | `Verified` | `99636608226fdb77a4f8b769c7026c7de5b1ce6a` (PR #104 merge) |
+| Post-merge Release Gate | `Verified PASS` | `30474014405` |
+| Formal G campaign | `Verified PASS` | Workflow `30474812807`; run-id `rg-g-20260729`; schema `full_function_matrix_eval_v1` |
+| TBG scenarios | `Verified PASS` | TBG01–TBG25 25/25 PASS; `repeat_run_consistent=true`; cleanup `restored`; `new_live_external_writes=0` |
+| G qualification | `Registered` | `FULL_FUNCTION_MATRIX_PASS` |
+| Live Gmail evidence | `Bound (prior)` | `AUTOMATIC_GMAIL_CORE_QUALIFIED@30435651905` — no new live runs in G |
+| Integration scope | `Documented` | Monday `BLOCKED_BY_POLICY`; Visma `BLOCKED_BY_POLICY`; Sheets `SANDBOX_ONLY` |
+| Testbot G closure | `Registered` | `testbot-g-full-function-matrix` `completed`; Testbot H not started |
+| **Not qualified** | `Documented` | Production activation; live Sheets/Monday/Visma writes; F2c live Gmail canary |
 
 ---
 

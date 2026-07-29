@@ -665,6 +665,23 @@ Reference: `docs/plans/testbot-f-f2-shadow-pipeline-plan.md`, `app/evaluation/cu
 
 ---
 
+## DEC-041 — Testbot G full-function matrix gates (2026-07-29)
+
+**Status:** Active — qualification registered at runtime SHA `9963660` (PR #104)
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **Capability registry + matrix** | 18 capabilities with explicit status; TBG01–TBG25 cover product/operator flows without production activation |
+| 2 | **No new live external writes in G** | G campaign external write budget = 0; compatible prior Gmail evidence may be bound read-only |
+| 3 | **Formal runner** | `app/evaluation.full_function.runner` on `ai_platform_full_function_eval` emits `FULL_FUNCTION_MATRIX_PASS` on PASS |
+| 4 | **Integration scope** | Monday/Visma remain blocked; Sheets sandbox/mock only; no live economic writes |
+| 5 | **F2c deferred** | Optional live Gmail observe-canary is separate operator decision; not required for G closure |
+| 6 | **`FULL_FUNCTION_MATRIX_PASS`** | Requires TBG01–TBG25 PASS, cleanup restored, repeat-run consistent, post-merge Release Gate PASS, and formal workflow PASS |
+
+Reference: `docs/plans/testbot-g-full-function-matrix-plan.md`, `app/evaluation/full_function/runner.py`.
+
+---
+
 ## DEC-2F1-TRUST — Live-eval trust anchor at API boundary
 
 **Status:** Locked (2F.1 merge hardening)  
