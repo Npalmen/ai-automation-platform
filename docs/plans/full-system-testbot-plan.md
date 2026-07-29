@@ -19,7 +19,7 @@ todos:
     status: in_progress
   - id: testbot-f-customer-card-stateful
     content: Testa skapande, uppdatering, deduplicering, tidslinje och historik för syntetiska kundkort genom flermejls- och flertrådsscenarier
-    status: in_progress
+    status: completed
   - id: testbot-g-full-function-matrix
     content: Testa varje faktiskt implementerad funktion och integration i rätt test- eller sandboxmiljö och dokumentera saknade eller ofullständiga produktförmågor
     status: pending
@@ -574,11 +574,11 @@ OPERATOR ACTION REQUIRED — Auktorisera automatisk testkampanj
 
 # F. Stateful kundkort
 
-**Todo:** `testbot-f-customer-card-stateful` — **in_progress**
+**Todo:** `testbot-f-customer-card-stateful` — **completed**
 
 **F1/F1b qualification (2026-07-29):** `CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED` and `CUSTOMER_CARD_HTTP_CONTRACT_QUALIFIED` registered @ SHA `b433cba` (DEC-039). TBF01–TBF10 10/10 PASS via formal runner (workflow `30456678196`). F1b HTTP contract evidence from Release Gate `30454617643` + supplement.
 
-**F2 shadow pipeline (2026-07-29):** Implementation delivered per `docs/plans/testbot-f-f2-shadow-pipeline-plan.md` (DEC-040): shadow ledger migration 024, TBF2-01–TBF2-10, campaigns `tbf2`/`tbf2b`. Formal F2a/F2b qualification and `CUSTOMER_CARD_PASS` closure pending workflow PASS.
+**F2 shadow pipeline (2026-07-29):** Implementation + qualification @ SHA `db7ca19` (PR #102, DEC-040). TBF2-01–TBF2-10 10/10 PASS via formal runner (workflow `30466634575`). `CUSTOMER_CARD_SHADOW_DOMAIN_QUALIFIED` + `CUSTOMER_CARD_SHADOW_PIPELINE_QUALIFIED` registered. `CUSTOMER_CARD_PASS` closure registered; F2c live Gmail canary not started.
 
 ## Mål
 

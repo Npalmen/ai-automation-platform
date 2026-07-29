@@ -8,6 +8,8 @@
 
 ## Last verified date
 
+2026-07-29 (Testbot F closure — runtime SHA `db7ca19` PR #102; post-merge Release Gate `30465944471`; F2 qualification workflow `30466634575`; TBF2-01–TBF2-10 10/10 PASS (F2a + F2b); `CUSTOMER_CARD_SHADOW_DOMAIN_QUALIFIED` + `CUSTOMER_CARD_SHADOW_PIPELINE_QUALIFIED`; `CUSTOMER_CARD_PASS` registered; `testbot-f-customer-card-stateful` `completed`; shadow flags default disabled; F2c not started.)
+
 2026-07-29 (Testbot F F2 shadow pipeline — migration `024_end_customer_shadow_ledger.sql`; shadow observation ledger + services + TBF2-01–TBF2-10 scenarios; campaigns `--campaign tbf2` / `tbf2b`; flags default disabled; formal qualification pending workflow run.)
 
 2026-07-29 (Testbot F F1/F1b qualification — runtime SHA `b433cba679bbc944d38faf128e651c1ad9de4f43` PR #98; formal F1 campaign workflow `30456678196` run-id `rg-f1-20260729`; TBF01–TBF10 10/10 PASS; `CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED`; F1b evidence Release Gate `30454617643` + supplement `30456678196`; `CUSTOMER_CARD_HTTP_CONTRACT_QUALIFIED`; flags default disabled; not activated; testbot F remains `in_progress` pending F2 operator authorization.)
@@ -1418,7 +1420,7 @@ These have caused real failures and are preserved from the README:
 | F1 qualification | `Registered` | `CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED` |
 | F1b HTTP contract | `Verified PASS` | pg_eval + hermetic tests @ `30454617643`; supplement pytest + HTTP identity create @ `30456678196` |
 | F1b qualification | `Registered` | `CUSTOMER_CARD_HTTP_CONTRACT_QUALIFIED` (isolated eval-process flags only) |
-| Testbot F closure | `Not qualified` | `testbot-f-customer-card-stateful` remains `in_progress`; F2 implemented — formal F2a/F2b qualification pending |
+| Testbot F closure | `Registered` | `CUSTOMER_CARD_PASS` @ SHA `db7ca19`; `testbot-f-customer-card-stateful` `completed` |
 | **Not qualified** | `Documented` | Production activation; automatic verify/merge; customer-card UI; live customer data; F2c live Gmail canary |
 
 ### Testbot F F2 shadow pipeline (2026-07-29)
@@ -1430,9 +1432,10 @@ These have caused real failures and are preserved from the README:
 | Shadow ledger | `Verified (code)` | `end_customer_shadow_observations`, identity signals, fact proposals, match proposals |
 | Services | `Verified (code)` | `ShadowObservationCommandService`, `ShadowMatchProposalService`, `ShadowReadService`, `ShadowPromotionService`, `shadow_intake_boundary` |
 | Feature flags | `Default false` | `END_CUSTOMER_SHADOW_INTAKE_ENABLED`, `END_CUSTOMER_SHADOW_MATCHING_ENABLED`, `END_CUSTOMER_SHADOW_PROMOTION_ENABLED` |
-| TBF2 scenarios | `Implemented` | TBF2-01–TBF2-10; campaigns `tbf2` (F2a) and `tbf2b` (mock-intake pipeline) |
-| F2a qualification | `Pending` | `CUSTOMER_CARD_SHADOW_DOMAIN_QUALIFIED` — formal runner `--campaign tbf2` |
-| F2b qualification | `Pending` | `CUSTOMER_CARD_SHADOW_PIPELINE_QUALIFIED` — formal runner `--campaign tbf2b` |
+| TBF2 scenarios | `Verified PASS` | TBF2-01–TBF2-10 10/10 PASS (F2a + F2b); campaigns `tbf2` / `tbf2b` |
+| F2a qualification | `Registered` | `CUSTOMER_CARD_SHADOW_DOMAIN_QUALIFIED` — workflow `30466634575`; campaign run `51a5fc38-e44a-4c8e-ab97-cfe59e8a3793`; run-id `rg-f2-20260729` |
+| F2b qualification | `Registered` | `CUSTOMER_CARD_SHADOW_PIPELINE_QUALIFIED` — workflow `30466634575`; campaign run `a2cf366c-c343-4e6e-aff0-ea08c268c867` |
+| Post-merge Release Gate | `Verified PASS` | `30465944471` @ SHA `db7ca19` |
 | F2c live Gmail | `Not in scope` | Separate operator decision per plan |
 
 ---

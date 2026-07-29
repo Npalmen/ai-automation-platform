@@ -642,7 +642,7 @@ Reference: `app/admin/customer_settings/`, `frontend/src/features/customerSettin
 | 2 | **F1b reuses Release Gate pg_eval where sufficient** | Hermetic tenant/operator isolation tests from the same gate count as supplemental evidence; at most one targeted F1b supplement for gaps (HTTP identity create @ `30456678196`) |
 | 3 | **Qualifications are narrow** | F1/F1b prove isolated direct-domain state + HTTP contract behavior in eval; they do **not** prove intake coupling, shadow pipeline, production rollout, automatic verify/merge, or customer UI |
 | 4 | **F2 is a separate operator gate** | Shadow pipeline / workflow → proposed customer facts requires explicit operator authorization before planning or implementation |
-| 5 | **Testbot F remains open** | `CUSTOMER_CARD_PASS` and testbot F closure are **not** registered; `testbot-f-customer-card-stateful` stays `in_progress` |
+| 5 | **Testbot F closure** | `CUSTOMER_CARD_PASS` registered @ SHA `db7ca19`; `testbot-f-customer-card-stateful` `completed` (F2c optional, not started) |
 
 **Evidence:** F1 workflow `30456678196` (run-id `rg-f1-20260729`); F1b Release Gate `30454617643` + supplement `30456678196`. Reference: `docs/01-current-truth.md` (End-customer domain § Testbot F F1/F1b).
 
@@ -650,7 +650,7 @@ Reference: `app/admin/customer_settings/`, `frontend/src/features/customerSettin
 
 ## DEC-040 — Testbot F F2 shadow pipeline gates (2026-07-29)
 
-**Status:** Active — implementation on branch `feat/testbot-f2-shadow-pipeline`
+**Status:** Active — qualifications registered at runtime SHA `db7ca19` (PR #102)
 
 | # | Rule | Consequence |
 |---|------|-------------|
