@@ -92,7 +92,18 @@ class EndCustomerShadowRepository:
         model_prompt_version: str | None = None,
         campaign_run_id: str | None = None,
         scenario_execution_id: str | None = None,
-    ) -> EndCustomerShadowObservationRecord:
+    ) -> tuple[EndCustomerShadowObservationRecord, bool]:
+        existing = EndCustomerShadowRepository.find_observation_by_idempotency(
+            db,
+            tenant_id,
+            source_provider=source_provider,
+            source_message_id=source_message_id,
+            extraction_version=extraction_version,
+            observation_type=observation_type,
+        )
+        if existing is not None:
+            return existing, False
+
         now = _utcnow()
         row = EndCustomerShadowObservationRecord(
             observation_id=_new_id(),
@@ -129,9 +140,9 @@ class EndCustomerShadowRepository:
                 observation_type=observation_type,
             )
             if existing is not None:
-                raise ShadowDuplicateObservationError("observation exists") from exc
+                return existing, False
             raise
-        return row
+        return row, True
 
     @staticmethod
     def update_observation_state(

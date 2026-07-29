@@ -8,6 +8,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.domain.customer.enums import SourceType
@@ -21,7 +22,6 @@ from app.domain.customer.shadow_enums import (
 from app.domain.customer.shadow_state import assert_shadow_observation_transition
 from app.repositories.postgres.end_customer_shadow_repository import (
     EndCustomerShadowRepository,
-    ShadowDuplicateObservationError,
 )
 from app.services.shadow_gate import assert_shadow_intake_allowed
 
@@ -100,7 +100,7 @@ class ShadowObservationCommandService:
         }
 
         try:
-            observation = EndCustomerShadowRepository.create_observation(
+            observation, created = EndCustomerShadowRepository.create_observation(
                 db,
                 tenant_id=event.tenant_id,
                 source_provider=event.source_provider,
@@ -118,8 +118,7 @@ class ShadowObservationCommandService:
                 campaign_run_id=event.campaign_run_id,
                 scenario_execution_id=event.scenario_execution_id,
             )
-            created = True
-        except ShadowDuplicateObservationError:
+        except IntegrityError:
             observation = EndCustomerShadowRepository.find_observation_by_idempotency(
                 db,
                 event.tenant_id,
@@ -131,6 +130,15 @@ class ShadowObservationCommandService:
             if observation is None:
                 raise
             created = False
+            return {
+                "observation_id": observation.observation_id,
+                "state": observation.state,
+                "created": False,
+                "identity_signals": [],
+                "fact_proposals": [],
+            }
+
+        if not created:
             return {
                 "observation_id": observation.observation_id,
                 "state": observation.state,
