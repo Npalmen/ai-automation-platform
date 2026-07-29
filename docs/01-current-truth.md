@@ -8,6 +8,8 @@
 
 ## Last verified date
 
+2026-07-29 (Production pilot P1 operational ready — runtime SHA `86c32f1` PR #112+#113; post-merge Release Gate `30495794549`; Regression Main `30495794441`; operational-ready workflow `30496397047`; `PRODUCTION_PILOT_P1_OPERATIONAL_READY`; observability daily report + ground-truth reviews + runtime readiness; historical technical P1 SHA `a7409c9`; P2 NO-GO; no production deploy; observation window not started.)
+
 2026-07-29 (Production pilot P1 observe-only — runtime SHA `a7409c9` PR #110; post-merge Release Gate `30488429460`; Regression Main `30488429425`; P1 qualification workflow `30489173208`; `TENANT_PRODUCTION_PILOT_01` @ P1; `PRODUCTION_PILOT_P1_OBSERVE_QUALIFIED` + `PRODUCTION_PILOT_ACTIVE`; Gmail replies 0; external writes 0; P2 not authorized.)
 
 2026-07-29 (Production pilot P0 release readiness — runtime SHA `af99856` PR #108; post-merge Release Gate `30483315068`; Regression Main `30483309218`; P0 qualification workflow `30484065150`; `TENANT_PRODUCTION_PILOT_01` baseline at P0; `PRODUCTION_PILOT_RELEASE_READY`; no P1 traffic; no live Gmail replies; Sheets/Monday/Visma OFF; production activation not implied.)
@@ -1507,6 +1509,23 @@ These have caused real failures and are preserved from the README:
 | External writes | `0` | Gmail replies 0; Sheets/Monday/Visma OFF |
 | Shadow pipeline | `Observe-only` | intake/matching ON; promotion OFF |
 | **Not activated** | `Documented` | P2 approval-based Gmail replies; automatic Gmail; production GA |
+
+### Production pilot P1 operational readiness (2026-07-29)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Plan | `Locked` | `docs/plans/production-pilot-p1-observability-fix-plan.md` |
+| Runtime SHA | `Verified` | `86c32f180cfea5879198255ab84ae8861419edf3` (PR #112 + #113) |
+| Post-merge Release Gate | `Verified PASS` | `30495794549` |
+| Regression Main | `Verified PASS` | `30495794441` |
+| Operational-ready workflow | `Verified PASS` | `30496397047`; `PRODUCTION_PILOT_P1_OPERATIONAL_READY` |
+| Migration | `Verified` | `025_production_pilot_message_reviews.sql` |
+| Daily report | `Implemented` | `scripts/production_pilot/p1_daily_report.py` (live DB, read-only) |
+| Ground-truth reviews | `Implemented` | `production_pilot_message_reviews` + admin API |
+| Runtime readiness | `Implemented` | `scripts/production_pilot/p1_runtime_readiness.py` |
+| Historical P1 technical SHA | `Preserved` | `a7409c9` (not future runtime target after observability fix) |
+| P2 status | `NO-GO` | `pilot-g-decision = pending` |
+| **Not activated** | `Documented` | Production deploy; P1 observation window (≥3 days / ≥25 messages); P2 Gmail replies |
 
 ---
 
