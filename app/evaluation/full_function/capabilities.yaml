@@ -1,0 +1,289 @@
+version: 1
+capabilities:
+  - id: intake.gmail.message
+    domain: intake
+    description: Gmail message intake and tenant binding
+    entrypoint: gmail_intake
+    code_owner_path: app/integrations/google/
+    supported_modes: [hermetic, postgres, live_gmail]
+    required_flags: []
+    required_integrations: [google_mail]
+    tenant_scoped: true
+    external_write_type: none
+    max_external_writes_per_scenario: 0
+    expected_default_status: DISABLED_BY_FLAG
+    safety_class: read_only
+    qualified_by: [OBSERVE_CAMPAIGN_QUALIFIED]
+
+  - id: classification.lead
+    domain: classification
+    description: Lead classification path
+    entrypoint: classify_lead
+    code_owner_path: app/workflows/processors/
+    supported_modes: [hermetic, postgres]
+    required_flags: []
+    required_integrations: []
+    tenant_scoped: true
+    external_write_type: none
+    max_external_writes_per_scenario: 0
+    expected_default_status: PASS
+    safety_class: internal
+    qualified_by: [OBSERVE_CAMPAIGN_QUALIFIED]
+
+  - id: classification.support
+    domain: classification
+    description: Support/complaint classification path
+    entrypoint: classify_support
+    code_owner_path: app/workflows/processors/
+    supported_modes: [hermetic, postgres]
+    required_flags: []
+    required_integrations: []
+    tenant_scoped: true
+    external_write_type: none
+    max_external_writes_per_scenario: 0
+    expected_default_status: PASS
+    safety_class: internal
+    qualified_by: [OBSERVE_CAMPAIGN_QUALIFIED]
+
+  - id: classification.invoice
+    domain: classification
+    description: Invoice classification and manual routing
+    entrypoint: classify_invoice
+    code_owner_path: app/workflows/processors/
+    supported_modes: [hermetic, postgres]
+    required_flags: []
+    required_integrations: []
+    tenant_scoped: true
+    external_write_type: none
+    max_external_writes_per_scenario: 0
+    expected_default_status: PASS
+    safety_class: internal
+    qualified_by: [OBSERVE_CAMPAIGN_QUALIFIED]
+
+  - id: classification.unknown
+    domain: classification
+    description: Unknown/ambiguous classification hold
+    entrypoint: classify_unknown
+    code_owner_path: app/workflows/processors/
+    supported_modes: [hermetic, postgres]
+    required_flags: []
+    required_integrations: []
+    tenant_scoped: true
+    external_write_type: none
+    max_external_writes_per_scenario: 0
+    expected_default_status: PASS
+    safety_class: internal
+    qualified_by: [OBSERVE_CAMPAIGN_QUALIFIED]
+
+  - id: policy.pre_write_reply_safety
+    domain: policy
+    description: Pre-write reply safety gate
+    entrypoint: reply_candidate_safety
+    code_owner_path: app/workflows/reply_candidate_safety.py
+    supported_modes: [hermetic, postgres, live_gmail]
+    required_flags: []
+    required_integrations: [google_mail]
+    tenant_scoped: true
+    external_write_type: none
+    max_external_writes_per_scenario: 0
+    expected_default_status: PASS
+    safety_class: safety
+    qualified_by: [AUTOMATIC_GMAIL_CORE_QUALIFIED]
+
+  - id: action.send_customer_auto_reply
+    domain: action
+    description: Customer auto-reply dispatch
+    entrypoint: send_customer_auto_reply
+    code_owner_path: app/workflows/action_executor.py
+    supported_modes: [hermetic, postgres, live_gmail]
+    required_flags: []
+    required_integrations: [google_mail]
+    tenant_scoped: true
+    external_write_type: gmail_reply
+    max_external_writes_per_scenario: 1
+    expected_default_status: DISABLED_BY_FLAG
+    safety_class: external_write
+    qualified_by: [AUTOMATIC_GMAIL_CORE_QUALIFIED]
+
+  - id: action.send_internal_handoff
+    domain: action
+    description: Internal handoff email dispatch
+    entrypoint: send_internal_handoff
+    code_owner_path: app/workflows/action_executor.py
+    supported_modes: [hermetic, postgres]
+    required_flags: []
+    required_integrations: [google_mail]
+    tenant_scoped: true
+    external_write_type: gmail_reply
+    max_external_writes_per_scenario: 1
+    expected_default_status: DISABLED_BY_FLAG
+    safety_class: external_write
+    qualified_by: [SEMI_AUTOMATIC_CAMPAIGN_QUALIFIED]
+
+  - id: action.create_monday_item
+    domain: action
+    description: Monday item creation
+    entrypoint: create_monday_item
+    code_owner_path: app/workflows/action_executor.py
+    supported_modes: [hermetic, postgres, sandbox]
+    required_flags: []
+    required_integrations: [monday]
+    tenant_scoped: true
+    external_write_type: monday_item
+    max_external_writes_per_scenario: 0
+    expected_default_status: BLOCKED_BY_POLICY
+    safety_class: external_write
+    qualified_by: []
+    known_limitations: Integration disabled by default in G campaign
+
+  - id: integration.google_sheets.export
+    domain: integration
+    description: Manual Google Sheets export endpoint
+    entrypoint: export_job
+    code_owner_path: app/integrations/google/sheets_client.py
+    supported_modes: [hermetic, postgres, sandbox]
+    required_flags: []
+    required_integrations: [google_sheets]
+    tenant_scoped: true
+    external_write_type: sheets_append
+    max_external_writes_per_scenario: 0
+    expected_default_status: BLOCKED_BY_POLICY
+    safety_class: external_write
+    qualified_by: []
+    known_limitations: No live Sheets write in G campaign
+
+  - id: integration.visma.oauth
+    domain: integration
+    description: Visma OAuth and sandbox path
+    entrypoint: visma_adapter
+    code_owner_path: app/integrations/visma/
+    supported_modes: [hermetic, postgres, sandbox]
+    required_flags: []
+    required_integrations: [visma]
+    tenant_scoped: true
+    external_write_type: accounting_write
+    max_external_writes_per_scenario: 0
+    expected_default_status: BLOCKED_BY_POLICY
+    safety_class: external_write
+    qualified_by: []
+    known_limitations: No live Visma write in G campaign
+
+  - id: approval.lifecycle
+    domain: approval
+    description: Approval approve/reject/stale handling
+    entrypoint: resolve_per_action_approval
+    code_owner_path: app/workflows/action_approval_resolution.py
+    supported_modes: [hermetic, postgres]
+    required_flags: []
+    required_integrations: []
+    tenant_scoped: true
+    external_write_type: none
+    max_external_writes_per_scenario: 1
+    expected_default_status: PASS
+    safety_class: operator
+    qualified_by: [SEMI_AUTOMATIC_CAMPAIGN_QUALIFIED]
+
+  - id: operator.recovery
+    domain: operator
+    description: Retry/replay/reclassify/re-extract recovery routes
+    entrypoint: recovery_actions
+    code_owner_path: app/workflows/
+    supported_modes: [hermetic, postgres]
+    required_flags: []
+    required_integrations: []
+    tenant_scoped: true
+    external_write_type: none
+    max_external_writes_per_scenario: 0
+    expected_default_status: PASS
+    safety_class: operator
+    qualified_by: []
+
+  - id: customer_card.direct_domain
+    domain: customer-card
+    description: Direct-domain customer card state
+    entrypoint: end_customer_read_service
+    code_owner_path: app/services/end_customer_read_service.py
+    supported_modes: [hermetic, postgres]
+    required_flags: [END_CUSTOMER_READ_API_ENABLED]
+    required_integrations: []
+    tenant_scoped: true
+    external_write_type: none
+    max_external_writes_per_scenario: 0
+    expected_default_status: DISABLED_BY_FLAG
+    safety_class: internal
+    qualified_by: [CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED]
+
+  - id: customer_card.shadow_pipeline
+    domain: customer-card
+    description: Shadow observation and match proposals
+    entrypoint: shadow_intake_boundary
+    code_owner_path: app/services/shadow_intake_boundary.py
+    supported_modes: [hermetic, postgres]
+    required_flags: [END_CUSTOMER_SHADOW_INTAKE_ENABLED]
+    required_integrations: []
+    tenant_scoped: true
+    external_write_type: none
+    max_external_writes_per_scenario: 0
+    expected_default_status: DISABLED_BY_FLAG
+    safety_class: internal
+    qualified_by: [CUSTOMER_CARD_SHADOW_PIPELINE_QUALIFIED]
+
+  - id: tenant.isolation
+    domain: tenant
+    description: Cross-tenant access block
+    entrypoint: tenant_scope
+    code_owner_path: app/core/
+    supported_modes: [hermetic, postgres]
+    required_flags: []
+    required_integrations: []
+    tenant_scoped: true
+    external_write_type: none
+    max_external_writes_per_scenario: 0
+    expected_default_status: PASS
+    safety_class: security
+    qualified_by: [CUSTOMER_CARD_PASS]
+
+  - id: observability.audit
+    domain: observability
+    description: Audit and integration event completeness
+    entrypoint: audit_repository
+    code_owner_path: app/repositories/postgres/
+    supported_modes: [hermetic, postgres]
+    required_flags: []
+    required_integrations: []
+    tenant_scoped: true
+    external_write_type: none
+    max_external_writes_per_scenario: 0
+    expected_default_status: PASS
+    safety_class: internal
+    qualified_by: []
+
+  - id: automation.pause
+    domain: automation
+    description: Tenant automation pause gate
+    entrypoint: tenant_automation
+    code_owner_path: app/workflows/tenant_automation.py
+    supported_modes: [hermetic, postgres]
+    required_flags: []
+    required_integrations: []
+    tenant_scoped: true
+    external_write_type: none
+    max_external_writes_per_scenario: 0
+    expected_default_status: PASS
+    safety_class: policy
+    qualified_by: []
+
+  - id: scheduler.pause
+    domain: scheduler
+    description: Scheduler pause/resume
+    entrypoint: scheduler_state
+    code_owner_path: app/core/
+    supported_modes: [hermetic, postgres]
+    required_flags: []
+    required_integrations: []
+    tenant_scoped: true
+    external_write_type: none
+    max_external_writes_per_scenario: 0
+    expected_default_status: PASS
+    safety_class: policy
+    qualified_by: []

@@ -1,0 +1,65 @@
+name: Full-function G qualification
+
+on:
+  workflow_dispatch:
+
+jobs:
+  g-campaign:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ai_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ai_platform"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_platform
+      ENV: test
+      EVAL_HARNESS_PG_ALLOWED: yes
+      EVAL_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_platform_full_function_eval
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Provision PostgreSQL eval database
+        run: python scripts/ci/provision_eval_pg_database.py
+
+      - name: Hermetic full-function contract tests
+        run: python -m pytest -q tests/evaluation/full_function/test_full_function_contract.py
+
+      - name: Formal TBG full-function campaign
+        run: |
+          python -m app.evaluation.full_function.runner \
+            --database-url "$EVAL_DATABASE_URL" \
+            --report-json testbot-g-full-function-matrix-rg-g-20260729.json \
+            --report-markdown testbot-g-full-function-matrix-rg-g-20260729.md
+
+      - name: C-F regression bundle
+        run: |
+          python -m pytest -q \
+            tests/evaluation/full_function/test_full_function_contract.py \
+            tests/evaluation/customer_domain/test_tbf_manifest_contract.py \
+            tests/evaluation/customer_domain/test_tbf2_manifest_contract.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-function-g-qualification
+          path: |
+            testbot-g-full-function-matrix-rg-g-20260729.json
+            testbot-g-full-function-matrix-rg-g-20260729.md
