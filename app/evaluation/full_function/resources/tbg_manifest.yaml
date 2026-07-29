@@ -1,0 +1,102 @@
+version: 1
+scenarios:
+  - scenario_id: TBG01
+    module: tbg01_safe_lead_observe
+    family: intake
+    capability_ids: [intake.gmail.message, classification.lead]
+  - scenario_id: TBG02
+    module: tbg02_support_manual_review
+    family: classification
+    capability_ids: [classification.support]
+  - scenario_id: TBG03
+    module: tbg03_invoice_manual_accounting
+    family: classification
+    capability_ids: [classification.invoice]
+  - scenario_id: TBG04
+    module: tbg04_unknown_ambiguous
+    family: classification
+    capability_ids: [classification.unknown]
+  - scenario_id: TBG05
+    module: tbg05_safe_auto_gmail_ack
+    family: action
+    capability_ids: [action.send_customer_auto_reply, policy.pre_write_reply_safety]
+  - scenario_id: TBG06
+    module: tbg06_restricted_reply_blocked
+    family: policy
+    capability_ids: [policy.pre_write_reply_safety]
+  - scenario_id: TBG07
+    module: tbg07_approval_approve
+    family: approval
+    capability_ids: [approval.lifecycle, action.send_customer_auto_reply]
+  - scenario_id: TBG08
+    module: tbg08_approval_reject
+    family: approval
+    capability_ids: [approval.lifecycle]
+  - scenario_id: TBG09
+    module: tbg09_duplicate_stale_approval
+    family: approval
+    capability_ids: [approval.lifecycle]
+  - scenario_id: TBG10
+    module: tbg10_provider_timeout
+    family: provider
+    capability_ids: [action.send_customer_auto_reply]
+  - scenario_id: TBG11
+    module: tbg11_internal_handoff
+    family: action
+    capability_ids: [action.send_internal_handoff]
+  - scenario_id: TBG12
+    module: tbg12_monday_disabled
+    family: integration
+    capability_ids: [action.create_monday_item]
+  - scenario_id: TBG13
+    module: tbg13_google_sheets_contract
+    family: integration
+    capability_ids: [integration.google_sheets.export]
+  - scenario_id: TBG14
+    module: tbg14_visma_contract
+    family: integration
+    capability_ids: [integration.visma.oauth]
+  - scenario_id: TBG15
+    module: tbg15_automation_paused
+    family: automation
+    capability_ids: [automation.pause]
+  - scenario_id: TBG16
+    module: tbg16_scheduler_paused
+    family: scheduler
+    capability_ids: [scheduler.pause]
+  - scenario_id: TBG17
+    module: tbg17_recovery_actions
+    family: operator
+    capability_ids: [operator.recovery]
+  - scenario_id: TBG18
+    module: tbg18_cross_tenant_block
+    family: tenant
+    capability_ids: [tenant.isolation]
+  - scenario_id: TBG19
+    module: tbg19_customer_card_returning
+    family: customer-card
+    capability_ids: [customer_card.direct_domain]
+  - scenario_id: TBG20
+    module: tbg20_shadow_observation_pipeline
+    family: customer-card
+    capability_ids: [customer_card.shadow_pipeline]
+  - scenario_id: TBG21
+    module: tbg21_prompt_injection
+    family: safety
+    capability_ids: [policy.pre_write_reply_safety]
+  - scenario_id: TBG22
+    module: tbg22_no_reply_spam
+    family: intake
+    capability_ids: [intake.gmail.message]
+  - scenario_id: TBG23
+    module: tbg23_concurrent_duplicate_intake
+    family: intake
+    capability_ids: [intake.gmail.message]
+  - scenario_id: TBG24
+    module: tbg24_audit_telemetry
+    family: observability
+    capability_ids: [observability.audit]
+  - scenario_id: TBG25
+    module: tbg25_default_flags_fail_closed
+    family: policy
+    capability_ids: [customer_card.direct_domain, customer_card.shadow_pipeline]

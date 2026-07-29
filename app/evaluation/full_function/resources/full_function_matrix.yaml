@@ -1,0 +1,82 @@
+version: 1
+matrix:
+  - capability_id: intake.gmail.message
+    mode: postgres
+    status: PASS
+    evidence: TBG01
+  - capability_id: classification.lead
+    mode: hermetic
+    status: PASS
+    evidence: TBG01
+  - capability_id: classification.support
+    mode: hermetic
+    status: PASS
+    evidence: TBG02
+  - capability_id: classification.invoice
+    mode: hermetic
+    status: PASS
+    evidence: TBG03
+  - capability_id: classification.unknown
+    mode: hermetic
+    status: PASS
+    evidence: TBG04
+  - capability_id: policy.pre_write_reply_safety
+    mode: hermetic
+    status: PASS
+    evidence: TBG06
+  - capability_id: action.send_customer_auto_reply
+    mode: live_gmail
+    status: PASS_LIVE
+    evidence: AUTOMATIC_GMAIL_CORE_QUALIFIED@30435651905
+  - capability_id: action.send_customer_auto_reply
+    mode: hermetic
+    status: PASS
+    evidence: TBG07
+  - capability_id: action.send_internal_handoff
+    mode: hermetic
+    status: PASS
+    evidence: TBG11
+  - capability_id: action.create_monday_item
+    mode: hermetic
+    status: BLOCKED_BY_POLICY
+    evidence: TBG12
+  - capability_id: integration.google_sheets.export
+    mode: hermetic
+    status: SANDBOX_ONLY
+    evidence: TBG13
+  - capability_id: integration.visma.oauth
+    mode: hermetic
+    status: BLOCKED_BY_POLICY
+    evidence: TBG14
+  - capability_id: approval.lifecycle
+    mode: postgres
+    status: PASS
+    evidence: TBG07,TBG08,TBG09
+  - capability_id: operator.recovery
+    mode: hermetic
+    status: PASS
+    evidence: TBG17
+  - capability_id: customer_card.direct_domain
+    mode: postgres
+    status: PASS
+    evidence: TBG19,CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED
+  - capability_id: customer_card.shadow_pipeline
+    mode: postgres
+    status: PASS
+    evidence: TBG20,CUSTOMER_CARD_SHADOW_PIPELINE_QUALIFIED
+  - capability_id: tenant.isolation
+    mode: postgres
+    status: PASS
+    evidence: TBG18
+  - capability_id: observability.audit
+    mode: postgres
+    status: PASS
+    evidence: TBG24
+  - capability_id: automation.pause
+    mode: hermetic
+    status: PASS
+    evidence: TBG15
+  - capability_id: scheduler.pause
+    mode: hermetic
+    status: PASS
+    evidence: TBG16

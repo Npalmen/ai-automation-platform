@@ -19,6 +19,7 @@ def main() -> int:
     extra_databases = [database_name]
     if database_name == "ai_platform_eval":
         extra_databases.append("ai_platform_customer_domain_eval")
+        extra_databases.append("ai_platform_full_function_eval")
 
     conn = psycopg2.connect(admin_url)
     conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
