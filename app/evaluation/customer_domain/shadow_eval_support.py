@@ -55,6 +55,7 @@ def act_shadow_intake(ctx, db, *, message: MockIntakeMessage, confidence: float 
                 "sender_name": message.sender_name,
                 "sender_phone": message.sender_phone,
                 "reply_to_email": message.reply_to_email,
+                "_eval_confidence": confidence,
             },
             result={},
         )
