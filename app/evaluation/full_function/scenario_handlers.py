@@ -434,7 +434,9 @@ def run_tbg09(ctx: EvalContext) -> ScenarioRunResult:
 
 
 def run_tbg10(ctx: EvalContext) -> ScenarioRunResult:
+    from app.workflows.action_fingerprint import compute_action_fingerprint
     from app.workflows.decision_record import ExecutionStatus
+    from app.workflows.decision_record_service import record_execution_outcome
     from app.workflows.decision_trace_errors import ReconciliationRequired
     from app.workflows.external_write_trace import execute_external_write_with_trace
 
@@ -443,14 +445,16 @@ def run_tbg10(ctx: EvalContext) -> ScenarioRunResult:
         job_id = str(uuid4())
         job = _seed_job_record(db, ctx.tenant_id, job_id)
         trace = create_trace_session(job, source=PipelineRunSource.INTAKE, db=db)
+        operation_id = str(uuid4())
         action = {
             "type": "send_customer_auto_reply",
             "to": "customer@example.com",
             "subject": "Hej",
             "body": "Tack",
             "tenant_id": ctx.tenant_id,
-            "_action_operation_id": str(uuid4()),
+            "_action_operation_id": operation_id,
         }
+        fingerprint, key_version = compute_action_fingerprint(action)
         adapter_calls = {"n": 0}
 
         def _timeout_adapter():
@@ -469,6 +473,18 @@ def run_tbg10(ctx: EvalContext) -> ScenarioRunResult:
                     job=job,
                     action=action,
                     adapter_fn=_timeout_adapter,
+                )
+            except TimeoutError:
+                record_execution_outcome(
+                    db,
+                    trace,
+                    job,
+                    action,
+                    operation_id=operation_id,
+                    fingerprint=fingerprint,
+                    key_version=key_version,
+                    status=ExecutionStatus.OUTCOME_UNKNOWN,
+                    metadata={"error_class": "TimeoutError", "reconciliation_required": True},
                 )
             except Exception:
                 pass
