@@ -45,6 +45,9 @@ SEND_BEHAVIORS = frozenset(
 OPERATOR_STOP_SEMI_AUTO = (
     "OPERATOR ACTION REQUIRED — Godkänn 40-scenario live semi-auto Gmail-kampanj"
 )
+OPERATOR_STOP_SEMI_AUTO_RUNNER = (
+    "OPERATOR ACTION REQUIRED — Godkänn faktisk 40-scenario live semi-auto Gmail-kampanj på mergad runner-SHA"
+)
 OPERATOR_STOP_AUTOMATIC = (
     "OPERATOR ACTION REQUIRED — Godkänn automatic Gmail canary"
 )
