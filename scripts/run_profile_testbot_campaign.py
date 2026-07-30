@@ -12,6 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from app.core.canonical_commit import resolve_canonical_commit
+from app.evaluation.live.config import get_live_eval_config
+from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.live.registry import new_evaluation_run_id
 from app.evaluation.profile_testbot.campaign.hermetic_runner import run_hermetic_profile_campaign
 from app.evaluation.profile_testbot.campaign.live_runners import (
@@ -19,6 +22,11 @@ from app.evaluation.profile_testbot.campaign.live_runners import (
     plan_automatic_canary_campaign,
     plan_automatic_core_campaign,
     plan_semi_auto_live_campaign,
+)
+from app.evaluation.profile_testbot.campaign.semi_auto_runner import (
+    SemiAutoRunnerConfig,
+    new_campaign_id,
+    run_profile_semi_auto_campaign,
 )
 from app.evaluation.profile_testbot.campaign.readiness import (
     build_profile_testbot_readiness,
@@ -29,6 +37,7 @@ from app.evaluation.profile_testbot.campaign.report import write_profile_testbot
 from app.evaluation.profile_testbot.constants import (
     OPERATOR_STOP_AUTOMATIC,
     OPERATOR_STOP_SEMI_AUTO,
+    OPERATOR_STOP_SEMI_AUTO_RUNNER,
 )
 
 
@@ -48,6 +57,34 @@ def _run_hermetic(args: argparse.Namespace) -> int:
 
 
 def _run_semi_auto(args: argparse.Namespace) -> int:
+    if getattr(args, "confirm_external", False):
+        runtime_sha = args.runtime_sha or resolve_canonical_commit() or "unknown"
+        _emit_stop(OPERATOR_STOP_SEMI_AUTO_RUNNER)
+        return 2
+
+    if getattr(args, "execute_contract", False):
+        config = get_live_eval_config()
+        senders = sorted(config.sender_emails)
+        recipients = sorted(config.recipient_emails)
+        campaign_id = args.campaign_id or new_campaign_id()
+        runtime_sha = args.runtime_sha or resolve_canonical_commit() or "unknown"
+        result = run_profile_semi_auto_campaign(
+            SemiAutoRunnerConfig(
+                campaign_id=campaign_id,
+                runtime_sha=runtime_sha,
+                profile_id=args.profile_id,
+                seed=args.seed,
+                contract_mode=True,
+                state_root=args.state_root or None,
+                sender_email=senders[0] if senders else "",
+                recipient_email=recipients[0] if recipients else "",
+            ),
+            resume=args.resume,
+        )
+        print(result.overall_status)
+        print(json.dumps(result.to_dict(), indent=2))
+        return 0 if result.overall_status == "PASS" else 1
+
     plan = plan_semi_auto_live_campaign(profile_id=args.profile_id, seed=args.seed)
     if plan.blocked_reason:
         _emit_stop(plan.blocked_reason)
@@ -88,6 +125,8 @@ def _write_readiness_report(report: dict) -> Path:
         f"- profile_snapshot_hash: `{report.get('profile_snapshot_hash')}`",
         f"- eval_tenant: `{report.get('eval_tenant')}`",
         f"- ready_for_live_semi_auto: **{report.get('ready_for_live_semi_auto')}**",
+        f"- runner_ready_for_contract_execution: **{report.get('runner_ready_for_contract_execution')}**",
+        f"- runner_ready_for_live_execution: **{report.get('runner_ready_for_live_execution')}**",
         f"- single_active_consumer: **{report.get('single_active_consumer')}**",
         "",
         "## Mailbox hashes (redacted)",
@@ -137,8 +176,14 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("readiness", help="Build profile testbot readiness report")
     sub.add_parser("hermetic", help="Run 120-scenario hermetic profile campaign")
-    semi = sub.add_parser("semi-auto-live", help="Plan live semi-auto campaign (requires approval)")
+    semi = sub.add_parser("semi-auto-live", help="Plan or execute live semi-auto campaign")
     semi.add_argument("--confirm-operator", action="store_true")
+    semi.add_argument("--execute-contract", action="store_true")
+    semi.add_argument("--confirm-external", action="store_true")
+    semi.add_argument("--campaign-id", default="")
+    semi.add_argument("--runtime-sha", default="")
+    semi.add_argument("--state-root", default="")
+    semi.add_argument("--resume", action="store_true")
     auto = sub.add_parser("automatic-live", help="Plan automatic campaigns (requires approval)")
     auto.add_argument("--confirm-operator", action="store_true")
 

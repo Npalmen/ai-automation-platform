@@ -17,6 +17,7 @@ from app.evaluation.profile_testbot.constants import (
     LIVE_EVAL_TENANT_ID,
     OPERATOR_STOP_AUTOMATIC,
     OPERATOR_STOP_SEMI_AUTO,
+    OPERATOR_STOP_SEMI_AUTO_RUNNER,
     QUALIFICATION_AUTOMATIC,
     QUALIFICATION_PASS,
     QUALIFICATION_SEMI_AUTO,
@@ -342,8 +343,19 @@ def build_profile_testbot_readiness(
         "issues": blocking_failures,
         "blockers": blocking_failures,
         "ready_for_live_semi_auto": ready,
+        "runner_ready_for_contract_execution": ready,
+        "runner_ready_for_live_execution": False,
         "operator_stop": None if ready else OPERATOR_STOP_SEMI_AUTO,
     }
+
+
+def require_live_semi_auto_runner_execution(*, runtime_sha: str) -> str | None:
+    approved_sha = os.environ.get("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED_SHA", "").strip()
+    if _env_truthy("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED"):
+        if approved_sha and approved_sha == runtime_sha.strip():
+            return None
+        return OPERATOR_STOP_SEMI_AUTO_RUNNER
+    return OPERATOR_STOP_SEMI_AUTO_RUNNER
 
 
 def require_live_semi_auto_approval() -> str | None:
