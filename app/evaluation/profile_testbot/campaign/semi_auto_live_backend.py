@@ -1,0 +1,352 @@
+"""Live Gmail backend for profile semi-auto campaign runner."""
+
+from __future__ import annotations
+
+import hashlib
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+
+from app.evaluation.live.campaign.test_operator import (
+    PendingApproval,
+    approve_approval,
+    list_job_approvals,
+)
+from app.evaluation.live.config import LiveEvalConfig, get_live_eval_config
+from app.evaluation.live.errors import LiveEvalPipelinePollError, LiveEvalSafetyError
+from app.evaluation.live.gmail_transport import (
+    SendOutcome,
+    observe_expected_sender_reply,
+    send_scenario_email,
+)
+from app.evaluation.live.observer import LiveEvalObserver
+from app.evaluation.live.registry import new_evaluation_run_id
+from app.evaluation.profile_testbot.campaign.mailbox_readiness import mailbox_hash
+from app.evaluation.profile_testbot.campaign.semi_auto_contract import (
+    ApprovalResult,
+    IntakeObservation,
+    ProcessingObservation,
+    ReplyVerification,
+    TestSendResult,
+)
+from app.evaluation.profile_testbot.campaign.send_payload import build_profile_testbot_message_body
+from app.evaluation.profile_testbot.constants import LIVE_EVAL_TENANT_ID
+from app.evaluation.profile_testbot.scenarios.schema import ProfileScenario
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _derive_approval_state(job: dict[str, Any]) -> str:
+    if job.get("has_pending_approvals"):
+        return "pending"
+    status = str(job.get("job_status") or "").lower()
+    if status in {"manual_review", "on_hold", "awaiting_approval"}:
+        return "hold"
+    return "none"
+
+
+def _draft_text_from_job_and_approvals(
+    *,
+    base_url: str,
+    admin_api_key: str,
+    tenant_id: str,
+    job_id: str,
+    job: dict[str, Any],
+) -> str:
+    import httpx
+
+    response = httpx.get(
+        f"{base_url.rstrip('/')}/jobs/{job_id}/approvals",
+        headers={
+            "X-Admin-API-Key": admin_api_key,
+            "X-Tenant-ID": tenant_id,
+        },
+        timeout=30.0,
+    )
+    response.raise_for_status()
+    for row in response.json().get("items") or []:
+        if str(row.get("state") or "") != "pending":
+            continue
+        delivery = row.get("delivery_payload") or {}
+        body = delivery.get("body")
+        if body:
+            return str(body)
+    policy = job.get("policy") or {}
+    recommended = policy.get("recommended_next_step")
+    if isinstance(recommended, dict):
+        text = recommended.get("body") or recommended.get("draft_text")
+        if text:
+            return str(text)
+    return ""
+
+
+@dataclass
+class _ScenarioRunContext:
+    evaluation_run_id: str
+    attempt_id: int = 1
+    job_id: str | None = None
+    intake_event_id: str | None = None
+    send_outcome: SendOutcome | None = None
+    send_window_start: datetime = field(default_factory=_utcnow)
+    observation: dict[str, Any] = field(default_factory=dict)
+    provider_message_id: str | None = None
+
+
+@dataclass
+class LiveSemiAutoBackend:
+    campaign_id: str
+    tenant_id: str = LIVE_EVAL_TENANT_ID
+    sender_email: str = ""
+    recipient_email: str = ""
+    base_url: str = ""
+    admin_api_key: str = ""
+    config: LiveEvalConfig | None = None
+    sent_keys: set[str] = field(default_factory=set)
+    approval_operations: dict[str, str] = field(default_factory=dict)
+    runs: dict[str, _ScenarioRunContext] = field(default_factory=dict)
+    gmail_sends: int = 0
+    external_writes: dict[str, int] = field(
+        default_factory=lambda: {"sheets": 0, "monday": 0, "visma": 0}
+    )
+    automatic_verify_link_merge: int = 0
+
+    def __post_init__(self) -> None:
+        self.config = self.config or get_live_eval_config()
+
+    @property
+    def observer(self) -> LiveEvalObserver:
+        return LiveEvalObserver(
+            base_url=self.base_url,
+            admin_api_key=self.admin_api_key,
+            tenant_id=self.tenant_id,
+        )
+
+    def _run_context(self, scenario_id: str) -> _ScenarioRunContext:
+        ctx = self.runs.get(scenario_id)
+        if ctx is None:
+            raise LiveEvalSafetyError(f"missing live run context for scenario={scenario_id}")
+        return ctx
+
+    def send_test_message(
+        self,
+        *,
+        campaign_id: str,
+        scenario: ProfileScenario,
+        idempotency_key: str,
+    ) -> TestSendResult:
+        if self.tenant_id != LIVE_EVAL_TENANT_ID:
+            raise LiveEvalSafetyError(f"cross-tenant send blocked: {self.tenant_id}")
+        if idempotency_key in self.sent_keys:
+            raise LiveEvalSafetyError(f"duplicate test send for idempotency_key={idempotency_key}")
+        recipient = self.recipient_email.strip().lower()
+        if not recipient:
+            raise LiveEvalSafetyError("recipient mailbox missing")
+
+        evaluation_run_id = new_evaluation_run_id()
+        ctx = _ScenarioRunContext(evaluation_run_id=evaluation_run_id)
+        self.runs[scenario.scenario_id] = ctx
+        self.sent_keys.add(idempotency_key)
+
+        self.observer.register_run(
+            {
+                "evaluation_run_id": evaluation_run_id,
+                "tenant_id": self.tenant_id,
+                "scenario_id": scenario.scenario_id,
+                "attempt_id": ctx.attempt_id,
+                "transport_mode": "live_gmail",
+                "ai_mode": "fixture_ai",
+                "expected_sender": self.sender_email,
+                "expected_recipient": self.recipient_email,
+            }
+        )
+
+        body = build_profile_testbot_message_body(
+            scenario=scenario,
+            evaluation_run_id=evaluation_run_id,
+            campaign_id=campaign_id,
+        )
+        outcome, _events = send_scenario_email(
+            evaluation_run_id=evaluation_run_id,
+            scenario_id=scenario.scenario_id,
+            attempt_id=ctx.attempt_id,
+            expected_sender=self.sender_email,
+            expected_recipient=self.recipient_email,
+            base_subject=scenario.input.subject,
+            message_body=body,
+            config=self.config,
+        )
+        ctx.send_outcome = outcome
+        ctx.provider_message_id = outcome.sender_gmail_message_id
+        return TestSendResult(
+            accepted=True,
+            provider_message_id=outcome.sender_gmail_message_id,
+            idempotency_key=idempotency_key,
+            recipient_hash=mailbox_hash(recipient),
+        )
+
+    def observe_intake(self, *, scenario_id: str, campaign_id: str) -> IntakeObservation:
+        ctx = self._run_context(scenario_id)
+
+        def on_poll(payload: dict[str, Any]) -> None:
+            if payload.get("duplicate_detected"):
+                raise LiveEvalSafetyError("correlation_failure: duplicate delivery")
+
+        try:
+            delivery = self.observer.poll_delivery(
+                ctx.evaluation_run_id,
+                timeout_seconds=min(300, self.config.max_runtime_minutes * 60),
+                on_poll=on_poll,
+            )
+        except LiveEvalPipelinePollError as exc:
+            raise LiveEvalSafetyError(f"intake_timeout: {exc.timeout_reason}") from exc
+
+        recipient_id = str(delivery.get("recipient_gmail_message_id") or "").strip()
+        if not recipient_id:
+            raise LiveEvalSafetyError("intake_timeout: missing recipient message id")
+
+        processed = self.observer.process_delivery(ctx.evaluation_run_id, recipient_id)
+        job_id = str(processed.get("job_id") or (processed.get("job") or {}).get("job_id") or "")
+        ctx.job_id = job_id or None
+        ctx.intake_event_id = recipient_id
+        return IntakeObservation(
+            intake_event_id=recipient_id,
+            job_id=job_id,
+            tenant_id=self.tenant_id,
+        )
+
+    def observe_processing(self, *, scenario_id: str) -> ProcessingObservation:
+        ctx = self._run_context(scenario_id)
+        try:
+            observation = self.observer.poll_pipeline(
+                ctx.evaluation_run_id,
+                timeout_seconds=min(600, self.config.max_runtime_minutes * 60),
+                success_statuses=frozenset(
+                    {"awaiting_approval", "manual_review", "completed", "on_hold"}
+                ),
+            )
+        except LiveEvalPipelinePollError as exc:
+            raise LiveEvalSafetyError(f"processing_timeout: {exc.timeout_reason}") from exc
+
+        ctx.observation = observation
+        job = observation.get("job") or {}
+        ctx.job_id = str(job.get("job_id") or ctx.job_id or "") or None
+        draft_text = ""
+        if ctx.job_id:
+            draft_text = _draft_text_from_job_and_approvals(
+                base_url=self.base_url,
+                admin_api_key=self.admin_api_key,
+                tenant_id=self.tenant_id,
+                job_id=ctx.job_id,
+                job=job,
+            )
+        classification = dict(job.get("classification") or {})
+        policy = dict(job.get("policy") or {})
+        return ProcessingObservation(
+            classification=classification,
+            route={"job_status": job.get("job_status")},
+            authorization={
+                "policy_authorization": policy.get("policy_authorization"),
+            },
+            approval_state=_derive_approval_state(job),
+            draft_text=draft_text,
+        )
+
+    def approve_via_lifecycle(
+        self,
+        *,
+        scenario_id: str,
+        operation_id: str,
+        decision: str,
+    ) -> ApprovalResult:
+        if operation_id in self.approval_operations:
+            return ApprovalResult(
+                operation_id=operation_id,
+                decision=self.approval_operations[operation_id],
+                already_resolved=True,
+            )
+        ctx = self._run_context(scenario_id)
+        if not ctx.job_id:
+            raise LiveEvalSafetyError("approval blocked: missing job_id")
+        pending = list_job_approvals(
+            base_url=self.base_url,
+            admin_api_key=self.admin_api_key,
+            tenant_id=self.tenant_id,
+            job_id=ctx.job_id,
+        )
+        target = next(
+            (
+                row
+                for row in pending
+                if row.state == "pending"
+                and row.next_on_approve in ("action_execute", "email_send")
+            ),
+            None,
+        )
+        if target is None:
+            raise LiveEvalSafetyError("approval blocked: no pending approval")
+        if decision == "approve":
+            result = approve_approval(
+                base_url=self.base_url,
+                admin_api_key=self.admin_api_key,
+                tenant_id=self.tenant_id,
+                approval=target,
+                reason="profile testbot semi-auto harness approve",
+            )
+            if result.http_status >= 400 and not result.idempotent:
+                raise LiveEvalSafetyError(
+                    f"approval failed: http_status={result.http_status}"
+                )
+            self.gmail_sends += 1
+            resolved = "approved"
+        else:
+            resolved = decision
+        self.approval_operations[operation_id] = resolved
+        return ApprovalResult(operation_id=operation_id, decision=resolved)
+
+    def verify_reply(
+        self,
+        *,
+        scenario: ProfileScenario,
+        approved: bool,
+    ) -> ReplyVerification:
+        if scenario.expected_send_behavior != "send_after_approval" or not approved:
+            return ReplyVerification(
+                execution_intents=0,
+                adapter_invocations=0,
+                provider_accepted=False,
+                recipient_verified=True,
+                duplicate_send=False,
+                reply_hash=None,
+            )
+
+        ctx = self._run_context(scenario.scenario_id)
+        evidence = observe_expected_sender_reply(
+            evaluation_run_id=ctx.evaluation_run_id,
+            scenario_id=scenario.scenario_id,
+            attempt_id=ctx.attempt_id,
+            expected_recipient=self.recipient_email,
+            expected_sender=self.sender_email,
+            send_window_start=ctx.send_window_start,
+            timeout_seconds=180.0,
+            campaign_run_id=self.campaign_id,
+        )
+        if evidence is None:
+            return ReplyVerification(
+                execution_intents=1,
+                adapter_invocations=0,
+                provider_accepted=False,
+                recipient_verified=False,
+                duplicate_send=False,
+                reply_hash=None,
+            )
+        reply_hash = hashlib.sha256(evidence.message_id.encode("utf-8")).hexdigest()
+        return ReplyVerification(
+            execution_intents=1,
+            adapter_invocations=1,
+            provider_accepted=True,
+            recipient_verified=True,
+            duplicate_send=False,
+            reply_hash=reply_hash,
+        )

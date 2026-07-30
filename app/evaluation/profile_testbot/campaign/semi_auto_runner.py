@@ -17,6 +17,7 @@ from app.evaluation.profile_testbot.campaign.readiness import (
     require_live_semi_auto_runner_execution,
 )
 from app.evaluation.profile_testbot.campaign.semi_auto_contract import ContractSemiAutoBackend
+from app.evaluation.profile_testbot.campaign.semi_auto_live_backend import LiveSemiAutoBackend
 from app.evaluation.profile_testbot.campaign.semi_auto_evidence import (
     build_campaign_evidence,
     write_campaign_evidence_report,
@@ -75,6 +76,8 @@ class SemiAutoRunnerConfig:
     state_root: str | Path | None = None
     sender_email: str = ""
     recipient_email: str = ""
+    base_url: str = ""
+    admin_api_key: str = ""
 
 
 @dataclass
@@ -166,21 +169,41 @@ def run_profile_semi_auto_campaign(
             raise LiveEvalSafetyError(blocked)
         if not _env_truthy("LIVE_GMAIL_EVAL_ALLOWED"):
             raise LiveEvalSafetyError("LIVE_GMAIL_EVAL_ALLOWED=yes required for live execution")
-        raise LiveEvalSafetyError(
-            "live Gmail execution is not enabled in this runner build; use contract mode"
+        readiness = build_profile_testbot_readiness(
+            profile_id=config.profile_id,
+            tenant_id=config.tenant_id,
         )
+        if not readiness.get("runner_ready_for_live_execution"):
+            blockers = readiness.get("live_execution_blockers") or []
+            raise LiveEvalSafetyError(
+                "live execution readiness failed: " + "; ".join(blockers or ["unknown"])
+            )
+        if not config.base_url or not config.admin_api_key:
+            raise LiveEvalSafetyError(
+                "LIVE_EVAL_APP_BASE_URL and ADMIN_API_KEY required for live execution"
+            )
 
-    if not config.contract_mode:
-        raise LiveEvalSafetyError("only contract_mode execution is supported in this release")
+    if not config.contract_mode and not config.confirm_external:
+        raise LiveEvalSafetyError("live execution requires confirm_external")
 
     profile = load_customer_profile(config.profile_id)
     scenarios = generate_semi_auto_campaign(profile, seed=config.seed)
     campaign_state = _prepare_campaign_state(config)
-    backend = ContractSemiAutoBackend(
-        tenant_id=config.tenant_id,
-        sender_email=config.sender_email,
-        recipient_email=config.recipient_email,
-    )
+    if config.contract_mode:
+        backend: ContractSemiAutoBackend | LiveSemiAutoBackend = ContractSemiAutoBackend(
+            tenant_id=config.tenant_id,
+            sender_email=config.sender_email,
+            recipient_email=config.recipient_email,
+        )
+    else:
+        backend = LiveSemiAutoBackend(
+            campaign_id=config.campaign_id,
+            tenant_id=config.tenant_id,
+            sender_email=config.sender_email,
+            recipient_email=config.recipient_email,
+            base_url=config.base_url,
+            admin_api_key=config.admin_api_key,
+        )
 
     send_after_count = sum(
         1 for scenario in scenarios if scenario.expected_send_behavior == "send_after_approval"
@@ -205,7 +228,7 @@ def run_profile_semi_auto_campaign(
             continue
 
         try:
-            result = _execute_scenario_contract(
+            result = _execute_scenario(
                 config=config,
                 campaign_state=campaign_state,
                 scenario_state=scenario_state,
@@ -286,13 +309,13 @@ def run_profile_semi_auto_campaign(
     )
 
 
-def _execute_scenario_contract(
+def _execute_scenario(
     *,
     config: SemiAutoRunnerConfig,
     campaign_state: SemiAutoCampaignState,
     scenario_state: ScenarioExecutionState,
     scenario,
-    backend: ContractSemiAutoBackend,
+    backend: ContractSemiAutoBackend | LiveSemiAutoBackend,
     profile,
 ) -> dict[str, Any]:
     if scenario_state.state == CampaignState.SCENARIO_VERIFIED:

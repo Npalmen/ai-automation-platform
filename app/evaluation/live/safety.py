@@ -199,9 +199,16 @@ def require_scenario_allowed_for_2f2(scenario_id: str) -> None:
 
 
 def require_scenario_allowed_for_live_gmail(scenario_id: str) -> None:
-    """Allow 2F.2 S01 or full-system campaign scenarios when campaign gate is enabled."""
+    """Allow 2F.2 S01, full-system campaign scenarios, or profile testbot semi-auto."""
     from app.evaluation.live.constants import ALLOWED_2F2_SCENARIOS
+    from app.evaluation.profile_testbot.campaign.scenario_gate import (
+        is_profile_testbot_semi_auto_scenario,
+        require_profile_testbot_live_execution_authorized,
+    )
 
+    if is_profile_testbot_semi_auto_scenario(scenario_id):
+        require_profile_testbot_live_execution_authorized()
+        return
     if scenario_id in ALLOWED_2F2_SCENARIOS:
         return
     from app.evaluation.live.campaign.gates import (

@@ -193,6 +193,35 @@ def _semi_auto_manifest(profile_id: str, *, seed: int = 0) -> dict[str, Any]:
     }
 
 
+def _live_execution_blockers(
+    *,
+    ready: bool,
+    mailbox_report: dict[str, Any],
+    runtime_sha: str,
+) -> list[str]:
+    blockers: list[str] = []
+    if not ready:
+        blockers.append("ready_for_live_semi_auto must pass before live execution")
+    if _env_truthy("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT"):
+        blockers.append(
+            "PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT must not be set for live Gmail execution"
+        )
+    if not _env_truthy("LIVE_GMAIL_EVAL_ALLOWED"):
+        blockers.append("LIVE_GMAIL_EVAL_ALLOWED=yes required for live execution")
+    if not os.environ.get("LIVE_EVAL_APP_BASE_URL", "").strip():
+        blockers.append("LIVE_EVAL_APP_BASE_URL required for live execution")
+    if not os.environ.get("ADMIN_API_KEY", "").strip():
+        blockers.append("ADMIN_API_KEY required for live execution")
+    runner_stop = require_live_semi_auto_runner_execution(runtime_sha=runtime_sha)
+    if runner_stop:
+        blockers.append(runner_stop)
+    if not mailbox_report.get("sender_provider_verified"):
+        blockers.append("sender provider not verified for live Gmail")
+    if not mailbox_report.get("recipient_deliverability_verified"):
+        blockers.append("recipient deliverability not verified for live Gmail")
+    return blockers
+
+
 def build_profile_testbot_readiness(
     *,
     profile_id: str = "pilot-service-company-v1",
@@ -297,8 +326,15 @@ def build_profile_testbot_readiness(
 
     safety_assertions = _build_safety_assertions(blocked_tenant_checks=blocked_tenant_checks)
     ready = not blocking_failures
+    runtime_sha = _runtime_sha()
+    live_blockers = _live_execution_blockers(
+        ready=ready,
+        mailbox_report=mailbox_report,
+        runtime_sha=runtime_sha,
+    )
+    runner_ready_for_live_execution = ready and not live_blockers
     return {
-        "runtime_sha": _runtime_sha(),
+        "runtime_sha": runtime_sha,
         "profile_id": profile.profile_id,
         "profile_snapshot_hash": profile.profile_snapshot_hash,
         "tenant_id": tenant_id,
@@ -344,7 +380,8 @@ def build_profile_testbot_readiness(
         "blockers": blocking_failures,
         "ready_for_live_semi_auto": ready,
         "runner_ready_for_contract_execution": ready,
-        "runner_ready_for_live_execution": False,
+        "runner_ready_for_live_execution": runner_ready_for_live_execution,
+        "live_execution_blockers": live_blockers,
         "operator_stop": None if ready else OPERATOR_STOP_SEMI_AUTO,
     }
 
