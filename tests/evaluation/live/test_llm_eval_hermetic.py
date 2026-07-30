@@ -677,3 +677,59 @@ def test_operation_reservation_blocks_duplicate_prompt(db, llm_eval_env):
             prompt_name="classification_v1",
             requested_model="gpt-4o-mini",
         )
+
+
+def test_profile_testbot_semi_auto_llm_reservation_allowed(db, llm_eval_env, monkeypatch):
+    approved_sha = "deadbeef1234567890abcdef1234567890abcdef"
+    monkeypatch.setenv("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED", "yes")
+    monkeypatch.setenv("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED_SHA", approved_sha)
+    monkeypatch.setenv("BUILD_COMMIT_SHA", approved_sha)
+    from app.evaluation.live.schemas import TrustedLiveEvalSnapshot
+
+    run_id = "run-ptb-sem-0000"
+    snap = TrustedLiveEvalSnapshot(
+        evaluation_run_id=run_id,
+        tenant_id="TENANT_LIVE_EVAL",
+        scenario_id="PTB-SEM-0000",
+        attempt_id=1,
+        transport_mode="live_gmail",
+        ai_mode="live_llm",
+        fixture_bundle_id=None,
+        expected_sender="sender@eval.test",
+        expected_recipient="recipient@eval.test",
+        llm_provider="openai",
+        llm_requested_model="gpt-4o-mini",
+        llm_max_calls=20,
+        config_hash="cfg",
+        trusted=True,
+    )
+    db.add(
+        LiveEvalRunRow(
+            evaluation_run_id=run_id,
+            tenant_id="TENANT_LIVE_EVAL",
+            scenario_id="PTB-SEM-0000",
+            attempt_id=1,
+            transport_mode="live_gmail",
+            ai_mode="live_llm",
+            fixture_bundle_id=None,
+            expected_sender="sender@eval.test",
+            expected_recipient="recipient@eval.test",
+            llm_provider="openai",
+            llm_requested_model="gpt-4o-mini",
+            llm_max_calls=20,
+            status="registered",
+            created_by="test",
+            created_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=2),
+            config_hash="cfg",
+        )
+    )
+    db.commit()
+
+    op_key = reserve_live_llm_operation(
+        db,
+        snapshot=snap,
+        prompt_name="classification_v1",
+        requested_model="gpt-4o-mini",
+    )
+    assert op_key.startswith(f"{run_id}:app_live_llm:classification_v1:1")

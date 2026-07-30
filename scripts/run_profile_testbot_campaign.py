@@ -5,12 +5,29 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+LIVE_EVAL_ENV_FILE = ROOT / ".env.live-eval.local"
+
+
+def _load_live_eval_env() -> None:
+    if os.environ.get("ENV", "").strip().lower() == "test":
+        return
+    if not LIVE_EVAL_ENV_FILE.is_file():
+        return
+    for line in LIVE_EVAL_ENV_FILE.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip())
+
 
 from app.core.canonical_commit import resolve_canonical_commit
 from app.evaluation.live.config import get_live_eval_config
@@ -57,6 +74,8 @@ def _run_hermetic(args: argparse.Namespace) -> int:
 
 
 def _run_semi_auto(args: argparse.Namespace) -> int:
+    if getattr(args, "confirm_external", False):
+        _load_live_eval_env()
     if getattr(args, "confirm_external", False):
         config = get_live_eval_config()
         senders = sorted(config.sender_emails)
@@ -207,6 +226,11 @@ def _write_readiness_report(report: dict) -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from app.core.settings import get_settings
+
+    settings = get_settings()
+    if settings.ADMIN_API_KEY and not os.environ.get("ADMIN_API_KEY", "").strip():
+        os.environ["ADMIN_API_KEY"] = settings.ADMIN_API_KEY
     parser = argparse.ArgumentParser(description="Profile-driven live testbot campaigns")
     parser.add_argument("--profile-id", default="pilot-service-company-v1")
     parser.add_argument("--seed", type=int, default=0)
@@ -227,6 +251,7 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     if args.command == "readiness":
+        _load_live_eval_env()
         report = build_profile_testbot_readiness(profile_id=args.profile_id)
         report_path = _write_readiness_report(report)
         sys.stdout.buffer.write(json.dumps(report, indent=2, ensure_ascii=False).encode("utf-8"))

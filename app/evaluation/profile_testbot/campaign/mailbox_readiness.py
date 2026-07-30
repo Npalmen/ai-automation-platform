@@ -30,6 +30,18 @@ def mailbox_hash(email: str) -> str:
     return hashlib.sha256(email.strip().lower().encode("utf-8")).hexdigest()
 
 
+def operator_approved_mailbox_hashes() -> frozenset[str]:
+    raw = os.environ.get("PROFILE_TESTBOT_OPERATOR_APPROVED_MAILBOX_HASHES", "")
+    return frozenset(item.strip().lower() for item in raw.split(",") if item.strip())
+
+
+def is_operator_approved_mailbox(email: str) -> bool:
+    normalized = (email or "").strip().lower()
+    if not normalized:
+        return False
+    return mailbox_hash(normalized) in operator_approved_mailbox_hashes()
+
+
 def is_non_deliverable_placeholder(email: str) -> bool:
     normalized = (email or "").strip().lower()
     if not normalized or normalized.count("@") != 1:
@@ -41,6 +53,8 @@ def is_non_deliverable_placeholder(email: str) -> bool:
 
 def looks_deliverable_mailbox(email: str) -> bool:
     normalized = (email or "").strip().lower()
+    if is_operator_approved_mailbox(normalized):
+        return True
     if is_non_deliverable_placeholder(normalized):
         return False
     local, domain = normalized.split("@", 1)
@@ -114,9 +128,9 @@ def verify_profile_testbot_mailboxes(
         blocking.append("sender mailbox is a non-deliverable placeholder")
     if recipient and is_non_deliverable_placeholder(recipient):
         blocking.append("recipient mailbox is a non-deliverable placeholder")
-    if sender and not looks_deliverable_mailbox(sender):
+    if sender and not looks_deliverable_mailbox(sender) and not is_operator_approved_mailbox(sender):
         blocking.append("sender mailbox is not a deliverable provider mailbox")
-    if recipient and not looks_deliverable_mailbox(recipient):
+    if recipient and not looks_deliverable_mailbox(recipient) and not is_operator_approved_mailbox(recipient):
         blocking.append("recipient mailbox is not a deliverable provider mailbox")
 
     sender_oauth_ok, sender_oauth_issues = _oauth_credentials_complete(role="sender")

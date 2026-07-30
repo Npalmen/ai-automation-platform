@@ -13,7 +13,7 @@ def build_profile_testbot_message_body(
     campaign_id: str,
 ) -> str:
     marker = f"<!-- KROWOLF_EVAL:evaluation_run_id={evaluation_run_id} -->"
-    campaign_marker = f"<!-- KROWOLF_PROFILE_TESTBOT:campaign_id={campaign_id} -->"
+    campaign_marker = f"<!-- KROWOLF_PROFILE_TESTBOT:batch_id={campaign_id} -->"
     scenario_marker = f"<!-- KROWOLF_PROFILE_TESTBOT:scenario_id={scenario.scenario_id} -->"
     profile_marker = f"<!-- KROWOLF_PROFILE:{scenario.profile_id} -->"
     text = (scenario.input.message_text or "").strip()

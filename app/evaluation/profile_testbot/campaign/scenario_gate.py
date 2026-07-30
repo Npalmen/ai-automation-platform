@@ -8,12 +8,16 @@ import re
 from app.core.canonical_commit import resolve_canonical_commit
 from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.profile_testbot.campaign.readiness import require_live_semi_auto_runner_execution
+from app.evaluation.profile_testbot.campaign.semi_auto_manifest import is_locked_ptb_sem_scenario_id
 
 _PROFILE_SEMI_AUTO_SCENARIO_RE = re.compile(r"^PTB-SEM-\d{4}$")
 
 
 def is_profile_testbot_semi_auto_scenario(scenario_id: str) -> bool:
-    return bool(_PROFILE_SEMI_AUTO_SCENARIO_RE.match((scenario_id or "").strip()))
+    normalized = (scenario_id or "").strip()
+    if not _PROFILE_SEMI_AUTO_SCENARIO_RE.match(normalized):
+        return False
+    return is_locked_ptb_sem_scenario_id(normalized)
 
 
 def _env_truthy(name: str) -> bool:
