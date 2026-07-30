@@ -78,6 +78,63 @@ qualifications:
       - action.send_customer_auto_reply
       - policy.pre_write_reply_safety
 
+  - id: PROFILE_DRIVEN_SEMI_AUTO_GMAIL_QUALIFIED
+    chapter: profile-testbot
+    scope: profile-driven semi-auto Gmail campaign on isolated live-eval tenant
+    source_workflow_run: pending
+    source_sha: pending
+    contract_version: profile_testbot_v1
+    evidence_schema: profile_testbot_campaign_v1
+    allowed_reuse: true
+    incompatible_changes:
+      - profile oracle contract change
+      - semi-auto operator guard change
+    expiry_policy: stale_on_contract_change
+    default_production_activation: false
+    live_external_write_type: gmail_reply
+    status: PENDING
+    compatible_capabilities:
+      - action.send_customer_auto_reply
+      - approval.lifecycle
+
+  - id: PROFILE_DRIVEN_AUTOMATIC_GMAIL_QUALIFIED
+    chapter: profile-testbot
+    scope: profile-driven automatic Gmail canary/core on isolated live-eval tenant
+    source_workflow_run: pending
+    source_sha: pending
+    contract_version: profile_testbot_v1
+    evidence_schema: profile_testbot_campaign_v1
+    allowed_reuse: true
+    incompatible_changes:
+      - automatic safe-send contract change
+      - profile oracle contract change
+    expiry_policy: stale_on_contract_change
+    default_production_activation: false
+    live_external_write_type: gmail_reply
+    status: PENDING
+    compatible_capabilities:
+      - action.send_customer_auto_reply
+      - policy.pre_write_reply_safety
+
+  - id: PROFILE_DRIVEN_TESTBOT_PASS
+    chapter: profile-testbot
+    scope: profile-driven testbot semi-auto + automatic closure aggregate
+    source_workflow_run: pending
+    source_sha: pending
+    contract_version: profile_testbot_v1
+    evidence_schema: profile_testbot_campaign_v1
+    allowed_reuse: true
+    incompatible_changes:
+      - profile contract version bump without requalification
+    expiry_policy: stale_on_contract_change
+    default_production_activation: false
+    live_external_write_type: gmail_reply
+    status: PENDING
+    compatible_capabilities:
+      - action.send_customer_auto_reply
+      - approval.lifecycle
+      - policy.pre_write_reply_safety
+
   - id: CUSTOMER_CARD_STATEFUL_DIRECT_QUALIFIED
     chapter: F
     scope: customer-card direct domain TBF01-TBF10
