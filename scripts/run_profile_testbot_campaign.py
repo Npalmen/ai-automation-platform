@@ -58,9 +58,38 @@ def _run_hermetic(args: argparse.Namespace) -> int:
 
 def _run_semi_auto(args: argparse.Namespace) -> int:
     if getattr(args, "confirm_external", False):
+        config = get_live_eval_config()
+        senders = sorted(config.sender_emails)
+        recipients = sorted(config.recipient_emails)
+        campaign_id = args.campaign_id or new_campaign_id()
         runtime_sha = args.runtime_sha or resolve_canonical_commit() or "unknown"
-        _emit_stop(OPERATOR_STOP_SEMI_AUTO_RUNNER)
-        return 2
+        import os
+
+        base_url = os.environ.get("LIVE_EVAL_APP_BASE_URL", "").strip()
+        admin_api_key = os.environ.get("ADMIN_API_KEY", "").strip()
+        try:
+            result = run_profile_semi_auto_campaign(
+                SemiAutoRunnerConfig(
+                    campaign_id=campaign_id,
+                    runtime_sha=runtime_sha,
+                    profile_id=args.profile_id,
+                    seed=args.seed,
+                    contract_mode=False,
+                    confirm_external=True,
+                    state_root=args.state_root or None,
+                    sender_email=senders[0] if senders else "",
+                    recipient_email=recipients[0] if recipients else "",
+                    base_url=base_url,
+                    admin_api_key=admin_api_key,
+                ),
+                resume=args.resume,
+            )
+        except LiveEvalSafetyError as exc:
+            print(f"FAIL: {exc}")
+            return 1
+        print(result.overall_status)
+        print(json.dumps(result.to_dict(), indent=2))
+        return 0 if result.overall_status == "PASS" else 1
 
     if getattr(args, "execute_contract", False):
         config = get_live_eval_config()
@@ -129,16 +158,25 @@ def _write_readiness_report(report: dict) -> Path:
         f"- runner_ready_for_live_execution: **{report.get('runner_ready_for_live_execution')}**",
         f"- single_active_consumer: **{report.get('single_active_consumer')}**",
         "",
-        "## Mailbox hashes (redacted)",
-        "",
-        f"- sender_mailbox_hash: `{report.get('sender_mailbox_hash')}`",
-        f"- recipient_mailbox_hash: `{report.get('recipient_mailbox_hash')}`",
-        f"- sender_provider_verified: **{report.get('sender_provider_verified')}**",
-        f"- recipient_deliverability_verified: **{report.get('recipient_deliverability_verified')}**",
-        "",
-        "## Safety assertions",
+        "## Live execution blockers",
         "",
     ]
+    live_blockers = report.get("live_execution_blockers") or []
+    if live_blockers:
+        lines.extend(f"- {item}" for item in live_blockers)
+    else:
+        lines.append("- none")
+    lines.extend(
+        [
+            f"- sender_mailbox_hash: `{report.get('sender_mailbox_hash')}`",
+            f"- recipient_mailbox_hash: `{report.get('recipient_mailbox_hash')}`",
+            f"- sender_provider_verified: **{report.get('sender_provider_verified')}**",
+            f"- recipient_deliverability_verified: **{report.get('recipient_deliverability_verified')}**",
+            "",
+            "## Safety assertions",
+            "",
+        ]
+    )
     assertions = report.get("safety_assertions") or []
     if assertions:
         lines.extend(f"- {item}" for item in assertions)

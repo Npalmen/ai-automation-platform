@@ -37,6 +37,11 @@ def readiness_env(monkeypatch, tmp_path):
     monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_ID", "test-client-id")
     monkeypatch.setenv("LIVE_EVAL_PURGE_ALLOWED", "yes")
     monkeypatch.setenv("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT", "yes")
+    monkeypatch.delenv("LIVE_GMAIL_EVAL_ALLOWED", raising=False)
+    monkeypatch.delenv("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED", raising=False)
+    monkeypatch.delenv("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED_SHA", raising=False)
+    monkeypatch.delenv("LIVE_EVAL_APP_BASE_URL", raising=False)
+    monkeypatch.delenv("ADMIN_API_KEY", raising=False)
     storage = tmp_path / "live_eval"
     storage.mkdir()
     monkeypatch.setenv("STORAGE_PATH", str(tmp_path))

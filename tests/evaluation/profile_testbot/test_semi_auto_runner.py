@@ -56,6 +56,11 @@ def runner_env(monkeypatch, tmp_path):
     monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_ID", "test-client-id")
     monkeypatch.setenv("LIVE_EVAL_PURGE_ALLOWED", "yes")
     monkeypatch.setenv("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT", "yes")
+    monkeypatch.delenv("LIVE_GMAIL_EVAL_ALLOWED", raising=False)
+    monkeypatch.delenv("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED", raising=False)
+    monkeypatch.delenv("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED_SHA", raising=False)
+    monkeypatch.delenv("LIVE_EVAL_APP_BASE_URL", raising=False)
+    monkeypatch.delenv("ADMIN_API_KEY", raising=False)
     state_root = tmp_path / "campaign_state"
     monkeypatch.chdir(tmp_path)
     from app.core.settings import get_settings
@@ -128,7 +133,7 @@ def test_resume_skips_completed_scenarios(runner_env):
         first = run_profile_semi_auto_campaign(config)
     assert first.overall_status == "PASS"
     with patch(
-        "app.evaluation.profile_testbot.campaign.semi_auto_runner._execute_scenario_contract"
+        "app.evaluation.profile_testbot.campaign.semi_auto_runner._execute_scenario"
     ) as execute:
         second = run_profile_semi_auto_campaign(config, resume=True)
         execute.assert_not_called()
@@ -241,6 +246,41 @@ def test_readiness_includes_runner_ready_flags(runner_env):
     report = build_profile_testbot_readiness()
     assert report["runner_ready_for_contract_execution"] is True
     assert report["runner_ready_for_live_execution"] is False
+    assert any(
+        "PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT" in item
+        for item in report.get("live_execution_blockers") or []
+    )
+
+
+def test_readiness_live_execution_requires_runner_sha(runner_env, monkeypatch):
+    monkeypatch.delenv("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT", raising=False)
+    monkeypatch.setenv("LIVE_GMAIL_EVAL_ALLOWED", "yes")
+    monkeypatch.setenv("LIVE_EVAL_APP_BASE_URL", "http://127.0.0.1:8010")
+    monkeypatch.setenv("ADMIN_API_KEY", "test-admin")
+    monkeypatch.setenv("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED", "yes")
+    monkeypatch.setenv("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED_SHA", "test-sha")
+    from app.core.settings import get_settings
+    from app.evaluation.live.config import get_live_eval_config
+
+    get_settings.cache_clear()
+    get_live_eval_config.cache_clear()
+    with patch(
+        "app.evaluation.profile_testbot.campaign.readiness.verify_profile_testbot_mailboxes",
+        return_value={
+            "sender_mailbox_hash": "sender-hash",
+            "recipient_mailbox_hash": "recipient-hash",
+            "sender_provider_verified": True,
+            "recipient_deliverability_verified": True,
+            "blocking_failures": [],
+        },
+    ), patch(
+        "app.evaluation.profile_testbot.campaign.readiness._runtime_sha",
+        return_value="test-sha",
+    ):
+        report = build_profile_testbot_readiness()
+    assert report["runner_ready_for_live_execution"] is True
+    get_settings.cache_clear()
+    get_live_eval_config.cache_clear()
 
 
 def test_cli_execute_contract_without_live_gmail(runner_env, monkeypatch, capsys):
@@ -266,7 +306,7 @@ def test_cli_execute_contract_without_live_gmail(runner_env, monkeypatch, capsys
     assert payload["qualification_status"] == "PENDING"
 
 
-def test_cli_confirm_external_stops(runner_env, capsys):
+def test_cli_confirm_external_fails_without_live_readiness(runner_env, capsys):
     from scripts.run_profile_testbot_campaign import main
 
     exit_code = main(
@@ -276,10 +316,13 @@ def test_cli_confirm_external_stops(runner_env, capsys):
             "--confirm-external",
             "--runtime-sha",
             "abc",
+            "--state-root",
+            str(runner_env),
         ]
     )
-    assert exit_code == 2
-    assert OPERATOR_STOP_SEMI_AUTO_RUNNER in capsys.readouterr().out
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "FAIL:" in captured.out
 
 
 @pytest.mark.integration_db
