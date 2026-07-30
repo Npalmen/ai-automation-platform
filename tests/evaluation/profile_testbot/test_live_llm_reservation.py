@@ -6,6 +6,9 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.evaluation.live.constants import S01_LLM_MAX_CALLS, S01_LLM_PROMPT_ORDER
 from app.evaluation.live.errors import LiveEvalSafetyError
@@ -25,7 +28,15 @@ from app.evaluation.profile_testbot.oracles.runner import run_oracles
 from app.evaluation.profile_testbot.oracles.hard_safety import HardSafetyContext
 from app.evaluation.profile_testbot.generator.profile_generator import generate_semi_auto_campaign
 from app.evaluation.profile_testbot.profile_contract import load_customer_profile
-from app.repositories.postgres.live_eval_models import LiveEvalRunRow
+from app.repositories.postgres.audit_models import AuditEventRecord
+from app.repositories.postgres.database import Base
+from app.repositories.postgres.job_models import JobRecord
+from app.repositories.postgres.live_eval_models import (
+    LiveEvalExternalEventRow,
+    LiveEvalLlmOperationRow,
+    LiveEvalRunRow,
+)
+from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 
 
 _APPROVED_SHA = "deadbeef1234567890abcdef1234567890abcdef"
@@ -50,6 +61,30 @@ def ptb_llm_env(monkeypatch):
     yield
     get_settings.cache_clear()
     get_live_eval_config.cache_clear()
+
+
+@pytest.fixture
+def db(ptb_llm_env):
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(
+        bind=engine,
+        tables=[
+            LiveEvalRunRow.__table__,
+            LiveEvalExternalEventRow.__table__,
+            LiveEvalLlmOperationRow.__table__,
+            AuditEventRecord.__table__,
+            JobRecord.__table__,
+            TenantConfigRecord.__table__,
+        ],
+    )
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    yield session
+    session.close()
 
 
 def _snapshot(
