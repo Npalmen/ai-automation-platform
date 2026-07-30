@@ -88,22 +88,37 @@ def _write_readiness_report(report: dict) -> Path:
         f"- profile_snapshot_hash: `{report.get('profile_snapshot_hash')}`",
         f"- eval_tenant: `{report.get('eval_tenant')}`",
         f"- ready_for_live_semi_auto: **{report.get('ready_for_live_semi_auto')}**",
+        f"- single_active_consumer: **{report.get('single_active_consumer')}**",
         "",
-        "## Allowlists",
+        "## Mailbox hashes (redacted)",
         "",
-        f"- sender: `{report.get('sender_allowlist')}`",
-        f"- recipient: `{report.get('recipient_allowlist')}`",
+        f"- sender_mailbox_hash: `{report.get('sender_mailbox_hash')}`",
+        f"- recipient_mailbox_hash: `{report.get('recipient_mailbox_hash')}`",
+        f"- sender_provider_verified: **{report.get('sender_provider_verified')}**",
+        f"- recipient_deliverability_verified: **{report.get('recipient_deliverability_verified')}**",
         "",
-        "## Semi-auto manifest",
-        "",
-        "```json",
-        json.dumps(report.get("semi_auto_manifest", {}), indent=2, ensure_ascii=False),
-        "```",
-        "",
-        "## Blockers",
+        "## Safety assertions",
         "",
     ]
-    blockers = report.get("blockers") or []
+    assertions = report.get("safety_assertions") or []
+    if assertions:
+        lines.extend(f"- {item}" for item in assertions)
+    else:
+        lines.append("- none")
+    lines.extend(
+        [
+            "",
+            "## Semi-auto manifest",
+            "",
+            "```json",
+            json.dumps(report.get("semi_auto_manifest", {}), indent=2, ensure_ascii=False),
+            "```",
+            "",
+            "## Blocking failures",
+            "",
+        ]
+    )
+    blockers = report.get("blocking_failures") or []
     if blockers:
         lines.extend(f"- {item}" for item in blockers)
     else:
