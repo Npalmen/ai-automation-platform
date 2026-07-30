@@ -74,6 +74,8 @@ def validate_no_production_resources(
 
     if tenant_id == "T_NIKLAS_DEMO_001":
         issues.append("pilot tenant T_NIKLAS_DEMO_001 is not allowed for testbot campaigns")
+    if tenant_id == "TENANT_PRODUCTION_PILOT_01":
+        issues.append("production pilot tenant TENANT_PRODUCTION_PILOT_01 is not allowed for testbot campaigns")
 
     return issues
 
