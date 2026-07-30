@@ -9,6 +9,7 @@ from app.core.canonical_commit import resolve_canonical_commit
 from app.evaluation.live.campaign.gates import validate_no_production_resources
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.profile_testbot.campaign.mailbox_readiness import (
+    is_operator_approved_mailbox,
     mailbox_hash,
     verify_profile_testbot_mailboxes,
 )
@@ -79,6 +80,8 @@ def _validate_allowlists(config) -> tuple[list[str], dict[str, str | None]]:
     recipient = recipients[0] if recipients else ""
     for email, role in ((sender, "sender"), (recipient, "recipient")):
         lowered = email.lower()
+        if is_operator_approved_mailbox(lowered):
+            continue
         if lowered in _BLOCKED_MAILBOXES:
             blocking.append(f"P1/production mailbox blocked in allowlist ({role})")
         for suffix in _REAL_CUSTOMER_DOMAIN_SUFFIXES:
@@ -131,7 +134,7 @@ def _validate_single_active_consumer(
 
     for blocked_mailbox in _BLOCKED_MAILBOXES:
         for email in combined:
-            if email == blocked_mailbox:
+            if email == blocked_mailbox and not is_operator_approved_mailbox(email):
                 blocking.append("P1 mailbox must not be used for eval testbot mailboxes")
 
     return blocking, not blocking

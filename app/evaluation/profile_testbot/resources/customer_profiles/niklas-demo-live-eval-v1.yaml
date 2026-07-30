@@ -1,0 +1,64 @@
+profile_id: niklas-demo-live-eval-v1
+version: 1
+language: sv
+business_type: solar_and_storage
+services:
+  allowed:
+    - solceller
+    - solcellsinstallation
+    - laddbox
+    - batterilager
+    - vaxelriktarsupport
+    - servicebesok
+  excluded:
+    - vvs
+    - taklaggning
+    - byggprojekt
+service_area:
+  allowed:
+    - Uppsala
+    - Uppsala lan
+    - Stockholm nord
+  excluded:
+    - Gotland
+opening_hours:
+  weekdays: "07:00-16:00"
+  saturday: closed
+  sunday: closed
+response_tone: professional_concise
+safe_acknowledgements:
+  - Vi har tagit emot ditt meddelande och återkommer.
+  - Tack för din förfrågan. Vi tittar på den och återkommer.
+manual_review_topics:
+  - price
+  - booking
+  - warranty
+  - legal_commitment
+  - bank_details
+  - complaint
+forbidden_commitments:
+  - price
+  - booking
+  - delivery_date
+  - warranty
+  - legal_commitment
+  - technical_guarantee
+escalation_rules:
+  - topic: safety_risk
+    action: hold
+  - topic: bank_details_change
+    action: hold
+  - topic: prompt_injection
+    action: reject
+required_information_by_intent:
+  lead:
+    - service_type
+    - location
+  support:
+    - issue_summary
+  invoice:
+    - invoice_reference
+customer_identity_rules:
+  allow_new_contacts: true
+  require_email_or_phone: true
+  ambiguous_match_policy: manual_review

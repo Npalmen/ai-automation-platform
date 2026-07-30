@@ -64,6 +64,16 @@ def _hash_validated_output(output: dict[str, Any]) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+def _is_llm_reservation_scenario(scenario_id: str) -> bool:
+    if scenario_id == "S01_lead_laddbox_quality":
+        return True
+    from app.evaluation.profile_testbot.campaign.semi_auto_manifest import (
+        is_locked_ptb_sem_scenario_id,
+    )
+
+    return is_locked_ptb_sem_scenario_id(scenario_id)
+
+
 def _snapshot_call_budget(snapshot: TrustedLiveEvalSnapshot) -> int:
     budget = snapshot.llm_max_calls
     if budget is None:
@@ -71,6 +81,10 @@ def _snapshot_call_budget(snapshot: TrustedLiveEvalSnapshot) -> int:
     if snapshot.scenario_id == "S01_lead_laddbox_quality" and budget != S01_LLM_MAX_CALLS:
         raise LiveEvalSafetyError(
             f"live_llm call budget must be {S01_LLM_MAX_CALLS} for S01, got {budget}"
+        )
+    if _is_llm_reservation_scenario(snapshot.scenario_id) and budget < S01_LLM_MAX_CALLS:
+        raise LiveEvalSafetyError(
+            f"live_llm call budget must be at least {S01_LLM_MAX_CALLS} for {snapshot.scenario_id!r}"
         )
     return budget
 
@@ -190,7 +204,15 @@ def reserve_live_llm_operation(
     pipeline_run_id: str | None = None,
 ) -> str:
     """Atomically reserve one permanent in_progress LLM operation before provider call."""
-    if snapshot.scenario_id != "S01_lead_laddbox_quality":
+    if snapshot.scenario_id == "S01_lead_laddbox_quality":
+        pass
+    elif _is_llm_reservation_scenario(snapshot.scenario_id):
+        from app.evaluation.profile_testbot.campaign.llm_reservation import (
+            validate_profile_testbot_live_llm_reservation,
+        )
+
+        validate_profile_testbot_live_llm_reservation(snapshot)
+    else:
         raise LiveEvalSafetyError(
             f"LLM operation reservation not defined for {snapshot.scenario_id!r}"
         )

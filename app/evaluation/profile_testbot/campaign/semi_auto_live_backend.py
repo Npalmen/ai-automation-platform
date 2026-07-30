@@ -13,7 +13,7 @@ from app.evaluation.live.campaign.test_operator import (
     list_job_approvals,
 )
 from app.evaluation.live.config import LiveEvalConfig, get_live_eval_config
-from app.evaluation.live.errors import LiveEvalPipelinePollError, LiveEvalSafetyError
+from app.evaluation.live.errors import LiveEvalIntakeSkippedError, LiveEvalPipelinePollError, LiveEvalSafetyError
 from app.evaluation.live.gmail_transport import (
     SendOutcome,
     observe_expected_sender_reply,
@@ -156,9 +156,11 @@ class LiveSemiAutoBackend:
                 "scenario_id": scenario.scenario_id,
                 "attempt_id": ctx.attempt_id,
                 "transport_mode": "live_gmail",
-                "ai_mode": "fixture_ai",
+                "ai_mode": "live_llm",
                 "expected_sender": self.sender_email,
                 "expected_recipient": self.recipient_email,
+                "llm_provider": (self.config.llm_provider if self.config else "") or None,
+                "llm_requested_model": (self.config.llm_model if self.config else "") or None,
             }
         )
 
@@ -202,11 +204,16 @@ class LiveSemiAutoBackend:
         except LiveEvalPipelinePollError as exc:
             raise LiveEvalSafetyError(f"intake_timeout: {exc.timeout_reason}") from exc
 
-        recipient_id = str(delivery.get("recipient_gmail_message_id") or "").strip()
+        confirmed = delivery.get("confirmed") or {}
+        recipient_id = str(confirmed.get("message_id") or "").strip()
         if not recipient_id:
             raise LiveEvalSafetyError("intake_timeout: missing recipient message id")
 
-        processed = self.observer.process_delivery(ctx.evaluation_run_id, recipient_id)
+        try:
+            processed = self.observer.process_delivery(ctx.evaluation_run_id, recipient_id)
+        except LiveEvalIntakeSkippedError as exc:
+            reason = str(exc.payload.get("reason") or exc.payload.get("intake_skip_reason") or "intake_skipped")
+            raise LiveEvalSafetyError(f"intake_skipped: {reason}") from exc
         job_id = str(processed.get("job_id") or (processed.get("job") or {}).get("job_id") or "")
         ctx.job_id = job_id or None
         ctx.intake_event_id = recipient_id

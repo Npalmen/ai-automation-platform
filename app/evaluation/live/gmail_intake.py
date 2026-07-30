@@ -35,6 +35,11 @@ _INFERRED_TYPE_TO_JOB_TYPE = {
     "lead": JobType.LEAD,
     "customer_inquiry": JobType.CUSTOMER_INQUIRY,
     "invoice": JobType.INVOICE,
+    "supplier": JobType.SUPPLIER,
+    "partnership": JobType.PARTNERSHIP,
+    "newsletter": JobType.NEWSLETTER,
+    "internal": JobType.INTERNAL,
+    "spam": JobType.SPAM,
 }
 
 

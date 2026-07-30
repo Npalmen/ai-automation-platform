@@ -16,6 +16,7 @@ from app.evaluation.live.constants import (
     S01_LLM_MAX_CALLS,
 )
 from app.evaluation.live.errors import LiveEvalSafetyError
+from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.fixture_bundle import resolve_fixture_bundle_id
 from app.evaluation.live.safety import validate_registration_request
 from app.evaluation.live.schemas import (
@@ -70,9 +71,20 @@ def register_live_eval_run(
     llm_provider: str | None = None
     llm_requested_model: str | None = None
     llm_max_calls: int | None = None
+    config = get_live_eval_config()
     if request.transport_mode == "live_gmail":
         expected_sender = request.expected_sender.strip().lower()
         expected_recipient = request.expected_recipient.strip().lower()
+        if request.ai_mode == "live_llm":
+            llm_provider = (request.llm_provider or config.llm_provider or "").strip() or None
+            llm_requested_model = (
+                request.llm_requested_model or config.llm_model or ""
+            ).strip() or None
+            if not llm_provider or not llm_requested_model:
+                raise LiveEvalSafetyError(
+                    "llm_provider and llm_requested_model are required for profile testbot live_llm"
+                )
+            llm_max_calls = int(config.max_llm_calls_per_run or 20)
     elif request.transport_mode == "fixture_input" and request.ai_mode == "live_llm":
         llm_provider = (request.llm_provider or "").strip()
         llm_requested_model = (request.llm_requested_model or "").strip()
