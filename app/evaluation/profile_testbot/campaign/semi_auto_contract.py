@@ -8,6 +8,10 @@ from typing import Any
 
 from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.profile_testbot.campaign.mailbox_readiness import mailbox_hash
+from app.evaluation.profile_testbot.campaign.post_approval_execution import (
+    ReplyExecutionEvidence,
+    provider_accepted,
+)
 from app.evaluation.profile_testbot.constants import LIVE_EVAL_TENANT_ID
 from app.evaluation.profile_testbot.profile_contract import load_customer_profile
 from app.evaluation.profile_testbot.scenarios.schema import ProfileScenario
@@ -29,6 +33,12 @@ class TestSendResult:
     provider_message_id: str
     idempotency_key: str
     recipient_hash: str
+    inbound_provider_message_id: str = ""
+    inbound_rfc_message_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.inbound_provider_message_id:
+            self.inbound_provider_message_id = self.provider_message_id
 
 
 @dataclass
@@ -53,6 +63,7 @@ class ApprovalResult:
     operation_id: str
     decision: str
     already_resolved: bool = False
+    reply_action_operation_id: str | None = None
 
 
 @dataclass
@@ -63,6 +74,13 @@ class ReplyVerification:
     recipient_verified: bool
     duplicate_send: bool
     reply_hash: str | None
+    inbound_provider_message_id: str | None = None
+    inbound_rfc_message_id: str | None = None
+    reply_provider_message_id: str | None = None
+    reply_rfc_message_id: str | None = None
+    reply_action_operation_id: str | None = None
+    reply_execution_status: str | None = None
+    reply_provider_outcome: str | None = None
 
 
 @dataclass
@@ -77,6 +95,10 @@ class ContractSemiAutoBackend:
     gmail_sends: int = 0
     external_writes: dict[str, int] = field(default_factory=lambda: {"sheets": 0, "monday": 0, "visma": 0})
     automatic_verify_link_merge: int = 0
+    reply_execution: dict[str, ReplyExecutionEvidence] = field(default_factory=dict)
+    simulate_execution_skipped: bool = False
+    simulate_execution_failed: bool = False
+    simulate_execution_outcome_unknown: bool = False
 
     def send_test_message(
         self,
@@ -121,6 +143,7 @@ class ContractSemiAutoBackend:
             provider_message_id=message_id,
             idempotency_key=idempotency_key,
             recipient_hash=mailbox_hash(recipient),
+            inbound_provider_message_id=message_id,
         )
 
     def observe_intake(self, *, scenario_id: str, campaign_id: str) -> IntakeObservation:
@@ -159,17 +182,52 @@ class ContractSemiAutoBackend:
         job = self._job_for_scenario(scenario_id)
         if decision == "approve":
             job["approval_state"] = "approved"
-            self.gmail_sends += 1
+            reply_operation_id = f"reply-op-{scenario_id.lower()}"
+            if self.simulate_execution_skipped:
+                self.reply_execution[scenario_id] = ReplyExecutionEvidence(
+                    reply_action_operation_id=reply_operation_id,
+                    reply_execution_status="skipped",
+                    reply_provider_outcome="skipped",
+                )
+            elif self.simulate_execution_failed:
+                self.reply_execution[scenario_id] = ReplyExecutionEvidence(
+                    reply_action_operation_id=reply_operation_id,
+                    reply_execution_status="failed",
+                    reply_provider_outcome="failed",
+                )
+            elif self.simulate_execution_outcome_unknown:
+                self.reply_execution[scenario_id] = ReplyExecutionEvidence(
+                    reply_action_operation_id=reply_operation_id,
+                    reply_execution_status="outcome_unknown",
+                    reply_provider_outcome="outcome_unknown",
+                )
+            else:
+                reply_provider_id = hashlib.sha256(
+                    f"reply:{scenario_id}:{operation_id}".encode("utf-8")
+                ).hexdigest()[:16]
+                self.reply_execution[scenario_id] = ReplyExecutionEvidence(
+                    reply_action_operation_id=reply_operation_id,
+                    reply_execution_status="succeeded",
+                    reply_provider_outcome="executed",
+                    reply_provider_message_id=reply_provider_id,
+                )
+            resolved = "approved"
         else:
-            job["approval_state"] = decision
-        self.approval_operations[operation_id] = decision
-        return ApprovalResult(operation_id=operation_id, decision=decision)
+            resolved = decision
+        self.approval_operations[operation_id] = resolved
+        return ApprovalResult(
+            operation_id=operation_id,
+            decision=resolved,
+            reply_action_operation_id=self.reply_execution.get(scenario_id, ReplyExecutionEvidence()).reply_action_operation_id,
+        )
 
     def verify_reply(
         self,
         *,
         scenario: ProfileScenario,
         approved: bool,
+        inbound_provider_message_id: str | None = None,
+        inbound_rfc_message_id: str | None = None,
     ) -> ReplyVerification:
         if scenario.expected_send_behavior == "send_after_approval":
             if not approved:
@@ -181,6 +239,30 @@ class ContractSemiAutoBackend:
                     duplicate_send=False,
                     reply_hash=None,
                 )
+            evidence = self.reply_execution.get(scenario.scenario_id)
+            if evidence is None or not provider_accepted(evidence):
+                status = evidence.reply_execution_status if evidence else "not_observed"
+                return ReplyVerification(
+                    execution_intents=1,
+                    adapter_invocations=0,
+                    provider_accepted=False,
+                    recipient_verified=False,
+                    duplicate_send=False,
+                    reply_hash=None,
+                    inbound_provider_message_id=inbound_provider_message_id,
+                    inbound_rfc_message_id=inbound_rfc_message_id,
+                    reply_action_operation_id=evidence.reply_action_operation_id if evidence else None,
+                    reply_execution_status=status,
+                    reply_provider_outcome=evidence.reply_provider_outcome if evidence else None,
+                )
+            if (
+                inbound_provider_message_id
+                and evidence.reply_provider_message_id == inbound_provider_message_id
+            ):
+                raise LiveEvalSafetyError(
+                    "evidence invariant violated: inbound_provider_message_id equals reply_provider_message_id"
+                )
+            self.gmail_sends += 1
             reply_text = "Contract reply body"
             return ReplyVerification(
                 execution_intents=1,
@@ -189,6 +271,12 @@ class ContractSemiAutoBackend:
                 recipient_verified=True,
                 duplicate_send=False,
                 reply_hash=hashlib.sha256(reply_text.encode("utf-8")).hexdigest(),
+                inbound_provider_message_id=inbound_provider_message_id,
+                inbound_rfc_message_id=inbound_rfc_message_id,
+                reply_provider_message_id=evidence.reply_provider_message_id,
+                reply_action_operation_id=evidence.reply_action_operation_id,
+                reply_execution_status=evidence.reply_execution_status,
+                reply_provider_outcome=evidence.reply_provider_outcome,
             )
         return ReplyVerification(
             execution_intents=0,

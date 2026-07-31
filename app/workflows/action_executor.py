@@ -407,7 +407,19 @@ def execute_action(
         }
 
     tenant_id = _get_tenant_id(action)
-    if not _integration_allowed_for_action(action_type, tenant_id, db=db):
+    integration_allowed = _integration_allowed_for_action(action_type, tenant_id, db=db)
+    if not integration_allowed:
+        from app.workflows.live_eval_approval_reply_authorization import (
+            allows_live_eval_approval_gated_customer_reply,
+        )
+
+        integration_allowed = allows_live_eval_approval_gated_customer_reply(
+            action,
+            tenant_id,
+            db,
+            phase="execute",
+        )
+    if not integration_allowed:
         integration = _ACTION_INTEGRATION_MAP[action_type].value
         target = action.get("to") or action.get("item_name") or action.get("channel")
         logger.info(

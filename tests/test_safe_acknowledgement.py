@@ -644,6 +644,46 @@ class TestSafeAckNeedsApprovalRegression:
         mock_adapter.execute_action.assert_called_once()
         assert count_pending_approvals_for_job(updated, db=db) == 0
 
+    def test_live_eval_safe_ack_executes_without_mocking_integration_allowed(self):
+        """Dispatch/execute share contract: empty enabled_external_writes still executes after approval."""
+        db = _sqlite_session()
+        _seed_live_eval_tenant(db)
+        action = {
+            "type": "send_customer_auto_reply",
+            "tenant_id": LIVE_EVAL_TENANT,
+            "to": "customer@example.com",
+            "subject": "Re: test",
+            "body": "Hej, tack för din förfrågan. Vi återkommer.",
+            "_needs_approval": True,
+            "_approval_reason": "safe_acknowledgement_requires_approval",
+            "_safe_acknowledgement_path": True,
+            "_authorization": "execution_allowed",
+        }
+        mock_adapter = MagicMock(
+            execute_action=MagicMock(return_value={"provider": "gmail", "message_id": "reply-1"})
+        )
+        with (
+            patch(
+                "app.workflows.action_executor.get_integration_adapter",
+                return_value=mock_adapter,
+            ),
+            patch(
+                "app.workflows.action_executor.get_integration_connection_config",
+                return_value={"configured": True},
+            ),
+            patch(
+                "app.workflows.action_executor.is_integration_configured",
+                return_value=True,
+            ),
+        ):
+            from app.workflows.action_executor import execute_action
+
+            result = execute_action(action, db=db)
+
+        mock_adapter.execute_action.assert_called_once()
+        assert result.get("integration_result", {}).get("skipped") is not True
+        assert result.get("integration_result", {}).get("reason") != "integration_not_allowed"
+
     def test_ptb_sem_0000_contract_passes_with_materialized_draft(self):
         from app.workflows.processors.policy_processor import process_policy_job
 

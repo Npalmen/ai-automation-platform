@@ -16,7 +16,10 @@ from app.evaluation.profile_testbot.campaign.readiness import (
     build_profile_testbot_readiness,
     require_live_semi_auto_runner_execution,
 )
-from app.evaluation.profile_testbot.campaign.semi_auto_contract import ContractSemiAutoBackend
+from app.evaluation.profile_testbot.campaign.semi_auto_contract import (
+    ContractSemiAutoBackend,
+    ReplyVerification,
+)
 from app.evaluation.profile_testbot.campaign.semi_auto_live_backend import LiveSemiAutoBackend
 from app.evaluation.profile_testbot.campaign.semi_auto_evidence import (
     build_campaign_evidence,
@@ -309,6 +312,23 @@ def run_profile_semi_auto_campaign(
     )
 
 
+def _apply_reply_evidence(scenario_state: ScenarioExecutionState, reply: ReplyVerification) -> None:
+    for key in (
+        "inbound_provider_message_id",
+        "inbound_rfc_message_id",
+        "reply_provider_message_id",
+        "reply_rfc_message_id",
+        "reply_action_operation_id",
+        "reply_execution_status",
+        "reply_provider_outcome",
+    ):
+        value = getattr(reply, key, None)
+        if value:
+            scenario_state.evidence[key] = value
+    if reply.reply_hash:
+        scenario_state.evidence["reply_hash"] = reply.reply_hash
+
+
 def _execute_scenario(
     *,
     config: SemiAutoRunnerConfig,
@@ -334,7 +354,11 @@ def _execute_scenario(
         )
         scenario_state.test_send_idempotency_key = send_result.idempotency_key
         scenario_state.state = CampaignState.TEST_MESSAGE_SENT
-        scenario_state.evidence["provider_message_id"] = send_result.provider_message_id
+        scenario_state.evidence["inbound_provider_message_id"] = (
+            send_result.inbound_provider_message_id or send_result.provider_message_id
+        )
+        if send_result.inbound_rfc_message_id:
+            scenario_state.evidence["inbound_rfc_message_id"] = send_result.inbound_rfc_message_id
 
     intake = backend.observe_intake(scenario_id=scenario.scenario_id, campaign_id=config.campaign_id)
     if intake.tenant_id != config.tenant_id:
@@ -395,13 +419,21 @@ def _execute_scenario(
         scenario_state.approval_operation_id = approval.operation_id
         scenario_state.approval_decision = approval.decision
         approved = True
-        campaign_state.send_budget_used += 1
-        scenario_state.sends = 1
+        if approval.reply_action_operation_id:
+            scenario_state.reply_operation_id = approval.reply_action_operation_id
     else:
         scenario_state.approval_decision = harness.decision
     scenario_state.state = CampaignState.APPROVED_OR_REJECTED
 
-    reply = backend.verify_reply(scenario=scenario, approved=approved)
+    inbound_provider_message_id = scenario_state.evidence.get("inbound_provider_message_id")
+    inbound_rfc_message_id = scenario_state.evidence.get("inbound_rfc_message_id")
+    reply = backend.verify_reply(
+        scenario=scenario,
+        approved=approved,
+        inbound_provider_message_id=inbound_provider_message_id,
+        inbound_rfc_message_id=inbound_rfc_message_id,
+    )
+    _apply_reply_evidence(scenario_state, reply)
     assert_hold_scenario_no_send(
         scenario=scenario,
         sends=scenario_state.sends,
@@ -409,10 +441,23 @@ def _execute_scenario(
     )
     if reply.duplicate_send:
         raise LiveEvalSafetyError("duplicate send detected")
-    if scenario.expected_send_behavior == "send_after_approval" and not reply.recipient_verified:
-        scenario_state.state = CampaignState.RECIPIENT_MISMATCH
-        scenario_state.failure_reason = "recipient verification failed"
-        return scenario_state.to_dict()
+    if scenario.expected_send_behavior == "send_after_approval" and approved:
+        if reply.reply_execution_status in {"skipped", "failed", "outcome_unknown", "not_observed"}:
+            scenario_state.state = CampaignState.SEND_FAILED
+            scenario_state.failure_reason = (
+                f"reply execution {reply.reply_execution_status or 'not_observed'}"
+            )
+            return scenario_state.to_dict()
+        if reply.provider_accepted and not reply.recipient_verified:
+            scenario_state.state = CampaignState.RECIPIENT_MISMATCH
+            scenario_state.failure_reason = "recipient verification failed"
+            return scenario_state.to_dict()
+        if not reply.provider_accepted:
+            scenario_state.state = CampaignState.SEND_FAILED
+            scenario_state.failure_reason = "reply execution not provider accepted"
+            return scenario_state.to_dict()
+        scenario_state.sends = 1
+        campaign_state.send_budget_used += 1
 
     scenario_state.replies = reply.adapter_invocations
     scenario_state.state = CampaignState.REPLY_OBSERVED_OR_NO_SEND_VERIFIED

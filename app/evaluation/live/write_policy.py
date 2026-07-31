@@ -114,10 +114,20 @@ def enforce_live_eval_write_policy(
         db=db,
     )
 
+    from app.workflows.live_eval_approval_reply_authorization import (
+        allows_live_eval_approval_gated_customer_reply,
+    )
+
+    eval_reply_allowed = allows_live_eval_approval_gated_customer_reply(
+        action,
+        snapshot.tenant_id,
+        db,
+        phase="execute",
+    )
     allowed = (
         action_type in _ALLOWED_REPLY_ACTIONS
         and _recipient_matches_allowed(str(target or ""), snapshot)
-        and gmail_write_enabled
+        and (gmail_write_enabled or eval_reply_allowed)
     )
 
     if allowed:
