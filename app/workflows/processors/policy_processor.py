@@ -183,6 +183,8 @@ def process_policy_job(job: Job, db: Session | None = None, trace=None) -> Job:
         invoice_has_issues=invoice_has_issues,
     )
 
+    decisioning_reasons = list(decisioning_payload.get("reasons") or [])
+
     safe_ack = evaluate_safe_acknowledgement_eligibility(
         detected_job_type=detected_job_type,
         risk_detected=bool(risk["risk_detected"]),
@@ -193,6 +195,7 @@ def process_policy_job(job: Job, db: Session | None = None, trace=None) -> Job:
         recommendation_raw=str(decisioning_raw) if decisioning_raw is not None else None,
         low_confidence=low_confidence,
         used_fallback=used_fallback,
+        decisioning_reasons=decisioning_reasons,
     )
     safe_acknowledgement_path = safe_ack.eligible
 
@@ -216,7 +219,7 @@ def process_policy_job(job: Job, db: Session | None = None, trace=None) -> Job:
     if safe_acknowledgement_path:
         requires_human_review = True
         target_queue = target_queue or "manual_review"
-        recommended_next_step = "awaiting_approval"
+        recommended_next_step = "manual_review"
 
     if requires_human_review and not target_queue:
         target_queue = "manual_review"

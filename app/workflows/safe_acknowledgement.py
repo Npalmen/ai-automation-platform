@@ -86,6 +86,7 @@ def evaluate_safe_acknowledgement_eligibility(
     recommendation_raw: str | None,
     low_confidence: bool,
     used_fallback: bool,
+    decisioning_reasons: list[str] | None = None,
 ) -> SafeAcknowledgementEligibility:
     """Return whether a safe acknowledgement draft may be prepared for approval."""
     reasons: list[str] = []
@@ -125,10 +126,26 @@ def evaluate_safe_acknowledgement_eligibility(
     if recommendation == DecisionRecommendation.HOLD:
         return SafeAcknowledgementEligibility(False, ("decisioning_hold",))
 
+    if decisioning_reasons:
+        blocked_reasons = frozenset(
+            {
+                "ambiguous_context",
+                "identity_conflict",
+                "prompt_injection",
+                "spam_detected",
+            }
+        )
+        matched = [reason for reason in decisioning_reasons if reason in blocked_reasons]
+        if matched:
+            return SafeAcknowledgementEligibility(False, tuple(matched))
+
     combined_text = " ".join(
         str(input_data.get(key) or "")
         for key in ("subject", "message_text")
     )
+    if "fwd:" in combined_text.lower() or "vidarebefordrat" in combined_text.lower():
+        return SafeAcknowledgementEligibility(False, ("forwarded_thread_context",))
+
     forbidden = _inbound_forbidden_topics(combined_text)
     if forbidden:
         return SafeAcknowledgementEligibility(False, tuple(forbidden))
@@ -136,12 +153,20 @@ def evaluate_safe_acknowledgement_eligibility(
     if _is_out_of_area(combined_text):
         return SafeAcknowledgementEligibility(False, ("out_of_service_area",))
 
-    # Incomplete-but-comprehensible: missing identity/service only, or manual review routing.
-    soft_signals = bool(issue_set) or low_confidence or used_fallback
+    # Incomplete-but-comprehensible: identity gaps or explicit manual-review routing.
+    # missing_requested_service alone on an auto_route lead must not override full_auto.
+    soft_signals = (
+        "missing_identity" in issue_set
+        or low_confidence
+        or used_fallback
+    )
     manual_review_signal = recommendation in (
         DecisionRecommendation.MANUAL_REVIEW,
         None,
     )
+    if recommendation == DecisionRecommendation.AUTO_ROUTE and not soft_signals:
+        return SafeAcknowledgementEligibility(False, ("auto_route_without_identity_gap",))
+
     if not soft_signals and not manual_review_signal:
         return SafeAcknowledgementEligibility(False, ("complete_enough_for_auto_path",))
 
