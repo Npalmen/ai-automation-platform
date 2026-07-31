@@ -36,6 +36,22 @@ _EMAIL_ACTION_TYPES = frozenset({
     "send_email",
 })
 
+# Post-approval execute/write-policy contracts require these metadata fields on delivery.
+_APPROVAL_DELIVERY_METADATA_KEYS = frozenset({
+    "_needs_approval",
+    "_approval_reason",
+    "_safe_acknowledgement_path",
+})
+
+
+def _approval_delivery_payload(action: dict[str, Any]) -> dict[str, Any]:
+    """Strip internal dispatch keys while preserving approval-gating metadata."""
+    return {
+        key: value
+        for key, value in action.items()
+        if not str(key).startswith("_") or key in _APPROVAL_DELIVERY_METADATA_KEYS
+    }
+
 _NO_REPLY_RE = re.compile(r"\b(?:no[-_. ]?reply|donotreply)\b", re.IGNORECASE)
 _EMAIL_RE = re.compile(r"([A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,})", re.IGNORECASE)
 _LEAD_SLA_TARGET_MINUTES = 15
@@ -1313,7 +1329,7 @@ def _create_action_approval_record(
         "action_fingerprint": action.get("_action_fingerprint"),
     }
 
-    delivery = {k: v for k, v in action.items() if not str(k).startswith("_")}
+    delivery = _approval_delivery_payload(action)
 
     ApprovalRequestRepository.upsert_from_payload(
         db=db,

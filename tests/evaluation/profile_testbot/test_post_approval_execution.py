@@ -603,3 +603,66 @@ class TestRunnerSkippedExecution:
         assert result["state"] == CampaignState.SEND_FAILED.value
         assert "skipped" in (result.get("failure_reason") or "")
         assert backend.gmail_sends == 0
+
+
+class TestApprovalDeliveryMetadata:
+    def test_delivery_payload_preserves_approval_gating_metadata(self):
+        from app.workflows.processors.action_dispatch_processor import _approval_delivery_payload
+
+        action = {
+            "type": "send_customer_auto_reply",
+            "to": RECIPIENT,
+            "subject": "Re: test",
+            "body": "Hej, tack för din förfrågan. Vi återkommer.",
+            "_needs_approval": True,
+            "_approval_reason": "safe_acknowledgement_requires_approval",
+            "_safe_acknowledgement_path": True,
+            "_action_operation_id": "op-123",
+            "_skip": False,
+        }
+        delivery = _approval_delivery_payload(action)
+        assert delivery["_needs_approval"] is True
+        assert delivery["_approval_reason"] == "safe_acknowledgement_requires_approval"
+        assert delivery["_safe_acknowledgement_path"] is True
+        assert "_action_operation_id" not in delivery
+        assert "_skip" not in delivery
+
+    def test_write_policy_allows_post_approval_delivery_with_metadata(self, tenant_db):
+        action = {
+            "type": "send_customer_auto_reply",
+            "to": SENDER,
+            "_needs_approval": True,
+            "_approval_reason": "safe_acknowledgement_requires_approval",
+            "_safe_acknowledgement_path": True,
+            "_authorization": "execution_allowed",
+        }
+        snapshot = TrustedLiveEvalSnapshot(
+            evaluation_run_id="run-1",
+            tenant_id=LIVE_EVAL_TENANT,
+            scenario_id="PTB-SEM-0000",
+            attempt_id=1,
+            transport_mode="live_gmail",
+            ai_mode="live_llm",
+            expected_sender=SENDER,
+            expected_recipient=RECIPIENT,
+            config_hash="cfg",
+            trusted=True,
+        )
+        with live_eval_context(snapshot, db=tenant_db):
+            with (
+                patch(
+                    "app.evaluation.live.write_policy.validate_trusted_live_eval_context",
+                    return_value=snapshot,
+                ),
+                patch("app.evaluation.live.write_policy.emit_live_eval_audit"),
+            ):
+                enforce_live_eval_write_policy(
+                    action,
+                    db=tenant_db,
+                    job=Job(
+                        job_id=str(uuid.uuid4()),
+                        tenant_id=LIVE_EVAL_TENANT,
+                        job_type=JobType.LEAD,
+                        input_data={"evaluation_run_id": "run-1"},
+                    ),
+                )
