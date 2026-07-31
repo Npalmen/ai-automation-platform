@@ -232,6 +232,9 @@ class WorkflowOrchestrator:
         decision = policy_payload.get("decision")
         recommended_next_step = policy_payload.get("recommended_next_step")
 
+        if policy_payload.get("safe_acknowledgement_path"):
+            return False
+
         if decision == "send_for_approval":
             return True
 
