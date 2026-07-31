@@ -196,6 +196,7 @@ class TestActionDispatchSafeAcknowledgement:
         assert "återkommer" in body_text.lower()
         assert "kostar" not in body_text.lower()
         assert "bokad" not in body_text.lower()
+        assert "ärende kommer" not in body_text.lower()
 
     def test_no_reply_address_skips_customer_draft(self):
         from app.workflows.processors.action_dispatch_processor import process_action_dispatch_job

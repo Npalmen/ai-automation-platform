@@ -190,6 +190,6 @@ def build_safe_acknowledgement_body(
         f"{service_line}\n\n"
         "För att vi ska kunna gå vidare behöver vi:\n"
         f"{question_block}\n\n"
-        "Ditt ärende kommer att granskas av oss innan vi återkommer."
+        "Förfrågan granskas av oss innan vi återkommer."
         f"{closing}"
     )
