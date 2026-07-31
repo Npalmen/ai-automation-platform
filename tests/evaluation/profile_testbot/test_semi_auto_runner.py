@@ -220,6 +220,46 @@ def test_runner_sha_approval_matches(monkeypatch):
     assert require_live_semi_auto_runner_execution(runtime_sha="abc123") is None
 
 
+def test_approve_http_does_not_increment_gmail_sends(runner_env):
+    backend = ContractSemiAutoBackend(sender_email=SENDER, recipient_email=RECIPIENT)
+    profile = load_customer_profile("pilot-service-company-v1")
+    scenario = next(
+        s
+        for s in generate_semi_auto_campaign(profile, seed=0)
+        if s.expected_send_behavior == "send_after_approval"
+    )
+    backend.send_test_message(campaign_id="c1", scenario=scenario, idempotency_key="k1")
+    backend.approve_via_lifecycle(
+        scenario_id=scenario.scenario_id, operation_id="op-1", decision="approve"
+    )
+    assert backend.gmail_sends == 0
+
+
+def test_skipped_execution_does_not_increment_gmail_sends(runner_env):
+    backend = ContractSemiAutoBackend(
+        sender_email=SENDER,
+        recipient_email=RECIPIENT,
+        simulate_execution_skipped=True,
+    )
+    profile = load_customer_profile("pilot-service-company-v1")
+    scenario = next(
+        s
+        for s in generate_semi_auto_campaign(profile, seed=0)
+        if s.expected_send_behavior == "send_after_approval"
+    )
+    send = backend.send_test_message(campaign_id="c1", scenario=scenario, idempotency_key="k1")
+    backend.approve_via_lifecycle(
+        scenario_id=scenario.scenario_id, operation_id="op-1", decision="approve"
+    )
+    reply = backend.verify_reply(
+        scenario=scenario,
+        approved=True,
+        inbound_provider_message_id=send.inbound_provider_message_id,
+    )
+    assert reply.adapter_invocations == 0
+    assert backend.gmail_sends == 0
+
+
 def test_production_pilot_tenant_blocked_in_runner(runner_env):
     with pytest.raises(LiveEvalSafetyError):
         run_profile_semi_auto_campaign(

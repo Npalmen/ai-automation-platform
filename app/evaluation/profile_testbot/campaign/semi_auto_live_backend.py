@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+import httpx
+
 from app.evaluation.live.campaign.test_operator import (
     PendingApproval,
     approve_approval,
@@ -22,6 +24,12 @@ from app.evaluation.live.gmail_transport import (
 from app.evaluation.live.observer import LiveEvalObserver
 from app.evaluation.live.registry import new_evaluation_run_id
 from app.evaluation.profile_testbot.campaign.mailbox_readiness import mailbox_hash
+from app.evaluation.profile_testbot.campaign.post_approval_execution import (
+    JobActionExecutionSnapshot,
+    ReplyExecutionEvidence,
+    poll_post_approval_reply_execution,
+    provider_accepted,
+)
 from app.evaluation.profile_testbot.campaign.semi_auto_contract import (
     ApprovalResult,
     IntakeObservation,
@@ -55,8 +63,6 @@ def _draft_text_from_job_and_approvals(
     job_id: str,
     job: dict[str, Any],
 ) -> str:
-    import httpx
-
     response = httpx.get(
         f"{base_url.rstrip('/')}/jobs/{job_id}/approvals",
         headers={
@@ -82,6 +88,35 @@ def _draft_text_from_job_and_approvals(
     return ""
 
 
+def _fetch_job_actions(
+    *,
+    base_url: str,
+    admin_api_key: str,
+    tenant_id: str,
+    job_id: str,
+) -> list[JobActionExecutionSnapshot]:
+    response = httpx.get(
+        f"{base_url.rstrip('/')}/jobs/{job_id}/actions",
+        headers={
+            "X-Admin-API-Key": admin_api_key,
+            "X-Tenant-ID": tenant_id,
+        },
+        timeout=30.0,
+    )
+    response.raise_for_status()
+    snapshots: list[JobActionExecutionSnapshot] = []
+    for row in response.json().get("items") or []:
+        snapshots.append(
+            JobActionExecutionSnapshot(
+                action_type=str(row.get("action_type") or ""),
+                status=str(row.get("status") or ""),
+                error_message=row.get("error_message"),
+                external_id=row.get("external_id"),
+            )
+        )
+    return snapshots
+
+
 @dataclass
 class _ScenarioRunContext:
     evaluation_run_id: str
@@ -91,7 +126,9 @@ class _ScenarioRunContext:
     send_outcome: SendOutcome | None = None
     send_window_start: datetime = field(default_factory=_utcnow)
     observation: dict[str, Any] = field(default_factory=dict)
-    provider_message_id: str | None = None
+    inbound_provider_message_id: str | None = None
+    inbound_rfc_message_id: str | None = None
+    reply_execution: ReplyExecutionEvidence | None = None
 
 
 @dataclass
@@ -180,12 +217,15 @@ class LiveSemiAutoBackend:
             config=self.config,
         )
         ctx.send_outcome = outcome
-        ctx.provider_message_id = outcome.sender_gmail_message_id
+        ctx.inbound_provider_message_id = outcome.sender_gmail_message_id
+        ctx.inbound_rfc_message_id = outcome.rfc_message_id
         return TestSendResult(
             accepted=True,
             provider_message_id=outcome.sender_gmail_message_id,
             idempotency_key=idempotency_key,
             recipient_hash=mailbox_hash(recipient),
+            inbound_provider_message_id=outcome.sender_gmail_message_id,
+            inbound_rfc_message_id=outcome.rfc_message_id,
         )
 
     def observe_intake(self, *, scenario_id: str, campaign_id: str) -> IntakeObservation:
@@ -293,6 +333,7 @@ class LiveSemiAutoBackend:
         )
         if target is None:
             raise LiveEvalSafetyError("approval blocked: no pending approval")
+        reply_operation_id = target.action_operation_id
         if decision == "approve":
             result = approve_approval(
                 base_url=self.base_url,
@@ -305,18 +346,36 @@ class LiveSemiAutoBackend:
                 raise LiveEvalSafetyError(
                     f"approval failed: http_status={result.http_status}"
                 )
-            self.gmail_sends += 1
+            ctx.reply_execution = poll_post_approval_reply_execution(
+                lambda: self.observer.get_observation(ctx.evaluation_run_id),
+                lambda: _fetch_job_actions(
+                    base_url=self.base_url,
+                    admin_api_key=self.admin_api_key,
+                    tenant_id=self.tenant_id,
+                    job_id=ctx.job_id or "",
+                ),
+                action_operation_id=reply_operation_id,
+                inbound_provider_message_id=ctx.inbound_provider_message_id,
+                inbound_rfc_message_id=ctx.inbound_rfc_message_id,
+                timeout_seconds=120.0,
+            )
             resolved = "approved"
         else:
             resolved = decision
         self.approval_operations[operation_id] = resolved
-        return ApprovalResult(operation_id=operation_id, decision=resolved)
+        return ApprovalResult(
+            operation_id=operation_id,
+            decision=resolved,
+            reply_action_operation_id=reply_operation_id,
+        )
 
     def verify_reply(
         self,
         *,
         scenario: ProfileScenario,
         approved: bool,
+        inbound_provider_message_id: str | None = None,
+        inbound_rfc_message_id: str | None = None,
     ) -> ReplyVerification:
         if scenario.expected_send_behavior != "send_after_approval" or not approved:
             return ReplyVerification(
@@ -329,7 +388,55 @@ class LiveSemiAutoBackend:
             )
 
         ctx = self._run_context(scenario.scenario_id)
-        evidence = observe_expected_sender_reply(
+        inbound_id = inbound_provider_message_id or ctx.inbound_provider_message_id
+        inbound_rfc = inbound_rfc_message_id or ctx.inbound_rfc_message_id
+        evidence = ctx.reply_execution
+
+        if evidence is None or not provider_accepted(evidence):
+            status = evidence.reply_execution_status if evidence else "not_observed"
+            return ReplyVerification(
+                execution_intents=1,
+                adapter_invocations=0,
+                provider_accepted=False,
+                recipient_verified=False,
+                duplicate_send=False,
+                reply_hash=None,
+                inbound_provider_message_id=inbound_id,
+                inbound_rfc_message_id=inbound_rfc,
+                reply_action_operation_id=evidence.reply_action_operation_id if evidence else None,
+                reply_execution_status=status,
+                reply_provider_outcome=evidence.reply_provider_outcome if evidence else None,
+            )
+
+        if (
+            inbound_id
+            and evidence.reply_provider_message_id
+            and inbound_id == evidence.reply_provider_message_id
+        ):
+            raise LiveEvalSafetyError(
+                "evidence invariant violated: inbound_provider_message_id equals reply_provider_message_id"
+            )
+
+        if evidence.reply_execution_status == "outcome_unknown":
+            return ReplyVerification(
+                execution_intents=1,
+                adapter_invocations=0,
+                provider_accepted=False,
+                recipient_verified=False,
+                duplicate_send=False,
+                reply_hash=None,
+                inbound_provider_message_id=inbound_id,
+                inbound_rfc_message_id=inbound_rfc,
+                reply_provider_message_id=evidence.reply_provider_message_id,
+                reply_rfc_message_id=evidence.reply_rfc_message_id,
+                reply_action_operation_id=evidence.reply_action_operation_id,
+                reply_execution_status=evidence.reply_execution_status,
+                reply_provider_outcome=evidence.reply_provider_outcome,
+            )
+
+        self.gmail_sends += 1
+        reply_provider_id = evidence.reply_provider_message_id
+        observed = observe_expected_sender_reply(
             evaluation_run_id=ctx.evaluation_run_id,
             scenario_id=scenario.scenario_id,
             attempt_id=ctx.attempt_id,
@@ -338,17 +445,26 @@ class LiveSemiAutoBackend:
             send_window_start=ctx.send_window_start,
             timeout_seconds=180.0,
             campaign_run_id=self.campaign_id,
+            provider_message_id=reply_provider_id,
+            inbound_rfc_message_id=inbound_rfc,
         )
-        if evidence is None:
+        if observed is None:
             return ReplyVerification(
                 execution_intents=1,
-                adapter_invocations=0,
-                provider_accepted=False,
+                adapter_invocations=1,
+                provider_accepted=True,
                 recipient_verified=False,
                 duplicate_send=False,
                 reply_hash=None,
+                inbound_provider_message_id=inbound_id,
+                inbound_rfc_message_id=inbound_rfc,
+                reply_provider_message_id=reply_provider_id,
+                reply_rfc_message_id=evidence.reply_rfc_message_id,
+                reply_action_operation_id=evidence.reply_action_operation_id,
+                reply_execution_status=evidence.reply_execution_status,
+                reply_provider_outcome=evidence.reply_provider_outcome,
             )
-        reply_hash = hashlib.sha256(evidence.message_id.encode("utf-8")).hexdigest()
+        reply_hash = hashlib.sha256(observed.message_id.encode("utf-8")).hexdigest()
         return ReplyVerification(
             execution_intents=1,
             adapter_invocations=1,
@@ -356,4 +472,11 @@ class LiveSemiAutoBackend:
             recipient_verified=True,
             duplicate_send=False,
             reply_hash=reply_hash,
+            inbound_provider_message_id=inbound_id,
+            inbound_rfc_message_id=inbound_rfc,
+            reply_provider_message_id=reply_provider_id,
+            reply_rfc_message_id=evidence.reply_rfc_message_id,
+            reply_action_operation_id=evidence.reply_action_operation_id,
+            reply_execution_status=evidence.reply_execution_status,
+            reply_provider_outcome=evidence.reply_provider_outcome,
         )

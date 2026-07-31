@@ -86,6 +86,23 @@ def _customer_reply_integration_selected(tenant_id: str, db: Session | None) -> 
     )
 
 
+def _allows_live_eval_approval_gated_materialization(
+    action: dict[str, Any],
+    tenant_id: str,
+    db: Session | None,
+) -> bool:
+    from app.workflows.live_eval_approval_reply_authorization import (
+        allows_live_eval_approval_gated_customer_reply,
+    )
+
+    return allows_live_eval_approval_gated_customer_reply(
+        action,
+        tenant_id,
+        db,
+        phase="dispatch_materialize",
+    )
+
+
 def _integration_allowed_at_dispatch(
     action_type: str,
     tenant_id: str,
@@ -149,9 +166,9 @@ def _apply_dispatch_authorization(
                     db,
                 )
                 if not integration_allowed and not (
-                    annotated.get("_needs_approval")
-                    and str(annotated.get("type") or "") == "send_customer_auto_reply"
-                    and _customer_reply_integration_selected(job.tenant_id, db)
+                    _allows_live_eval_approval_gated_materialization(
+                        annotated, job.tenant_id, db
+                    )
                 ):
                     annotated = _build_skipped_action(
                         str(annotated.get("type") or "unknown"),
