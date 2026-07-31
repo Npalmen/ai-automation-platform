@@ -181,9 +181,9 @@ def test_production_demo_blocking_remains_active_after_fix(readiness_env):
     assert report["demo_tenant_blocked"] is True
 
 
-def test_live_qualifications_remain_pending(readiness_env):
+def test_live_qualifications_after_semi_auto_closure(readiness_env):
     report = build_profile_testbot_readiness()
-    assert report["live_qualifications"]["PROFILE_DRIVEN_SEMI_AUTO_GMAIL_QUALIFIED"] == "PENDING"
+    assert report["live_qualifications"]["PROFILE_DRIVEN_SEMI_AUTO_GMAIL_QUALIFIED"] == "VALID"
     assert report["live_qualifications"]["PROFILE_DRIVEN_AUTOMATIC_GMAIL_QUALIFIED"] == "PENDING"
     assert report["live_qualifications"]["PROFILE_DRIVEN_TESTBOT_PASS"] == "PENDING"
 

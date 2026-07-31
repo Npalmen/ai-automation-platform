@@ -81,8 +81,8 @@ qualifications:
   - id: PROFILE_DRIVEN_SEMI_AUTO_GMAIL_QUALIFIED
     chapter: profile-testbot
     scope: profile-driven semi-auto Gmail campaign on isolated live-eval tenant
-    source_workflow_run: pending
-    source_sha: pending
+    source_workflow_run: "30659465404"
+    source_sha: 1c4213dcd5eac31858c2bb2ba2d590623d9d5f61
     contract_version: profile_testbot_v1
     evidence_schema: profile_testbot_campaign_v1
     allowed_reuse: true
@@ -92,7 +92,7 @@ qualifications:
     expiry_policy: stale_on_contract_change
     default_production_activation: false
     live_external_write_type: gmail_reply
-    status: PENDING
+    status: VALID
     compatible_capabilities:
       - action.send_customer_auto_reply
       - approval.lifecycle

@@ -8,6 +8,8 @@
 
 ## Last verified date
 
+2026-07-31 (Profile testbot semi-auto Gmail closure — runtime SHA `1c4213dcd5eac31858c2bb2ba2d590623d9d5f61` PR #123+#124; post-merge Release Gate `30659465404`; Regression Main `30659465594`; 4-scenario canary `3950058c` 4/4 PASS; full campaign `3f416a93` 40/40 PASS on `TENANT_LIVE_EVAL` / `niklas-demo-live-eval-v1`; 20 approval-gated Gmail replies provider-accepted + recipient-verified; 20 hold/reject/no_reply with 0 sends; `PROFILE_DRIVEN_SEMI_AUTO_GMAIL_QUALIFIED` registered; `PROFILE_DRIVEN_AUTOMATIC_GMAIL_QUALIFIED` + `PROFILE_DRIVEN_TESTBOT_PASS` remain PENDING; production activation not implied.)
+
 2026-07-29 (Production pilot P1 operational ready — runtime SHA `86c32f1` PR #112+#113; post-merge Release Gate `30495794549`; Regression Main `30495794441`; operational-ready workflow `30496397047`; `PRODUCTION_PILOT_P1_OPERATIONAL_READY`; observability daily report + ground-truth reviews + runtime readiness; historical technical P1 SHA `a7409c9`; P2 NO-GO; no production deploy; observation window not started.)
 
 2026-07-29 (Production pilot P1 observe-only — runtime SHA `a7409c9` PR #110; post-merge Release Gate `30488429460`; Regression Main `30488429425`; P1 qualification workflow `30489173208`; `TENANT_PRODUCTION_PILOT_01` @ P1; `PRODUCTION_PILOT_P1_OBSERVE_QUALIFIED` + `PRODUCTION_PILOT_ACTIVE`; Gmail replies 0; external writes 0; P2 not authorized.)

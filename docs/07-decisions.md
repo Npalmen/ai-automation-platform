@@ -791,3 +791,20 @@ Reference: `docs/plans/production-pilot-p1-observability-fix-plan.md`, `app/prod
 **Classification:** `EVAL_STACK_RUNTIME_SHA_MISMATCH`, `READINESS_REMOTE_RUNTIME_SHA_NOT_ENFORCED`  
 **Reference:** `app/evaluation/profile_testbot/campaign/runtime_sha_readiness.py`, `app/evaluation/live/pipeline_runtime.py`
 
+---
+
+## DEC-044 — Profile testbot semi-auto Gmail qualification (2026-07-31)
+
+**Status:** Active — `PROFILE_DRIVEN_SEMI_AUTO_GMAIL_QUALIFIED` registered at runtime SHA `1c4213dcd5eac31858c2bb2ba2d590623d9d5f61` (PR #123 + PR #124)
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **Isolated eval tenant only** | Live evidence on `TENANT_LIVE_EVAL` with dedicated eval mailboxes; no production pilot or demo tenant impact |
+| 2 | **Post-approval execution contract** | Dispatch and execute share authorization; harness counts provider outcomes not approve HTTP; inbound/reply provider IDs remain separate |
+| 3 | **Approval metadata preservation** | `_needs_approval`, `_approval_reason`, `_safe_acknowledgement_path` must survive `delivery_payload` through approval execute |
+| 4 | **Semi-auto campaign evidence** | 40-scenario manifest: 20 `send_after_approval`, 20 hold/reject/no_reply; max 20 Gmail replies; 0 non-Gmail writes |
+| 5 | **Qualification scope** | Registers semi-auto Gmail only; `PROFILE_DRIVEN_AUTOMATIC_GMAIL_QUALIFIED` and `PROFILE_DRIVEN_TESTBOT_PASS` remain PENDING |
+
+**Evidence:** Release Gate `30659465404`; canary `3950058c` 4/4 PASS; full campaign `3f416a93` 40/40 PASS.  
+**Reference:** `app/evaluation/regression/qualification_registry.yaml`, `app/evaluation/profile_testbot/campaign/semi_auto_runner.py`
+

@@ -327,9 +327,13 @@ def build_profile_testbot_readiness(
         QUALIFICATION_AUTOMATIC: qualifications.get(QUALIFICATION_AUTOMATIC, {}).get("status"),
         QUALIFICATION_PASS: qualifications.get(QUALIFICATION_PASS, {}).get("status"),
     }
-    if live_quals[QUALIFICATION_SEMI_AUTO] != "PENDING":
+    if live_quals[QUALIFICATION_SEMI_AUTO] not in {"PENDING", "VALID"}:
         blocking_failures.append(
-            f"{QUALIFICATION_SEMI_AUTO} must remain PENDING until live semi-auto PASS"
+            f"{QUALIFICATION_SEMI_AUTO} has unknown status {live_quals[QUALIFICATION_SEMI_AUTO]!r}"
+        )
+    elif live_quals[QUALIFICATION_SEMI_AUTO] == "VALID":
+        blocking_failures.append(
+            f"{QUALIFICATION_SEMI_AUTO} already registered; new live semi-auto run requires re-qualification"
         )
 
     cleanup_ready = os.path.isdir(config.storage_root) or _env_truthy("LIVE_EVAL_PURGE_ALLOWED")
