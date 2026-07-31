@@ -42,7 +42,11 @@ def _register(client, run_id: str = "run-obs-1"):
         )
 
 
-def test_runtime_readiness(client):
+def test_runtime_readiness(client, monkeypatch):
+    monkeypatch.setenv(
+        "BUILD_GIT_SHA",
+        "84887d9f336a27e94b0a7dcf8398e8b6d81338af",
+    )
     response = client.get(
         "/admin/live-eval/runtime-readiness",
         headers={"X-Admin-API-Key": "test-admin-key"},
@@ -51,6 +55,9 @@ def test_runtime_readiness(client):
     body = response.json()
     assert body["env"] == "test"
     assert "database_ok" in body
+    assert body["build_git_sha"] == "84887d9f336a27e94b0a7dcf8398e8b6d81338af"
+    assert body["api_build_git_sha"] == "84887d9f336a27e94b0a7dcf8398e8b6d81338af"
+    assert body["worker_build_git_sha"] == "84887d9f336a27e94b0a7dcf8398e8b6d81338af"
 
 
 def test_get_run_summary(client):

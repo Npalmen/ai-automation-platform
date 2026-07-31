@@ -774,3 +774,20 @@ Reference: `docs/plans/production-pilot-p1-observability-fix-plan.md`, `app/prod
 **Reason:** Live canary `077542fc` showed LLM reservation works but pipeline conflated `manual_review` routing with `hold_for_review`, producing no draft for `send_after_approval` scenarios.  
 **Reference:** `app/workflows/safe_acknowledgement.py`, `app/workflows/processors/policy_processor.py`, `app/workflows/processors/action_dispatch_processor.py`
 
+---
+
+## DEC-047 — Remote eval-stack runtime SHA is authoritative for profile testbot readiness (2026-07-31)
+
+**Status:** Active — branch `fix/live-eval-runtime-sha-readiness`
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **Remote runtime authoritative** | Profile testbot readiness must verify `/admin/live-eval/runtime-readiness`; local `GIT_COMMIT`/checkout is not server proof |
+| 2 | **Full SHA consistency** | Operator-approved SHA, API `build_git_sha`, and pipeline `worker_build_git_sha` must all match exactly (40-char hex) |
+| 3 | **Fail-closed** | Endpoint down, auth failure, missing/short SHA, or API/worker mismatch → `runner_ready_for_live_execution=false` |
+| 4 | **Read-only** | Readiness performs no Gmail sends, approvals, jobs, or qualification changes |
+
+**Reason:** Canary `053b92ed` ran against server SHA `3d2b0ac` while client readiness was green on authorized `84887d9`; PR #120 safe-ack path was not live-verified.  
+**Classification:** `EVAL_STACK_RUNTIME_SHA_MISMATCH`, `READINESS_REMOTE_RUNTIME_SHA_NOT_ENFORCED`  
+**Reference:** `app/evaluation/profile_testbot/campaign/runtime_sha_readiness.py`, `app/evaluation/live/pipeline_runtime.py`
+

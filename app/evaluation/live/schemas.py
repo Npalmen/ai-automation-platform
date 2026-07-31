@@ -177,6 +177,8 @@ class RuntimeReadinessResponse(BaseModel):
     env: str
     env_fingerprint: str
     build_git_sha: str | None = None
+    api_build_git_sha: str | None = None
+    worker_build_git_sha: str | None = None
     live_eval_enabled: bool
     gmail_eval_enabled: bool
     external_side_effects_enabled: bool
