@@ -212,10 +212,15 @@ def _live_execution_blockers(
     mailbox_report: dict[str, Any],
     runtime_sha: str | None,
     runtime_live_blockers: list[str],
+    semi_auto_qualification_status: str | None = None,
 ) -> list[str]:
     blockers: list[str] = list(runtime_live_blockers)
     if not ready:
         blockers.append("ready_for_live_semi_auto must pass before live execution")
+    if semi_auto_qualification_status == "VALID":
+        blockers.append(
+            f"{QUALIFICATION_SEMI_AUTO} already registered; new live semi-auto run requires re-qualification"
+        )
     if _env_truthy("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT"):
         blockers.append(
             "PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT must not be set for live Gmail execution"
@@ -331,10 +336,6 @@ def build_profile_testbot_readiness(
         blocking_failures.append(
             f"{QUALIFICATION_SEMI_AUTO} has unknown status {live_quals[QUALIFICATION_SEMI_AUTO]!r}"
         )
-    elif live_quals[QUALIFICATION_SEMI_AUTO] == "VALID":
-        blocking_failures.append(
-            f"{QUALIFICATION_SEMI_AUTO} already registered; new live semi-auto run requires re-qualification"
-        )
 
     cleanup_ready = os.path.isdir(config.storage_root) or _env_truthy("LIVE_EVAL_PURGE_ALLOWED")
     if not cleanup_ready:
@@ -368,6 +369,7 @@ def build_profile_testbot_readiness(
         mailbox_report=mailbox_report,
         runtime_sha=runtime_report.get("authoritative_runtime_sha"),
         runtime_live_blockers=runtime_report.get("live_execution_blockers", []),
+        semi_auto_qualification_status=live_quals[QUALIFICATION_SEMI_AUTO],
     )
     runner_ready_for_live_execution = ready and not live_blockers
     return {

@@ -188,6 +188,17 @@ def test_live_qualifications_after_semi_auto_closure(readiness_env):
     assert report["live_qualifications"]["PROFILE_DRIVEN_TESTBOT_PASS"] == "PENDING"
 
 
+def test_live_semi_auto_requalification_required_when_valid(readiness_env, monkeypatch):
+    monkeypatch.delenv("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT", raising=False)
+    monkeypatch.setenv("LIVE_GMAIL_EVAL_ALLOWED", "yes")
+    monkeypatch.setenv("LIVE_EVAL_APP_BASE_URL", "http://127.0.0.1:8010")
+    monkeypatch.setenv("ADMIN_API_KEY", "test-admin")
+    report = build_profile_testbot_readiness()
+    assert any(
+        "already registered" in item for item in report.get("live_execution_blockers") or []
+    )
+
+
 def test_readiness_reports_manifest_and_oracle_authority(readiness_env):
     report = build_profile_testbot_readiness()
     assert report["eval_tenant"] == "TENANT_LIVE_EVAL"

@@ -321,6 +321,13 @@ def test_readiness_live_execution_requires_runner_sha(runner_env, monkeypatch):
     ), patch(
         "app.evaluation.profile_testbot.campaign.runtime_sha_readiness.fetch_eval_stack_runtime_readiness",
         return_value=(remote_payload, None),
+    ), patch(
+        "app.evaluation.profile_testbot.campaign.readiness.qualification_index",
+        return_value={
+            "PROFILE_DRIVEN_SEMI_AUTO_GMAIL_QUALIFIED": {"status": "PENDING"},
+            "PROFILE_DRIVEN_AUTOMATIC_GMAIL_QUALIFIED": {"status": "PENDING"},
+            "PROFILE_DRIVEN_TESTBOT_PASS": {"status": "PENDING"},
+        },
     ):
         report = build_profile_testbot_readiness()
     assert report["runner_ready_for_live_execution"] is True
