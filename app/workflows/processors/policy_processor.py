@@ -16,6 +16,7 @@ from app.workflows.decision_contract import (
     resolve_policy_authorization,
 )
 from app.workflows.intelligence_safety import assess_content_risk
+from app.workflows.safe_acknowledgement import evaluate_safe_acknowledgement_eligibility
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
     get_latest_processor_payload,
@@ -182,8 +183,28 @@ def process_policy_job(job: Job, db: Session | None = None, trace=None) -> Job:
         invoice_has_issues=invoice_has_issues,
     )
 
+    safe_ack = evaluate_safe_acknowledgement_eligibility(
+        detected_job_type=detected_job_type,
+        risk_detected=bool(risk["risk_detected"]),
+        risk_categories=list(risk.get("categories") or []),
+        extraction_issues=list(extraction_issues),
+        input_data=input_data,
+        recommendation=recommendation,
+        recommendation_raw=str(decisioning_raw) if decisioning_raw is not None else None,
+        low_confidence=low_confidence,
+        used_fallback=used_fallback,
+    )
+    safe_acknowledgement_path = safe_ack.eligible
+
     reasons.extend(auth_result.reasons)
     authorization = auth_result.authorization
+
+    if safe_acknowledgement_path:
+        authorization = PolicyAuthorization.APPROVAL_REQUIRED
+        reasons.append("safe_acknowledgement_path")
+        reasons.extend(safe_ack.reasons)
+        if not target_queue:
+            target_queue = "manual_review"
 
     decision = project_policy_decision(authorization)
     approval_route = project_approval_route(authorization)
@@ -192,6 +213,10 @@ def process_policy_job(job: Job, db: Session | None = None, trace=None) -> Job:
         PolicyAuthorization.HOLD_FOR_REVIEW,
         PolicyAuthorization.NO_ACTION,
     )
+    if safe_acknowledgement_path:
+        requires_human_review = True
+        target_queue = target_queue or "manual_review"
+        recommended_next_step = "awaiting_approval"
 
     if requires_human_review and not target_queue:
         target_queue = "manual_review"
@@ -244,6 +269,8 @@ def process_policy_job(job: Job, db: Session | None = None, trace=None) -> Job:
             "approval_required": approval_route in ("approval_required", "manual_review"),
             "route_to": target_queue,
             "next_best_action": recommended_next_step,
+            "safe_acknowledgement_path": safe_acknowledgement_path,
+            "operational_routing": target_queue if safe_acknowledgement_path else None,
         },
     }
 

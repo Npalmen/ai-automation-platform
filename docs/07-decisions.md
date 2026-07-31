@@ -757,3 +757,20 @@ Reference: `docs/plans/production-pilot-p1-observability-fix-plan.md`, `app/prod
 **Consequence:** Clients cannot self-register trusted eval context via job creation.  
 **Reference:** `app/evaluation/live/authorization.py`, `app/main.py` (`create_job`)
 
+---
+
+## DEC-046 — Manual review routing with safe acknowledgement approval (2026-07-31)
+
+**Status:** Active — branch `fix/manual-review-safe-acknowledgement`
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **Dual-state separation** | Operational routing (`target_queue=manual_review`) may coexist with `policy_authorization=approval_required` / `send_for_approval` |
+| 2 | **Safe acknowledgement only** | Incomplete low-risk leads with usable reply email may get a bounded acknowledgement draft + pending approval; auto-send remains OFF |
+| 3 | **Fail-closed without draft** | No reply address, content risk, forbidden inbound topics (price/booking/warranty/legal/bank), out-of-area, hold/reject/no_reply — no customer draft |
+| 4 | **Oracle unchanged** | Profile testbot `required_fact_acknowledgement` oracle is not weakened; draft must contain profile `safe_acknowledgements` phrases |
+| 5 | **PTB-SEM-0000 scope** | Hermetic template `tpl_lead_new` uses in-scope `solcellsinstallation` for eval profile `niklas-demo-live-eval-v1` (solar/storage only) |
+
+**Reason:** Live canary `077542fc` showed LLM reservation works but pipeline conflated `manual_review` routing with `hold_for_review`, producing no draft for `send_after_approval` scenarios.  
+**Reference:** `app/workflows/safe_acknowledgement.py`, `app/workflows/processors/policy_processor.py`, `app/workflows/processors/action_dispatch_processor.py`
+

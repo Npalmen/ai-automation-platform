@@ -14,6 +14,7 @@ from app.workflows.action_executor import _integration_allowed_for_action, execu
 from app.workflows.action_authorization import apply_action_authorization, classify_action, ActionEffect
 from app.workflows.decision_record_service import record_action_authorization
 from app.workflows.intelligence_safety import assess_content_risk
+from app.workflows.safe_acknowledgement import build_safe_acknowledgement_body
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
     classify_inquiry_priority,
@@ -408,6 +409,76 @@ def _build_complaint_customer_ack(
     }
 
 
+def _build_safe_acknowledgement_action(
+    job: Job,
+    *,
+    automation_settings: dict[str, Any],
+) -> dict[str, Any] | None:
+    policy_payload = get_latest_processor_payload(job, "policy_processor")
+    if not policy_payload.get("safe_acknowledgement_path"):
+        return None
+
+    input_data = job.input_data or {}
+    sender = normalize_sender(input_data)
+    settings = automation_settings or {}
+    signature_name = settings.get("email_signature_name") or ""
+    internal_recipient = settings.get("internal_notification_email") or ""
+
+    sender_name = sender.get("name", "")
+    sender_email = sender.get("email", "")
+    subject = input_data.get("subject") or "Lead"
+    message_text = input_data.get("message_text") or ""
+    source_meta = input_data.get("source") if isinstance(input_data.get("source"), dict) else {}
+    source_thread_id = source_meta.get("thread_id")
+    source_internet_message_id = source_meta.get("internet_message_id")
+
+    customer_to, use_thread_reply = _resolve_customer_reply_target(
+        input_data=input_data,
+        sender_email=sender_email,
+        internal_recipient=internal_recipient,
+    )
+    if not customer_to:
+        return None
+
+    display_name = resolve_customer_name(sender_name, message_text)
+    first = _first_name(display_name) or _first_name(sender_name)
+    greeting = f"Hej {first}," if first else "Hej,"
+
+    entities_payload = get_latest_processor_payload(job, "entity_extraction_processor")
+    entities = (entities_payload.get("entities") or {}) if entities_payload else {}
+    service_hint = str(entities.get("requested_service") or "").strip()
+    if not service_hint:
+        service_hint = "din förfrågan"
+
+    completeness = evaluate_information_completeness("lead", input_data)
+    missing_fields = list(completeness.get("missing_fields") or [])
+    extraction_validation = (entities_payload.get("validation") or {}) if entities_payload else {}
+    for issue in extraction_validation.get("issues") or []:
+        if issue == "missing_identity":
+            missing_fields.append("name")
+        if issue == "missing_requested_service":
+            missing_fields.append("service_type")
+
+    body = build_safe_acknowledgement_body(
+        greeting=greeting,
+        service_hint=service_hint,
+        missing_fields=missing_fields,
+        signature_name=signature_name,
+    )
+    reply_subject = f"Re: {subject}" if subject and subject != "Lead" else "Re: ditt ärende"
+    return {
+        "type": "send_customer_auto_reply",
+        "tenant_id": job.tenant_id,
+        "to": customer_to,
+        "subject": reply_subject,
+        "body": body,
+        "thread_id": source_thread_id if use_thread_reply else None,
+        "in_reply_to": source_internet_message_id if use_thread_reply else None,
+        "references": source_internet_message_id if use_thread_reply else None,
+        "_approval_reason": "safe_acknowledgement_requires_approval",
+    }
+
+
 def _build_lead_default_actions(
     job: Job,
     automation_settings: dict[str, Any] | None = None,
@@ -479,8 +550,14 @@ def _build_lead_default_actions(
 
     actions: list[dict[str, Any]] = []
 
+    safe_ack_action = _build_safe_acknowledgement_action(
+        job,
+        automation_settings=settings,
+    )
+    if safe_ack_action is not None:
+        actions.append(safe_ack_action)
     # Customer auto-reply: conversational and information-seeking.
-    if not followups_enabled:
+    elif not followups_enabled:
         actions.append(_build_skipped_action("send_customer_auto_reply", "followups_enabled=false"))
     elif not customer_to:
         actions.append(_build_skipped_action("send_customer_auto_reply", "no_customer_email"))
