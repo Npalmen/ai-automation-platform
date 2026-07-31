@@ -258,12 +258,17 @@ def test_readiness_live_execution_requires_runner_sha(runner_env, monkeypatch):
     monkeypatch.setenv("LIVE_EVAL_APP_BASE_URL", "http://127.0.0.1:8010")
     monkeypatch.setenv("ADMIN_API_KEY", "test-admin")
     monkeypatch.setenv("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED", "yes")
-    monkeypatch.setenv("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED_SHA", "test-sha")
+    approved_sha = "84887d9f336a27e94b0a7dcf8398e8b6d81338af"
+    monkeypatch.setenv("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED_SHA", approved_sha)
     from app.core.settings import get_settings
     from app.evaluation.live.config import get_live_eval_config
 
     get_settings.cache_clear()
     get_live_eval_config.cache_clear()
+    remote_payload = {
+        "build_git_sha": approved_sha,
+        "worker_build_git_sha": approved_sha,
+    }
     with patch(
         "app.evaluation.profile_testbot.campaign.readiness.verify_profile_testbot_mailboxes",
         return_value={
@@ -274,8 +279,8 @@ def test_readiness_live_execution_requires_runner_sha(runner_env, monkeypatch):
             "blocking_failures": [],
         },
     ), patch(
-        "app.evaluation.profile_testbot.campaign.readiness._runtime_sha",
-        return_value="test-sha",
+        "app.evaluation.profile_testbot.campaign.runtime_sha_readiness.fetch_eval_stack_runtime_readiness",
+        return_value=(remote_payload, None),
     ):
         report = build_profile_testbot_readiness()
     assert report["runner_ready_for_live_execution"] is True

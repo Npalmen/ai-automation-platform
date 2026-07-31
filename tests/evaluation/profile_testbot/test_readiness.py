@@ -200,11 +200,25 @@ def test_readiness_reports_manifest_and_oracle_authority(readiness_env):
 def test_provider_read_only_verification_when_gmail_eval_enabled(readiness_env, monkeypatch):
     monkeypatch.setenv("LIVE_GMAIL_EVAL_ALLOWED", "yes")
     monkeypatch.delenv("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT", raising=False)
+    monkeypatch.setenv("LIVE_EVAL_APP_BASE_URL", "http://127.0.0.1:8010")
+    monkeypatch.setenv("ADMIN_API_KEY", "test-admin-key")
+    monkeypatch.setenv("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED", "yes")
+    monkeypatch.setenv(
+        "PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED_SHA",
+        "84887d9f336a27e94b0a7dcf8398e8b6d81338af",
+    )
     sender_client = MagicMock()
     sender_client.get_profile_email.return_value = SENDER
     recipient_client = MagicMock()
     recipient_client.get_profile_email.return_value = RECIPIENT
+    remote_payload = {
+        "build_git_sha": "84887d9f336a27e94b0a7dcf8398e8b6d81338af",
+        "worker_build_git_sha": "84887d9f336a27e94b0a7dcf8398e8b6d81338af",
+    }
     with patch(
+        "app.evaluation.profile_testbot.campaign.runtime_sha_readiness.fetch_eval_stack_runtime_readiness",
+        return_value=(remote_payload, None),
+    ), patch(
         "app.evaluation.profile_testbot.campaign.mailbox_readiness.build_sender_client",
         return_value=sender_client,
     ), patch(
@@ -215,6 +229,8 @@ def test_provider_read_only_verification_when_gmail_eval_enabled(readiness_env, 
     assert report["sender_provider_verified"] is True
     assert report["recipient_deliverability_verified"] is True
     assert report["ready_for_live_semi_auto"] is True
+    assert report["runtime_readiness_endpoint_verified"] is True
+    assert report["runtime_sha_consistent"] is True
     sender_client.send_message.assert_not_called()
 
 

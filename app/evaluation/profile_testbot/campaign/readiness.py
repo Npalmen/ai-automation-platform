@@ -5,9 +5,11 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from app.core.canonical_commit import resolve_canonical_commit
 from app.evaluation.live.campaign.gates import validate_no_production_resources
 from app.evaluation.live.config import get_live_eval_config
+from app.evaluation.profile_testbot.campaign.runtime_sha_readiness import (
+    evaluate_eval_stack_runtime_sha,
+)
 from app.evaluation.profile_testbot.campaign.mailbox_readiness import (
     is_operator_approved_mailbox,
     mailbox_hash,
@@ -46,10 +48,6 @@ _REAL_CUSTOMER_DOMAIN_SUFFIXES = (
 
 def _env_truthy(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in ("yes", "true", "1")
-
-
-def _runtime_sha() -> str:
-    return resolve_canonical_commit() or "unknown"
 
 
 def validate_profile_testbot_tenant(tenant_id: str) -> list[str]:
@@ -196,13 +194,26 @@ def _semi_auto_manifest(profile_id: str, *, seed: int = 0) -> dict[str, Any]:
     }
 
 
+def _requires_remote_runtime_verification() -> bool:
+    if _env_truthy("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT"):
+        return False
+    return _env_truthy("LIVE_GMAIL_EVAL_ALLOWED")
+
+
+def _approved_runtime_sha() -> str | None:
+    if not _env_truthy("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED"):
+        return None
+    return os.environ.get("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED_SHA", "").strip() or None
+
+
 def _live_execution_blockers(
     *,
     ready: bool,
     mailbox_report: dict[str, Any],
-    runtime_sha: str,
+    runtime_sha: str | None,
+    runtime_live_blockers: list[str],
 ) -> list[str]:
-    blockers: list[str] = []
+    blockers: list[str] = list(runtime_live_blockers)
     if not ready:
         blockers.append("ready_for_live_semi_auto must pass before live execution")
     if _env_truthy("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT"):
@@ -215,7 +226,7 @@ def _live_execution_blockers(
         blockers.append("LIVE_EVAL_APP_BASE_URL required for live execution")
     if not os.environ.get("ADMIN_API_KEY", "").strip():
         blockers.append("ADMIN_API_KEY required for live execution")
-    runner_stop = require_live_semi_auto_runner_execution(runtime_sha=runtime_sha)
+    runner_stop = require_live_semi_auto_runner_execution(runtime_sha=runtime_sha or "")
     if runner_stop:
         blockers.append(runner_stop)
     if not mailbox_report.get("sender_provider_verified"):
@@ -328,16 +339,43 @@ def build_profile_testbot_readiness(
         )
 
     safety_assertions = _build_safety_assertions(blocked_tenant_checks=blocked_tenant_checks)
+
+    approved_runtime_sha = _approved_runtime_sha()
+    if _requires_remote_runtime_verification() and _env_truthy(
+        "PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED"
+    ):
+        if not approved_runtime_sha:
+            blocking_failures.append(
+                "EVAL_STACK_RUNTIME_SHA_MISSING: operator-approved SHA missing"
+            )
+    runtime_report = evaluate_eval_stack_runtime_sha(
+        base_url=os.environ.get("LIVE_EVAL_APP_BASE_URL", "").strip(),
+        admin_api_key=os.environ.get("ADMIN_API_KEY", "").strip(),
+        approved_runtime_sha=approved_runtime_sha,
+        runner_runtime_sha=approved_runtime_sha,
+        require_remote=_requires_remote_runtime_verification(),
+    )
+    blocking_failures.extend(runtime_report.get("blocking_failures", []))
+
     ready = not blocking_failures
-    runtime_sha = _runtime_sha()
+    runtime_sha = runtime_report.get("authoritative_runtime_sha") or "unknown"
     live_blockers = _live_execution_blockers(
         ready=ready,
         mailbox_report=mailbox_report,
-        runtime_sha=runtime_sha,
+        runtime_sha=runtime_report.get("authoritative_runtime_sha"),
+        runtime_live_blockers=runtime_report.get("live_execution_blockers", []),
     )
     runner_ready_for_live_execution = ready and not live_blockers
     return {
         "runtime_sha": runtime_sha,
+        "approved_runtime_sha": runtime_report.get("approved_runtime_sha"),
+        "runner_runtime_sha": runtime_report.get("runner_runtime_sha"),
+        "api_runtime_sha": runtime_report.get("api_runtime_sha"),
+        "worker_runtime_sha": runtime_report.get("worker_runtime_sha"),
+        "runtime_sha_consistent": runtime_report.get("runtime_sha_consistent"),
+        "runtime_readiness_endpoint_verified": runtime_report.get(
+            "runtime_readiness_endpoint_verified"
+        ),
         "profile_id": profile.profile_id,
         "profile_snapshot_hash": profile.profile_snapshot_hash,
         "tenant_id": tenant_id,

@@ -13,6 +13,11 @@ from app.core.admin_auth import require_admin_api_key
 from app.core.settings import get_settings
 from app.evaluation.live.cleanup import cleanup_recipient_message
 from app.evaluation.live.config import get_live_eval_config
+from app.evaluation.live.pipeline_runtime import (
+    record_pipeline_execution_build_sha,
+    resolve_api_build_git_sha,
+    resolve_worker_build_git_sha,
+)
 from app.evaluation.live.constants import (
     RUN_STATUS_ACTIVE,
     RUN_STATUS_REGISTERED,
@@ -419,6 +424,7 @@ def process_live_eval_delivery(
         live_eval_run_id=evaluation_run_id,
         skip_slack_notify=True,
     )
+    record_pipeline_execution_build_sha()
     if intake_result.get("status") == "failed":
         reason = str(intake_result.get("reason") or "intake failed")
         raise _intake_failed_http_exception(
@@ -500,10 +506,14 @@ def runtime_readiness(
         database_ok = True
     except Exception:
         database_ok = False
+    api_sha = resolve_api_build_git_sha()
+    worker_sha = resolve_worker_build_git_sha()
     return RuntimeReadinessResponse(
         env=settings.ENV,
         env_fingerprint=config.env_fingerprint,
-        build_git_sha=os.environ.get("BUILD_GIT_SHA") or None,
+        build_git_sha=api_sha,
+        api_build_git_sha=api_sha,
+        worker_build_git_sha=worker_sha,
         live_eval_enabled=config.enabled,
         gmail_eval_enabled=config.gmail_enabled,
         external_side_effects_enabled=config.external_side_effects_enabled,
