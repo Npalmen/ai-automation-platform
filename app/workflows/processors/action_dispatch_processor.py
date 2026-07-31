@@ -74,6 +74,18 @@ def _dispatch_integration_gate_applies(tenant_id: str, db: Session | None) -> bo
     return tenant_id in TENANT_CONFIGS
 
 
+def _customer_reply_integration_selected(tenant_id: str, db: Session | None) -> bool:
+    """Return True when google_mail is selected for the tenant (not direct-write enabled)."""
+    from app.integrations.enums import IntegrationType
+    from app.integrations.policies import is_integration_enabled_for_tenant
+
+    return is_integration_enabled_for_tenant(
+        tenant_id,
+        IntegrationType.GOOGLE_MAIL,
+        db=db,
+    )
+
+
 def _integration_allowed_at_dispatch(
     action_type: str,
     tenant_id: str,
@@ -130,19 +142,21 @@ def _apply_dispatch_authorization(
         )
         if not annotated.get("_skip") and _dispatch_integration_gate_applies(job.tenant_id, db):
             spec = classify_action(annotated.get("type"))
-            if (
-                spec is not None
-                and spec.effect == ActionEffect.EXTERNAL_WRITE
-                and not _integration_allowed_at_dispatch(
+            if spec is not None and spec.effect == ActionEffect.EXTERNAL_WRITE:
+                integration_allowed = _integration_allowed_at_dispatch(
                     str(annotated.get("type") or ""),
                     job.tenant_id,
                     db,
                 )
-            ):
-                annotated = _build_skipped_action(
-                    str(annotated.get("type") or "unknown"),
-                    "integration_not_allowed",
-                )
+                if not integration_allowed and not (
+                    annotated.get("_needs_approval")
+                    and str(annotated.get("type") or "") == "send_customer_auto_reply"
+                    and _customer_reply_integration_selected(job.tenant_id, db)
+                ):
+                    annotated = _build_skipped_action(
+                        str(annotated.get("type") or "unknown"),
+                        "integration_not_allowed",
+                    )
         if (
             db is not None
             and trace is not None
@@ -475,6 +489,7 @@ def _build_safe_acknowledgement_action(
         "thread_id": source_thread_id if use_thread_reply else None,
         "in_reply_to": source_internet_message_id if use_thread_reply else None,
         "references": source_internet_message_id if use_thread_reply else None,
+        "_needs_approval": True,
         "_approval_reason": "safe_acknowledgement_requires_approval",
     }
 
