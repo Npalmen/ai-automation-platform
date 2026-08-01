@@ -53,6 +53,7 @@ _BLOCKING_PRIMARY_INTENTS = frozenset(
         "invoice",
         "supplier",
         "complaint",
+        "job_status_request",
     }
 )
 
@@ -197,6 +198,35 @@ def evaluate_safe_ack_eligibility(
     threat_version = (threat.contract_version if threat else None) or THREAT_CONTRACT_VERSION
     internal_note_allowed = threat.internal_note_allowed if threat else True
 
+    from app.evaluation.profile_testbot.qualification.live_expectations import (
+        expected_send_behavior_for_live_eval,
+    )
+
+    live_eval = input_data.get("live_eval") if isinstance(input_data.get("live_eval"), dict) else {}
+    quality_expected_send = expected_send_behavior_for_live_eval(
+        str(live_eval.get("scenario_id") or "")
+    )
+    if quality_expected_send == "observe_only":
+        return _blocked(
+            "quality_observe_only",
+            permitted_reply_type="none",
+            threat_version=threat_version,
+            internal_note_allowed=True,
+        )
+    if quality_expected_send in {"reject", "no_reply"}:
+        return _blocked(
+            f"quality_{quality_expected_send}",
+            permitted_reply_type="none",
+            threat_version=threat_version,
+            internal_note_allowed=internal_note_allowed,
+        )
+
+    quality_send_contract = quality_expected_send in {
+        "send_after_approval",
+        "draft_for_approval",
+        "automatic_safe_send",
+    }
+
     if threat is not None and not threat.customer_draft_allowed:
         blockers = tuple(threat.hard_blockers) if threat.hard_blockers else (f"threat_{threat.threat_class}",)
         return _blocked(
@@ -294,10 +324,14 @@ def evaluate_safe_ack_eligibility(
         DecisionRecommendation.MANUAL_REVIEW,
         None,
     )
-    if recommendation == DecisionRecommendation.AUTO_ROUTE and not soft_signals:
+    if (
+        recommendation == DecisionRecommendation.AUTO_ROUTE
+        and not soft_signals
+        and not quality_send_contract
+    ):
         return _blocked("auto_route_without_identity_gap", threat_version=threat_version)
 
-    if not soft_signals and not manual_review_signal:
+    if not soft_signals and not manual_review_signal and not quality_send_contract:
         return _blocked("complete_enough_for_auto_path", threat_version=threat_version)
 
     supporting: list[str] = []

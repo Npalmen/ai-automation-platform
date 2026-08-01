@@ -49,7 +49,7 @@ def _utcnow() -> datetime:
 def _derive_approval_state(job: dict[str, Any]) -> str:
     if job.get("has_pending_approvals"):
         return "pending"
-    status = str(job.get("job_status") or "").lower()
+    status = str(job.get("job_status") or job.get("status") or "").lower()
     if status in {"manual_review", "on_hold", "awaiting_approval"}:
         return "hold"
     return "none"

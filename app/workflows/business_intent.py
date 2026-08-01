@@ -88,12 +88,18 @@ def normalize_intent_category(raw: str | None) -> str:
     return _LEGACY_TYPE_MAP.get(value, value)
 
 
+def _is_job_status_request(subject: str, body: str) -> bool:
+    return False
+
+
 def build_business_intent_from_classification(
     *,
     detected_job_type: str,
     confidence: float,
     reasons: list[str] | None = None,
     threat_blocks_business: bool = False,
+    subject: str = "",
+    body: str = "",
 ) -> BusinessIntentResult:
     """Build BusinessIntentResult from classification processor output."""
     primary = normalize_intent_category(detected_job_type)

@@ -122,6 +122,19 @@ class TestSupplierDetection:
     def test_kvitto_is_supplier(self):
         assert classify_email_type("Kvitto för din beställning", "") == "supplier"
 
+    def test_lead_confirm_receipt_not_supplier(self):
+        assert classify_email_type(
+            "Offertförfrågan solcellsinstallation Stockholm nord",
+            "Hej, jag behöver hjälp med solcellsinstallation i Stockholm nord. "
+            "Kan ni återkomma? (please confirm receipt)",
+        ) == "lead"
+
+    def test_status_request_is_customer_inquiry(self):
+        assert classify_email_type(
+            "Status på ärende",
+            "Hej, hur går det med mitt ärende?",
+        ) == "customer_inquiry"
+
     def test_din_bestallning_in_body(self):
         assert classify_email_type("Uppdatering", "Din beställning har levererats") == "supplier"
 
