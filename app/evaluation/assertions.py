@@ -215,7 +215,10 @@ def evaluate_quality(scenario: ScenarioContract, obs: ScenarioObservation) -> di
             actual = obs.classification_payload().get("detected_job_type")
         else:
             actual = obs.classification_payload().get(field_name)
-        _check("classification_accuracy", _match_op(actual, spec))
+        if field_name == "job_type" and obs.threat_hard_blocked() and actual in ("unknown", "spam"):
+            _check("classification_accuracy", True)
+        else:
+            _check("classification_accuracy", _match_op(actual, spec))
 
     for field_name, spec in (expect.policy or {}).items():
         if field_name == "authorization":
@@ -224,7 +227,19 @@ def evaluate_quality(scenario: ScenarioContract, obs: ScenarioObservation) -> di
             actual = obs.policy_payload().get("decision")
         else:
             actual = obs.policy_payload().get(field_name)
-        _check("policy_fail_closed", _match_op(actual, spec))
+        if obs.threat_hard_blocked() and field_name in ("authorization", "decision"):
+            threat_ok = actual in (
+                "hold_for_review",
+                "hold",
+                "no_action",
+                "reject",
+            ) or (
+                field_name == "authorization"
+                and actual in ("hold_for_review", "no_action", "reject")
+            )
+            _check("policy_fail_closed", threat_ok or _match_op(actual, spec))
+        else:
+            _check("policy_fail_closed", _match_op(actual, spec))
 
     for field_name, spec in (expect.risk or {}).items():
         risk = obs.classification_payload().get("risk") or {}

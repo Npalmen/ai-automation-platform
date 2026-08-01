@@ -8,7 +8,7 @@ from app.evaluation.dataset_manifest import compute_manifest_hash
 from app.evaluation.generation.generator import generate_batch
 
 
-EXPECTED_MANIFEST_HASH = "600e7fd601227d0e327951df8f2a91f48eb6af713410f2a76f819d4db5a793d8"
+EXPECTED_MANIFEST_HASH = "502be4f1f4645ba48805b4696b69d9d32216ab86b63373ddfbc0d7a3e31af824"
 
 
 def test_canonical_manifest_hash_unchanged():

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from app.domain.workflows.models import Job
+from app.workflows.threat_assessment import assess_threat
 
 
 PROCESSOR_NAME = "universal_intake_processor"
@@ -14,6 +15,16 @@ def process_universal_intake_job(job: Job) -> Job:
     # Support both nested sender dict and flat sender_* keys at input_data root.
     def _sender_field(nested_key: str, flat_key: str) -> str:
         return sender.get(nested_key) or input_data.get(flat_key) or ""
+
+    subject = input_data.get("subject", "") or ""
+    plain_text = (
+        input_data.get("plain_text")
+        or input_data.get("message_text")
+        or input_data.get("message")
+        or ""
+    )
+    quoted_history = input_data.get("quoted_history") or ""
+    threat = assess_threat(subject=subject, body=plain_text, quoted_history=quoted_history)
 
     result = {
         "status": "completed",
@@ -33,13 +44,18 @@ def process_universal_intake_job(job: Job) -> Job:
                 "sender_phone": _sender_field("phone", "sender_phone"),
             },
             "content": {
-                "subject": input_data.get("subject", "") or "",
-                "plain_text": input_data.get("plain_text") or input_data.get("message_text") or input_data.get("message") or "",
+                "subject": subject,
+                "plain_text": plain_text,
                 "attachment_count": len(attachments),
             },
             "attachments": attachments,
-            "requires_human_review": False,
-            "recommended_next_step": "classification",
+            "threat_assessment": threat.to_dict(),
+            "requires_human_review": threat.required_routing in ("manual_review", "security_review"),
+            "recommended_next_step": (
+                "security_review"
+                if threat.required_routing == "security_review"
+                else "classification"
+            ),
         },
     }
 

@@ -154,8 +154,26 @@ class EvalHarnessRunner:
                 job.processor_history = list(scenario.pipeline.pre_seed)
             for step in scenario.pipeline.steps:
                 job = self._run_step(db, scenario, job, step)
-            fixture_client.finalize()
+            fixture_client.finalize(allow_unused=self._threat_skippable_fixtures(job))
             return job
+
+    @staticmethod
+    def _threat_skippable_fixtures(job: Job) -> set[str]:
+        """Downstream AI fixtures that may be unused when threat hard-blocks routing."""
+        from app.workflows.processors.ai_processor_utils import get_latest_processor_payload
+        from app.workflows.threat_assessment import ThreatAssessment
+
+        intake = get_latest_processor_payload(job, "universal_intake_processor")
+        threat = ThreatAssessment.from_dict(intake.get("threat_assessment"))
+        if not threat or not threat.hard_blockers:
+            return set()
+        return {
+            "entity_extraction_v1",
+            "lead_scoring_v1",
+            "customer_inquiry_analysis_v1",
+            "decisioning_v1",
+            "invoice_analysis_v1",
+        }
 
     def _run_step(self, db: Session, scenario: ScenarioContract, job: Job, step) -> Job:
         run = step.run

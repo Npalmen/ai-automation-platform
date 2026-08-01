@@ -66,8 +66,10 @@ class FixtureAIClient:
         self._called.add(prompt_name)
         return json.loads(validated.model_dump_json())
 
-    def finalize(self) -> None:
+    def finalize(self, *, allow_unused: set[str] | None = None) -> None:
         unused = set(self._fixtures) - self._called
+        if allow_unused:
+            unused -= allow_unused
         if unused:
             raise FixtureAIError(f"Unused AI fixtures: {sorted(unused)}")
 

@@ -25,6 +25,14 @@ class ScenarioObservation:
     def classification_payload(self) -> dict[str, Any]:
         return get_latest_processor_payload(self.job, "classification_processor") or {}
 
+    def threat_assessment_payload(self) -> dict[str, Any]:
+        intake = get_latest_processor_payload(self.job, "universal_intake_processor") or {}
+        payload = intake.get("threat_assessment")
+        return payload if isinstance(payload, dict) else {}
+
+    def threat_hard_blocked(self) -> bool:
+        return bool(self.threat_assessment_payload().get("hard_blockers"))
+
     def dispatch_payload(self) -> dict[str, Any]:
         return get_latest_processor_payload(self.job, "action_dispatch_processor") or {}
 
