@@ -39,13 +39,13 @@ todos:
     status: completed
   - id: D
     title: Central safe-acknowledgement eligibility
-    status: in_progress
+    status: completed
   - id: E
     title: Profile-driven missing-fact policy
-    status: in_progress
+    status: completed
   - id: F
     title: Reply planning and reply quality
-    status: in_progress
+    status: completed
   - id: G
     title: Threading, duplicates and replay semantics
     status: pending
