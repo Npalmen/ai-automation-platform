@@ -48,13 +48,13 @@ todos:
     status: completed
   - id: G
     title: Threading, duplicates and replay semantics
-    status: pending
+    status: completed
   - id: H
     title: Broad quality evaluation dataset
-    status: pending
+    status: completed
   - id: I
     title: Oracles, metrics and quality gates
-    status: pending
+    status: completed
   - id: J
     title: Qualification and closure
     status: pending

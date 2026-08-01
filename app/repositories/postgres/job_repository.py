@@ -146,6 +146,43 @@ class JobRepository:
         return JobRepository._to_domain(record)
 
     @staticmethod
+    def get_by_internet_message_id(db: Session, tenant_id: str, internet_message_id: str) -> Job | None:
+        """Find job by normalized RFC Message-ID within tenant (cross-mailbox safe)."""
+        from app.workflows.message_partition import normalize_rfc_message_id
+
+        normalized = normalize_rfc_message_id(internet_message_id)
+        if not normalized:
+            return None
+        record = (
+            db.query(JobRecord)
+            .filter(
+                JobRecord.tenant_id == tenant_id,
+                JobRecord.input_data["source"]["system"].as_string() == "gmail",
+                JobRecord.input_data["source"]["internet_message_id"].as_string() == normalized,
+            )
+            .order_by(JobRecord.created_at.desc())
+            .first()
+        )
+        if record is None:
+            # Fallback: match stored values that may not be normalized yet.
+            bare = normalized.strip("<>")
+            record = (
+                db.query(JobRecord)
+                .filter(
+                    JobRecord.tenant_id == tenant_id,
+                    JobRecord.input_data["source"]["system"].as_string() == "gmail",
+                    JobRecord.input_data["source"]["internet_message_id"].as_string().in_(
+                        (normalized, bare, f"<{bare}>")
+                    ),
+                )
+                .order_by(JobRecord.created_at.desc())
+                .first()
+            )
+        if record is None:
+            return None
+        return JobRepository._to_domain(record)
+
+    @staticmethod
     def get_by_source_thread_id(
         db: Session,
         tenant_id: str,

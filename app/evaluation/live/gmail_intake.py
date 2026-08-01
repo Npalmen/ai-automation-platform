@@ -23,6 +23,8 @@ from app.integrations.enums import IntegrationType
 from app.integrations.factory import get_integration_adapter
 from app.integrations.service import get_integration_connection_config
 from app.repositories.postgres.job_repository import JobRepository
+from app.workflows.message_partition import normalize_rfc_message_id, partition_message_text
+from app.workflows.thread_replay_context import build_thread_replay_context
 from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 from app.workflows.action_executor import execute_action as dispatch_action
 from app.workflows.intake_enforcement import evaluate_intake_gate
@@ -125,6 +127,19 @@ def process_gmail_message_by_id(
         return {"status": "failed", "message_id": message_id, "reason": str(exc)}
 
     msg = detail_result.get("message") or {}
+    internet_message_id = normalize_rfc_message_id(msg.get("internet_message_id") or "")
+    if internet_message_id:
+        existing_by_rfc = JobRepository.get_by_internet_message_id(
+            db, tenant_id, internet_message_id
+        )
+        if existing_by_rfc is not None:
+            return {
+                "status": "skipped",
+                "message_id": message_id,
+                "reason": "duplicate_rfc_message_id",
+                "job_id": existing_by_rfc.job_id,
+                "internet_message_id": internet_message_id,
+            }
     tenant_row = (
         db.query(TenantConfigRecord)
         .filter(TenantConfigRecord.tenant_id == tenant_id)
@@ -150,6 +165,22 @@ def process_gmail_message_by_id(
     subject = _clean_gmail_subject(msg.get("subject") or "(no subject)")
     body_text = msg.get("body_text") or ""
     thread_id = msg.get("thread_id") or ""
+    current_text, quoted_history = partition_message_text(body_text)
+    reply_to = msg.get("reply_to") or None
+
+    thread_replay = build_thread_replay_context(
+        tenant_id=tenant_id,
+        gmail_message_id=message_id,
+        gmail_thread_id=thread_id,
+        internet_message_id=internet_message_id,
+        subject=subject,
+        body_text=body_text,
+        reply_to=reply_to,
+        transport_metadata={
+            "internal_date_ms": msg.get("internal_date_ms") or msg.get("internal_date"),
+            "received_at": msg.get("received_at"),
+        },
+    )
 
     tenant_config = get_tenant_config(tenant_id, db=db)
     enabled_job_types = set(tenant_config.get("enabled_job_types") or [])
@@ -167,14 +198,17 @@ def process_gmail_message_by_id(
 
     input_data = {
         "subject": subject,
-        "message_text": body_text,
+        "message_text": current_text or body_text,
+        "quoted_history": quoted_history,
         "sender": sender_dict,
         "source": {
             "system": "gmail",
             "message_id": message_id,
             "thread_id": thread_id,
-            "internet_message_id": msg.get("internet_message_id") or "",
+            "internet_message_id": internet_message_id,
+            "reply_to": reply_to or "",
         },
+        "thread_replay_context": thread_replay.to_dict(),
         "received_at": msg.get("received_at") or None,
     }
 

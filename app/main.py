@@ -1640,6 +1640,23 @@ def _run_gmail_inbox_sync(
 
         msg = detail_result.get("message") or {}
 
+        from app.workflows.message_partition import normalize_rfc_message_id, partition_message_text
+        from app.workflows.thread_replay_context import build_thread_replay_context
+
+        internet_message_id = normalize_rfc_message_id(msg.get("internet_message_id") or "")
+        if internet_message_id:
+            existing_by_rfc = JobRepository.get_by_internet_message_id(
+                db, tenant_id, internet_message_id
+            )
+            if existing_by_rfc is not None:
+                skipped_messages.append({
+                    "message_id": message_id,
+                    "reason": "duplicate_rfc_message_id",
+                    "job_id": existing_by_rfc.job_id,
+                    "internet_message_id": internet_message_id,
+                })
+                continue
+
         from app.repositories.postgres.tenant_config_models import TenantConfigRecord
         from app.workflows.intake_enforcement import evaluate_intake_gate
 
@@ -1680,6 +1697,22 @@ def _run_gmail_inbox_sync(
         subject = _clean_gmail_subject(msg.get("subject") or "(no subject)")
         body_text = msg.get("body_text") or ""
         thread_id = msg.get("thread_id") or ""
+        current_text, quoted_history = partition_message_text(body_text)
+        reply_to = msg.get("reply_to") or None
+        thread_replay = build_thread_replay_context(
+            tenant_id=tenant_id,
+            gmail_message_id=message_id,
+            gmail_thread_id=thread_id,
+            internet_message_id=internet_message_id,
+            subject=subject,
+            body_text=body_text,
+            reply_to=reply_to,
+            is_thread_continuation=bool(thread_id),
+            transport_metadata={
+                "internal_date_ms": msg.get("internal_date_ms") or msg.get("internal_date"),
+                "received_at": msg.get("received_at"),
+            },
+        )
 
         # Step 3: thread continuation — look for existing job with same thread_id.
         continuation_job = None
@@ -1699,9 +1732,10 @@ def _run_gmail_inbox_sync(
                 "source": "gmail",
                 "message_id": message_id,
                 "thread_id": thread_id,
-                "internet_message_id": msg.get("internet_message_id") or "",
+                "internet_message_id": internet_message_id,
                 "subject": subject,
-                "message_text": body_text,
+                "message_text": current_text or body_text,
+                "quoted_history": quoted_history,
                 "sender": sender_dict,
             }
 
@@ -1800,14 +1834,17 @@ def _run_gmail_inbox_sync(
 
         input_data = {
             "subject": subject,
-            "message_text": body_text,
+            "message_text": current_text or body_text,
+            "quoted_history": quoted_history,
             "sender": sender_dict,
             "source": {
                 "system": "gmail",
                 "message_id": message_id,
                 "thread_id": thread_id,
-                "internet_message_id": msg.get("internet_message_id") or "",
+                "internet_message_id": internet_message_id,
+                "reply_to": reply_to or "",
             },
+            "thread_replay_context": thread_replay.to_dict(),
             "received_at": msg.get("received_at") or None,
         }
 
