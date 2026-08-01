@@ -91,10 +91,19 @@ class TestLiveQualityCanaryManifest:
         manifest = build_live_quality_canary_manifest()
         assert PTB_SEM_0024_SCENARIO_ID in manifest.scenario_ids
 
-    def test_budget_validation_passes(self):
+    def test_quality_live_execution_blocked_until_valid(self):
         manifest = build_live_quality_canary_manifest()
-        issues = validate_live_quality_canary_budget(manifest.scenarios)
-        assert issues == []
+        assert manifest.send_budget <= LIVE_QUALITY_CANARY_SEND_MAX
+        from app.evaluation.profile_testbot.campaign.readiness import (
+            _live_quality_execution_blockers,
+        )
+
+        blockers = _live_quality_execution_blockers(
+            ready=True,
+            live_blockers=[],
+            quality_qualification_status="PENDING",
+        )
+        assert any(QUALIFICATION_SEMI_AUTO_QUALITY in item for item in blockers)
 
 
 class TestLiveQualityCampaignManifest:

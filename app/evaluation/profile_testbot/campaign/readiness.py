@@ -216,6 +216,22 @@ def _approved_runtime_sha() -> str | None:
     return os.environ.get("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED_SHA", "").strip() or None
 
 
+def _live_quality_execution_blockers(
+    *,
+    ready: bool,
+    live_blockers: list[str],
+    quality_qualification_status: str | None,
+) -> list[str]:
+    blockers = list(live_blockers)
+    if not ready:
+        blockers.append("ready_for_live_semi_auto must pass before live quality execution")
+    if quality_qualification_status != "VALID":
+        blockers.append(
+            f"{QUALIFICATION_SEMI_AUTO_QUALITY} must be VALID before live quality canary/campaign"
+        )
+    return blockers
+
+
 def _live_execution_blockers(
     *,
     ready: bool,
@@ -223,7 +239,6 @@ def _live_execution_blockers(
     runtime_sha: str | None,
     runtime_live_blockers: list[str],
     semi_auto_qualification_status: str | None = None,
-    quality_qualification_status: str | None = None,
 ) -> list[str]:
     blockers: list[str] = list(runtime_live_blockers)
     if not ready:
@@ -231,10 +246,6 @@ def _live_execution_blockers(
     if semi_auto_qualification_status == "VALID":
         blockers.append(
             f"{QUALIFICATION_SEMI_AUTO} already registered; new live semi-auto run requires re-qualification"
-        )
-    if quality_qualification_status != "VALID":
-        blockers.append(
-            f"{QUALIFICATION_SEMI_AUTO_QUALITY} must be VALID before live quality canary/campaign"
         )
     if _env_truthy("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT"):
         blockers.append(
@@ -344,8 +355,8 @@ def build_profile_testbot_readiness(
     qualifications = qualification_index()
     live_quals = {
         QUALIFICATION_SEMI_AUTO: qualifications.get(QUALIFICATION_SEMI_AUTO, {}).get("status"),
-        QUALIFICATION_SEMI_AUTO_QUALITY: qualifications.get(QUALIFICATION_SEMI_AUTO_QUALITY, {}).get(
-            "status"
+        QUALIFICATION_SEMI_AUTO_QUALITY: (
+            qualifications.get(QUALIFICATION_SEMI_AUTO_QUALITY, {}).get("status") or "PENDING"
         ),
         QUALIFICATION_AUTOMATIC: qualifications.get(QUALIFICATION_AUTOMATIC, {}).get("status"),
         QUALIFICATION_PASS: qualifications.get(QUALIFICATION_PASS, {}).get("status"),
@@ -403,9 +414,14 @@ def build_profile_testbot_readiness(
         runtime_sha=runtime_report.get("authoritative_runtime_sha"),
         runtime_live_blockers=runtime_report.get("live_execution_blockers", []),
         semi_auto_qualification_status=live_quals[QUALIFICATION_SEMI_AUTO],
+    )
+    live_quality_blockers = _live_quality_execution_blockers(
+        ready=ready,
+        live_blockers=live_blockers,
         quality_qualification_status=live_quals[QUALIFICATION_SEMI_AUTO_QUALITY],
     )
     runner_ready_for_live_execution = ready and not live_blockers
+    runner_ready_for_live_quality_execution = ready and not live_quality_blockers
     return {
         "runtime_sha": runtime_sha,
         "approved_runtime_sha": runtime_report.get("approved_runtime_sha"),
@@ -465,7 +481,9 @@ def build_profile_testbot_readiness(
         "ready_for_live_semi_auto": ready,
         "runner_ready_for_contract_execution": ready,
         "runner_ready_for_live_execution": runner_ready_for_live_execution,
+        "runner_ready_for_live_quality_execution": runner_ready_for_live_quality_execution,
         "live_execution_blockers": live_blockers,
+        "live_quality_execution_blockers": live_quality_blockers,
         "operator_stop": None if ready else OPERATOR_STOP_SEMI_AUTO,
     }
 
