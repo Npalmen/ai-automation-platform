@@ -5,7 +5,7 @@
   "schema_version": "2e.1",
   "hash_algorithm": "semantic-json-v2",
   "created_at": "2026-07-21",
-  "manifest_hash": "600e7fd601227d0e327951df8f2a91f48eb6af713410f2a76f819d4db5a793d8",
+  "manifest_hash": "502be4f1f4645ba48805b4696b69d9d32216ab86b63373ddfbc0d7a3e31af824",
   "scenario_status": {
     "S01_lead_laddbox_quality": "pass",
     "S08_sensitive_inkasso": "pass",
