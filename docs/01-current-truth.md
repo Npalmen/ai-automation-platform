@@ -8,6 +8,8 @@
 
 ## Last verified date
 
+2026-08-01 (PD-IQH PR-3 inbox quality evaluation — runtime SHA `08309243938fdd7b8e30da7a6d2d6caafb2c5274` PR #128; post-merge Release Gate `30718372134`; Regression Main `30718372072`; hermetic quality dataset 96/96 PASS; thread/replay semantics + explicit oracle status model; `PROFILE_DRIVEN_SEMI_AUTO_QUALITY_QUALIFIED` not yet registered; live quality canary/campaign pending operator readiness.)
+
 2026-07-31 (Profile testbot semi-auto Gmail closure — runtime SHA `1c4213dcd5eac31858c2bb2ba2d590623d9d5f61` PR #123+#124; post-merge Release Gate `30659465404`; Regression Main `30659465594`; 4-scenario canary `3950058c` 4/4 PASS; full campaign `3f416a93` 40/40 PASS on `TENANT_LIVE_EVAL` / `niklas-demo-live-eval-v1`; 20 approval-gated Gmail replies provider-accepted + recipient-verified; 20 hold/reject/no_reply with 0 sends; `PROFILE_DRIVEN_SEMI_AUTO_GMAIL_QUALIFIED` registered; `PROFILE_DRIVEN_AUTOMATIC_GMAIL_QUALIFIED` + `PROFILE_DRIVEN_TESTBOT_PASS` remain PENDING; production activation not implied.)
 
 2026-07-29 (Production pilot P1 operational ready — runtime SHA `86c32f1` PR #112+#113; post-merge Release Gate `30495794549`; Regression Main `30495794441`; operational-ready workflow `30496397047`; `PRODUCTION_PILOT_P1_OPERATIONAL_READY`; observability daily report + ground-truth reviews + runtime readiness; historical technical P1 SHA `a7409c9`; P2 NO-GO; no production deploy; observation window not started.)

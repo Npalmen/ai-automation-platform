@@ -57,7 +57,7 @@ todos:
     status: completed
   - id: J
     title: Qualification and closure
-    status: pending
+    status: in_progress
 ---
 
 # Profile-driven Inbox Intelligence & Reply Quality Hardening

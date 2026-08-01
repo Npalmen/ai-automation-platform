@@ -24,9 +24,19 @@ from app.evaluation.profile_testbot.constants import (
     QUALIFICATION_AUTOMATIC,
     QUALIFICATION_PASS,
     QUALIFICATION_SEMI_AUTO,
+    QUALIFICATION_SEMI_AUTO_QUALITY,
     SEMI_AUTO_HOLD_EDGE_MIN,
     SEMI_AUTO_SCENARIO_TARGET,
     SEMI_AUTO_SEND_AFTER_APPROVAL_MIN,
+)
+from app.evaluation.profile_testbot.qualification.hermetic_quality import (
+    run_hermetic_quality_qualification,
+)
+from app.evaluation.profile_testbot.qualification.live_canary_manifest import (
+    build_live_quality_canary_manifest,
+)
+from app.evaluation.profile_testbot.qualification.live_campaign_manifest import (
+    build_live_quality_campaign_manifest,
 )
 from app.evaluation.profile_testbot.generator.profile_generator import (
     generate_hermetic_campaign,
@@ -213,6 +223,7 @@ def _live_execution_blockers(
     runtime_sha: str | None,
     runtime_live_blockers: list[str],
     semi_auto_qualification_status: str | None = None,
+    quality_qualification_status: str | None = None,
 ) -> list[str]:
     blockers: list[str] = list(runtime_live_blockers)
     if not ready:
@@ -220,6 +231,10 @@ def _live_execution_blockers(
     if semi_auto_qualification_status == "VALID":
         blockers.append(
             f"{QUALIFICATION_SEMI_AUTO} already registered; new live semi-auto run requires re-qualification"
+        )
+    if quality_qualification_status != "VALID":
+        blockers.append(
+            f"{QUALIFICATION_SEMI_AUTO_QUALITY} must be VALID before live quality canary/campaign"
         )
     if _env_truthy("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT"):
         blockers.append(
@@ -329,6 +344,9 @@ def build_profile_testbot_readiness(
     qualifications = qualification_index()
     live_quals = {
         QUALIFICATION_SEMI_AUTO: qualifications.get(QUALIFICATION_SEMI_AUTO, {}).get("status"),
+        QUALIFICATION_SEMI_AUTO_QUALITY: qualifications.get(QUALIFICATION_SEMI_AUTO_QUALITY, {}).get(
+            "status"
+        ),
         QUALIFICATION_AUTOMATIC: qualifications.get(QUALIFICATION_AUTOMATIC, {}).get("status"),
         QUALIFICATION_PASS: qualifications.get(QUALIFICATION_PASS, {}).get("status"),
     }
@@ -336,6 +354,21 @@ def build_profile_testbot_readiness(
         blocking_failures.append(
             f"{QUALIFICATION_SEMI_AUTO} has unknown status {live_quals[QUALIFICATION_SEMI_AUTO]!r}"
         )
+    if live_quals[QUALIFICATION_SEMI_AUTO_QUALITY] not in {"PENDING", "VALID"}:
+        blocking_failures.append(
+            f"{QUALIFICATION_SEMI_AUTO_QUALITY} has unknown status "
+            f"{live_quals[QUALIFICATION_SEMI_AUTO_QUALITY]!r}"
+        )
+
+    hermetic_quality = run_hermetic_quality_qualification(profile_id=profile_id, seed=seed)
+    if hermetic_quality.overall_status != "PASS":
+        blocking_failures.append(
+            "hermetic quality qualification failed: "
+            + "; ".join(hermetic_quality.gate_failures[:3])
+        )
+
+    quality_canary = build_live_quality_canary_manifest(profile_id=profile_id, seed=seed)
+    quality_campaign = build_live_quality_campaign_manifest(profile_id=profile_id, seed=seed)
 
     cleanup_ready = os.path.isdir(config.storage_root) or _env_truthy("LIVE_EVAL_PURGE_ALLOWED")
     if not cleanup_ready:
@@ -370,6 +403,7 @@ def build_profile_testbot_readiness(
         runtime_sha=runtime_report.get("authoritative_runtime_sha"),
         runtime_live_blockers=runtime_report.get("live_execution_blockers", []),
         semi_auto_qualification_status=live_quals[QUALIFICATION_SEMI_AUTO],
+        quality_qualification_status=live_quals[QUALIFICATION_SEMI_AUTO_QUALITY],
     )
     runner_ready_for_live_execution = ready and not live_blockers
     return {
@@ -412,6 +446,9 @@ def build_profile_testbot_readiness(
         },
         "cleanup_ready": cleanup_ready,
         "hermetic_scenario_count": len(hermetic),
+        "hermetic_quality_qualification": hermetic_quality.to_dict(),
+        "live_quality_canary_manifest": quality_canary.to_dict(),
+        "live_quality_campaign_manifest": quality_campaign.to_dict(),
         "semi_auto_manifest": semi_auto,
         "oracle_authority": {
             "hard_safety": "QUALIFICATION_AUTHORITY",
