@@ -29,26 +29,6 @@ ai:
       detected_job_type: lead
       confidence: 0.9
       reasons: [keyword_match]
-    entity_extraction_v1:
-      entities:
-        customer_name: Anna Test
-        email: anna-inject@example.com
-      confidence: 0.85
-    lead_scoring_v1:
-      lead_score: 70
-      priority: medium
-      routing: crm_update
-      reasons: []
-      confidence: 0.85
-    decisioning_v1:
-      decision: manual_review
-      target_queue: manual_review
-      action_flags:
-        create_crm_lead: false
-        notify_human: true
-        request_missing_data: false
-      reasons: [injection_risk]
-      confidence: 0.85
 pipeline:
   steps:
     - run: pipeline
