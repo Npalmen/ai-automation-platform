@@ -1,7 +1,9 @@
 from app.ai.schemas import ClassificationResponse
 from app.domain.workflows.models import Job
+from app.workflows.business_intent import build_business_intent_from_classification
 from app.workflows.intelligence_safety import assess_content_risk
-from app.workflows.processors.ai_processor_utils import run_ai_step
+from app.workflows.processors.ai_processor_utils import get_latest_processor_payload, run_ai_step
+from app.workflows.threat_assessment import ThreatAssessment
 
 
 PROCESSOR_NAME = "classification_processor"
@@ -132,10 +134,44 @@ def _build_source_context(job: Job) -> dict:
     }
 
 
+def _threat_from_intake(job: Job) -> ThreatAssessment | None:
+    intake_payload = get_latest_processor_payload(job, "universal_intake_processor")
+    threat_data = intake_payload.get("threat_assessment")
+    return ThreatAssessment.from_dict(threat_data)
+
+
+def _apply_threat_override(
+    payload: dict,
+    threat: ThreatAssessment | None,
+) -> dict:
+    """Enforce deterministic threat blockers on classification output."""
+    if threat is None or not threat.hard_blockers:
+        return payload
+
+    if threat.threat_class in (
+        "phishing",
+        "prompt_injection",
+        "spam",
+        "credential_request",
+        "payment_detail_change",
+    ):
+        payload = dict(payload)
+        payload["detected_job_type"] = "spam" if threat.threat_class == "spam" else "unknown"
+        payload["confidence"] = max(float(payload.get("confidence") or 0), threat.confidence)
+        reasons = list(payload.get("reasons") or [])
+        reasons.extend(["threat_blocked", threat.threat_class])
+        payload["reasons"] = reasons
+        payload["recommended_next_step"] = threat.required_routing
+        payload["threat_override"] = True
+
+    return payload
+
+
 def process_classification_job(job: Job, trace=None) -> Job:
     context = _build_source_context(job)
 
     input_data = job.input_data or {}
+    threat = _threat_from_intake(job)
 
     def _deterministic_fallback(error_message: str) -> dict:
         detected = _classify_deterministic(
@@ -161,14 +197,40 @@ def process_classification_job(job: Job, trace=None) -> Job:
         context=context,
         response_model=ClassificationResponse,
         success_summary="Ärendet klassificerat med AI.",
-        success_payload_builder=lambda parsed: {
-            "detected_job_type": parsed.detected_job_type,
-            "confidence": parsed.confidence,
-            "reasons": parsed.reasons,
-            "recommended_next_step": parsed.detected_job_type,
-        },
-        fallback_payload_builder=_deterministic_fallback,
+        success_payload_builder=lambda parsed: _apply_threat_override(
+            {
+                "detected_job_type": parsed.detected_job_type,
+                "confidence": parsed.confidence,
+                "reasons": parsed.reasons,
+                "recommended_next_step": parsed.detected_job_type,
+            },
+            threat,
+        ),
+        fallback_payload_builder=lambda err: _apply_threat_override(
+            _deterministic_fallback(err), threat
+        ),
     )
+
+    # Post-process: threat override on LLM success path too.
+    from app.workflows.processors.ai_processor_utils import get_latest_processor_payload as _glp
+
+    latest = _glp(job, PROCESSOR_NAME) or {}
+    if threat and threat.hard_blockers:
+        overridden = _apply_threat_override(latest, threat)
+        if overridden != latest:
+            job.processor_history[-1]["result"]["payload"] = overridden
+            latest = overridden
+
+    business_intent = build_business_intent_from_classification(
+        detected_job_type=str(latest.get("detected_job_type") or "unknown"),
+        confidence=float(latest.get("confidence") or 0),
+        reasons=list(latest.get("reasons") or []),
+        threat_blocks_business=bool(threat and threat.hard_blockers),
+    )
+    job.processor_history[-1]["result"]["payload"]["business_intent"] = business_intent.to_dict()
+    if threat:
+        job.processor_history[-1]["result"]["payload"]["threat_assessment"] = threat.to_dict()
+
     if trace is not None and trace.db is not None:
         from app.workflows.decision_record import DecisionRecordType
         from app.workflows.decision_record_service import record_processor_decision

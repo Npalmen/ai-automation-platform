@@ -17,6 +17,7 @@ from app.workflows.decision_contract import (
 )
 from app.workflows.intelligence_safety import assess_content_risk
 from app.workflows.safe_acknowledgement import evaluate_safe_acknowledgement_eligibility
+from app.workflows.threat_assessment import ThreatAssessment
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
     get_latest_processor_payload,
@@ -185,6 +186,10 @@ def process_policy_job(job: Job, db: Session | None = None, trace=None) -> Job:
 
     decisioning_reasons = list(decisioning_payload.get("reasons") or [])
 
+    intake_payload = get_latest_processor_payload(job, "universal_intake_processor")
+    threat = ThreatAssessment.from_dict(intake_payload.get("threat_assessment"))
+    threat_dict = threat.to_dict() if threat else None
+
     safe_ack = evaluate_safe_acknowledgement_eligibility(
         detected_job_type=detected_job_type,
         risk_detected=bool(risk["risk_detected"]),
@@ -196,11 +201,21 @@ def process_policy_job(job: Job, db: Session | None = None, trace=None) -> Job:
         low_confidence=low_confidence,
         used_fallback=used_fallback,
         decisioning_reasons=decisioning_reasons,
+        threat_assessment=threat_dict,
     )
     safe_acknowledgement_path = safe_ack.eligible
 
+    if threat and not threat.customer_draft_allowed:
+        safe_acknowledgement_path = False
+        authorization = PolicyAuthorization.HOLD_FOR_REVIEW
+        reasons.append(f"threat_{threat.threat_class}")
+        target_queue = threat.required_routing
+        requires_human_review_override = True
+    else:
+        requires_human_review_override = False
+
     reasons.extend(auth_result.reasons)
-    authorization = auth_result.authorization
+    authorization = auth_result.authorization if not requires_human_review_override else authorization
 
     if safe_acknowledgement_path:
         authorization = PolicyAuthorization.APPROVAL_REQUIRED
@@ -274,6 +289,7 @@ def process_policy_job(job: Job, db: Session | None = None, trace=None) -> Job:
             "next_best_action": recommended_next_step,
             "safe_acknowledgement_path": safe_acknowledgement_path,
             "operational_routing": target_queue if safe_acknowledgement_path else None,
+            "threat_assessment": threat_dict,
         },
     }
 

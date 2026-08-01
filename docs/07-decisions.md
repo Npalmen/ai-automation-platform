@@ -808,3 +808,20 @@ Reference: `docs/plans/production-pilot-p1-observability-fix-plan.md`, `app/prod
 **Evidence:** Release Gate `30659465404`; canary `3950058c` 4/4 PASS; full campaign `3f416a93` 40/40 PASS.  
 **Reference:** `app/evaluation/regression/qualification_registry.yaml`, `app/evaluation/profile_testbot/campaign/semi_auto_runner.py`
 
+---
+
+## DEC-048 — Separated threat assessment layer for inbox quality (2026-08-01)
+
+**Status:** Active — PD-IQH-001 PR-1 (`feature/inbox-quality-threat-intent`)
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **Deterministic first** | `assess_threat` runs at intake; hard blockers cannot be lowered by LLM |
+| 2 | **Separate from business intent** | `ThreatAssessment` and `BusinessIntentResult` are distinct contracts |
+| 3 | **Customer draft gate** | `customer_draft_allowed=False` blocks safe-ack path and pending customer approval |
+| 4 | **Extraction sanitization** | Prompt-injection spans excluded from authoritative `ExtractedFactSet` |
+| 5 | **PTB-SEM-0024 regression** | Hermetic test blocks customer draft when LLM misclassifies as lead |
+
+**Reason:** Live campaign PTB-SEM-0024 showed transport-safe but decision-quality failure (phishing classified as lead, `requested_service` from injection).  
+**Reference:** `app/workflows/threat_assessment.py`, `app/workflows/safe_extraction.py`, `docs/inbox-quality/`
+

@@ -87,9 +87,19 @@ def evaluate_safe_acknowledgement_eligibility(
     low_confidence: bool,
     used_fallback: bool,
     decisioning_reasons: list[str] | None = None,
+    threat_assessment: dict[str, Any] | None = None,
 ) -> SafeAcknowledgementEligibility:
     """Return whether a safe acknowledgement draft may be prepared for approval."""
     reasons: list[str] = []
+
+    if threat_assessment is not None:
+        if not threat_assessment.get("customer_draft_allowed", True):
+            blockers = threat_assessment.get("hard_blockers") or []
+            threat_class = threat_assessment.get("threat_class", "unknown")
+            return SafeAcknowledgementEligibility(
+                False,
+                tuple(blockers) if blockers else (f"threat_{threat_class}",),
+            )
 
     if detected_job_type not in ("lead", "customer_inquiry"):
         return SafeAcknowledgementEligibility(False, ("unsupported_job_type",))

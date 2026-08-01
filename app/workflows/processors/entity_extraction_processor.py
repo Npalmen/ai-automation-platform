@@ -1,5 +1,7 @@
 from app.ai.schemas import EntityExtractionResponse
 from app.domain.workflows.models import Job
+from app.workflows.safe_extraction import sanitize_entities
+from app.workflows.threat_assessment import ThreatAssessment
 from app.workflows.processors.ai_processor_utils import (
     get_latest_processor_payload,
     run_ai_step,
@@ -69,6 +71,16 @@ def process_entity_extraction_job(job: Job) -> Job:
 
     def success_payload_builder(parsed):
         entities = _apply_intake_fallback(parsed.entities.model_dump(), origin)
+        intake_payload = get_latest_processor_payload(job, "universal_intake_processor")
+        input_data = job.input_data or {}
+        threat = ThreatAssessment.from_dict(intake_payload.get("threat_assessment"))
+        entities, fact_set = sanitize_entities(
+            entities,
+            subject=str(input_data.get("subject") or ""),
+            body=str(input_data.get("message_text") or input_data.get("plain_text") or ""),
+            threat=threat,
+            extraction_confidence=float(parsed.confidence or 0),
+        )
         validation = validate_entities(entities)
 
         return {
@@ -79,6 +91,7 @@ def process_entity_extraction_job(job: Job) -> Job:
                 "is_valid": validation["is_valid"],
                 "issues": validation["issues"],
             },
+            "extracted_fact_set": fact_set.to_dict(),
             "recommended_next_step": (
                 "manual_review" if not validation["is_valid"] else None
             ),
