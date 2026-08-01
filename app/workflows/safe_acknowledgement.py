@@ -2,44 +2,26 @@
 
 Separates operational routing (manual_review) from communication authorization
 (send_for_approval) so a bounded customer reply can be drafted and gated by approval.
+
+Eligibility is owned by app.workflows.safe_ack_eligibility — this module provides
+backward-compatible shims and legacy body builder delegation.
 """
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from typing import Any
 
-from app.workflows.decision_contract import DecisionRecommendation, _LEGACY_AUTHORIZATION_TOKENS
-from app.workflows.processors.ai_processor_utils import normalize_sender
-
-# Extraction validation issues that may coexist with a safe acknowledgement draft.
-_SOFT_EXTRACTION_ISSUES = frozenset(
-    {
-        "missing_identity",
-        "missing_requested_service",
-    }
+from app.workflows.decision_contract import DecisionRecommendation
+from app.workflows.missing_fact_plan import MissingFactPlan, build_missing_fact_plan
+from app.workflows.reply_planning import (
+    CustomerReplyPlan,
+    build_customer_reply_plan,
+    render_customer_reply,
 )
-
-# Hard blockers — never create a customer draft.
-_HARD_EXTRACTION_ISSUES = frozenset(
-    {
-        "invalid_email",
-        "invalid_phone",
-    }
-)
-
-# Inbound topics that require hold without customer draft (no price/booking promises).
-_FORBIDDEN_INBOUND_TOPIC_PATTERNS: tuple[tuple[str, str], ...] = (
-    ("price", r"\b(?:pris|kostar|kostnad|vad\s+kostar)\b"),
-    ("booking", r"\b(?:boka|bokning|inbokad|bokat\s+tid)\b"),
-    ("warranty", r"\b(?:garanti|reklamation)\b"),
-    ("legal_commitment", r"\b(?:juridiskt|stämning|advokat)\b"),
-    ("bank_details", r"\b(?:bankgiro|plusgiro|swish\s+nummer)\b"),
-)
-
-_OUT_OF_AREA_MARKERS = (
-    "gotland",
+from app.workflows.safe_ack_eligibility import (
+    SafeAckEligibilityResult,
+    evaluate_safe_ack_eligibility,
 )
 
 
@@ -48,31 +30,11 @@ class SafeAcknowledgementEligibility:
     eligible: bool
     reasons: tuple[str, ...] = ()
 
-
-def _usable_customer_email(input_data: dict[str, Any]) -> str:
-    sender = normalize_sender(input_data)
-    email = str(sender.get("email") or "").strip().lower()
-    if email and "no-reply" not in email and "noreply" not in email:
-        return email
-    for key in ("customer_email", "reply_to_email", "email"):
-        candidate = str(input_data.get(key) or "").strip().lower()
-        if candidate and "no-reply" not in candidate and "noreply" not in candidate:
-            return candidate
-    return ""
-
-
-def _inbound_forbidden_topics(text: str) -> list[str]:
-    lowered = (text or "").lower()
-    found: list[str] = []
-    for topic, pattern in _FORBIDDEN_INBOUND_TOPIC_PATTERNS:
-        if re.search(pattern, lowered, re.IGNORECASE):
-            found.append(topic)
-    return found
-
-
-def _is_out_of_area(text: str) -> bool:
-    lowered = (text or "").lower()
-    return any(marker in lowered for marker in _OUT_OF_AREA_MARKERS)
+    @classmethod
+    def from_result(cls, result: SafeAckEligibilityResult) -> SafeAcknowledgementEligibility:
+        if result.eligible:
+            return cls(True, result.supporting_reason_codes)
+        return cls(False, result.blocker_codes)
 
 
 def evaluate_safe_acknowledgement_eligibility(
@@ -88,108 +50,26 @@ def evaluate_safe_acknowledgement_eligibility(
     used_fallback: bool,
     decisioning_reasons: list[str] | None = None,
     threat_assessment: dict[str, Any] | None = None,
+    business_intent: dict[str, Any] | None = None,
+    extracted_fact_set: dict[str, Any] | None = None,
 ) -> SafeAcknowledgementEligibility:
-    """Return whether a safe acknowledgement draft may be prepared for approval."""
-    reasons: list[str] = []
-
-    if threat_assessment is not None:
-        if not threat_assessment.get("customer_draft_allowed", True):
-            blockers = threat_assessment.get("hard_blockers") or []
-            threat_class = threat_assessment.get("threat_class", "unknown")
-            return SafeAcknowledgementEligibility(
-                False,
-                tuple(blockers) if blockers else (f"threat_{threat_class}",),
-            )
-
-    if detected_job_type not in ("lead", "customer_inquiry"):
-        return SafeAcknowledgementEligibility(False, ("unsupported_job_type",))
-
-    if risk_detected:
-        return SafeAcknowledgementEligibility(False, ("content_risk_detected",))
-
-    if risk_categories:
-        return SafeAcknowledgementEligibility(False, tuple(risk_categories))
-
-    if not _usable_customer_email(input_data):
-        return SafeAcknowledgementEligibility(False, ("no_usable_reply_address",))
-
-    issue_set = {str(i) for i in extraction_issues if i}
-    if issue_set & _HARD_EXTRACTION_ISSUES:
-        return SafeAcknowledgementEligibility(
-            False,
-            tuple(sorted(issue_set & _HARD_EXTRACTION_ISSUES)),
-        )
-
-    if issue_set - _SOFT_EXTRACTION_ISSUES:
-        return SafeAcknowledgementEligibility(
-            False,
-            tuple(sorted(issue_set - _SOFT_EXTRACTION_ISSUES)),
-        )
-
-    raw = str(recommendation_raw or "").strip().lower()
-    if raw in _LEGACY_AUTHORIZATION_TOKENS:
-        return SafeAcknowledgementEligibility(False, ("legacy_authorization_token",))
-
-    if raw in {"hold", "reject", "no_reply", "no_action"}:
-        return SafeAcknowledgementEligibility(False, (f"decisioning_{raw}",))
-
-    if recommendation == DecisionRecommendation.HOLD:
-        return SafeAcknowledgementEligibility(False, ("decisioning_hold",))
-
-    if decisioning_reasons:
-        blocked_reasons = frozenset(
-            {
-                "ambiguous_context",
-                "identity_conflict",
-                "prompt_injection",
-                "spam_detected",
-            }
-        )
-        matched = [reason for reason in decisioning_reasons if reason in blocked_reasons]
-        if matched:
-            return SafeAcknowledgementEligibility(False, tuple(matched))
-
-    combined_text = " ".join(
-        str(input_data.get(key) or "")
-        for key in ("subject", "message_text")
+    """Backward-compatible shim — delegates to central safe_ack_eligibility."""
+    result = evaluate_safe_ack_eligibility(
+        detected_job_type=detected_job_type,
+        risk_detected=risk_detected,
+        risk_categories=risk_categories,
+        extraction_issues=extraction_issues,
+        input_data=input_data,
+        recommendation=recommendation,
+        recommendation_raw=recommendation_raw,
+        low_confidence=low_confidence,
+        used_fallback=used_fallback,
+        decisioning_reasons=decisioning_reasons,
+        threat_assessment=threat_assessment,
+        business_intent=business_intent,
+        extracted_fact_set=extracted_fact_set,
     )
-    if "fwd:" in combined_text.lower() or "vidarebefordrat" in combined_text.lower():
-        return SafeAcknowledgementEligibility(False, ("forwarded_thread_context",))
-
-    forbidden = _inbound_forbidden_topics(combined_text)
-    if forbidden:
-        return SafeAcknowledgementEligibility(False, tuple(forbidden))
-
-    if _is_out_of_area(combined_text):
-        return SafeAcknowledgementEligibility(False, ("out_of_service_area",))
-
-    # Incomplete-but-comprehensible: identity gaps or explicit manual-review routing.
-    # missing_requested_service alone on an auto_route lead must not override full_auto.
-    soft_signals = (
-        "missing_identity" in issue_set
-        or low_confidence
-        or used_fallback
-    )
-    manual_review_signal = recommendation in (
-        DecisionRecommendation.MANUAL_REVIEW,
-        None,
-    )
-    if recommendation == DecisionRecommendation.AUTO_ROUTE and not soft_signals:
-        return SafeAcknowledgementEligibility(False, ("auto_route_without_identity_gap",))
-
-    if not soft_signals and not manual_review_signal:
-        return SafeAcknowledgementEligibility(False, ("complete_enough_for_auto_path",))
-
-    if soft_signals:
-        reasons.append("incomplete_lead_missing_details")
-    if manual_review_signal:
-        reasons.append("operational_manual_review")
-    if low_confidence:
-        reasons.append("low_confidence_soft")
-    if used_fallback:
-        reasons.append("decisioning_used_fallback_soft")
-
-    return SafeAcknowledgementEligibility(True, tuple(reasons))
+    return SafeAcknowledgementEligibility.from_result(result)
 
 
 def build_safe_acknowledgement_body(
@@ -198,33 +78,38 @@ def build_safe_acknowledgement_body(
     service_hint: str,
     missing_fields: list[str],
     signature_name: str,
+    location_hint: str = "",
+    question_labels: list[str] | None = None,
 ) -> str:
     """Build a bounded acknowledgement that requests missing information only."""
-    ack = "Tack för din förfrågan. Vi tittar på den och återkommer."
-    service_line = ""
-    if service_hint:
-        service_line = f"\n\nVi ser att du vill ha hjälp med {service_hint}."
+    labels = question_labels
+    if labels is None:
+        prompts: list[str] = []
+        if "customer_name" in missing_fields or "name" in missing_fields or "contact_name" in missing_fields:
+            prompts.append("Ditt namn")
+        if "phone" in missing_fields or "phone_or_email" in missing_fields:
+            prompts.append("Telefonnummer")
+        if "address" in missing_fields or "location" in missing_fields:
+            prompts.append("Adress eller ort")
+        if "requested_service" in missing_fields or "service_type" in missing_fields:
+            prompts.append("Vilken tjänst det gäller")
+        labels = prompts or ["Namn", "Telefonnummer", "Adress"]
 
-    prompts: list[str] = []
-    if "customer_name" in missing_fields or "name" in missing_fields:
-        prompts.append("Ditt namn")
-    if "phone" in missing_fields:
-        prompts.append("Telefonnummer")
-    if "address" in missing_fields or "location" in missing_fields:
-        prompts.append("Adress eller ort")
-    if "requested_service" in missing_fields or "service_type" in missing_fields:
-        prompts.append("Vilken tjänst det gäller")
-    if not prompts:
-        prompts = ["Namn", "Telefonnummer", "Adress"]
-
-    question_block = "\n".join(f"- {item}" for item in prompts)
-    closing = f"\n\nVänliga hälsningar\n{signature_name}" if signature_name else ""
-    return (
-        f"{greeting}\n\n"
-        f"{ack}"
-        f"{service_line}\n\n"
-        "För att vi ska kunna gå vidare behöver vi:\n"
-        f"{question_block}\n\n"
-        "Förfrågan granskas av oss innan vi återkommer."
-        f"{closing}"
+    plan = CustomerReplyPlan(
+        acknowledgement_intent="safe_incomplete_lead_ack",
+        verified_facts=(),
+        service_hint=service_hint or "din förfrågan",
+        location_hint=location_hint,
+        missing_questions=tuple(labels),
+        forbidden_commitments=("price", "booking", "warranty"),
+        language="sv",
+        tone="professional",
+        next_step_wording="Förfrågan granskas av oss innan vi återkommer.",
+        greeting=greeting,
+        signature_name=signature_name,
+        profile_service_type="legacy",
+        fallback_template_key="safe_ack_incomplete_lead_v1",
+        plan_provenance=("legacy_builder",),
+        policy_version="reply_planning_v1",
     )
+    return render_customer_reply(plan)

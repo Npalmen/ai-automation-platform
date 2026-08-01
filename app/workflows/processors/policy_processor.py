@@ -15,8 +15,10 @@ from app.workflows.decision_contract import (
     project_recommended_next_step,
     resolve_policy_authorization,
 )
+from app.workflows.business_intent import BusinessIntentResult
 from app.workflows.intelligence_safety import assess_content_risk
-from app.workflows.safe_acknowledgement import evaluate_safe_acknowledgement_eligibility
+from app.workflows.reply_planning import build_internal_operator_note
+from app.workflows.safe_ack_eligibility import evaluate_safe_ack_eligibility
 from app.workflows.threat_assessment import ThreatAssessment
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
@@ -190,7 +192,12 @@ def process_policy_job(job: Job, db: Session | None = None, trace=None) -> Job:
     threat = ThreatAssessment.from_dict(intake_payload.get("threat_assessment"))
     threat_dict = threat.to_dict() if threat else None
 
-    safe_ack = evaluate_safe_acknowledgement_eligibility(
+    business_intent = BusinessIntentResult.from_dict(
+        classification_payload.get("business_intent")
+    )
+    extracted_fact_set = extraction_payload.get("extracted_fact_set")
+
+    safe_ack = evaluate_safe_ack_eligibility(
         detected_job_type=detected_job_type,
         risk_detected=bool(risk["risk_detected"]),
         risk_categories=list(risk.get("categories") or []),
@@ -201,9 +208,21 @@ def process_policy_job(job: Job, db: Session | None = None, trace=None) -> Job:
         low_confidence=low_confidence,
         used_fallback=used_fallback,
         decisioning_reasons=decisioning_reasons,
-        threat_assessment=threat_dict,
+        threat_assessment=threat,
+        business_intent=business_intent,
+        extracted_fact_set=extracted_fact_set,
     )
     safe_acknowledgement_path = safe_ack.eligible
+    safe_ack_dict = safe_ack.to_dict()
+    internal_operator_note = None
+    if not safe_ack.customer_draft_allowed:
+        internal_operator_note = build_internal_operator_note(
+            threat_assessment=threat_dict,
+            extracted_fact_set=extracted_fact_set,
+            eligibility=safe_ack,
+            hold_reason=safe_ack.blocker_codes[0] if safe_ack.blocker_codes else None,
+            risk_categories=list(risk.get("categories") or []),
+        ).to_dict()
 
     if threat and not threat.customer_draft_allowed:
         safe_acknowledgement_path = False
@@ -220,7 +239,7 @@ def process_policy_job(job: Job, db: Session | None = None, trace=None) -> Job:
     if safe_acknowledgement_path:
         authorization = PolicyAuthorization.APPROVAL_REQUIRED
         reasons.append("safe_acknowledgement_path")
-        reasons.extend(safe_ack.reasons)
+        reasons.extend(safe_ack.supporting_reason_codes)
         if not target_queue:
             target_queue = "manual_review"
 
@@ -288,8 +307,10 @@ def process_policy_job(job: Job, db: Session | None = None, trace=None) -> Job:
             "route_to": target_queue,
             "next_best_action": recommended_next_step,
             "safe_acknowledgement_path": safe_acknowledgement_path,
+            "safe_ack_eligibility": safe_ack_dict,
             "operational_routing": target_queue if safe_acknowledgement_path else None,
             "threat_assessment": threat_dict,
+            "internal_operator_note": internal_operator_note,
         },
     }
 

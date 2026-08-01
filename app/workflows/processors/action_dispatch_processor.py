@@ -14,7 +14,13 @@ from app.workflows.action_executor import _integration_allowed_for_action, execu
 from app.workflows.action_authorization import apply_action_authorization, classify_action, ActionEffect
 from app.workflows.decision_record_service import record_action_authorization
 from app.workflows.intelligence_safety import assess_content_risk
-from app.workflows.safe_acknowledgement import build_safe_acknowledgement_body
+from app.workflows.missing_fact_plan import build_missing_fact_plan
+from app.workflows.reply_candidate_safety import assess_reply_candidate_safety
+from app.workflows.reply_planning import (
+    build_customer_reply_plan,
+    render_customer_reply,
+)
+from app.workflows.safe_ack_eligibility import SafeAckEligibilityResult
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
     classify_inquiry_priority,
@@ -465,6 +471,14 @@ def _build_safe_acknowledgement_action(
     if not policy_payload.get("safe_acknowledgement_path"):
         return None
 
+    eligibility = SafeAckEligibilityResult.from_dict(
+        policy_payload.get("safe_ack_eligibility")
+    )
+    if eligibility is not None and not eligibility.eligible:
+        return None
+    if eligibility is not None and not eligibility.customer_draft_allowed:
+        return None
+
     input_data = job.input_data or {}
     sender = normalize_sender(input_data)
     settings = automation_settings or {}
@@ -493,25 +507,75 @@ def _build_safe_acknowledgement_action(
 
     entities_payload = get_latest_processor_payload(job, "entity_extraction_processor")
     entities = (entities_payload.get("entities") or {}) if entities_payload else {}
-    service_hint = str(entities.get("requested_service") or "").strip()
-    if not service_hint:
-        service_hint = "din förfrågan"
+    fact_set_raw = entities_payload.get("extracted_fact_set") if entities_payload else None
+    fact_map: dict[str, str | None] = {}
+    if fact_set_raw:
+        for fact in fact_set_raw.get("facts") or []:
+            if fact.get("fact_status") != "excluded":
+                fact_map[str(fact.get("field_name"))] = fact.get("normalized_value")
 
-    completeness = evaluate_information_completeness("lead", input_data)
-    missing_fields = list(completeness.get("missing_fields") or [])
-    extraction_validation = (entities_payload.get("validation") or {}) if entities_payload else {}
-    for issue in extraction_validation.get("issues") or []:
-        if issue == "missing_identity":
-            missing_fields.append("name")
-        if issue == "missing_requested_service":
-            missing_fields.append("service_type")
-
-    body = build_safe_acknowledgement_body(
-        greeting=greeting,
-        service_hint=service_hint,
-        missing_fields=missing_fields,
-        signature_name=signature_name,
+    classification_payload = get_latest_processor_payload(job, "classification_processor")
+    detected_job_type = (
+        classification_payload.get("detected_job_type")
+        or policy_payload.get("detected_job_type")
+        or "lead"
     )
+    lead_payload = get_latest_processor_payload(job, "lead_processor")
+    lead_type = lead_payload.get("lead_type") if lead_payload else None
+    lead_analyzer_payload = get_latest_processor_payload(job, "lead_analyzer_processor")
+    service_type = lead_analyzer_payload.get("service_profile_type") if lead_analyzer_payload else None
+
+    missing_plan = build_missing_fact_plan(
+        input_data=input_data,
+        entities=entities,
+        detected_job_type=detected_job_type,
+        lead_type=lead_type,
+        service_type=service_type,
+    )
+    if eligibility is None:
+        from app.workflows.decision_contract import normalize_decision_recommendation
+        from app.workflows.safe_ack_eligibility import evaluate_safe_ack_eligibility
+
+        decisioning_payload = get_latest_processor_payload(job, "decisioning_processor")
+        risk = assess_content_risk(input_data)
+        extraction_validation = (entities_payload.get("validation") or {}) if entities_payload else {}
+        eligibility = evaluate_safe_ack_eligibility(
+            detected_job_type=detected_job_type,
+            risk_detected=bool(risk["risk_detected"]),
+            risk_categories=list(risk.get("categories") or []),
+            extraction_issues=list(extraction_validation.get("issues") or []),
+            input_data=input_data,
+            recommendation=normalize_decision_recommendation(
+                decisioning_payload.get("decision"),
+                used_fallback=bool(decisioning_payload.get("used_fallback")),
+            ),
+            recommendation_raw=str(decisioning_payload.get("decision") or ""),
+            low_confidence=bool(lead_payload.get("low_confidence")) if lead_payload else False,
+            used_fallback=bool(decisioning_payload.get("used_fallback")),
+            decisioning_reasons=list(decisioning_payload.get("reasons") or []),
+            threat_assessment=policy_payload.get("threat_assessment"),
+            business_intent=classification_payload.get("business_intent"),
+            extracted_fact_set=fact_set_raw,
+        )
+        if not eligibility.eligible:
+            return None
+
+    reply_plan = build_customer_reply_plan(
+        greeting=greeting,
+        signature_name=signature_name,
+        missing_fact_plan=missing_plan,
+        eligibility=eligibility,
+        entities=entities,
+        fact_map=fact_map,
+    )
+    if reply_plan is None:
+        return None
+
+    body = render_customer_reply(reply_plan)
+    safety = assess_reply_candidate_safety(body)
+    if not safety.get("passed"):
+        body = render_customer_reply(reply_plan, use_fallback=True)
+
     reply_subject = f"Re: {subject}" if subject and subject != "Lead" else "Re: ditt ärende"
     return {
         "type": "send_customer_auto_reply",
@@ -524,6 +588,9 @@ def _build_safe_acknowledgement_action(
         "references": source_internet_message_id if use_thread_reply else None,
         "_needs_approval": True,
         "_approval_reason": "safe_acknowledgement_requires_approval",
+        "_safe_acknowledgement_path": True,
+        "_customer_reply_plan": reply_plan.to_dict(),
+        "_missing_fact_plan": missing_plan.to_dict(),
     }
 
 
