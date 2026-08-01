@@ -97,6 +97,28 @@ qualifications:
       - action.send_customer_auto_reply
       - approval.lifecycle
 
+  - id: PROFILE_DRIVEN_SEMI_AUTO_QUALITY_QUALIFIED
+    chapter: profile-testbot
+    scope: profile-driven inbox quality hermetic + live semi-auto quality qualification
+    source_workflow_run: pending
+    source_sha: pending
+    contract_version: inbox_quality_hermetic_v1
+    evidence_schema: profile_quality_campaign_v1
+    allowed_reuse: true
+    incompatible_changes:
+      - quality oracle contract change
+      - quality dataset version bump without requalification
+      - thread replay semantics change
+      - safe-ack eligibility contract change
+    expiry_policy: stale_on_contract_change
+    default_production_activation: false
+    live_external_write_type: gmail_reply
+    status: PENDING
+    compatible_capabilities:
+      - action.send_customer_auto_reply
+      - approval.lifecycle
+      - policy.pre_write_reply_safety
+
   - id: PROFILE_DRIVEN_AUTOMATIC_GMAIL_QUALIFIED
     chapter: profile-testbot
     scope: profile-driven automatic Gmail canary/core on isolated live-eval tenant

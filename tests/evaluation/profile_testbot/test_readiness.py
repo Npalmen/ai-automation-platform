@@ -184,6 +184,7 @@ def test_production_demo_blocking_remains_active_after_fix(readiness_env):
 def test_live_qualifications_after_semi_auto_closure(readiness_env):
     report = build_profile_testbot_readiness()
     assert report["live_qualifications"]["PROFILE_DRIVEN_SEMI_AUTO_GMAIL_QUALIFIED"] == "VALID"
+    assert report["live_qualifications"]["PROFILE_DRIVEN_SEMI_AUTO_QUALITY_QUALIFIED"] == "PENDING"
     assert report["live_qualifications"]["PROFILE_DRIVEN_AUTOMATIC_GMAIL_QUALIFIED"] == "PENDING"
     assert report["live_qualifications"]["PROFILE_DRIVEN_TESTBOT_PASS"] == "PENDING"
 
@@ -206,6 +207,9 @@ def test_readiness_reports_manifest_and_oracle_authority(readiness_env):
     assert report["semi_auto_manifest"]["send_after_approval_count"] >= 20
     assert report["semi_auto_manifest"]["hold_reject_no_reply_count"] >= 20
     assert report["oracle_authority"]["semantic_judge"] == "STUB_NOT_QUALIFICATION_AUTHORITY"
+    assert report["hermetic_quality_qualification"]["overall_status"] == "PASS"
+    assert report["live_quality_canary_manifest"]["scenario_count"] == 12
+    assert report["live_quality_campaign_manifest"]["scenario_count"] == 32
 
 
 def test_provider_read_only_verification_when_gmail_eval_enabled(readiness_env, monkeypatch):
