@@ -532,6 +532,7 @@ def evaluate_coworker_reply_oracles(
     reply_body: str,
     plan_v2: CustomerReplyPlanV2 | None,
     provenance: ReplyRenderProvenance | None,
+    render_validation: dict[str, Any] | None = None,
 ) -> list[CoworkerOracleResult]:
     setup = scenario.customer_state_setup or {}
     if not setup.get("oracle_applicability", {}).get("coworker_reply_quality", True):
@@ -774,6 +775,24 @@ def evaluate_coworker_reply_oracles(
                 "fallback_usage",
                 provenance.fallback_reason or "fallback",
                 blocker=False,
+            )
+        )
+
+    if render_validation is not None:
+        final_gate = render_validation.get("final_customer_text_validation") or {}
+        passed = bool(final_gate.get("passed"))
+        detail_parts = [
+            f"stage={final_gate.get('validation_stage')}",
+            f"hash={str(final_gate.get('validated_body_hash') or '')[:12]}",
+        ]
+        if final_gate.get("issues"):
+            detail_parts.append(";".join(str(i) for i in final_gate["issues"][:3]))
+        results.append(
+            CoworkerOracleResult(
+                "final_customer_text_validation",
+                "pass" if passed else "fail",
+                "surface_quality",
+                "|".join(detail_parts),
             )
         )
 
