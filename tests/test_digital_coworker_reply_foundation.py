@@ -31,6 +31,27 @@ def _eligibility(input_data=None):
     )
 
 
+class TestCoworkerFeatureFlag:
+    def test_disabled_by_default_in_test_env(self, monkeypatch):
+        monkeypatch.delenv("DIGITAL_COWORKER_REPLY_ENABLED", raising=False)
+        monkeypatch.setenv("ENV", "test")
+        from app.workflows.reply_quality.feature_flag import (
+            LIVE_EVAL_TENANT,
+            is_digital_coworker_reply_enabled,
+        )
+
+        assert is_digital_coworker_reply_enabled(tenant_id=LIVE_EVAL_TENANT) is False
+
+    def test_enabled_when_env_flag_set(self, monkeypatch):
+        monkeypatch.setenv("DIGITAL_COWORKER_REPLY_ENABLED", "true")
+        from app.workflows.reply_quality.feature_flag import (
+            LIVE_EVAL_TENANT,
+            is_digital_coworker_reply_enabled,
+        )
+
+        assert is_digital_coworker_reply_enabled(tenant_id=LIVE_EVAL_TENANT) is True
+
+
 class TestRenderingAudit:
     def test_audit_covers_send_scenarios(self):
         records = audit_legacy_reply_path()

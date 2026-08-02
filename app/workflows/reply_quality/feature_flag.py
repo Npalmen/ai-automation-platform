@@ -24,8 +24,5 @@ def is_digital_coworker_reply_enabled(
         return False
     if env in ("1", "true", "yes", "on"):
         return tenant_id == LIVE_EVAL_TENANT
-    return tenant_id == LIVE_EVAL_TENANT and os.environ.get("ENV", "dev") in {
-        "dev",
-        "test",
-        "staging",
-    }
+    # Fail-closed: legacy safe-ack remains default until explicitly enabled.
+    return False
