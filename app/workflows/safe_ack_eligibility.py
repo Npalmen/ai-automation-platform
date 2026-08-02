@@ -213,7 +213,7 @@ def evaluate_safe_ack_eligibility(
             threat_version=threat_version,
             internal_note_allowed=True,
         )
-    if quality_expected_send in {"reject", "no_reply"}:
+    if quality_expected_send in {"reject", "no_reply", "hold"}:
         return _blocked(
             f"quality_{quality_expected_send}",
             permitted_reply_type="none",

@@ -145,13 +145,17 @@ def _resolve_runtime_sha(runtime_sha: str | None) -> str:
 
 
 def _customer_draft_created(*, scenario: ProfileScenario, approval_state: str, draft_text: str) -> bool:
+    if bool(draft_text):
+        return True
+    if scenario.expected_send_behavior in {"hold", "observe_only"}:
+        return False
     if scenario.expected_send_behavior in {"reject", "no_reply"}:
-        return approval_state == "pending" or bool(draft_text)
+        return approval_state == "pending"
     if scenario.expected_send_behavior == "draft_for_approval":
-        return approval_state == "pending" or bool(draft_text)
+        return approval_state == "pending"
     if scenario.expected_send_behavior in SEND_BEHAVIORS_COUNTING_AS_GMAIL_SEND:
-        return approval_state == "pending" or bool(draft_text)
-    return approval_state == "pending"
+        return approval_state == "pending"
+    return False
 
 
 def _prepare_campaign_state(

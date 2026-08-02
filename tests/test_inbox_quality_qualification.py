@@ -37,6 +37,27 @@ from app.evaluation.regression.qualification_registry import (
     qualification_index,
     validate_qualification_registry,
 )
+from app.evaluation.profile_testbot.campaign.quality_live_runner import _customer_draft_created
+
+
+class TestCustomerDraftCreatedOracle:
+    def test_hold_ignores_pending_without_customer_draft_text(self):
+        scenario = type("S", (), {"expected_send_behavior": "hold"})()
+        assert _customer_draft_created(
+            scenario=scenario, approval_state="pending", draft_text=""
+        ) is False
+
+    def test_hold_detects_customer_draft_text(self):
+        scenario = type("S", (), {"expected_send_behavior": "hold"})()
+        assert _customer_draft_created(
+            scenario=scenario, approval_state="none", draft_text="Hej,"
+        ) is True
+
+    def test_send_after_approval_counts_pending_without_body(self):
+        scenario = type("S", (), {"expected_send_behavior": "send_after_approval"})()
+        assert _customer_draft_created(
+            scenario=scenario, approval_state="pending", draft_text=""
+        ) is True
 
 
 class TestQualificationRegistry:
