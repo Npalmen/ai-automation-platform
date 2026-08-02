@@ -76,6 +76,7 @@ def _plan_for(scenario_id: str):
         question_surface_labels=tuple(plan_dict.get("question_surface_labels") or []),
         location_phrase=plan_dict.get("location_phrase"),
         case_reference_phrase=plan_dict.get("case_reference_phrase"),
+        scenario_family=plan_dict.get("scenario_family"),
     )
 
 
@@ -106,10 +107,10 @@ class TestMockedLiveOutputsPassValidator:
         monkeypatch.setenv("DIGITAL_COWORKER_LLM_RENDER", "live")
         plan = _plan_for("PTB-DCQ-0056")
         body = (
-            "Hej,\n\nTack för att du hör av dig om felet på den befintliga solcellsanläggningen. "
+            "Hej,\n\nTack för att du hör av dig om din befintliga anläggning. "
             "Kan du beskriva eventuell felkod på display eller app, om något känns osäkert "
             "el- eller brandsäkerhetsmässigt, samt bilder eller ritningar om du har?\n\n"
-            "När vi har det går vi igenom uppgifterna och ser hur ärendet bör hanteras.\n\n"
+            "När vi har uppgifterna går vi igenom felbilden och bedömer nästa felsökningssteg.\n\n"
             "Vänliga hälsningar\nNiklas"
         )
         with patch("app.ai.llm.client.get_llm_client") as mock_get:

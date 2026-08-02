@@ -130,6 +130,28 @@ def pronoun_register_for_plan(*, service_family: str, language: str) -> str:
     return "ni"
 
 
+_PRONOUN_CONTRACTS_SV: dict[str, dict[str, tuple[str, ...]]] = {
+    "du": {
+        "allowed": ("du", "dig", "din", "ditt", "dina"),
+        "forbidden": ("ni", "er", "ert", "era"),
+    },
+    "ni": {
+        "allowed": ("ni", "er", "ert", "era"),
+        "forbidden": ("du", "dig", "din", "ditt", "dina"),
+    },
+}
+
+
+def pronoun_surface_contract(*, register: str, language: str) -> dict[str, tuple[str, ...]]:
+    """Explicit allowed/forbidden pronoun forms for constrained LLM rendering."""
+    if language == "en":
+        return {
+            "allowed": ("you", "your", "yours"),
+            "forbidden": (),
+        }
+    return _PRONOUN_CONTRACTS_SV.get(register, _PRONOUN_CONTRACTS_SV["ni"])
+
+
 def _adjust_sv_register(text: str, register: str) -> str:
     if register != "du":
         return text
@@ -232,27 +254,22 @@ def localized_next_step(
     language: str,
     service_family: str,
     has_questions: bool,
+    business_intent: str = "lead",
+    thread_state: str = "new_thread",
+    is_continuation: bool = False,
+    scenario_family: str | None = None,
+    mentions_attachment_gap: bool = False,
 ) -> str:
-    if service_family == "job_status":
-        return (
-            "We will get back to you once we have reviewed the case."
-            if language == "en"
-            else "Vi återkommer när vi har gått igenom ärendet."
-        )
-    if service_family == "complaint_warranty":
-        return (
-            "A colleague will review the case manually once we have the details."
-            if language == "en"
-            else "En kollega går igenom ärendet när vi har underlaget."
-        )
-    if has_questions:
-        return (
-            "Once we have that information, we will review the site conditions and get back to you."
-            if language == "en"
-            else "När vi har det underlaget går vi igenom förutsättningarna och återkommer."
-        )
-    return (
-        "We will review the details and get back to you."
-        if language == "en"
-        else "Vi går igenom underlaget och återkommer."
+    from app.workflows.reply_quality.next_step_surface import localized_next_step as _localized
+
+    return _localized(
+        step_id=step_id,
+        language=language,
+        service_family=service_family,
+        has_questions=has_questions,
+        business_intent=business_intent,
+        thread_state=thread_state,
+        is_continuation=is_continuation,
+        scenario_family=scenario_family,
+        mentions_attachment_gap=mentions_attachment_gap,
     )

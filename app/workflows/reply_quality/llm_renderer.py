@@ -6,14 +6,14 @@ import json
 import os
 from typing import Any
 
-from app.workflows.reply_quality.customer_surface import localized_next_step
+from app.workflows.reply_quality.customer_surface import localized_next_step, pronoun_surface_contract
 from app.workflows.reply_quality.llm_reply_parser import LLMReplyParseError, parse_llm_reply_output
 from app.workflows.reply_quality.plan_v2 import CustomerReplyPlanV2
 from app.workflows.reply_quality.reply_language import localized_closing
 
-PROMPT_VERSION = "coworker_constrained_llm_v4"
+PROMPT_VERSION = "coworker_constrained_llm_v5"
 MODEL_ID = "gpt-4o-mini"
-TEMPLATE_VERSION = "digital_coworker_constrained_llm_v4"
+TEMPLATE_VERSION = "digital_coworker_constrained_llm_v5"
 RENDERER_POLICY_VERSION = "constrained_llm_renderer_v1"
 
 _PRONOUN_RULES_SV = {
@@ -28,14 +28,31 @@ _PRONOUN_RULES_EN = {
 def build_constrained_llm_payload(plan: CustomerReplyPlanV2) -> dict[str, Any]:
     """Surface-safe payload allowed into the constrained LLM renderer."""
     pronoun = plan.salutation_strategy or ("du" if plan.language == "sv" else "you")
+    pronoun_contract = pronoun_surface_contract(register=pronoun, language=plan.language)
+    from app.workflows.reply_quality.next_step_surface import build_next_step_surface
+
+    next_surface = build_next_step_surface(
+        step_id=plan.response_objective,
+        service_family=plan.service_family,
+        business_intent=plan.business_intent,
+        thread_state=plan.thread_context.thread_state,
+        is_continuation=plan.thread_context.is_continuation,
+        has_questions=bool(plan.question_surface_labels),
+        language=plan.language,
+        scenario_family=plan.scenario_family,
+        mentions_attachment_gap=any("missing_attachment" in e for e in plan.evidence),
+    )
     return {
         "language": plan.language,
         "pronoun_register": pronoun,
+        "pronoun_allowed_forms": list(pronoun_contract["allowed"]),
+        "pronoun_forbidden_forms": list(pronoun_contract["forbidden"]),
         "greeting": plan.greeting,
         "acknowledgement_statement": plan.acknowledgement_statement,
         "approved_questions": list(plan.question_surface_labels),
         "selected_question_ids": list(plan.selected_questions),
         "next_step_statement": plan.next_step_statement,
+        "next_step_contract": next_surface.to_dict(),
         "signature_name": plan.signature_name,
         "service_family": plan.service_family,
         "response_objective": plan.response_objective,
@@ -54,14 +71,24 @@ def build_constrained_llm_prompt(plan: CustomerReplyPlanV2) -> str:
     register = plan.salutation_strategy or ("du" if language.startswith("sv") else "you")
     if language.startswith("en"):
         pronoun_rule = _PRONOUN_RULES_EN.get(register, _PRONOUN_RULES_EN["you"])
+        pronoun_detail = ""
     else:
         pronoun_rule = _PRONOUN_RULES_SV.get(register, _PRONOUN_RULES_SV["ni"])
+        contract = pronoun_surface_contract(register=register, language=plan.language)
+        allowed = ", ".join(contract["allowed"])
+        forbidden = ", ".join(contract["forbidden"])
+        pronoun_detail = (
+            f" Allowed forms: {allowed}. Forbidden forms: {forbidden}. "
+            "Apply consistently in acknowledgement, questions, next step, and closing."
+        )
 
     return (
         "Compose a natural customer email reply using ONLY the approved fields in the JSON payload.\n"
         'Return JSON: {"reply_body": "<full email text>"}\n'
         "Hard rules:\n"
-        f"- Language: {plan.language}. {pronoun_rule}\n"
+        f"- Language: {plan.language}. {pronoun_rule}{pronoun_detail}\n"
+        "- Use next_step_statement verbatim in meaning; do not replace it with a generic "
+        "'review conditions and get back' phrase when next_step_contract specifies a concrete step.\n"
         "- Write flowing prose paragraphs only.\n"
         "- NEVER use schema labels, field names, key:value lines, bullet lists of internal fields, "
         "or technical headings from the payload.\n"
@@ -146,18 +173,18 @@ def compose_constrained_reply_hermetic(plan: CustomerReplyPlanV2) -> str:
     signature = f"\n\n{closing}\n{plan.signature_name}" if plan.signature_name else ""
 
     if plan.service_family == "existing_installation_support":
-        ack = _support_acknowledgement(plan)
+        ack = (plan.acknowledgement_statement or _support_acknowledgement(plan)).strip()
         questions = tuple(plan.question_surface_labels)
         if language == "en":
             q_block = _join_questions_en(questions) if questions else ""
-            next_step = (
+            next_step = plan.next_step_statement or (
                 "Once we have that information, we will review the details and decide how to handle the case."
                 if questions
                 else plan.next_step_statement
             )
         else:
             q_block = _render_question_block(plan) if questions else ""
-            next_step = (
+            next_step = plan.next_step_statement or (
                 "När vi har det går vi igenom uppgifterna och ser hur ärendet bör hanteras."
                 if questions
                 else plan.next_step_statement

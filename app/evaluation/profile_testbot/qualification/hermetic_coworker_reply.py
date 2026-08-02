@@ -79,6 +79,7 @@ def _render_scenario_reply(
         "language": scenario.input.language,
         "_force_service_type": setup.get("service_type"),
         "_coworker_hermetic_eval": True,
+        "_coworker_scenario_family": setup.get("coworker_family") or scenario.family,
         "sender": {
             "name": scenario.input.sender_name,
             "email": scenario.input.sender_email,

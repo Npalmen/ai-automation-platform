@@ -395,6 +395,37 @@ def evaluate_coworker_reply_oracles(
     return results
 
 
+_NEXT_STEP_SKELETON_MARKERS: tuple[tuple[str, str], ...] = (
+    ("takets förutsättningar", "<NEXT_SOLAR>"),
+    ("offertprocessen", "<NEXT_SOLAR_FOLLOWUP>"),
+    ("sista uppgifterna", "<NEXT_SOLAR_CONT>"),
+    ("kompatibilitet med befintligt system", "<NEXT_BATTERY>"),
+    ("installationsförutsättningar", "<NEXT_EV>"),
+    ("felbilden", "<NEXT_SUPPORT>"),
+    ("supportärendet", "<NEXT_SUPPORT_FOLLOWUP>"),
+    ("ärendets aktuella status", "<NEXT_STATUS>"),
+    ("fler kontaktuppgifter", "<NEXT_STATUS_NO_CONTACT>"),
+    ("reklamationen", "<NEXT_COMPLAINT>"),
+    ("rätt tjänst", "<NEXT_CONSULT>"),
+    ("filen igen", "<NEXT_ATTACHMENT>"),
+    ("roof conditions", "<NEXT_SOLAR>"),
+    ("battery", "<NEXT_BATTERY>"),
+    ("installation conditions", "<NEXT_EV>"),
+    ("fault picture", "<NEXT_SUPPORT>"),
+    ("case status", "<NEXT_STATUS>"),
+)
+
+
+def _next_step_skeleton_tag(line: str) -> str | None:
+    lowered = line.lower()
+    if _GENERIC_NEXT_STEP_SV in lowered:
+        return "<NEXT_GENERIC>"
+    for marker, tag in _NEXT_STEP_SKELETON_MARKERS:
+        if marker in lowered:
+            return tag
+    return None
+
+
 def _structural_skeleton(body: str) -> str:
     lines = []
     for line in body.splitlines():
@@ -409,10 +440,9 @@ def _structural_skeleton(body: str) -> str:
             lines.append("<CLOSE>")
         elif "tack" in stripped.lower() or "thank" in stripped.lower():
             lines.append("<ACK>")
-        elif _GENERIC_NEXT_STEP_SV in stripped.lower():
-            lines.append("<NEXT_GENERIC>")
         else:
-            lines.append("<BODY>")
+            next_tag = _next_step_skeleton_tag(stripped)
+            lines.append(next_tag or "<BODY>")
     return "|".join(lines)
 
 

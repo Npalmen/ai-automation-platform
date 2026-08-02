@@ -54,6 +54,7 @@ def build_acknowledgement_plan(
     pronoun_register: str = "ni",
     mentions_battery: bool = False,
     mentions_attachment_gap: bool = False,
+    scenario_family: str | None = None,
 ) -> AcknowledgementPlan:
     family = playbook.service_family
     service = _service_phrase(family=family, language=language)
@@ -120,20 +121,41 @@ def build_acknowledgement_plan(
         )
 
     if family == "existing_installation_support":
+        followup_family = bool(scenario_family and scenario_family.endswith("_followup"))
         if thread.is_continuation:
-            statement = (
-                "Thanks for the follow-up about the fault on your installation."
-                if language == "en"
-                else "Tack för uppföljningen om felet på den befintliga anläggningen."
-            )
+            if language == "en":
+                statement = (
+                    "Thanks for following up on the support case."
+                    if followup_family
+                    else "Thanks for the follow-up about the fault on your installation."
+                )
+            elif followup_family:
+                statement = (
+                    "Tack för att du följer upp det befintliga supportärendet."
+                    if register == "du"
+                    else "Tack för att ni följer upp det befintliga supportärendet."
+                )
+            else:
+                statement = "Tack för uppföljningen om felet på den befintliga anläggningen."
             claims.append("support_follow_up")
             evidence.append("thread:continuation")
         else:
-            statement = (
-                "Thank you for contacting us about your existing installation."
-                if language == "en"
-                else "Tack för att du hör av dig om er befintliga anläggning."
-            )
+            if language == "en":
+                statement = (
+                    "Thank you for contacting us again about the fault."
+                    if followup_family
+                    else "Thank you for contacting us about your existing installation."
+                )
+            elif followup_family:
+                statement = (
+                    "Tack för att du hör av dig igen om felet på den befintliga anläggningen."
+                    if register == "du"
+                    else "Tack för att ni hör av er igen om felet på den befintliga anläggningen."
+                )
+            elif register == "du":
+                statement = "Tack för att du hör av dig om din befintliga anläggning."
+            else:
+                statement = "Tack för att ni hör av er om er befintliga anläggning."
             claims.append("support_new_contact")
             evidence.append("thread:new_thread")
         return AcknowledgementPlan(
@@ -158,8 +180,19 @@ def build_acknowledgement_plan(
         )
 
     if thread.is_continuation:
+        followup_family = bool(scenario_family and scenario_family.endswith("_followup"))
         if family == "solar_installation":
-            if mentions_battery:
+            if followup_family:
+                statement = (
+                    "Thanks for following up on your solar quote request."
+                    if language == "en"
+                    else (
+                        "Tack för att ni följer upp er solcellsförfrågan."
+                        if register == "ni"
+                        else "Tack för att du följer upp din solcellsförfrågan."
+                    )
+                )
+            elif mentions_battery:
                 statement = (
                     "Thanks for following up on your solar and battery enquiry."
                     if language == "en"
@@ -330,15 +363,27 @@ def build_acknowledgement_plan(
         )
         )
     elif family == "solar_installation":
-        statement = (
-            "Thank you for your solar installation enquiry."
-            if language == "en"
-            else (
-            "Tack för er förfrågan om solcellsinstallation."
-            if register == "ni"
-            else "Tack för din förfrågan om solcellsinstallation."
-        )
-        )
+        followup_family = bool(scenario_family and scenario_family.endswith("_followup"))
+        if followup_family:
+            statement = (
+                "Thank you for getting back to us about the solar quote."
+                if language == "en"
+                else (
+                    "Tack för er återkomst om solcellsofferten."
+                    if register == "ni"
+                    else "Tack för din återkomst om solcellsofferten."
+                )
+            )
+        else:
+            statement = (
+                "Thank you for your solar installation enquiry."
+                if language == "en"
+                else (
+                    "Tack för er förfrågan om solcellsinstallation."
+                    if register == "ni"
+                    else "Tack för din förfrågan om solcellsinstallation."
+                )
+            )
     else:
         statement = (
             "Thank you for your message."

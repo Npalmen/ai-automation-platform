@@ -23,7 +23,7 @@ from app.workflows.reply_quality.provenance import (
 )
 from app.workflows.reply_quality.reply_language import localized_closing
 
-TEMPLATE_VERSION = "digital_coworker_constrained_llm_v4"
+TEMPLATE_VERSION = "digital_coworker_constrained_llm_v5"
 
 
 @dataclass(frozen=True)
