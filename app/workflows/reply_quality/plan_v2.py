@@ -11,7 +11,7 @@ from app.workflows.reply_quality.operational_next_step import OperationalNextSte
 from app.workflows.reply_quality.service_playbooks import ReplyServicePlaybook
 from app.workflows.reply_quality.thread_context import ThreadReplyContext
 
-POLICY_VERSION = "customer_reply_plan_v2"
+POLICY_VERSION = "customer_reply_plan_v3"
 
 
 @dataclass(frozen=True)
@@ -38,6 +38,11 @@ class CustomerReplyPlanV2:
     evidence: tuple[str, ...]
     playbook_id: str
     policy_version: str
+    acknowledgement_statement: str = ""
+    question_surface_labels: tuple[str, ...] = ()
+    location_phrase: str | None = None
+    case_reference_phrase: str | None = None
+    language_decision_evidence: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -63,6 +68,11 @@ class CustomerReplyPlanV2:
             "evidence": list(self.evidence),
             "playbook_id": self.playbook_id,
             "policy_version": self.policy_version,
+            "acknowledgement_statement": self.acknowledgement_statement,
+            "question_surface_labels": list(self.question_surface_labels),
+            "location_phrase": self.location_phrase,
+            "case_reference_phrase": self.case_reference_phrase,
+            "language_decision_evidence": list(self.language_decision_evidence),
         }
 
 
@@ -81,9 +91,20 @@ def build_customer_reply_plan_v2(
     language: str = "sv",
     forbidden_commitments: tuple[str, ...] = (),
     fallback_reason: str | None = None,
+    acknowledgement_statement: str = "",
+    question_surface_labels: tuple[str, ...] = (),
+    location_phrase: str | None = None,
+    case_reference_phrase: str | None = None,
+    language_decision_evidence: tuple[str, ...] = (),
 ) -> CustomerReplyPlanV2:
-    from app.workflows.reply_quality.operational_next_step import next_step_wording
+    from app.workflows.reply_quality.customer_surface import localized_next_step
 
+    next_step_statement = localized_next_step(
+        step_id=next_step.step_id,
+        language=language,
+        service_family=playbook.service_family,
+        has_questions=bool(question_surface_labels or information_plan.selected_questions),
+    )
     return CustomerReplyPlanV2(
         response_objective=next_step.step_id,
         acknowledgement_mode=acknowledgement_mode,
@@ -93,7 +114,7 @@ def build_customer_reply_plan_v2(
         facts_not_allowed_to_repeat=information_plan.already_known_facts,
         selected_questions=information_plan.selected_questions,
         selected_question_labels=information_plan.selected_question_labels,
-        next_step_statement=next_step_wording(next_step, language=language),
+        next_step_statement=next_step_statement,
         commitment_constraints=forbidden_commitments,
         tone_profile=tone_profile,
         language=language,
@@ -112,6 +133,11 @@ def build_customer_reply_plan_v2(
         evidence=information_plan.selection_reasons,
         playbook_id=playbook.playbook_id,
         policy_version=POLICY_VERSION,
+        acknowledgement_statement=acknowledgement_statement,
+        question_surface_labels=question_surface_labels or information_plan.selected_question_labels,
+        location_phrase=location_phrase,
+        case_reference_phrase=case_reference_phrase,
+        language_decision_evidence=language_decision_evidence,
     )
 
 

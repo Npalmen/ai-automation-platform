@@ -221,6 +221,11 @@ def run_hermetic_coworker_reply_qualification(
                 evidence=tuple(plan_dict.get("evidence") or ()),
                 playbook_id=plan_dict["playbook_id"],
                 policy_version=plan_dict["policy_version"],
+                acknowledgement_statement=str(plan_dict.get("acknowledgement_statement") or ""),
+                question_surface_labels=tuple(plan_dict.get("question_surface_labels") or []),
+                location_phrase=plan_dict.get("location_phrase"),
+                case_reference_phrase=plan_dict.get("case_reference_phrase"),
+                language_decision_evidence=tuple(plan_dict.get("language_decision_evidence") or []),
             )
 
         oracle_results = evaluate_coworker_reply_oracles(

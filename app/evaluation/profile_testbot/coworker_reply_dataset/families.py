@@ -41,7 +41,7 @@ _FAMILY_TEMPLATES: dict[str, tuple[CoworkerFamilyCell, ...]] = {
         CoworkerFamilyCell("Batteri växelriktare", "Har solceller och undrar om vår växelriktare klarar batteri.", "battery_storage", "lead", "new_thread", "sv", "send_after_approval", (), False, True, ("batteri", "växelrikt"), ()),
         CoworkerFamilyCell("Batteri syfte", "Vi vill ha batteri främst för egenförbrukning i Uppsala.", "battery_storage", "lead", "new_thread", "sv", "send_after_approval", ("city",), False, True, ("batteri",), ()),
         CoworkerFamilyCell("Batteri känd adress", "Vi har solceller på Storgatan 4 Uppsala och vill ha batteri.", "battery_storage", "lead", "new_thread", "sv", "send_after_approval", ("address", "existing_solar_system"), True, True, ("batteri",), ("adress",)),
-        CoworkerFamilyCell("Batteri uppföljning", "Tack, här kommer info om befintlig anläggning 8 kWp.", "battery_storage", "lead", "continuation", "sv", "send_after_approval", ("existing_solar_system",), True, True, ("uppföljning",), ()),
+        CoworkerFamilyCell("Batteri uppföljning", "Tack, här kommer info om befintlig anläggning 8 kWp.", "battery_storage", "lead", "continuation", "sv", "send_after_approval", ("existing_solar_system",), True, True, ("kompletter", "batteri"), ()),
         CoworkerFamilyCell("Batteri offert", "Kan ni titta på batterilager till vår villa?", "battery_storage", "lead", "new_thread", "sv", "send_after_approval", (), False, True, ("batteri",), ()),
     ),
 }
@@ -84,12 +84,12 @@ def _simple_family(
             service_type,
             intent,
             ("new_thread", "continuation")[i % 2],
-            "sv" if i % 4 else "en",
+            "en" if i % 4 == 0 else "sv",
             "send_after_approval" if i % 5 else "draft_for_approval",
             ("city",) if i % 3 == 0 else (),
             i % 2 == 0,
             True,
-            (marker_sv,) if i % 4 else (marker_en,),
+            (marker_sv,) if i % 4 != 0 else (marker_en,),
             ("pris", "bokad"),
         )
         for i in range(8)
@@ -142,7 +142,7 @@ for family in COWORKER_FAMILIES:
                 ("customer_name",),
                 True,
                 True,
-                ("status",),
+                ("ärende",),
                 ("solcellsinstallation",),
             )
             for i in range(8)
@@ -160,7 +160,7 @@ for family in COWORKER_FAMILIES:
                 ("email",),
                 True,
                 True,
-                ("status",),
+                ("ärende",),
                 ("telefon",),
             )
             for i in range(8)
@@ -169,7 +169,7 @@ for family in COWORKER_FAMILIES:
         _FAMILY_TEMPLATES[family] = tuple(
             CoworkerFamilyCell(
                 "Ärende om tidigare installation",
-                f"Vi vill rapportera ett problem med installationen som upptäcktes för {i} veckor sedan.",
+                f"Vi vill rapportera ett problem med installationen som upptäcktes för {'nyligen' if i == 0 else 'två veckor sedan' if i == 1 else 'den här veckan'}.",
                 "solar_service",
                 "support_status",
                 "new_thread",
@@ -185,12 +185,12 @@ for family in COWORKER_FAMILIES:
         )
     elif family == "general_consultation":
         _FAMILY_TEMPLATES[family] = _simple_family(
-            family, service_type="generic_lead", intent="lead", marker_sv="hjälp", marker_en="help",
+            family, service_type="generic_lead", intent="lead", marker_sv="meddelande", marker_en="message",
             subjects=("Allmän fråga", "Rådgivning"),
         )
     elif family == "missing_attachment":
         _FAMILY_TEMPLATES[family] = _simple_family(
-            family, service_type="generic_lead", intent="ambiguous_short", marker_sv="bild", marker_en="image",
+            family, service_type="generic_lead", intent="ambiguous_short", marker_sv="meddelande", marker_en="message",
             subjects=("Bifogar snart", "Saknar ritning"),
         )
     elif family == "multi_turn_continuation":
@@ -206,7 +206,7 @@ for family in COWORKER_FAMILIES:
                 ("city", "customer_name"),
                 True,
                 True,
-                ("uppföljning", "kompletter"),
+                ("kompletter",),
                 ("tack för din förfrågan",),
             )
             for i in range(8)
