@@ -271,6 +271,67 @@ _COMPLAINT_PLAYBOOK = _pb(
     forbidden=("personnummer", "bank_account", "technical_guarantee"),
 )
 
+_CONSULTATION_PLAYBOOKS: dict[str, ReplyServicePlaybook] = {
+    "consultation_solar_vs_battery": _pb(
+        "general_consultation",
+        intents=("lead", "lead_new"),
+        next_steps=("clarify_service_scope",),
+        required={"clarify_service_scope": ("annual_consumption", "existing_installation", "intended_purpose")},
+        priority=(
+            "annual_consumption",
+            "existing_installation",
+            "intended_purpose",
+            "property_type",
+            "address",
+            "battery_preference",
+        ),
+        first_max=4,
+    ),
+    "consultation_energy_storage": _pb(
+        "general_consultation",
+        intents=("lead", "lead_new"),
+        next_steps=("clarify_service_scope",),
+        required={"clarify_service_scope": ("existing_installation", "intended_purpose", "annual_consumption")},
+        priority=(
+            "existing_installation",
+            "intended_purpose",
+            "annual_consumption",
+            "current_inverter",
+            "address",
+            "property_type",
+        ),
+        first_max=4,
+    ),
+    "consultation_charger_vs_solar": _pb(
+        "general_consultation",
+        intents=("lead", "lead_new"),
+        next_steps=("clarify_service_scope",),
+        required={"clarify_service_scope": ("charging_points", "annual_consumption", "intended_purpose")},
+        priority=(
+            "charging_points",
+            "annual_consumption",
+            "intended_purpose",
+            "existing_installation",
+            "address",
+            "battery_interest",
+        ),
+        first_max=4,
+    ),
+    "consultation_booking": _pb(
+        "general_consultation",
+        intents=("lead", "lead_new"),
+        next_steps=("collect_contact_preference",),
+        required={"collect_contact_preference": ()},
+        priority=("phone_or_email",),
+        first_max=0,
+        follow_max=0,
+    ),
+}
+
+
+def get_consultation_playbook(consultation_intent: str) -> ReplyServicePlaybook:
+    return _CONSULTATION_PLAYBOOKS.get(consultation_intent, _PLAYBOOKS["generic_lead"])
+
 
 def map_service_type_to_family(service_type: str, *, business_intent: str | None = None) -> str:
     if business_intent in {"support_status"} and service_type in {"generic_support", "solar_service"}:

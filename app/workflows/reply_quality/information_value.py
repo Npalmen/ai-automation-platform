@@ -17,14 +17,19 @@ from app.workflows.reply_quality.fact_extraction import (
     extract_customer_facts,
     normalize_case_reference,
 )
+from app.workflows.reply_quality.fact_evidence import (
+    ADDRESS_STATE_PROPERTY_ADDRESS,
+    build_fact_evidence,
+)
 from app.workflows.reply_quality.semantic_fact_predicates import (
     attachment_state,
+    detect_consultation_intent,
     existing_solar_verified,
 )
 from app.workflows.reply_quality.operational_next_step import OperationalNextStep
 from app.workflows.reply_quality.service_playbooks import ReplyServicePlaybook
 
-POLICY_VERSION = "information_value_plan_v4"
+POLICY_VERSION = "information_value_plan_v5"
 
 _FIELD_LABELS: dict[str, str] = {
     "address": "Adress eller ort för installationen/ärendet",
@@ -111,6 +116,12 @@ def _field_known(
         return True
     if field == "discovery_time":
         return extract_discovery_time_phrase(text) is not None
+    if field == "annual_consumption":
+        if re.search(r"\b\d{4,5}\s*kwh\b", text, re.I):
+            return True
+        if "annual_consumption" in extracted_known or entities.get("annual_consumption"):
+            return True
+        return False
     if field == "address":
         if entities.get("address"):
             return True
@@ -190,6 +201,14 @@ def build_information_value_plan(
     text = _combined_text(input_data)
     extracted = extract_customer_facts(input_data=input_data, entities=entities)
     extracted_known = set(extracted.known_question_fields) | set(extracted.fact_ids)
+    semantic_ids = set(extracted.fact_ids)
+    evidence = build_fact_evidence(
+        input_data=input_data,
+        entities=entities,
+        known_fact_fields=known_fact_fields,
+    )
+    evidenced_known: set[str] = set(evidence.evidenced_question_fields)
+    consultation_intent = detect_consultation_intent(text)
     city_phrase = extracted.location_city or extract_city_phrase(
         text=input_data.get("message_text", "") + " " + input_data.get("subject", ""),
         entities=entities,
@@ -208,70 +227,93 @@ def build_information_value_plan(
         if case_reference or status_requested:
             budget = 0
 
-    known: list[str] = list(known_fact_fields)
+    known: list[str] = []
     candidates = list(playbook.question_priority)
     for required in playbook.required_facts_by_next_step.get(next_step.step_id, ()):
         if required not in candidates:
             candidates.append(required)
+
+    if consultation_intent == "consultation_booking":
+        budget = 0
+    elif consultation_intent:
+        budget = min(budget, 4)
 
     scored: list[tuple[int, str]] = []
     excluded: list[str] = []
     reasons: list[str] = []
 
     attach_state = attachment_state(text)
+    solar_verified = existing_solar_verified(semantic_ids, extracted_known)
 
     for field in candidates:
-        present = field in known or _field_known(
-            field,
-            entities=entities,
-            text=text,
-            extracted_known=extracted_known,
-            fact_ids=set(extracted.fact_ids),
-        )
+        if field in evidenced_known:
+            excluded.append(field)
+            reasons.append(f"exclude:{field}:evidenced_known")
+            continue
+
+        if consultation_intent and field in {"project_description", "requested_service"}:
+            excluded.append(field)
+            reasons.append(f"exclude:{field}:consultation_intent")
+            continue
+
         if case_reference and field in {"case_reference", "customer_identifier", "status_dimension"}:
-            present = True
+            evidenced_known.add(field)
+            excluded.append(field)
+            reasons.append(f"exclude:{field}:evidenced_known")
+            continue
         if status_requested and field in {"status_dimension", "case_reference"}:
-            present = True
-        if entities.get("email") and field == "customer_identifier":
-            present = True
-        if city_phrase and field == "address" and not re.search(
-            r"\b\d{1,4}\b|\bgatan\b|\bvägen\b|\bstreet\b", text, re.I
-        ):
-            present = False
+            evidenced_known.add(field)
+            excluded.append(field)
+            reasons.append(f"exclude:{field}:evidenced_known")
+            continue
+
         if field in {"roof_type", "property_type"} and "battery_retrofit" in extracted_known:
-            present = True
+            excluded.append(field)
             reasons.append(f"exclude:{field}:battery_retrofit")
-        if field == "existing_solar_system" and not existing_solar_verified(
-            set(extracted.fact_ids), extracted_known
-        ):
-            present = True
+            continue
+        if field == "existing_solar_system" and not solar_verified:
+            excluded.append(field)
             reasons.append(f"exclude:{field}:no_verified_solar")
-        if field == "current_inverter" and not existing_solar_verified(
-            set(extracted.fact_ids), extracted_known
-        ):
-            present = True
+            continue
+        if field == "current_inverter" and not solar_verified:
+            excluded.append(field)
             reasons.append(f"exclude:{field}:no_verified_solar")
-        if field == "existing_installation" and existing_solar_verified(
-            set(extracted.fact_ids), extracted_known
-        ):
-            present = True
+            continue
+        if field == "existing_installation" and solar_verified:
+            evidenced_known.add("existing_installation")
+            excluded.append(field)
+            reasons.append(f"exclude:{field}:evidenced_known")
+            continue
         if field == "attachment" and attach_state in {
             "attachment_claimed_kwh",
             "attachment_present_kwh",
         }:
-            present = True
+            evidenced_known.add("attachment")
+            excluded.append(field)
+            reasons.append(f"exclude:{field}:evidenced_known")
+            continue
         if field == "annual_consumption" and attach_state in {
             "attachment_claimed_kwh",
             "attachment_present_kwh",
         }:
-            present = True
-        if field == "requested_service" and "requested_service_explicit" in extracted_known:
-            present = True
-        if present:
-            known.append(field)
+            evidenced_known.add("annual_consumption")
             excluded.append(field)
-            reasons.append(f"exclude:{field}:already_known")
+            reasons.append(f"exclude:{field}:evidenced_known")
             continue
+
+        present = _field_known(
+            field,
+            entities=entities,
+            text=text,
+            extracted_known=extracted_known,
+            fact_ids=semantic_ids,
+        )
+        if present:
+            evidenced_known.add(field)
+            excluded.append(field)
+            reasons.append(f"exclude:{field}:evidenced_known")
+            continue
+
         score = _score_field(
             field,
             playbook=playbook,
@@ -295,14 +337,22 @@ def build_information_value_plan(
         if (
             field == "existing_installation"
             and playbook.service_family == "battery_installation"
-            and not existing_solar_verified(set(extracted.fact_ids), extracted_known)
+            and not solar_verified
         ):
             score += 45
+        if consultation_intent and field in {"annual_consumption", "existing_installation", "intended_purpose"}:
+            score += 25
         scored.append((score, field))
 
     scored.sort(key=lambda item: (-item[0], item[1]))
     selected = [field for score, field in scored if score > 0][:budget]
-    selected = [field for field in selected if field not in set(known)]
+    selected = [field for field in selected if field not in evidenced_known]
+    final_evidence = build_fact_evidence(
+        input_data=input_data,
+        entities=entities,
+        known_fact_fields=tuple(sorted(evidenced_known)),
+    )
+    known = list(final_evidence.evidenced_question_fields)
     labels = [
         contextual_question_surface(field, language=language, city_phrase=city_phrase)
         for field in selected
@@ -316,7 +366,7 @@ def build_information_value_plan(
         selected_question_labels=tuple(labels),
         excluded_questions=tuple(excluded),
         selection_reasons=tuple(reasons),
-        already_known_facts=tuple(sorted(set(known))),
+        already_known_facts=tuple(known),
         question_budget=budget,
         playbook_id=playbook.playbook_id,
         policy_version=POLICY_VERSION,

@@ -22,8 +22,14 @@ from app.workflows.reply_quality.post_render_validator import validate_post_rend
 from app.workflows.reply_quality.reply_language import authoritative_reply_language
 from app.workflows.reply_quality.plan_v2 import CustomerReplyPlanV2
 from app.workflows.reply_quality.provenance import ReplyRenderProvenance
+from app.workflows.reply_quality.fact_evidence import (
+    ADDRESS_STATE_PROPERTY_ADDRESS,
+    build_fact_evidence,
+)
+from app.workflows.reply_quality.plan_invariants import validate_pipeline_playbook_consistency
 from app.workflows.reply_quality.semantic_fact_predicates import (
     attachment_state,
+    detect_consultation_intent,
     detect_semantic_fact_ids,
     existing_solar_verified,
     is_battery_retrofit_intent,
@@ -149,9 +155,29 @@ _FOLLOWUP_ACK_FORBIDDEN_ON_NEW = re.compile(
     re.I,
 )
 _MALFORMED_QUESTION = re.compile(
-    r"\bom (?:du|ni) har om (?:du|ni) har\b|\bkan (?:du|ni) skicka vilken\b|if you have if you have",
+    r"\bom (?:du|ni) har om (?:du|ni) har\b|\bkan (?:du|ni) skicka vilken\b|if you have if you have"
+    r"|\bbekräfta om det finns redan\b"
+    r"|\bkan (?:du|ni) bekräfta huruvida\b",
     re.I,
 )
+
+
+def _scenario_evidence_context(scenario: ProfileScenario) -> tuple[dict[str, Any], tuple[str, ...]]:
+    from app.evaluation.profile_testbot.scenarios.schema import ProfileScenario as _ProfileScenario
+
+    _ = _ProfileScenario
+    setup = scenario.customer_state_setup or {}
+    entities: dict[str, Any] = {"email": scenario.input.sender_email or "customer@example.com"}
+    from app.workflows.reply_quality.customer_surface import extract_city_phrase
+
+    for key in setup.get("known_entities") or []:
+        if key == "city":
+            entities[key] = (
+                extract_city_phrase(text=scenario.input.message_text, entities={}) or "Uppsala"
+            )
+        else:
+            entities[key] = f"known-{key}"
+    return entities, tuple(setup.get("known_facts") or ())
 
 
 def _semantic_known_fields(fact_ids: set[str]) -> set[str]:
@@ -245,7 +271,11 @@ def evaluate_semantic_human_review_oracles(
         results.append(_oracle_pass("attachment_state_alignment", "conversation_quality", "aligned"))
 
     if extracted.location_city and "property_address" not in semantic_ids:
-        if "address" in extracted.known_question_fields and plan_v2.location_phrase:
+        address_known = (
+            "address" in (plan_v2.facts_not_allowed_to_repeat or ())
+            or any(v.startswith("internal_known:address") for v in (plan_v2.verified_facts or ()))
+        )
+        if address_known and plan_v2.location_phrase:
             results.append(
                 _oracle_fail("city_address_granularity", "question_utility", "city_treated_as_address")
             )
@@ -253,6 +283,114 @@ def evaluate_semantic_human_review_oracles(
             results.append(_oracle_pass("city_address_granularity", "question_utility", "clean"))
     else:
         results.append(_oracle_pass("city_address_granularity", "question_utility", "clean"))
+
+    entities, _known_facts = _scenario_evidence_context(scenario)
+    evidence = build_fact_evidence(
+        input_data={"subject": scenario.input.subject, "message_text": scenario.input.message_text},
+        entities=entities,
+        known_fact_fields=tuple(plan_v2.facts_not_allowed_to_repeat or ()),
+    )
+    evidence_failures: list[str] = []
+    for field in plan_v2.facts_not_allowed_to_repeat or ():
+        if field in evidence.evidenced_question_fields:
+            continue
+        if field in {"existing_solar_system", "current_inverter"} and not existing_solar_verified(
+            semantic_ids, set(extracted.known_question_fields)
+        ):
+            evidence_failures.append(field)
+        elif field == "address" and evidence.address_state.state != ADDRESS_STATE_PROPERTY_ADDRESS:
+            evidence_failures.append(field)
+        elif field in {"contact_name", "phone_or_email"}:
+            if field == "phone_or_email" and "@" in text:
+                continue
+            evidence_failures.append(field)
+        else:
+            evidence_failures.append(field)
+    if evidence_failures:
+        results.append(
+            _oracle_fail(
+                "verified_fact_requires_positive_evidence",
+                "question_utility",
+                ",".join(sorted(set(evidence_failures))[:3]),
+            )
+        )
+    else:
+        results.append(
+            _oracle_pass("verified_fact_requires_positive_evidence", "question_utility", "clean")
+        )
+
+    exclusion_failures = [
+        reason
+        for reason in (plan_v2.evidence or ())
+        if reason.startswith("exclude:") and reason.endswith(":already_known")
+    ]
+    if exclusion_failures:
+        results.append(
+            _oracle_fail(
+                "excluded_question_does_not_imply_known_fact",
+                "question_utility",
+                exclusion_failures[0],
+            )
+        )
+    else:
+        results.append(
+            _oracle_pass("excluded_question_does_not_imply_known_fact", "question_utility", "clean")
+        )
+
+    playbook_check = validate_pipeline_playbook_consistency(
+        playbook_id=plan_v2.playbook_id,
+        service_family=plan_v2.service_family,
+        next_step_service_family=plan_v2.service_family,
+    )
+    if not playbook_check.passed:
+        results.append(
+            _oracle_fail(
+                "pipeline_playbook_consistency",
+                "plan_fidelity",
+                ";".join(playbook_check.violations[:2]),
+            )
+        )
+    else:
+        results.append(_oracle_pass("pipeline_playbook_consistency", "plan_fidelity", "aligned"))
+
+    consultation_intent = detect_consultation_intent(text)
+    if consultation_intent:
+        if "project_description" in selected:
+            results.append(
+                _oracle_fail("consultation_question_relevance", "question_utility", "project_description")
+            )
+        else:
+            results.append(_oracle_pass("consultation_question_relevance", "question_utility", "clean"))
+        if consultation_intent != "consultation_booking":
+            results.append(
+                _oracle_pass("consultation_intent_alignment", "question_utility", consultation_intent)
+            )
+        else:
+            lowered_body = (reply_body or "").lower()
+            if not any(token in lowered_body for token in ("call", "samtal", "times", "tider")):
+                results.append(
+                    _oracle_fail("booking_request_not_ignored", "conversation_quality", "call_not_acknowledged")
+                )
+            else:
+                results.append(
+                    _oracle_pass("booking_request_not_ignored", "conversation_quality", "acknowledged")
+                )
+            results.append(
+                _oracle_pass("consultation_intent_alignment", "question_utility", consultation_intent)
+            )
+        if consultation_intent == "consultation_booking" and "requested_service" in selected:
+            results.append(
+                _oracle_fail("explicit_request_acknowledged", "conversation_quality", "service_reask")
+            )
+        elif consultation_intent:
+            results.append(
+                _oracle_pass("explicit_request_acknowledged", "conversation_quality", "acknowledged")
+            )
+    else:
+        results.append(_oracle_pass("consultation_intent_alignment", "question_utility", "n/a"))
+        results.append(_oracle_pass("consultation_question_relevance", "question_utility", "n/a"))
+        results.append(_oracle_pass("explicit_request_acknowledged", "conversation_quality", "n/a"))
+        results.append(_oracle_pass("booking_request_not_ignored", "conversation_quality", "n/a"))
 
     retrofit = is_battery_retrofit_intent(text)
     if retrofit and selected.intersection({"roof_type", "property_type"}):

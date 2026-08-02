@@ -102,7 +102,8 @@ class TestInformationValue:
             entities={"city": "Uppsala", "email": "customer@example.com"},
             known_fact_fields=("address",),
         )
-        assert "address" in plan.excluded_questions or "address" in plan.already_known_facts
+        assert "address" not in plan.already_known_facts
+        assert "address" in plan.selected_questions
 
     def test_name_deprioritized(self):
         playbook = get_reply_playbook("solar_installation")

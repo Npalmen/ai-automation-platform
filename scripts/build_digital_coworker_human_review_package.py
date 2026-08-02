@@ -41,10 +41,9 @@ from app.evaluation.profile_testbot.scenarios.schema import ProfileScenario  # n
 from app.workflows.missing_fact_plan import build_missing_fact_plan  # noqa: E402
 from app.workflows.reply_planning import _resolve_location_hint, _resolve_service_hint  # noqa: E402
 from app.workflows.reply_quality.information_value import build_information_value_plan  # noqa: E402
-from app.workflows.reply_quality.operational_next_step import select_operational_next_step  # noqa: E402
 from app.workflows.reply_quality.pipeline import build_and_render_coworker_reply  # noqa: E402
+from app.workflows.reply_quality.pipeline_routing import resolve_reply_pipeline_context  # noqa: E402
 from app.workflows.reply_quality.plan_v2 import CustomerReplyPlanV2  # noqa: E402
-from app.workflows.reply_quality.service_playbooks import get_reply_playbook  # noqa: E402
 from app.workflows.reply_quality.thread_context import (  # noqa: E402
     acknowledgement_mode_for_thread,
     build_thread_reply_context,
@@ -197,6 +196,80 @@ class RenderedScenario:
     oracles: list[dict[str, Any]]
     proxy_score: dict[str, Any]
     template_skeleton: str
+    audit: dict[str, Any] | None = None
+
+
+def _map_evidence_source(raw: str) -> str:
+    if raw.startswith("entity:"):
+        return "explicit_input_fact"
+    if raw.startswith("extracted:") or raw.startswith("semantic:"):
+        return "explicit_input_fact"
+    if raw.startswith("profile_known:"):
+        return "verified_profile_fact"
+    if raw.startswith("evidence:"):
+        return raw
+    return raw or "missing_evidence"
+
+
+def _build_scenario_audit(
+    *,
+    scenario: ProfileScenario,
+    input_data: dict[str, Any],
+    entities: dict[str, Any],
+    missing_known: tuple[str, ...],
+    pipeline_ctx,
+    info_plan: dict[str, Any],
+    plan_v2: CustomerReplyPlanV2 | None,
+) -> dict[str, Any]:
+    from app.workflows.reply_quality.fact_evidence import build_fact_evidence
+    from app.workflows.reply_quality.plan_invariants import validate_pipeline_playbook_consistency
+    from app.workflows.reply_quality.semantic_fact_predicates import (
+        attachment_state,
+        detect_consultation_intent,
+    )
+
+    combined = f"{scenario.input.subject} {scenario.input.message_text}"
+    evidence = build_fact_evidence(
+        input_data=input_data,
+        entities=entities,
+        known_fact_fields=missing_known,
+    )
+    exclusion_reasons: dict[str, str] = {}
+    for reason in info_plan.get("selection_reasons") or []:
+        if not str(reason).startswith("exclude:"):
+            continue
+        parts = str(reason).split(":", 2)
+        if len(parts) >= 3:
+            exclusion_reasons[parts[1]] = parts[2]
+    evidence_sources = {
+        field: _map_evidence_source(evidence.evidence_by_field.get(field, "missing_evidence"))
+        for field in info_plan.get("already_known_facts") or []
+    }
+    pipeline_check = validate_pipeline_playbook_consistency(
+        playbook_id=pipeline_ctx.playbook.playbook_id,
+        service_family=pipeline_ctx.playbook.service_family,
+        next_step_service_family=pipeline_ctx.next_step.service_family,
+        information_plan_playbook_id=info_plan.get("playbook_id"),
+    )
+    if plan_v2 is not None:
+        pipeline_check = validate_pipeline_playbook_consistency(
+            playbook_id=plan_v2.playbook_id,
+            service_family=plan_v2.service_family,
+            next_step_service_family=pipeline_ctx.next_step.service_family,
+            information_plan_playbook_id=info_plan.get("playbook_id"),
+        )
+    return {
+        "location_city_state": evidence.address_state.state,
+        "location_city": evidence.address_state.city,
+        "property_address_known": evidence.address_state.has_street_address,
+        "evidence_sources": evidence_sources,
+        "exclusion_reasons": exclusion_reasons,
+        "routed_service_type": pipeline_ctx.service_type,
+        "routed_service_family": pipeline_ctx.playbook.service_family,
+        "consultation_intent": pipeline_ctx.consultation_intent or detect_consultation_intent(combined),
+        "attachment_state": attachment_state(combined),
+        "pipeline_playbook_consistency": pipeline_check.to_dict(),
+    }
 
 
 def _plan_v2_from_dict(plan_dict: dict[str, Any]) -> CustomerReplyPlanV2:
@@ -302,18 +375,23 @@ def render_scenario_full(scenario: ProfileScenario) -> RenderedScenario:
 
     thread_state = str(setup.get("thread_state") or "new_thread")
     service_type = str(setup.get("service_type") or "")
-    playbook = get_reply_playbook(service_type, business_intent=playbook_intent)
     thread = build_thread_reply_context(
         thread_state=thread_state,
         prior_safe_ack=thread_state == "continuation",
         supplied_facts=missing.known_facts,
     )
-    next_step = select_operational_next_step(
-        service_type=service_type,
+    pipeline_ctx = resolve_reply_pipeline_context(
+        base_service_type=service_type,
         business_intent=playbook_intent,
+        input_data=input_data,
+        entities=entities,
+        known_fact_fields=missing.known_facts,
         thread_state=thread_state,
         is_continuation=thread.is_continuation,
     )
+    playbook = pipeline_ctx.playbook
+    next_step = pipeline_ctx.next_step
+    service_type = pipeline_ctx.service_type
     info_plan = build_information_value_plan(
         playbook=playbook,
         next_step=next_step,
@@ -379,6 +457,15 @@ def render_scenario_full(scenario: ProfileScenario) -> RenderedScenario:
         reply_body=body,
         required_markers=list(setup.get("required_markers") or []),
     )
+    audit = _build_scenario_audit(
+        scenario=scenario,
+        input_data=input_data,
+        entities=entities,
+        missing_known=missing.known_facts,
+        pipeline_ctx=pipeline_ctx,
+        info_plan=info_plan.to_dict(),
+        plan_v2=plan_v2,
+    )
     return RenderedScenario(
         scenario=scenario,
         bucket="",
@@ -397,6 +484,7 @@ def render_scenario_full(scenario: ProfileScenario) -> RenderedScenario:
         oracles=[r.to_dict() for r in oracle_results],
         proxy_score=proxy.to_dict(),
         template_skeleton=_structural_skeleton(body),
+        audit=audit,
     )
 
 
@@ -592,6 +680,7 @@ def build_reports(*, merge_sha: str) -> dict[str, Path]:
                 "surface_metrics": surface_metrics,
                 "scenario_pass": agg["passed"],
                 "overall_pass": agg["passed"],
+                "fact_integrity_audit": item.audit or {},
             }
         )
 
@@ -723,6 +812,11 @@ def build_reports(*, merge_sha: str) -> dict[str, Path]:
                 "### InformationValuePlan",
                 "```json",
                 json.dumps(redact_obj(item.info_plan), indent=2, ensure_ascii=False),
+                "```",
+                "",
+                "### Fact integrity audit",
+                "```json",
+                json.dumps(redact_obj(item.audit or {}), indent=2, ensure_ascii=False),
                 "```",
                 "",
                 "### CustomerReplyPlanV2",
