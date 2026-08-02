@@ -445,7 +445,7 @@ def _renderer_label(provenance: dict[str, Any]) -> str:
         return "deterministic_fallback"
     if llm_meta.get("live_call") and provenance.get("llm_used"):
         return "constrained_llm_success"
-    if llm_meta.get("invocation_attempted") and llm_meta.get("provider_outcome") == "failed":
+    if llm_meta.get("invocation_attempted") and llm_meta.get("provider_outcome") in {"failed", "parse_failed"}:
         return "provider_failed_hermetic"
     return "hermetic_composer"
 
@@ -458,11 +458,55 @@ def _renderer_distribution(rendered: list[RenderedScenario]) -> dict[str, int]:
         "no_reply": 0,
         "provider_failed_hermetic": 0,
         "hermetic_composer": 0,
+        "provider_failures": 0,
+        "parser_failures": 0,
+        "validator_failures": 0,
     }
     for item in rendered:
         label = _renderer_label(item.provenance)
         counts[label] = counts.get(label, 0) + 1
+        llm_meta = item.provenance.get("llm_meta") or {}
+        if llm_meta.get("provider_outcome") == "failed":
+            counts["provider_failures"] += 1
+        if llm_meta.get("provider_outcome") == "parse_failed":
+            counts["parser_failures"] += 1
+        if llm_meta.get("live_validation_outcome") == "fail":
+            counts["validator_failures"] += 1
     return counts
+
+
+def write_r1_qualification_report(*, merge_sha: str) -> Path:
+    from app.evaluation.profile_testbot.coworker_quality_oracles import (
+        dominant_generic_phrase_rate,
+        exact_duplicate_reply_groups,
+    )
+    from app.evaluation.profile_testbot.qualification.hermetic_coworker_reply import (
+        run_hermetic_coworker_reply_qualification,
+    )
+
+    result = run_hermetic_coworker_reply_qualification()
+    profile = load_customer_profile(PROFILE_ID)
+    scenarios = generate_coworker_reply_dataset(profile, seed=0)
+    bodies: list[str] = []
+    from app.evaluation.profile_testbot.qualification.hermetic_coworker_reply import _render_scenario_reply
+
+    for scenario in scenarios:
+        body, _, _ = _render_scenario_reply(scenario)
+        if body:
+            bodies.append(body)
+    dup_groups = exact_duplicate_reply_groups(bodies)
+    short = merge_sha[:7]
+    path = STATUS / f"digital-coworker-r1-qualification-{short}.json"
+    payload = {
+        **result.to_dict(),
+        "merge_sha": merge_sha,
+        "scenario_pass_count": sum(1 for s in result.scenario_results if s.passed),
+        "dominant_generic_phrase_rate": dominant_generic_phrase_rate(bodies),
+        "exact_duplicate_groups": len(dup_groups),
+        "exact_duplicate_reply_count": sum(len(g) for g in dup_groups),
+    }
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return path
 
 
 def validate_selection(scenarios_by_id: dict[str, ProfileScenario]) -> list[str]:
@@ -701,13 +745,38 @@ def build_reports(*, merge_sha: str) -> dict[str, Path]:
                 json.dumps(redact_obj(item.plan_v2.to_dict() if item.plan_v2 else {}), indent=2, ensure_ascii=False),
                 "```",
                 "",
+                "### Selected / excluded questions",
+                f"- selected_questions: `{list(item.plan_v2.selected_questions) if item.plan_v2 else []}`",
+                f"- question_surface_labels: `{list(item.plan_v2.question_surface_labels) if item.plan_v2 else []}`",
+                f"- facts_not_allowed_to_repeat: `{list(item.plan_v2.facts_not_allowed_to_repeat) if item.plan_v2 else []}`",
+                "",
+                "### Actual LLM provenance",
+                f"- renderer_mode: `{_renderer_label(item.provenance)}`",
+                f"- invocation_attempted: `{(item.provenance.get('llm_meta') or {}).get('invocation_attempted', False)}`",
+                f"- provider_outcome: `{(item.provenance.get('llm_meta') or {}).get('provider_outcome', 'n/a')}`",
+                f"- model_id: `{item.provenance.get('model_id') or (item.provenance.get('llm_meta') or {}).get('returned_model') or 'n/a'}`",
+                f"- prompt_version: `{item.provenance.get('prompt_version') or (item.provenance.get('llm_meta') or {}).get('prompt_version') or 'n/a'}`",
+                f"- plan_hash: `{(item.provenance.get('plan_hash') or '')[:16]}`",
+                f"- live_validation_outcome: `{(item.provenance.get('llm_meta') or {}).get('live_validation_outcome', 'n/a')}`",
+                f"- use_fallback: `{item.provenance.get('use_fallback', False)}`",
+                f"- fallback_reason: `{item.provenance.get('fallback_reason') or 'n/a'}`",
+                f"- body_hash: `{(item.provenance.get('body_hash') or '')[:16]}`",
+                "",
+                "### Rå LLM-output (före eventuell fallback)",
+                "```",
+                redact_text((item.provenance.get("llm_meta") or {}).get("live_body") or "(ingen live-output)"),
+                "```",
+                "",
+                "### Validatorresultat (live)",
+                f"- issues: `{(item.provenance.get('llm_meta') or {}).get('live_validation_issues') or []}`",
+                "",
                 "### Renderer",
                 f"- mode: `{_renderer_label(item.provenance)}`",
                 f"- template_version: `{item.provenance.get('template_version', 'n/a')}`",
                 f"- use_fallback: `{item.provenance.get('use_fallback', False)}`",
                 f"- fallback_reason: `{item.provenance.get('fallback_reason') or 'n/a'}`",
                 "",
-                "### Slutlig svarstext (faktisk render)",
+                "### Slutlig kundtext (faktisk render)",
                 "```",
                 redact_text(item.body),
                 "```",
@@ -899,8 +968,18 @@ def main() -> int:
     if not args.skip_worktree_check:
         verify_clean_worktree()
     paths = build_reports(merge_sha=args.merge_sha)
+    r1_path = write_r1_qualification_report(merge_sha=args.merge_sha)
     live = check_live_prep()
-    print(json.dumps({"reports": {k: str(v) for k, v in paths.items()}, "live_prep": live}, indent=2))
+    print(
+        json.dumps(
+            {
+                "reports": {k: str(v) for k, v in paths.items()},
+                "r1_qualification": str(r1_path),
+                "live_prep": live,
+            },
+            indent=2,
+        )
+    )
     return 0
 
 

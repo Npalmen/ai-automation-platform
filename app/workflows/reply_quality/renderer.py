@@ -71,6 +71,7 @@ def render_coworker_reply_with_validation(
             "live_validation_outcome": "pass" if live_validation["passed"] else "fail",
             "live_validation_issues": list(live_validation.get("issues") or []),
             "live_body_hash": hash_body(body),
+            "live_body": body,
         }
 
     validation = validate_post_render_reply(plan=plan, body=body)
