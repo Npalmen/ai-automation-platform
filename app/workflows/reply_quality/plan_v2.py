@@ -44,6 +44,7 @@ class CustomerReplyPlanV2:
     case_reference_phrase: str | None = None
     language_decision_evidence: tuple[str, ...] = ()
     scenario_family: str | None = None
+    attachment_state: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -75,6 +76,7 @@ class CustomerReplyPlanV2:
             "case_reference_phrase": self.case_reference_phrase,
             "language_decision_evidence": list(self.language_decision_evidence),
             "scenario_family": self.scenario_family,
+            "attachment_state": self.attachment_state,
         }
 
 
@@ -101,8 +103,8 @@ def build_customer_reply_plan_v2(
     pronoun_register: str = "ni",
     scenario_family: str | None = None,
     mentions_attachment_gap: bool = False,
+    attachment_state: str | None = None,
 ) -> CustomerReplyPlanV2:
-    from app.workflows.reply_quality.customer_surface import localized_next_step
     from app.workflows.reply_quality.next_step_surface import build_next_step_surface
 
     has_questions = bool(question_surface_labels or information_plan.selected_questions)
@@ -116,6 +118,7 @@ def build_customer_reply_plan_v2(
         is_continuation=thread_context.is_continuation,
         scenario_family=scenario_family,
         mentions_attachment_gap=mentions_attachment_gap,
+        attachment_state=attachment_state,
     )
     next_step_statement = next_surface.statement
     return CustomerReplyPlanV2(
@@ -152,6 +155,7 @@ def build_customer_reply_plan_v2(
         case_reference_phrase=case_reference_phrase,
         language_decision_evidence=language_decision_evidence,
         scenario_family=scenario_family,
+        attachment_state=attachment_state,
     )
 
 

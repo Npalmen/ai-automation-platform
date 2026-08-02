@@ -108,16 +108,51 @@ def _compose_address_question(plan: CustomerReplyPlanV2) -> str | None:
     return f"Vilken adress i {plan.location_phrase} gäller installationen?"
 
 
+def _is_standalone_question(text: str) -> bool:
+    lowered = text.strip().lower()
+    return lowered.startswith(
+        (
+            "vilken ",
+            "vilket ",
+            "which ",
+            "vad ",
+            "what ",
+            "när ",
+            "when ",
+            "hur ",
+            "how ",
+            "kan ",
+            "could ",
+            "finns ",
+        )
+    ) or lowered.startswith("om ") and "?" in text
+
+
 def _join_questions_sv(questions: tuple[str, ...], register: str) -> str:
     if not questions:
         return ""
+    standalone = [_is_standalone_question(q) for q in questions]
     if len(questions) == 1:
         q = questions[0].rstrip(".?")
-        if q.lower().startswith(("vilken ", "which ", "vad ", "what ", "när ", "when ")):
+        if standalone[0]:
             return q if q.endswith("?") else q + "?"
         if register == "du":
             return f"Kan du skicka {q}?"
         return f"Kan ni skicka {q}?"
+    if any(standalone):
+        parts: list[str] = []
+        for q, is_standalone in zip(questions, standalone):
+            cleaned = q.rstrip(".?")
+            if is_standalone:
+                parts.append(cleaned if cleaned.endswith("?") else cleaned + "?")
+            elif register == "du":
+                parts.append(f"kan du skicka {cleaned}")
+            else:
+                parts.append(f"kan ni skicka {cleaned}")
+        if len(parts) == 1:
+            return parts[0][0].upper() + parts[0][1:] + ("?" if not parts[0].endswith("?") else "")
+        body = ", ".join(parts[:-1]) + f" och {parts[-1]}"
+        return body[0].upper() + body[1:] + ("?" if not body.endswith("?") else "")
     joined = ", ".join(q.rstrip(".?") for q in questions[:-1])
     last = questions[-1].rstrip(".?")
     if register == "du":
@@ -142,8 +177,22 @@ def _render_question_block(plan: CustomerReplyPlanV2) -> str:
 def _join_questions_en(questions: tuple[str, ...]) -> str:
     if not questions:
         return ""
+    standalone = [_is_standalone_question(q) for q in questions]
     if len(questions) == 1:
-        return f"Could you please send {questions[0].rstrip('.')}?"
+        q = questions[0].rstrip(".?")
+        if standalone[0]:
+            return q if q.endswith("?") else q + "?"
+        return f"Could you please send {q}?"
+    if any(standalone):
+        parts: list[str] = []
+        for q, is_standalone in zip(questions, standalone):
+            cleaned = q.rstrip(".?")
+            if is_standalone:
+                parts.append(cleaned if cleaned.endswith("?") else cleaned + "?")
+            else:
+                parts.append(f"could you please send {cleaned}")
+        body = ", ".join(parts[:-1]) + f", and {parts[-1]}"
+        return body[0].upper() + body[1:]
     joined = ", ".join(q.rstrip(".") for q in questions[:-1])
     last = questions[-1].rstrip(".")
     return f"Could you please send {joined}, and {last}?"

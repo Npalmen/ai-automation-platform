@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
-POLICY_VERSION = "next_step_surface_v1"
+POLICY_VERSION = "next_step_surface_v2"
 
 _GENERIC_NEXT_STEP_SV = (
     "När vi har det underlaget går vi igenom förutsättningarna och återkommer."
@@ -53,23 +53,82 @@ def build_next_step_surface(
     language: str,
     scenario_family: str | None = None,
     mentions_attachment_gap: bool = False,
+    attachment_state: str | None = None,
 ) -> NextStepSurfaceContract:
     """Return a service-specific next-step contract; avoid generic filler when possible."""
     lang = "en" if (language or "sv").lower().startswith("en") else "sv"
     followup = _is_followup_family(scenario_family)
 
+    if attachment_state in {"attachment_claimed_kwh", "attachment_present_kwh"}:
+        if lang == "en":
+            stmt = "We will review the consumption details and continue the assessment."
+        else:
+            stmt = "Vi går igenom förbrukningsuppgifterna och fortsätter bedömningen."
+        return NextStepSurfaceContract(
+            statement=stmt,
+            operational_summary="review attached consumption data",
+            actor="operator",
+            prerequisite="annual consumption details",
+            must_not_promise=("quote_amount", "installation_date"),
+        )
+
+    if attachment_state == "attachment_promised":
+        if lang == "en":
+            stmt = "Please attach the file when you can and we will continue once it arrives."
+        else:
+            stmt = "Bifoga gärna filen när ni kan så fortsätter vi så fort den kommit in."
+        return NextStepSurfaceContract(
+            statement=stmt,
+            operational_summary="await promised attachment",
+            actor="customer",
+            prerequisite="promised attachment",
+            must_not_promise=("quote_amount", "installation_date"),
+        )
+
     if mentions_attachment_gap or step_id == "request_missing_attachment":
+        if attachment_state == "attachment_missing_drawing":
+            if lang == "en":
+                return NextStepSurfaceContract(
+                    statement="Please attach the roof drawing when you can and we will continue the quote assessment.",
+                    operational_summary="request missing roof drawing before proceeding",
+                    actor="customer",
+                    prerequisite="roof drawing attachment",
+                    must_not_promise=("booking", "quote_amount", "installation_date"),
+                )
+            return NextStepSurfaceContract(
+                statement="Bifoga gärna takritningen så fort det går så fortsätter vi offertbedömningen.",
+                operational_summary="be om saknad takritning innan vidare hantering",
+                actor="customer",
+                prerequisite="saknad takritning",
+                must_not_promise=("bokning", "offertbelopp", "installationsdatum"),
+            )
+        if is_continuation:
+            if lang == "en":
+                return NextStepSurfaceContract(
+                    statement="Please resend the file and we will continue once it arrives.",
+                    operational_summary="request missing attachment before proceeding",
+                    actor="customer",
+                    prerequisite="missing attachment",
+                    must_not_promise=("booking", "quote_amount", "installation_date"),
+                )
+            return NextStepSurfaceContract(
+                statement="Skicka gärna filen igen så fortsätter vi behandlingen när den kommit in.",
+                operational_summary="be om saknad bilaga innan vidare hantering",
+                actor="customer",
+                prerequisite="saknad bilaga",
+                must_not_promise=("bokning", "offertbelopp", "installationsdatum"),
+            )
         if lang == "en":
             return NextStepSurfaceContract(
-                statement="Please resend the file and we will continue once it arrives.",
-                operational_summary="request missing attachment before proceeding",
+                statement="Please attach the missing file when you can and we will continue the assessment.",
+                operational_summary="request first-time attachment before proceeding",
                 actor="customer",
                 prerequisite="missing attachment",
                 must_not_promise=("booking", "quote_amount", "installation_date"),
             )
         return NextStepSurfaceContract(
-            statement="Skicka gärna filen igen så fortsätter vi behandlingen när den kommit in.",
-            operational_summary="be om saknad bilaga innan vidare hantering",
+            statement="Bifoga gärna den saknade filen så fort det går så fortsätter vi bedömningen.",
+            operational_summary="be om första bilaga innan vidare hantering",
             actor="customer",
             prerequisite="saknad bilaga",
             must_not_promise=("bokning", "offertbelopp", "installationsdatum"),
@@ -330,6 +389,7 @@ def localized_next_step(
     is_continuation: bool = False,
     scenario_family: str | None = None,
     mentions_attachment_gap: bool = False,
+    attachment_state: str | None = None,
 ) -> str:
     """Backward-compatible wrapper returning only the customer-facing statement."""
     return build_next_step_surface(
@@ -342,4 +402,5 @@ def localized_next_step(
         language=language,
         scenario_family=scenario_family,
         mentions_attachment_gap=mentions_attachment_gap,
+        attachment_state=attachment_state,
     ).statement

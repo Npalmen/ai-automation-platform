@@ -17,10 +17,21 @@ from app.workflows.reply_quality.surface_contract import (
     validate_customer_surface,
 )
 
-POLICY_VERSION = "post_render_validator_v2"
+POLICY_VERSION = "post_render_validator_v3"
 
 _GENERIC_NEXT_STEP_SV = "när vi har det underlaget går vi igenom förutsättningarna och återkommer"
-_GRAMMATICAL_BAD_SV = re.compile(r"\bbehöver vi vilken\b|\bbehöver vi vad\b|\bbehöver vi när\b", re.I)
+_GRAMMATICAL_BAD_SV = re.compile(
+    r"\bbehöver vi vilken\b|\bbehöver vi vad\b|\bbehöver vi när\b"
+    r"|\bom (?:du|ni) har om (?:du|ni) har\b"
+    r"|\bkan (?:du|ni) skicka vilken\b"
+    r"|\bkan (?:du|ni) skicka which\b"
+    r"|\bför att kunna hjälpa er på bästa sätt, vilken tjänst ni söker\b",
+    re.I,
+)
+_GRAMMATICAL_BAD_EN = re.compile(
+    r"\bif you have if you have\b|\bcould you please send which\b",
+    re.I,
+)
 
 _QUESTION_SEMANTIC_HINTS: dict[str, tuple[str, ...]] = {
     "orderreferens": ("orderreferens", "order", "ärendenummer", "referens", "ursprung"),
@@ -104,6 +115,8 @@ def validate_post_render_reply(
     issues.extend(_pronoun_violations(body, register=register, language=language))
 
     if _GRAMMATICAL_BAD_SV.search(body or ""):
+        issues.append("grammatical_question_composition:awkward_need_phrase")
+    if language == "en" and _GRAMMATICAL_BAD_EN.search(body or ""):
         issues.append("grammatical_question_composition:awkward_need_phrase")
 
     normalized = (body or "").lower()

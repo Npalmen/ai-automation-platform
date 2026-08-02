@@ -11,8 +11,12 @@ from app.workflows.reply_quality.customer_surface import (
     extract_city_phrase,
     extract_discovery_time_phrase,
 )
+from app.workflows.reply_quality.semantic_fact_predicates import (
+    detect_semantic_fact_ids,
+    semantic_known_question_fields,
+)
 
-POLICY_VERSION = "coworker_fact_extraction_v1"
+POLICY_VERSION = "coworker_fact_extraction_v2"
 
 # Semantic aliases: extracted fact id -> question fields it satisfies.
 FACT_TO_QUESTION_FIELDS: dict[str, frozenset[str]] = {
@@ -23,7 +27,14 @@ FACT_TO_QUESTION_FIELDS: dict[str, frozenset[str]] = {
     "symptom_poor_performance": frozenset({"symptom"}),
     "when_started_yesterday": frozenset({"when_started"}),
     "when_started_last_week": frozenset({"when_started"}),
-    "property_type_villa": frozenset({"property_type"}),
+    "property_type_villa": frozenset({"property_type", "housing_association_context"}),
+    "property_type_private": frozenset({"property_type", "housing_association_context"}),
+    "load_balancing_stated": frozenset({"load_balancing_need"}),
+    "requested_service_explicit": frozenset({"requested_service"}),
+    "battery_retrofit": frozenset({"existing_solar_system", "existing_installation", "battery_interest"}),
+    "attachment_claimed_kwh": frozenset({"attachment", "annual_consumption"}),
+    "attachment_present_kwh": frozenset({"annual_consumption"}),
+    "attachment_missing_drawing": frozenset(),
     "existing_solar_system": frozenset({"existing_solar_system", "existing_installation"}),
     "annual_consumption": frozenset({"annual_consumption"}),
     "case_reference_valid": frozenset({"case_reference", "status_dimension"}),
@@ -121,11 +132,14 @@ def extract_customer_facts(
         fact_ids.append("when_started_last_week")
         known_fields.add("when_started")
 
-    if any(token in lowered for token in ("villa", "detached house", "radhus", "townhouse")):
+    semantic_ids = detect_semantic_fact_ids(message)
+    fact_ids.extend(sorted(semantic_ids))
+
+    if any(token in lowered for token in ("villa", "detached house", "radhus", "townhouse", "privatbostad")):
         fact_ids.append("property_type_villa")
         known_fields.add("property_type")
 
-    if any(token in lowered for token in ("solceller sedan", "existing solar", "8 kwp", "befintlig sol")):
+    if any(token in lowered for token in ("solceller sedan", "existing solar", "8 kwp", "befintlig sol", "vi har solceller", "we have solar", "har solceller")):
         fact_ids.append("existing_solar_system")
         known_fields.update({"existing_solar_system", "existing_installation"})
 
@@ -148,16 +162,23 @@ def extract_customer_facts(
         known_fields.add("discovery_time")
 
     if any(token in lowered for token in ("bifogar", "attached", "attachment", "ritning", "bifogade")):
-        if "saknar" in lowered or "without" in lowered or "inte bifogat" in lowered:
+        if "saknar" in lowered or "without" in lowered or "inte bifogat" in lowered or "not attached" in lowered:
+            if any(token in lowered for token in ("ritning", "drawing", "roof")):
+                fact_ids.append("attachment_missing_drawing")
             fact_ids.append("attachment_missing")
+        elif "årsförbrukning" in lowered or re.search(r"\b\d{4,5}\s*kwh\b", lowered):
+            fact_ids.append("attachment_claimed_kwh")
+        else:
+            fact_ids.append("attachment_claimed")
 
     if any(token in lowered for token in ("batteri", "battery storage", "battery")):
         if "sol" in lowered or "solar" in lowered:
             fact_ids.append("battery_interest")
             known_fields.add("battery_interest")
 
-    for fact_id in fact_ids:
+    for fact_id in sorted(set(fact_ids)):
         known_fields.update(FACT_TO_QUESTION_FIELDS.get(fact_id, frozenset()))
+    known_fields.update(semantic_known_question_fields(set(fact_ids)))
 
     return ExtractedCustomerFacts(
         fact_ids=tuple(sorted(set(fact_ids))),
