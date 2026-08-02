@@ -68,27 +68,11 @@ def _git_head_sha() -> str:
 
 
 def verify_clean_worktree() -> None:
-    proc = subprocess.run(
-        ["git", "status", "--porcelain"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
+    from app.evaluation.profile_testbot.qualification.package_build_worktree import (
+        verify_clean_worktree as _verify,
     )
-    blocked: list[str] = []
-    for ln in (proc.stdout or "").splitlines():
-        if not ln.strip():
-            continue
-        path = ln[3:].strip() if len(ln) > 3 else ln.strip()
-        norm = path.replace("\\", "/")
-        if norm.startswith("storage/status/"):
-            continue
-        blocked.append(ln)
-    if blocked:
-        raise RuntimeError(
-            "dirty worktree — commit or stash changes before building qualification package: "
-            + "; ".join(blocked[:5])
-        )
+
+    _verify(ROOT)
 
 
 def verify_merge_sha(merge_sha: str) -> None:
@@ -262,6 +246,7 @@ def render_scenario_full(scenario: ProfileScenario) -> RenderedScenario:
         "language": scenario.input.language,
         "_force_service_type": setup.get("service_type"),
         "_coworker_hermetic_eval": True,
+        "_coworker_scenario_family": setup.get("coworker_family") or scenario.family,
         "sender": {
             "name": redact_text(scenario.input.sender_name),
             "email": "[REDACTED_EMAIL]",

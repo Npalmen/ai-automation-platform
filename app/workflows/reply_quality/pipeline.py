@@ -99,6 +99,11 @@ def build_coworker_reply_plan_v2(
     entities = dict(entities or {})
     fact_map = dict(fact_map or {})
     combined_text = f"{input_data.get('subject') or ''} {input_data.get('message_text') or ''}"
+    scenario_family = input_data.get("_coworker_scenario_family")
+    if isinstance(scenario_family, str):
+        scenario_family = scenario_family.strip() or None
+    else:
+        scenario_family = None
     language_decision = decide_reply_language(
         input_data=input_data,
         profile_default_language=profile_default_language,
@@ -193,6 +198,7 @@ def build_coworker_reply_plan_v2(
         pronoun_register=pronoun,
         mentions_battery=mentions_battery,
         mentions_attachment_gap=mentions_attachment_gap,
+        scenario_family=scenario_family,
     )
     verified = _internal_verified_fact_ids(
         service_type=service_type,
@@ -219,6 +225,8 @@ def build_coworker_reply_plan_v2(
         case_reference_phrase=case_reference_phrase,
         language_decision_evidence=language_decision.evidence,
         pronoun_register=pronoun,
+        scenario_family=scenario_family,
+        mentions_attachment_gap=mentions_attachment_gap,
     )
     return plan
 

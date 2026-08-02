@@ -43,6 +43,7 @@ class CustomerReplyPlanV2:
     location_phrase: str | None = None
     case_reference_phrase: str | None = None
     language_decision_evidence: tuple[str, ...] = ()
+    scenario_family: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -73,6 +74,7 @@ class CustomerReplyPlanV2:
             "location_phrase": self.location_phrase,
             "case_reference_phrase": self.case_reference_phrase,
             "language_decision_evidence": list(self.language_decision_evidence),
+            "scenario_family": self.scenario_family,
         }
 
 
@@ -97,15 +99,25 @@ def build_customer_reply_plan_v2(
     case_reference_phrase: str | None = None,
     language_decision_evidence: tuple[str, ...] = (),
     pronoun_register: str = "ni",
+    scenario_family: str | None = None,
+    mentions_attachment_gap: bool = False,
 ) -> CustomerReplyPlanV2:
     from app.workflows.reply_quality.customer_surface import localized_next_step
+    from app.workflows.reply_quality.next_step_surface import build_next_step_surface
 
-    next_step_statement = localized_next_step(
+    has_questions = bool(question_surface_labels or information_plan.selected_questions)
+    next_surface = build_next_step_surface(
         step_id=next_step.step_id,
         language=language,
         service_family=playbook.service_family,
-        has_questions=bool(question_surface_labels or information_plan.selected_questions),
+        has_questions=has_questions,
+        business_intent=business_intent,
+        thread_state=thread_context.thread_state,
+        is_continuation=thread_context.is_continuation,
+        scenario_family=scenario_family,
+        mentions_attachment_gap=mentions_attachment_gap,
     )
+    next_step_statement = next_surface.statement
     return CustomerReplyPlanV2(
         response_objective=next_step.step_id,
         acknowledgement_mode=acknowledgement_mode,
@@ -139,6 +151,7 @@ def build_customer_reply_plan_v2(
         location_phrase=location_phrase,
         case_reference_phrase=case_reference_phrase,
         language_decision_evidence=language_decision_evidence,
+        scenario_family=scenario_family,
     )
 
 
