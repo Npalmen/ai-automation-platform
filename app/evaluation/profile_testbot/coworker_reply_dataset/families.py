@@ -87,11 +87,61 @@ def _simple_family(
                 message_text = "Hi, we are interested in battery storage for our home in Uppsala."
             elif marker_en == "charger":
                 message_text = "Hi, we are interested in an EV charger for our home in Uppsala."
+            elif marker_en == "consultation":
+                message_text = "Hi, we would like advice on solar and battery options for our villa in Uppsala."
             else:
                 message_text = f"Hi, we are interested in {marker_en} for our home in Uppsala."
             required_markers = (marker_en,)
         else:
-            message_text = f"Meddelande {i} om {marker_sv} i Uppsala."
+            if marker_sv == "sol":
+                variants = (
+                    "Hej, vi vill ha offert på solceller till villan i Uppsala.",
+                    "Hej, vi undersöker solceller för radhus i Enköping.",
+                    "Vi vill veta förutsättningarna för solceller på plåttak i Uppsala.",
+                    "Hej, vår årsförbrukning är cirka 18000 kWh och vi vill ha solceller.",
+                    "Hej, vi vill ha solceller och funderar på batteri i Uppsala.",
+                    "Hej igen, följer upp vår förfrågan om solceller i Uppsala.",
+                    "Hej, kan ni ge en indikation på solceller för vår villa i Enköping?",
+                    "Hej, vi planerar solceller på taket i Uppsala och vill ha en offert.",
+                )
+            elif marker_sv == "batteri":
+                variants = (
+                    "Hej, vi vill installera batterilager i villan i Uppsala.",
+                    "Vi har solceller sedan 2021 och vill komplettera med batteri.",
+                    "Hej, har solceller och undrar om vår växelriktare klarar batteri.",
+                    "Vi vill ha batteri främst för egenförbrukning i Uppsala.",
+                    "Vi har solceller på Storgatan 4 Uppsala och vill ha batteri.",
+                    "Tack, här kommer info om befintlig anläggning 8 kWp.",
+                    "Kan ni titta på batterilager till vår villa i Enköping?",
+                    "Hej, vi funderar på batteri till befintliga solceller i Uppsala.",
+                )
+            elif marker_sv == "laddbox":
+                variants = (
+                    "Hej, vi vill ha laddbox installerad i villan i Uppsala.",
+                    "Hej, intresserad av laddbox till villa i Enköping.",
+                    "Vi behöver offert på laddbox med lastbalansering i Uppsala.",
+                    "Hej, vi har huvudsäkring 25A och vill installera laddbox.",
+                    "Kan ni installera laddbox i carport i Uppsala?",
+                    "Hej igen, följer upp vår förfrågan om laddbox.",
+                    "Vi vill ha två laddpunkter till villan i Enköping.",
+                    "Hej, vi söker offert på laddbox till radhus i Uppsala.",
+                )
+            elif marker_sv == "konsultation":
+                variants = (
+                    "Hej, vi funderar på solceller och batteri men vet inte vad som passar vår villa.",
+                    "Kan ni ge råd om solceller kontra batteri för vår förbrukning?",
+                    "Hej, vi vill ha en genomgång av möjligheterna för energilagring i Uppsala.",
+                    "Vi behöver hjälp att bedöma om laddbox eller solceller bör prioriteras.",
+                    "Hej, vi planerar renovering och vill veta vad som är rimligt för taket.",
+                    "Kan ni boka ett kort samtal om sol, batteri och laddning?",
+                    "Hej, vi vill ha en översiktlig rådgivning för vår villa i Enköping.",
+                    "Vi undrar vilken lösning som ger bäst nytta för vår årsförbrukning.",
+                )
+            else:
+                variants = tuple(
+                    f"Hej, vi vill ha hjälp med {marker_sv} i Uppsala." for _ in range(8)
+                )
+            message_text = variants[i % len(variants)]
             required_markers = (marker_sv,)
         cells.append(
             CoworkerFamilyCell(
@@ -141,9 +191,31 @@ for family in COWORKER_FAMILIES:
             for _ in range(8)
         )
     elif family == "solar_battery_combined":
-        _FAMILY_TEMPLATES[family] = _simple_family(
-            family, service_type="solar_installation", intent="lead", marker_sv="sol", marker_en="solar",
-            subjects=("Sol och batteri", "Solceller med batteri"),
+        _FAMILY_TEMPLATES[family] = tuple(
+            CoworkerFamilyCell(
+                ("Sol och batteri", "Solceller med batteri", "Sol+batteri offert")[i % 3],
+                (
+                    "Hej, vi vill installera både solceller och batteri i villan i Uppsala.",
+                    "Hej, vi har solceller och vill komplettera med batterilager i Enköping.",
+                    "Hi, we want solar panels and battery storage for our house in Uppsala.",
+                    "Hej, vi undersöker solceller tillsammans med batteri för vår villa.",
+                    "Vi vill ha offert på solceller och batteri till radhus i Uppsala.",
+                    "Hej, vi vill ha offert på både solceller och batteri till villan i Uppsala.",
+                    "Hej, vår årsförbrukning är 20000 kWh och vi vill ha sol och batteri i Uppsala.",
+                    "Kan ni ge en indikation på solceller med batterilager i Enköping?",
+                )[i],
+                "solar_installation",
+                "lead",
+                "new_thread",
+                "en" if i % 4 == 2 else "sv",
+                "send_after_approval" if i % 5 else "draft_for_approval",
+                ("city",) if i % 3 == 0 else (),
+                i % 2 == 0,
+                True,
+                ("sol", "batteri") if i != 2 else ("solar", "battery"),
+                ("pris", "bokad"),
+            )
+            for i in range(8)
         )
     elif family == "job_status_request":
         _FAMILY_TEMPLATES[family] = tuple(
@@ -167,7 +239,7 @@ for family in COWORKER_FAMILIES:
         _FAMILY_TEMPLATES[family] = tuple(
             CoworkerFamilyCell(
                 "Status utan telefon",
-                f"Kan ni uppdatera status på offertförfrågan {i}?",
+                f"Kan ni uppdatera status på offertförfrågan {1042 + i}?",
                 "generic_support",
                 "support_status",
                 "continuation",
@@ -184,8 +256,17 @@ for family in COWORKER_FAMILIES:
     elif family == "complaint_warranty":
         _FAMILY_TEMPLATES[family] = tuple(
             CoworkerFamilyCell(
-                "Ärende om tidigare installation",
-                f"Vi vill rapportera ett problem med installationen som upptäcktes för {'nyligen' if i == 0 else 'två veckor sedan' if i == 1 else 'den här veckan'}.",
+                "Reklamation installation",
+                (
+                    "Hej, vi vill reklamera ett problem med solcellsanläggningen som upptäcktes i går.",
+                    "Hej, installationen från förra året har börjat ge felmeddelanden och vi vill få det åtgärdat.",
+                    "Vi upptäckte ett problem med växelriktaren för två veckor sedan och behöver hjälp under garantin.",
+                    "Hej, produktionen har sjunkit kraftigt sedan installationen och vi vill rapportera det.",
+                    "Vi har sett varningar i appen nyligen och vill få en reklamation registrerad.",
+                    "Hej, en panel verkar ha slutat fungera och vi vill få garantiärendet igång.",
+                    "Problemet märktes för en vecka sedan och vi behöver support kring installationen.",
+                    "Hej, vi vill få hjälp med ett fel som uppstod efter er installation i höstas.",
+                )[i],
                 "solar_service",
                 "support_status",
                 "new_thread",
@@ -200,20 +281,74 @@ for family in COWORKER_FAMILIES:
             for i in range(8)
         )
     elif family == "general_consultation":
-        _FAMILY_TEMPLATES[family] = _simple_family(
-            family, service_type="generic_lead", intent="lead", marker_sv="meddelande", marker_en="message",
-            subjects=("Allmän fråga", "Rådgivning"),
+        _langs = ("sv", "sv", "en", "sv", "sv", "en", "sv", "en")
+        _FAMILY_TEMPLATES[family] = tuple(
+            CoworkerFamilyCell(
+                ("Allmän fråga", "Rådgivning", "Energirådgivning")[i % 3],
+                (
+                    "Hej, vi funderar på solceller och batteri men vet inte vad som passar vår villa.",
+                    "Kan ni ge råd om solceller kontra batteri för vår förbrukning?",
+                    "Hi, we would like an overview of energy storage options for our home in Uppsala.",
+                    "Vi behöver hjälp att bedöma om laddbox eller solceller bör prioriteras.",
+                    "Hej, vi planerar renovering och vill veta vad som är rimligt för taket.",
+                    "Can you book a short call about solar, battery and charging?",
+                    "Hej, vi vill ha en översiktlig rådgivning för vår villa i Enköping.",
+                    "We wonder which solution gives the best value for our annual consumption.",
+                )[i],
+                "generic_lead",
+                "lead",
+                "new_thread",
+                _langs[i],
+                "send_after_approval",
+                (),
+                False,
+                True,
+                ("consultation",) if _langs[i] == "en" else ("rådgivning",),
+                ("pris",),
+            )
+            for i in range(8)
         )
     elif family == "missing_attachment":
-        _FAMILY_TEMPLATES[family] = _simple_family(
-            family, service_type="generic_lead", intent="ambiguous_short", marker_sv="meddelande", marker_en="message",
-            subjects=("Bifogar snart", "Saknar ritning"),
+        _FAMILY_TEMPLATES[family] = tuple(
+            CoworkerFamilyCell(
+                ("Bifogar snart", "Saknar ritning", "Ritning följer")[i % 3],
+                (
+                    "Hej, vi vill ha offert på solceller men saknar ritning på taket just nu.",
+                    "Hej, vi planerar laddbox och kan bifoga elschema senare idag.",
+                    "Hi, we need a solar quote but the roof drawing is not attached yet.",
+                    "Hej, bifogar bilder på taket så snart vi är hemma.",
+                    "Vi vill ha solceller i Uppsala och har ritningen kvar på datorn, skickar den strax.",
+                    "Hej, laddbox-offert önskas. Elritning saknas i det här mailet.",
+                    "Hej, kan ni titta på solceller? Jag bifogar takmätning i nästa mail.",
+                    "Hej, vi söker offert men utan bifogad ritning i detta meddelande.",
+                )[i],
+                "solar_installation" if i % 2 == 0 else "ev_charger_installation",
+                "ambiguous_short",
+                "new_thread",
+                "en" if i == 2 else "sv",
+                "send_after_approval",
+                (),
+                False,
+                True,
+                ("bifog",) if i != 2 else ("attach",),
+                ("pris",),
+            )
+            for i in range(8)
         )
     elif family == "multi_turn_continuation":
         _FAMILY_TEMPLATES[family] = tuple(
             CoworkerFamilyCell(
                 "Fortsättning tråd",
-                f"Här kommer kompletterande info punkt {i} om vår förfrågan.",
+                (
+                    "Hej igen, här kommer takytan: cirka 45 kvm plåttak i Uppsala.",
+                    "Tack, bifogar nu årsförbrukningen på 18500 kWh.",
+                    "Hej, vi kan bekräfta att det gäller villa och inte BRF.",
+                    "Här kommer adressen: Storgatan 12 i Enköping.",
+                    "Hej igen, vi har mätt taket till 38 kvm och vill veta nästa steg.",
+                    "Kompletterar med att huvudsäkringen är 25A.",
+                    "Hej, vi följer upp offertförfrågan och kan skicka takbilder idag.",
+                    "Här är kompletterande info: taket vetter söder och är utan skugga.",
+                )[i],
                 "solar_installation",
                 "lead",
                 "continuation",

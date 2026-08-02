@@ -96,6 +96,7 @@ def build_customer_reply_plan_v2(
     location_phrase: str | None = None,
     case_reference_phrase: str | None = None,
     language_decision_evidence: tuple[str, ...] = (),
+    pronoun_register: str = "ni",
 ) -> CustomerReplyPlanV2:
     from app.workflows.reply_quality.customer_surface import localized_next_step
 
@@ -120,7 +121,7 @@ def build_customer_reply_plan_v2(
         language=language,
         greeting=greeting,
         signature_name=signature_name,
-        salutation_strategy="first_name_when_known",
+        salutation_strategy=pronoun_register,
         closing_strategy="profile_signature",
         thread_context=thread_context,
         rendering_constraints=(

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-POLICY_VERSION = "customer_surface_contract_v2"
+POLICY_VERSION = "customer_surface_contract_v3"
 
 _INTERNAL_METADATA_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\bservice\s*:", re.I),
@@ -115,6 +115,24 @@ def detect_mixed_language(body: str, *, expected_language: str) -> list[str]:
     return []
 
 
+def detect_semantic_placeholders(body: str) -> list[str]:
+    issues: list[str] = []
+    text = body or ""
+    if re.search(r"\bCity\b", text):
+        issues.append("semantic_placeholder:City")
+    if re.search(r"\bin city\b", text, re.I):
+        issues.append("semantic_placeholder:in_city")
+    if re.search(r"\bknown-[a-z_]+\b", text, re.I):
+        issues.append("semantic_placeholder:known_entity")
+    if re.search(r"\b(meddelande|message)\s+\d+\s+om\b", text, re.I):
+        issues.append("semantic_placeholder:transport_message")
+    if re.search(r"\bkompletterande info punkt\b", text, re.I):
+        issues.append("semantic_placeholder:continuation_transport")
+    if re.search(r"\boffertförfrågan\s+0\b", text, re.I):
+        issues.append("semantic_placeholder:invalid_quote_ref_0")
+    return issues
+
+
 def detect_robotic_template_composition(body: str) -> list[str]:
     lowered = (body or "").lower()
     hits = sum(1 for segment in _ROBOTIC_SEGMENTS if segment in lowered)
@@ -138,6 +156,7 @@ def validate_customer_surface(
     issues.extend(detect_internal_metadata_leaks(body))
     issues.extend(detect_unresolved_placeholders(body))
     issues.extend(detect_unlocalized_fact_labels(body))
+    issues.extend(detect_semantic_placeholders(body))
     issues.extend(detect_mixed_language(body, expected_language=expected_language))
     issues.extend(detect_robotic_template_composition(body))
     issues.extend(detect_key_value_fragments(body))

@@ -23,6 +23,7 @@ from app.evaluation.profile_testbot.profile_contract import load_customer_profil
 from app.evaluation.profile_testbot.scenarios.schema import ProfileScenario
 from app.workflows.missing_fact_plan import build_missing_fact_plan
 from app.workflows.reply_quality.pipeline import build_and_render_coworker_reply
+from app.workflows.reply_quality.customer_surface import extract_city_phrase
 from app.workflows.reply_quality.provenance import ReplyRenderProvenance
 from app.workflows.safe_ack_eligibility import evaluate_safe_ack_eligibility
 
@@ -77,6 +78,7 @@ def _render_scenario_reply(
         "message_text": scenario.input.message_text,
         "language": scenario.input.language,
         "_force_service_type": setup.get("service_type"),
+        "_coworker_hermetic_eval": True,
         "sender": {
             "name": scenario.input.sender_name,
             "email": scenario.input.sender_email,
@@ -84,7 +86,12 @@ def _render_scenario_reply(
     }
     entities = {"email": scenario.input.sender_email}
     for key in setup.get("known_entities") or []:
-        entities[key] = f"known-{key}"
+        if key == "city":
+            entities[key] = (
+                extract_city_phrase(text=scenario.input.message_text, entities={}) or "Uppsala"
+            )
+        else:
+            entities[key] = f"known-{key}"
     missing = build_missing_fact_plan(
         input_data=input_data,
         entities=entities,
@@ -103,9 +110,10 @@ def _render_scenario_reply(
         business_intent={"primary_intent": setup.get("business_intent")},
     )
     playbook_intent = str(setup.get("business_intent") or "lead")
-    if setup.get("coworker_family") == "complaint_warranty":
+    coworker_family = setup.get("coworker_family")
+    if coworker_family == "complaint_warranty":
         playbook_intent = "support_complaint"
-    if not eligibility.eligible and playbook_intent == "support_status":
+    if not eligibility.eligible and playbook_intent in {"support_status", "support_complaint"}:
         eligibility = evaluate_safe_ack_eligibility(
             detected_job_type="lead",
             risk_detected=False,
@@ -118,7 +126,12 @@ def _render_scenario_reply(
             used_fallback=False,
             business_intent={"primary_intent": "lead"},
         )
-        playbook_intent = str(setup.get("business_intent") or "lead")
+        if coworker_family == "complaint_warranty":
+            playbook_intent = "support_complaint"
+        elif coworker_family in {"existing_support_symptom", "existing_support_followup"}:
+            playbook_intent = "support_status"
+        else:
+            playbook_intent = str(setup.get("business_intent") or "lead")
     if not eligibility.eligible:
         return "", None, None
 

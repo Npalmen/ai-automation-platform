@@ -96,14 +96,17 @@ def extract_case_reference(text: str) -> str | None:
 
 
 def extract_city_phrase(*, text: str, entities: dict[str, Any]) -> str | None:
+    for candidate in ("Enköping", "Uppsala", "Stockholm"):
+        if candidate.lower() in text.lower():
+            return candidate
     city = entities.get("city")
     if isinstance(city, str) and city.strip():
         value = city.replace("known-", "").strip()
-        if value and not value.startswith("known"):
+        lowered = value.lower()
+        if lowered in {"", "city", "known-city", "known_city"}:
+            return None
+        if lowered in {"uppsala", "enköping", "stockholm"}:
             return value.title() if value.islower() else value
-    for candidate in ("Uppsala", "Stockholm", "Enköping"):
-        if candidate.lower() in text.lower():
-            return candidate
     return None
 
 
@@ -119,20 +122,49 @@ def extract_discovery_time_phrase(text: str) -> str | None:
     return None
 
 
+def pronoun_register_for_plan(*, service_family: str, language: str) -> str:
+    if language == "en":
+        return "you"
+    if service_family in {"existing_installation_support", "complaint_warranty", "job_status"}:
+        return "du"
+    return "ni"
+
+
+def _adjust_sv_register(text: str, register: str) -> str:
+    if register != "du":
+        return text
+    adjusted = text
+    replacements = (
+        (r"\bera\b", "dina"),
+        (r"\bert\b", "ditt"),
+        (r"\ber\b", "din"),
+        (r"\bni\b", "du"),
+        (r"\bom ni har\b", "om du har"),
+        (r"\bni vill\b", "du vill"),
+        (r"\bni söker\b", "du söker"),
+        (r"\bni behöver\b", "du behöver"),
+        (r"\bni har\b", "du har"),
+    )
+    for pattern, repl in replacements:
+        adjusted = re.sub(pattern, repl, adjusted, flags=re.I)
+    return adjusted
+
+
 def contextual_question_surface(
     field: str,
     *,
     language: str,
     city_phrase: str | None = None,
+    pronoun_register: str = "ni",
 ) -> str:
     labels = _QUESTION_LABELS_EN if language == "en" else _QUESTION_LABELS_SV
     if field == "address" and city_phrase:
         if language == "en":
-            return f"the property address in {city_phrase}"
-        return f"adressen till fastigheten i {city_phrase}"
+            return f"the installation address in {city_phrase}"
+        return f"adressen i {city_phrase}"
     label = labels.get(field)
     if label is not None:
-        return label
+        return _adjust_sv_register(label, pronoun_register) if language == "sv" else label
     # Never expose raw schema field ids to customers.
     normalized = field.replace("_", " ")
     if language == "en":
@@ -145,9 +177,15 @@ def build_question_surface_labels(
     *,
     language: str,
     city_phrase: str | None = None,
+    pronoun_register: str = "ni",
 ) -> tuple[str, ...]:
     return tuple(
-        contextual_question_surface(field, language=language, city_phrase=city_phrase)
+        contextual_question_surface(
+            field,
+            language=language,
+            city_phrase=city_phrase,
+            pronoun_register=pronoun_register,
+        )
         for field in selected_questions
     )
 

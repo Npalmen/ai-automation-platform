@@ -116,12 +116,14 @@ class TestGoldenReplies:
         assert body.lower().startswith("hi,")
         assert "charger" in body.lower() or "ev" in body.lower()
 
-    def test_ptb_dcq_0048_english_solar_battery(self):
+    def test_ptb_dcq_0048_solar_battery_uppsala(self):
         body = _render("PTB-DCQ-0048")
         _assert_no_internal_metadata(body)
-        _assert_single_language(body, "en")
-        assert body.lower().startswith("hi,")
-        assert "solar" in body.lower()
+        _assert_single_language(body, "sv")
+        assert "sol" in body.lower()
+        assert "batteri" in body.lower()
+        assert "uppsala" in body.lower()
+        assert "city" not in body.lower()
 
     def test_ptb_dcq_0024_english_battery(self):
         body = _render("PTB-DCQ-0024")

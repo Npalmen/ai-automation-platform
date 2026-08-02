@@ -10,10 +10,12 @@ from app.workflows.reply_planning import _resolve_location_hint, _resolve_servic
 from app.workflows.reply_quality.acknowledgement_plan import build_acknowledgement_plan
 from app.workflows.reply_quality.customer_surface import (
     build_question_surface_labels,
-    extract_case_reference,
     extract_city_phrase,
     extract_discovery_time_phrase,
+    pronoun_register_for_plan,
 )
+from app.workflows.reply_quality.fact_extraction import extract_customer_facts, normalize_case_reference
+from app.workflows.reply_quality.plan_invariants import validate_selected_known_invariant
 from app.workflows.reply_quality.information_value import build_information_value_plan
 from app.workflows.reply_quality.operational_next_step import select_operational_next_step
 from app.workflows.reply_quality.plan_v2 import (
@@ -35,11 +37,17 @@ def _continuation_has_new_substance(message_text: str) -> bool:
     lowered = (message_text or "").lower()
     markers = (
         "här kommer",
+        "kompletterande info",
         "bifogar",
         "kompletterar med",
+        "bekräfta",
+        "villa",
+        "brf",
         "årsförbrukning",
         " kwh",
-        "taktyp",
+        "kvm",
+        "takbilder",
+        "takytan",
         "adress",
         "storgatan",
         "enclosure",
@@ -122,12 +130,19 @@ def build_coworker_reply_plan_v2(
         phone_required_by_profile=False,
         language=language,
     )
-    location_phrase = extract_city_phrase(text=combined_text, entities=entities)
-    if not location_phrase:
-        location_phrase = _resolve_location_hint(entities, fact_map) or None
-        if location_phrase and location_phrase.startswith("known-"):
-            location_phrase = location_phrase.replace("known-", "").title()
-    case_reference_phrase = extract_case_reference(combined_text)
+    extracted = extract_customer_facts(input_data=input_data, entities=entities)
+    invariant = validate_selected_known_invariant(
+        selected_questions=info_plan.selected_questions,
+        already_known_facts=info_plan.already_known_facts,
+        extracted_known_fields=extracted.known_question_fields,
+    )
+    if not invariant.passed:
+        return None
+
+    location_phrase = extracted.location_city or extract_city_phrase(text=combined_text, entities=entities)
+    if location_phrase and location_phrase.lower() in {"city", "known-city"}:
+        location_phrase = None
+    case_reference_phrase = extracted.case_reference or normalize_case_reference(combined_text)
     discovery_phrase = extract_discovery_time_phrase(combined_text)
 
     selected_questions = info_plan.selected_questions
@@ -138,12 +153,33 @@ def build_coworker_reply_plan_v2(
         selected_questions,
         language=language,
         city_phrase=location_phrase,
+        pronoun_register=pronoun_register_for_plan(
+            service_family=playbook.service_family,
+            language=language,
+        ),
     )
     ack_mode = acknowledgement_mode_for_thread(
         thread=thread,
         service_family=playbook.service_family,
         next_step_id=next_step.step_id,
     )
+    mentions_battery = any(
+        token in combined_text.lower() for token in ("batteri", "battery storage", "battery")
+    )
+    mentions_attachment_gap = any(
+        token in combined_text.lower()
+        for token in (
+            "saknar ritning",
+            "not attached",
+            "utan bifogad",
+            "saknas i det här mailet",
+            "bifogar bilder",
+            "bifogar nu",
+            "bifogar takmätning",
+            "skickar den strax",
+        )
+    )
+    pronoun = pronoun_register_for_plan(service_family=playbook.service_family, language=language)
     acknowledgement = build_acknowledgement_plan(
         playbook=playbook,
         thread=thread,
@@ -154,6 +190,9 @@ def build_coworker_reply_plan_v2(
         new_supplied_facts=thread.supplied_facts
         if thread.is_continuation and _continuation_has_new_substance(input_data.get("message_text", ""))
         else (),
+        pronoun_register=pronoun,
+        mentions_battery=mentions_battery,
+        mentions_attachment_gap=mentions_attachment_gap,
     )
     verified = _internal_verified_fact_ids(
         service_type=service_type,
@@ -161,7 +200,7 @@ def build_coworker_reply_plan_v2(
         location_phrase=location_phrase,
         case_reference_phrase=case_reference_phrase,
     )
-    return build_customer_reply_plan_v2(
+    plan = build_customer_reply_plan_v2(
         greeting=greeting,
         signature_name=signature_name,
         playbook=playbook,
@@ -179,7 +218,9 @@ def build_coworker_reply_plan_v2(
         location_phrase=location_phrase,
         case_reference_phrase=case_reference_phrase,
         language_decision_evidence=language_decision.evidence,
+        pronoun_register=pronoun,
     )
+    return plan
 
 
 def build_and_render_coworker_reply(

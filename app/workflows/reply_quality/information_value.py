@@ -10,14 +10,17 @@ from app.service_profiles.qualification import _profile_field_present
 
 from app.workflows.reply_quality.customer_surface import (
     contextual_question_surface,
-    extract_case_reference,
     extract_city_phrase,
     extract_discovery_time_phrase,
+)
+from app.workflows.reply_quality.fact_extraction import (
+    extract_customer_facts,
+    normalize_case_reference,
 )
 from app.workflows.reply_quality.operational_next_step import OperationalNextStep
 from app.workflows.reply_quality.service_playbooks import ReplyServicePlaybook
 
-POLICY_VERSION = "information_value_plan_v2"
+POLICY_VERSION = "information_value_plan_v3"
 
 _FIELD_LABELS: dict[str, str] = {
     "address": "Adress eller ort för installationen/ärendet",
@@ -86,9 +89,17 @@ def _combined_text(input_data: dict[str, Any]) -> str:
     return f"{input_data.get('subject') or ''} {input_data.get('message_text') or ''}".lower()
 
 
-def _field_known(field: str, *, entities: dict[str, Any], text: str) -> bool:
+def _field_known(
+    field: str,
+    *,
+    entities: dict[str, Any],
+    text: str,
+    extracted_known: set[str],
+) -> bool:
+    if field in extracted_known:
+        return True
     if field == "case_reference":
-        return extract_case_reference(text) is not None
+        return normalize_case_reference(text) is not None
     if field == "status_dimension" and any(
         token in text for token in ("status", "läge", "hur ligger", "var står")
     ):
@@ -110,6 +121,7 @@ def _score_field(
     playbook: ReplyServicePlaybook,
     next_step_id: str,
     known: bool,
+    text: str = "",
 ) -> int:
     if known:
         return -100
@@ -129,6 +141,10 @@ def _score_field(
         score -= 10
     if field in playbook.optional_high_value_facts:
         score += 5
+    if field == "attachment" and any(
+        token in text for token in ("saknar ritning", "saknar", "not attached", "bifogar", "bifogade")
+    ):
+        score += 60
     return score
 
 
@@ -145,8 +161,13 @@ def build_information_value_plan(
 ) -> InformationValuePlan:
     entities = dict(entities or {})
     text = _combined_text(input_data)
-    city_phrase = extract_city_phrase(text=input_data.get("message_text", "") + " " + input_data.get("subject", ""), entities=entities)
-    case_reference = extract_case_reference(text)
+    extracted = extract_customer_facts(input_data=input_data, entities=entities)
+    extracted_known = set(extracted.known_question_fields)
+    city_phrase = extracted.location_city or extract_city_phrase(
+        text=input_data.get("message_text", "") + " " + input_data.get("subject", ""),
+        entities=entities,
+    )
+    case_reference = extracted.case_reference or normalize_case_reference(text)
     status_requested = bool(
         re.search(r"\bstatus\b|uppdatera status|hur ligger|var står", text, re.I)
     )
@@ -171,7 +192,9 @@ def build_information_value_plan(
     reasons: list[str] = []
 
     for field in candidates:
-        present = field in known or _field_known(field, entities=entities, text=text)
+        present = field in known or _field_known(
+            field, entities=entities, text=text, extracted_known=extracted_known
+        )
         if case_reference and field in {"case_reference", "customer_identifier", "status_dimension"}:
             present = True
         if status_requested and field in {"status_dimension", "case_reference"}:
@@ -192,6 +215,7 @@ def build_information_value_plan(
             playbook=playbook,
             next_step_id=next_step.step_id,
             known=False,
+            text=text,
         )
         if field == "phone_or_email" and not phone_required_by_profile:
             if entities.get("email") or "@" in text:
@@ -210,6 +234,7 @@ def build_information_value_plan(
 
     scored.sort(key=lambda item: (-item[0], item[1]))
     selected = [field for score, field in scored if score > 0][:budget]
+    selected = [field for field in selected if field not in set(known)]
     labels = [
         contextual_question_surface(field, language=language, city_phrase=city_phrase)
         for field in selected

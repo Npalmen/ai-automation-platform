@@ -4,6 +4,16 @@ slug: profile-driven-digital-coworker-reply-quality
 status: approved
 created: 2026-08-02
 qualification_target: PROFILE_DRIVEN_DIGITAL_COWORKER_REPLY_QUALITY_QUALIFIED
+qualification_registry_status: PENDING
+gates:
+  R1_HERMETIC: PASS
+  R2_PRECHECK: PASS
+  R2_HUMAN_REVIEW: FAIL
+  R3_LIVE_CANARY: PENDING
+  R4_LIVE_CAMPAIGN: PENDING
+  R5_CLOSURE: PENDING
+human_review_failure_sha: e653186f50daa1bd8675bb71778685f3073e7e5c
+closure_branch: fix/digital-coworker-human-quality-v4
 production_activation: false
 automatic_gmail_activation: false
 todos:
