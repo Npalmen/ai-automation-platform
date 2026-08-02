@@ -843,3 +843,19 @@ Reference: `docs/plans/production-pilot-p1-observability-fix-plan.md`, `app/prod
 
 **Reference:** `app/evaluation/profile_testbot/qualification/`, `app/evaluation/regression/qualification_registry.yaml`
 
+---
+
+## DEC-050 — Digital coworker reply rendering audit and provenance (2026-08-02)
+
+**Status:** Active — digital coworker reply quality chapter
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **Audit before renderer** | Todo A documented legacy path: deterministic `render_customer_reply` only; safe-ack bypasses lead-analyzer questions |
+| 2 | **Renderer provenance required** | `_reply_render_provenance` on every coworker payload |
+| 3 | **Eval feature flag** | `DIGITAL_COWORKER_REPLY_ENABLED` on `TENANT_LIVE_EVAL` only |
+| 4 | **Plan/render separation** | `CustomerReplyPlanV2` is authoritative; renderer cannot add facts/questions |
+| 5 | **Blocking coworker oracles** | Generic-but-safe replies fail R1; template similarity measured cross-family |
+
+**Reference:** `docs/reply-quality/current-rendering-truth.md`, `app/workflows/reply_quality/`
+

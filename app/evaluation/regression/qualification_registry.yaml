@@ -119,6 +119,27 @@ qualifications:
       - approval.lifecycle
       - policy.pre_write_reply_safety
 
+  - id: PROFILE_DRIVEN_DIGITAL_COWORKER_REPLY_QUALITY_QUALIFIED
+    chapter: profile-testbot
+    scope: profile-driven digital coworker reply quality on TENANT_LIVE_EVAL
+    source_workflow_run: pending
+    source_sha: pending
+    contract_version: coworker_reply_hermetic_v1
+    evidence_schema: coworker_reply_quality_v1
+    allowed_reuse: true
+    incompatible_changes:
+      - CustomerReplyPlanV2 contract change
+      - coworker blocking oracle threshold change
+      - renderer provenance schema change
+    expiry_policy: stale_on_contract_change
+    default_production_activation: false
+    live_external_write_type: gmail_reply
+    status: PENDING
+    compatible_capabilities:
+      - action.send_customer_auto_reply
+      - approval.lifecycle
+      - policy.pre_write_reply_safety
+
   - id: PROFILE_DRIVEN_AUTOMATIC_GMAIL_QUALIFIED
     chapter: profile-testbot
     scope: profile-driven automatic Gmail canary/core on isolated live-eval tenant

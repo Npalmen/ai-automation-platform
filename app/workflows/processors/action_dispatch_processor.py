@@ -20,6 +20,8 @@ from app.workflows.reply_planning import (
     build_customer_reply_plan,
     render_customer_reply,
 )
+from app.workflows.reply_quality.feature_flag import is_digital_coworker_reply_enabled
+from app.workflows.reply_quality.pipeline import build_and_render_coworker_reply
 from app.workflows.safe_ack_eligibility import SafeAckEligibilityResult
 from app.workflows.processors.ai_processor_utils import (
     append_processor_result,
@@ -559,6 +561,55 @@ def _build_safe_acknowledgement_action(
         )
         if not eligibility.eligible:
             return None
+
+    classification_payload = get_latest_processor_payload(job, "classification_processor")
+    business_intent_payload = classification_payload.get("business_intent") or {}
+    business_intent = (
+        business_intent_payload.get("primary_intent")
+        if isinstance(business_intent_payload, dict)
+        else business_intent_payload
+    )
+    thread_state = "new_thread"
+    if isinstance(source_meta, dict):
+        thread_state = source_meta.get("thread_state") or thread_state
+
+    if is_digital_coworker_reply_enabled(
+        tenant_id=job.tenant_id,
+        automation_settings=settings,
+    ):
+        coworker = build_and_render_coworker_reply(
+            greeting=greeting,
+            signature_name=signature_name,
+            missing_fact_plan=missing_plan,
+            eligibility=eligibility,
+            input_data=input_data,
+            entities=entities,
+            fact_map=fact_map,
+            business_intent=str(business_intent) if business_intent else None,
+            thread_state=thread_state,
+        )
+        if coworker is not None:
+            body, plan_v2, render_result, extra_meta = coworker
+            reply_subject = f"Re: {subject}" if subject and subject != "Lead" else "Re: ditt ärende"
+            return {
+                "type": "send_customer_auto_reply",
+                "tenant_id": job.tenant_id,
+                "to": customer_to,
+                "subject": reply_subject,
+                "body": body,
+                "thread_id": source_thread_id if use_thread_reply else None,
+                "in_reply_to": source_internet_message_id if use_thread_reply else None,
+                "references": source_internet_message_id if use_thread_reply else None,
+                "_needs_approval": True,
+                "_approval_reason": "safe_acknowledgement_requires_approval",
+                "_safe_acknowledgement_path": True,
+                "_digital_coworker_reply_path": True,
+                "_customer_reply_plan": extra_meta["_customer_reply_plan"],
+                "_customer_reply_plan_v2": extra_meta["_customer_reply_plan_v2"],
+                "_reply_render_provenance": extra_meta["_reply_render_provenance"],
+                "_information_value_plan": extra_meta["_information_value_plan"],
+                "_missing_fact_plan": missing_plan.to_dict(),
+            }
 
     reply_plan = build_customer_reply_plan(
         greeting=greeting,
