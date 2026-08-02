@@ -52,6 +52,7 @@ class AcknowledgementPlan:
 def _service_phrase(*, family: str, language: str) -> str:
     phrases = {
         "solar_installation": ("solceller", "solar panels"),
+        "solar_battery_combined": ("solceller och batteri", "solar panels and battery storage"),
         "battery_installation": ("batterilager", "battery storage"),
         "ev_charger": ("laddbox", "an EV charger"),
         "existing_installation_support": ("er befintliga anläggning", "your existing installation"),
@@ -209,7 +210,7 @@ def build_acknowledgement_plan(
 
     if thread.is_continuation:
         followup_family = bool(scenario_family and scenario_family.endswith("_followup"))
-        if family == "solar_installation":
+        if family in {"solar_installation", "solar_battery_combined"}:
             if followup_family:
                 statement = (
                     "Thanks for following up on your solar quote request."
@@ -220,7 +221,7 @@ def build_acknowledgement_plan(
                         else "Tack för att du följer upp din solcellsförfrågan."
                     )
                 )
-            elif mentions_battery:
+            elif family == "solar_battery_combined" or mentions_battery:
                 statement = (
                     "Thanks for following up on your solar and battery enquiry."
                     if language == "en"
@@ -387,8 +388,8 @@ def build_acknowledgement_plan(
             policy_version=POLICY_VERSION,
         )
 
-    if location_phrase and family == "solar_installation":
-        if mentions_battery:
+    if location_phrase and family in {"solar_installation", "solar_battery_combined"}:
+        if family == "solar_battery_combined" or mentions_battery:
             statement = (
                 f"Thank you for getting in touch about solar panels and battery storage in {location_phrase}."
                 if language == "en"
@@ -483,6 +484,16 @@ def build_acknowledgement_plan(
                     else "Tack för din förfrågan om solcellsinstallation."
                 )
             )
+    elif family == "solar_battery_combined":
+        statement = (
+            "Thank you for your solar and battery installation enquiry."
+            if language == "en"
+            else (
+                "Tack för er förfrågan om solceller och batteri."
+                if register == "ni"
+                else "Tack för din förfrågan om solceller och batteri."
+            )
+        )
     else:
         statement = (
             "Thank you for your message."
@@ -499,14 +510,26 @@ def build_acknowledgement_plan(
     if not _continuation_ack_allowed(thread=thread, message_text=message_text) and _contains_followup_ack_tokens(
         statement, language=language
     ):
-        if family == "solar_installation":
+        if family in {"solar_installation", "solar_battery_combined"}:
             statement = (
-                "Thank you for your solar installation enquiry."
-                if language == "en"
+                "Thank you for your solar and battery installation enquiry."
+                if family == "solar_battery_combined" and language == "en"
                 else (
-                    "Tack för er förfrågan om solcellsinstallation."
-                    if register == "ni"
-                    else "Tack för din förfrågan om solcellsinstallation."
+                    "Thank you for your solar installation enquiry."
+                    if language == "en"
+                    else (
+                        "Tack för er förfrågan om solceller och batteri."
+                        if family == "solar_battery_combined" and register == "ni"
+                        else (
+                            "Tack för din förfrågan om solceller och batteri."
+                            if family == "solar_battery_combined"
+                            else (
+                                "Tack för er förfrågan om solcellsinstallation."
+                                if register == "ni"
+                                else "Tack för din förfrågan om solcellsinstallation."
+                            )
+                        )
+                    )
                 )
             )
         elif family == "existing_installation_support":
