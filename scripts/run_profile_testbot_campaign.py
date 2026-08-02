@@ -124,6 +124,9 @@ from app.evaluation.profile_testbot.constants import (
     OPERATOR_STOP_SEMI_AUTO_RUNNER,
     QUALITY_LIVE_PROFILE_ID,
 )
+from app.evaluation.profile_testbot.qualification.hermetic_coworker_reply import (
+    run_hermetic_coworker_reply_qualification,
+)
 from app.evaluation.profile_testbot.qualification.hermetic_quality import (
     run_hermetic_quality_qualification,
 )
@@ -230,6 +233,16 @@ def _run_automatic(args: argparse.Namespace) -> int:
     write_profile_testbot_report(phase="automatic-live", run_id=run_id, payload=payload)
     print("READY_FOR_AUTOMATIC")
     return 0
+
+
+def _run_hermetic_coworker_reply(args: argparse.Namespace) -> int:
+    result = run_hermetic_coworker_reply_qualification(
+        profile_id=args.profile_id,
+        seed=args.seed,
+    )
+    print(result.overall_status)
+    print(json.dumps(result.to_dict(), indent=2))
+    return 0 if result.overall_status == "PASS" else 1
 
 
 def _run_hermetic_quality(args: argparse.Namespace) -> int:
@@ -361,6 +374,10 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("readiness", help="Build profile testbot readiness report")
     sub.add_parser("hermetic", help="Run 120-scenario hermetic profile campaign")
     sub.add_parser("hermetic-quality", help="Run Gate Q5 hermetic quality qualification")
+    sub.add_parser(
+        "hermetic-coworker-reply",
+        help="Run Gate R1 hermetic digital coworker reply qualification",
+    )
     quality_canary = sub.add_parser(
         "quality-canary-live",
         help="Execute 12-scenario live inbox quality canary (Gate Q6)",
@@ -403,6 +420,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if report.get("ready_for_live_semi_auto") else 1
     if args.command == "hermetic":
         return _run_hermetic(args)
+    if args.command == "hermetic-coworker-reply":
+        return _run_hermetic_coworker_reply(args)
     if args.command == "hermetic-quality":
         return _run_hermetic_quality(args)
     if args.command == "quality-canary-live":
