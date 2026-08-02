@@ -14,6 +14,7 @@ from app.evaluation.profile_testbot.coworker_reply_dataset.constants import (
     COWORKER_SCENARIO_TARGET,
 )
 from app.evaluation.profile_testbot.coworker_reply_dataset.families import all_coworker_family_cells
+from app.workflows.reply_quality.customer_surface import extract_city_phrase
 from app.evaluation.profile_testbot.profile_contract import CustomerProfileSnapshot
 from app.evaluation.profile_testbot.scenarios.schema import (
     ProfileScenario,
@@ -50,7 +51,12 @@ def generate_coworker_reply_dataset(
     scenarios: list[ProfileScenario] = []
     for index, (family, cell) in enumerate(all_coworker_family_cells()):
         scenario_id = f"PTB-DCQ-{index:04d}"
-        entities = {key: f"known-{key}" for key in cell.known_entities}
+        entities = {}
+        for key in cell.known_entities:
+            if key == "city":
+                entities[key] = extract_city_phrase(text=cell.message_text, entities={}) or "Uppsala"
+            else:
+                entities[key] = f"known-{key}"
         scenario = ProfileScenario(
             scenario_id=scenario_id,
             profile_id=profile.profile_id,

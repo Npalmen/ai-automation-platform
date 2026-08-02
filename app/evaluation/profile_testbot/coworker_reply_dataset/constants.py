@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-COWORKER_REPLY_DATASET_VERSION = "coworker_reply_dataset_v3"
+COWORKER_REPLY_DATASET_VERSION = "coworker_reply_dataset_v4"
 COWORKER_SCENARIO_TARGET = 120
 COWORKER_FAMILY_TARGET = 15
 COWORKER_SCENARIOS_PER_FAMILY = 8

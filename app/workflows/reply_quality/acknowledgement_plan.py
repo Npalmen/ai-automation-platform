@@ -51,11 +51,15 @@ def build_acknowledgement_plan(
     location_phrase: str | None = None,
     case_reference_phrase: str | None = None,
     new_supplied_facts: tuple[str, ...] = (),
+    pronoun_register: str = "ni",
+    mentions_battery: bool = False,
+    mentions_attachment_gap: bool = False,
 ) -> AcknowledgementPlan:
     family = playbook.service_family
     service = _service_phrase(family=family, language=language)
     claims: list[str] = []
     evidence: list[str] = []
+    register = pronoun_register if language == "sv" else "you"
 
     if family == "job_status" and case_reference_phrase:
         if language == "en":
@@ -64,7 +68,9 @@ def build_acknowledgement_plan(
             )
         else:
             statement = (
-                f"Vi har tagit emot din fråga om status för ärende {case_reference_phrase}."
+                f"Vi har tagit emot er fråga om status för ärende {case_reference_phrase}."
+                if register == "ni"
+                else f"Vi har tagit emot din fråga om status för ärende {case_reference_phrase}."
             )
         claims.append("status_request_with_case_reference")
         evidence.append(f"case_reference:{case_reference_phrase}")
@@ -79,7 +85,11 @@ def build_acknowledgement_plan(
         statement = (
             "We have received your status request and will check the case."
             if language == "en"
-            else "Vi har tagit emot din statusförfrågan och kontrollerar ärendet."
+            else (
+                "Vi har tagit emot er statusförfrågan och kontrollerar ärendet."
+                if register == "ni"
+                else "Vi har tagit emot din statusförfrågan och kontrollerar ärendet."
+            )
         )
         claims.append("status_request")
         evidence.append("intent:job_status")
@@ -94,7 +104,11 @@ def build_acknowledgement_plan(
         statement = (
             "Thank you for contacting us about the complaint."
             if language == "en"
-            else "Tack för att du kontaktar oss om reklamationen."
+            else (
+                "Tack för att ni kontaktar oss om reklamationen."
+                if register == "ni"
+                else "Tack för att du kontaktar oss om reklamationen."
+            )
         )
         claims.append("complaint_received")
         evidence.append("intent:complaint_warranty")
@@ -145,34 +159,65 @@ def build_acknowledgement_plan(
 
     if thread.is_continuation:
         if family == "solar_installation":
-            statement = (
-                "Thanks for following up on your solar enquiry."
-                if language == "en"
-                else "Tack för din uppföljning om solcellerna."
-            )
+            if mentions_battery:
+                statement = (
+                    "Thanks for following up on your solar and battery enquiry."
+                    if language == "en"
+                    else (
+                        "Tack för er uppföljning om solceller och batteri."
+                        if register == "ni"
+                        else "Tack för din uppföljning om solceller och batteri."
+                    )
+                )
+            else:
+                statement = (
+                    "Thanks for following up on your solar enquiry."
+                    if language == "en"
+                    else (
+                        "Tack för er uppföljning om solcellerna."
+                        if register == "ni"
+                        else "Tack för din uppföljning om solcellerna."
+                    )
+                )
         elif family == "battery_installation":
             statement = (
                 "Thanks for following up on the battery enquiry."
                 if language == "en"
+                else (
+                "Tack för er uppföljning om batterilösningen."
+                if register == "ni"
                 else "Tack för din uppföljning om batterilösningen."
+            )
             )
         elif family == "ev_charger":
             statement = (
                 "Thanks for following up on the charger enquiry."
                 if language == "en"
+                else (
+                "Tack för er uppföljning om laddboxen."
+                if register == "ni"
                 else "Tack för din uppföljning om laddboxen."
+            )
             )
         else:
             statement = (
                 "Thanks for your follow-up."
                 if language == "en"
+                else (
+                "Tack för att ni följer upp ärendet."
+                if register == "ni"
                 else "Tack för att du följer upp ärendet."
+            )
             )
         if family == "general_consultation":
             statement = (
                 "Thanks for your follow-up message."
                 if language == "en"
+                else (
+                "Tack för er uppföljning av meddelandet."
+                if register == "ni"
                 else "Tack för din uppföljning av meddelandet."
+            )
             )
         claims.append("thread_follow_up")
         evidence.append("thread:continuation")
@@ -183,12 +228,68 @@ def build_acknowledgement_plan(
             policy_version=POLICY_VERSION,
         )
 
-    if location_phrase and family == "solar_installation":
-        statement = (
-            f"Thank you for getting in touch about solar panels in {location_phrase}."
-            if language == "en"
-            else f"Tack för att ni hör av er om solceller i {location_phrase}."
+    if mentions_attachment_gap and family in {"solar_installation", "ev_charger"}:
+        if family == "ev_charger":
+            statement = (
+                "Thank you for your charger enquiry. We note the photos are not attached yet."
+                if language == "en"
+                else (
+                    "Tack för er förfrågan om laddbox. Vi ser att bilderna ännu inte är bifogade."
+                    if register == "ni"
+                    else "Tack för din förfrågan om laddbox. Vi ser att bilderna ännu inte är bifogade."
+                )
+            )
+        else:
+            statement = (
+                "Thank you for your enquiry. We note the drawing is not attached yet."
+                if language == "en"
+                else (
+                    "Tack för er förfrågan. Vi ser att ritningen ännu inte är bifogad."
+                    if register == "ni"
+                    else "Tack för din förfrågan. Vi ser att ritningen ännu inte är bifogad."
+                )
+            )
+        claims.append("attachment_gap_acknowledged")
+        evidence.append("input:missing_attachment")
+        return AcknowledgementPlan(
+            statement=statement,
+            claims=tuple(claims),
+            evidence=tuple(evidence),
+            policy_version=POLICY_VERSION,
         )
+
+    if family == "general_consultation":
+        statement = (
+            "Thank you for your consultation enquiry."
+            if language == "en"
+            else (
+                "Tack för er förfrågan om rådgivning."
+                if register == "ni"
+                else "Tack för din förfrågan om rådgivning."
+            )
+        )
+        claims.append("consultation_received")
+        evidence.append("intent:general_consultation")
+        return AcknowledgementPlan(
+            statement=statement,
+            claims=tuple(claims),
+            evidence=tuple(evidence),
+            policy_version=POLICY_VERSION,
+        )
+
+    if location_phrase and family == "solar_installation":
+        if mentions_battery:
+            statement = (
+                f"Thank you for getting in touch about solar panels and battery storage in {location_phrase}."
+                if language == "en"
+                else f"Tack för att ni hör av er om solceller och batteri i {location_phrase}."
+            )
+        else:
+            statement = (
+                f"Thank you for getting in touch about solar panels in {location_phrase}."
+                if language == "en"
+                else f"Tack för att ni hör av er om solceller i {location_phrase}."
+            )
         claims.append("solar_lead_with_location")
         evidence.append(f"location:{location_phrase}")
         return AcknowledgementPlan(
@@ -202,31 +303,51 @@ def build_acknowledgement_plan(
         statement = (
             "Thank you for your status request."
             if language == "en"
+            else (
+            "Tack för er statusförfrågan."
+            if register == "ni"
             else "Tack för din statusförfrågan."
+        )
         )
     elif family == "battery_installation":
         statement = (
             "Thank you for your enquiry about battery storage."
             if language == "en"
+            else (
+            "Tack för att ni hör av er om batterilager."
+            if register == "ni"
             else "Tack för att du hör av dig om batterilager."
+        )
         )
     elif family == "ev_charger":
         statement = (
             "Thank you for your enquiry about an EV charger."
             if language == "en"
+            else (
+            "Tack för er förfrågan om laddbox."
+            if register == "ni"
             else "Tack för din förfrågan om laddbox."
+        )
         )
     elif family == "solar_installation":
         statement = (
             "Thank you for your solar installation enquiry."
             if language == "en"
+            else (
+            "Tack för er förfrågan om solcellsinstallation."
+            if register == "ni"
             else "Tack för din förfrågan om solcellsinstallation."
+        )
         )
     else:
         statement = (
             "Thank you for your message."
             if language == "en"
+            else (
+            "Tack för ert meddelande."
+            if register == "ni"
             else "Tack för ditt meddelande."
+        )
         )
 
     claims.append("first_contact_acknowledgement")

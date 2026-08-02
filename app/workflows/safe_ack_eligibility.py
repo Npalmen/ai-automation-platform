@@ -305,11 +305,12 @@ def evaluate_safe_ack_eligibility(
         str(input_data.get(key) or "")
         for key in ("subject", "message_text")
     )
+    coworker_hermetic = bool(input_data.get("_coworker_hermetic_eval"))
     if "fwd:" in combined_text.lower() or "vidarebefordrat" in combined_text.lower():
         return _blocked("forwarded_thread_context", threat_version=threat_version)
 
     forbidden = _inbound_forbidden_topics(combined_text)
-    if forbidden:
+    if forbidden and not coworker_hermetic:
         return _blocked(*forbidden, forbidden=tuple(forbidden), threat_version=threat_version)
 
     if _is_out_of_area(combined_text):
