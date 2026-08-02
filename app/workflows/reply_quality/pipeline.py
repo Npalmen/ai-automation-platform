@@ -15,9 +15,12 @@ from app.workflows.reply_quality.customer_surface import (
     pronoun_register_for_plan,
 )
 from app.workflows.reply_quality.fact_extraction import extract_customer_facts, normalize_case_reference
-from app.workflows.reply_quality.plan_invariants import validate_selected_known_invariant
+from app.workflows.reply_quality.plan_invariants import (
+    validate_evidence_based_known_facts,
+    validate_pipeline_playbook_consistency,
+    validate_selected_known_invariant,
+)
 from app.workflows.reply_quality.information_value import build_information_value_plan
-from app.workflows.reply_quality.operational_next_step import select_operational_next_step
 from app.workflows.reply_quality.plan_v2 import (
     CustomerReplyPlanV2,
     adapt_plan_v2_to_v1,
@@ -25,11 +28,12 @@ from app.workflows.reply_quality.plan_v2 import (
 )
 from app.workflows.reply_quality.renderer import RenderResult, render_coworker_reply_with_validation
 from app.workflows.reply_quality.reply_language import decide_reply_language, localized_greeting
-from app.workflows.reply_quality.semantic_fact_predicates import (
-    attachment_state,
-    is_battery_retrofit_intent,
+from app.workflows.reply_quality.fact_evidence import (
+    FactEvidenceSnapshot,
+    verified_fact_labels_from_evidence,
 )
-from app.workflows.reply_quality.service_playbooks import get_reply_playbook
+from app.workflows.reply_quality.pipeline_routing import resolve_reply_pipeline_context
+from app.workflows.reply_quality.semantic_fact_predicates import attachment_state
 from app.workflows.reply_quality.thread_context import (
     acknowledgement_mode_for_thread,
     build_thread_reply_context,
@@ -66,20 +70,14 @@ def _continuation_has_new_substance(message_text: str) -> bool:
 def _internal_verified_fact_ids(
     *,
     service_type: str,
-    known_fields: tuple[str, ...],
-    location_phrase: str | None,
+    evidence: FactEvidenceSnapshot,
     case_reference_phrase: str | None,
 ) -> tuple[str, ...]:
-    labels: list[str] = []
-    if service_type:
-        labels.append(f"internal_service:{service_type}")
-    if location_phrase:
-        labels.append(f"internal_location_city:{location_phrase}")
-    if case_reference_phrase:
-        labels.append(f"internal_case_reference:{case_reference_phrase}")
-    for field in known_fields:
-        labels.append(f"internal_known:{field}")
-    return tuple(labels)
+    return verified_fact_labels_from_evidence(
+        service_type=service_type,
+        evidence=evidence,
+        case_reference_phrase=case_reference_phrase,
+    )
 
 
 def build_coworker_reply_plan_v2(
@@ -116,21 +114,24 @@ def build_coworker_reply_plan_v2(
     greeting = localized_greeting(language=language, signature_name=signature_name)
 
     service_type = str(input_data.get("_force_service_type") or missing_fact_plan.service_type)
-    if is_battery_retrofit_intent(combined_text):
-        service_type = "battery_storage"
     intent = business_intent or "lead"
-    playbook = get_reply_playbook(service_type, business_intent=intent)
     thread = build_thread_reply_context(
         thread_state=thread_state,
         prior_safe_ack=thread_state == "continuation",
         supplied_facts=missing_fact_plan.known_facts,
     )
-    next_step = select_operational_next_step(
-        service_type=service_type,
+    pipeline_ctx = resolve_reply_pipeline_context(
+        base_service_type=service_type,
         business_intent=intent,
+        input_data=input_data,
+        entities=entities,
+        known_fact_fields=missing_fact_plan.known_facts,
         thread_state=thread_state,
         is_continuation=thread.is_continuation,
     )
+    service_type = pipeline_ctx.service_type
+    playbook = pipeline_ctx.playbook
+    next_step = pipeline_ctx.next_step
     info_plan = build_information_value_plan(
         playbook=playbook,
         next_step=next_step,
@@ -147,7 +148,18 @@ def build_coworker_reply_plan_v2(
         already_known_facts=info_plan.already_known_facts,
         extracted_known_fields=extracted.known_question_fields,
     )
-    if not invariant.passed:
+    evidence_invariant = validate_evidence_based_known_facts(
+        already_known_facts=info_plan.already_known_facts,
+        evidence=pipeline_ctx.fact_evidence,
+        selection_reasons=info_plan.selection_reasons,
+    )
+    playbook_invariant = validate_pipeline_playbook_consistency(
+        playbook_id=playbook.playbook_id,
+        service_family=playbook.service_family,
+        next_step_service_family=next_step.service_family,
+        information_plan_playbook_id=info_plan.playbook_id,
+    )
+    if not invariant.passed or not evidence_invariant.passed or not playbook_invariant.passed:
         return None
 
     location_phrase = extracted.location_city or extract_city_phrase(text=combined_text, entities=entities)
@@ -199,8 +211,7 @@ def build_coworker_reply_plan_v2(
     )
     verified = _internal_verified_fact_ids(
         service_type=service_type,
-        known_fields=info_plan.already_known_facts,
-        location_phrase=location_phrase,
+        evidence=pipeline_ctx.fact_evidence,
         case_reference_phrase=case_reference_phrase,
     )
     plan = build_customer_reply_plan_v2(

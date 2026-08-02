@@ -12,6 +12,10 @@ SEMANTIC_FACT_TO_FIELDS: dict[str, frozenset[str]] = {
     "property_type_private": frozenset({"property_type", "housing_association_context"}),
     "load_balancing_stated": frozenset({"load_balancing_need"}),
     "requested_service_explicit": frozenset({"requested_service"}),
+    "consultation_solar_vs_battery": frozenset({"requested_service"}),
+    "consultation_energy_storage": frozenset({"requested_service"}),
+    "consultation_charger_vs_solar": frozenset({"requested_service"}),
+    "consultation_booking": frozenset({"requested_service"}),
     "existing_solar_system": frozenset({"existing_solar_system", "existing_installation"}),
     "battery_retrofit": frozenset({"existing_solar_system", "existing_installation", "battery_interest"}),
     "attachment_missing": frozenset(),
@@ -47,6 +51,7 @@ _REQUESTED_SERVICE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"energy storage", re.I), "consultation"),
     (re.compile(r"solar,\s*battery\s+and\s+charging", re.I), "consultation"),
     (re.compile(r"short call about solar", re.I), "consultation"),
+    (re.compile(r"book a short call", re.I), "consultation_booking"),
     (re.compile(r"solcellsoffert|solar quote", re.I), "solar"),
     (re.compile(r"\b(?:want|need|wants|looking for)\s+(?:a\s+)?solar\b", re.I), "solar"),
     (re.compile(r"\b(?:vill|önskar)\s+ha\s+solceller\b", re.I), "solar"),
@@ -54,6 +59,23 @@ _REQUESTED_SERVICE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bbatteri(?:lager|lagring)?\b", re.I), "battery"),
     (re.compile(r"\bladdbox\b|\bev charger\b", re.I), "ev_charger"),
 )
+
+_CONSULTATION_INTENT_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"solceller\s+kontra\s+batteri", re.I), "consultation_solar_vs_battery"),
+    (re.compile(r"overview of energy storage", re.I), "consultation_energy_storage"),
+    (re.compile(r"energy storage options", re.I), "consultation_energy_storage"),
+    (re.compile(r"laddbox\s+eller\s+solceller", re.I), "consultation_charger_vs_solar"),
+    (re.compile(r"book a short call about solar", re.I), "consultation_booking"),
+    (re.compile(r"short call about solar,\s*battery", re.I), "consultation_booking"),
+)
+
+
+def detect_consultation_intent(message: str) -> str | None:
+    lowered = (message or "").lower()
+    for pattern, intent in _CONSULTATION_INTENT_PATTERNS:
+        if pattern.search(lowered):
+            return intent
+    return None
 
 
 def detect_semantic_fact_ids(message: str) -> set[str]:
@@ -73,6 +95,10 @@ def detect_semantic_fact_ids(message: str) -> set[str]:
         if pattern.search(lowered):
             fact_ids.add("requested_service_explicit")
             break
+
+    consultation_intent = detect_consultation_intent(message)
+    if consultation_intent:
+        fact_ids.add(consultation_intent)
 
     has_existing_solar = bool(
         re.search(

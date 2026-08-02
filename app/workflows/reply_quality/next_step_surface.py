@@ -137,14 +137,9 @@ def build_next_step_surface(
     if service_family == "job_status" or step_id == "provide_status_acknowledgement":
         if scenario_family == "job_status_no_contact":
             if lang == "en":
-                stmt = (
-                    "We will check the case status and reply without needing further contact details."
-                )
+                stmt = "We will check the case status and get back to you."
             else:
-                stmt = (
-                    "Vi kontrollerar ärendets status och återkommer utan att behöva "
-                    "fler kontaktuppgifter."
-                )
+                stmt = "Vi kontrollerar ärendets status och återkommer till dig."
             return NextStepSurfaceContract(
                 statement=stmt,
                 operational_summary="check status without requesting contact details",
@@ -244,6 +239,29 @@ def build_next_step_surface(
             actor="operator",
             prerequisite="symptom and safety details",
             must_not_promise=("remote_fix_guarantee", "same_day_resolution"),
+        )
+
+    if (
+        service_family == "general_consultation"
+        and step_id == "collect_contact_preference"
+        and not has_questions
+    ):
+        if lang == "en":
+            stmt = (
+                "Please send a couple of times that work for you and a brief note on "
+                "what you mainly want to discuss during the consultation."
+            )
+        else:
+            stmt = (
+                "Skicka gärna ett par tider som passar samt en kort rad om vilka frågor "
+                "ni främst vill gå igenom."
+            )
+        return NextStepSurfaceContract(
+            statement=stmt,
+            operational_summary="collect preferred call times for consultation",
+            actor="customer",
+            prerequisite="call scheduling preference",
+            must_not_promise=("booking_confirmation", "quote_amount"),
         )
 
     if not has_questions:

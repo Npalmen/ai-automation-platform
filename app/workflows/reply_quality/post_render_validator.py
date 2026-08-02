@@ -24,8 +24,9 @@ _GRAMMATICAL_BAD_SV = re.compile(
     r"\bbehöver vi vilken\b|\bbehöver vi vad\b|\bbehöver vi när\b"
     r"|\bom (?:du|ni) har om (?:du|ni) har\b"
     r"|\bkan (?:du|ni) skicka vilken\b"
-    r"|\bkan (?:du|ni) skicka which\b"
-    r"|\bför att kunna hjälpa er på bästa sätt, vilken tjänst ni söker\b",
+    r"|\bkan (?:du|ni) bekräfta om\b"
+    r"|\bom det finns redan\b"
+    r"|\bkan (?:du|ni) bekräfta huruvida\b",
     re.I,
 )
 _GRAMMATICAL_BAD_EN = re.compile(

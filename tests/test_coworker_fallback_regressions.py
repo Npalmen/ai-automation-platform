@@ -149,7 +149,8 @@ class TestMockedLiveOutputsPassValidator:
         plan = _plan_for("PTB-DCQ-0032")
         body = (
             "Hi,\n\nThank you for your enquiry about an EV charger in Uppsala. "
-            "Could you please tell us the type of property, how many charging points you need "
+            "Could you please tell us the type of property, which address in Uppsala "
+            "applies to the installation, how many charging points you need "
             "and where they should be placed, and your main fuse rating or available capacity?\n\n"
             "Once we have that information we will review the details and get back to you.\n\n"
             "Kind regards\nNiklas"

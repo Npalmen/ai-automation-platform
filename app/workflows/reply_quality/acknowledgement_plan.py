@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.workflows.reply_quality.semantic_fact_predicates import (
+    detect_consultation_intent,
     is_battery_retrofit_intent,
 )
 from app.workflows.reply_quality.thread_context import ThreadReplyContext
@@ -341,6 +342,25 @@ def build_acknowledgement_plan(
             )
         claims.append("attachment_promised_acknowledged")
         evidence.append("input:attachment_promised")
+        return AcknowledgementPlan(
+            statement=statement,
+            claims=tuple(claims),
+            evidence=tuple(evidence),
+            policy_version=POLICY_VERSION,
+        )
+
+    if detect_consultation_intent(message_text) == "consultation_booking":
+        statement = (
+            "We'd be happy to help prepare a short consultation call about solar, battery and charging."
+            if language == "en"
+            else (
+                "Vi hjälper gärna till att förbereda ett kort samtal om solceller, batteri och laddning."
+                if register == "ni"
+                else "Vi hjälper gärna till att förbereda ett kort samtal om solceller, batteri och laddning."
+            )
+        )
+        claims.append("booking_request_acknowledged")
+        evidence.append("intent:consultation_booking")
         return AcknowledgementPlan(
             statement=statement,
             claims=tuple(claims),

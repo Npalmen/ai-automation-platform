@@ -41,10 +41,9 @@ from app.evaluation.profile_testbot.scenarios.schema import ProfileScenario  # n
 from app.workflows.missing_fact_plan import build_missing_fact_plan  # noqa: E402
 from app.workflows.reply_planning import _resolve_location_hint, _resolve_service_hint  # noqa: E402
 from app.workflows.reply_quality.information_value import build_information_value_plan  # noqa: E402
-from app.workflows.reply_quality.operational_next_step import select_operational_next_step  # noqa: E402
 from app.workflows.reply_quality.pipeline import build_and_render_coworker_reply  # noqa: E402
+from app.workflows.reply_quality.pipeline_routing import resolve_reply_pipeline_context  # noqa: E402
 from app.workflows.reply_quality.plan_v2 import CustomerReplyPlanV2  # noqa: E402
-from app.workflows.reply_quality.service_playbooks import get_reply_playbook  # noqa: E402
 from app.workflows.reply_quality.thread_context import (  # noqa: E402
     acknowledgement_mode_for_thread,
     build_thread_reply_context,
@@ -302,18 +301,23 @@ def render_scenario_full(scenario: ProfileScenario) -> RenderedScenario:
 
     thread_state = str(setup.get("thread_state") or "new_thread")
     service_type = str(setup.get("service_type") or "")
-    playbook = get_reply_playbook(service_type, business_intent=playbook_intent)
     thread = build_thread_reply_context(
         thread_state=thread_state,
         prior_safe_ack=thread_state == "continuation",
         supplied_facts=missing.known_facts,
     )
-    next_step = select_operational_next_step(
-        service_type=service_type,
+    pipeline_ctx = resolve_reply_pipeline_context(
+        base_service_type=service_type,
         business_intent=playbook_intent,
+        input_data=input_data,
+        entities=entities,
+        known_fact_fields=missing.known_facts,
         thread_state=thread_state,
         is_continuation=thread.is_continuation,
     )
+    playbook = pipeline_ctx.playbook
+    next_step = pipeline_ctx.next_step
+    service_type = pipeline_ctx.service_type
     info_plan = build_information_value_plan(
         playbook=playbook,
         next_step=next_step,
