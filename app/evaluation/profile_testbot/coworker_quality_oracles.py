@@ -157,7 +157,18 @@ _FOLLOWUP_ACK_FORBIDDEN_ON_NEW = re.compile(
 _MALFORMED_QUESTION = re.compile(
     r"\bom (?:du|ni) har om (?:du|ni) har\b|\bkan (?:du|ni) skicka vilken\b|if you have if you have"
     r"|\bbekräfta om det finns redan\b"
-    r"|\bkan (?:du|ni) bekräfta huruvida\b",
+    r"|\bkan (?:du|ni) bekräfta huruvida\b"
+    r"|\bdessutom,?\s*om\b"
+    r"|\bom lastbalansering behövs\b",
+    re.I,
+)
+_BATTERY_DOMAIN_QUESTION = re.compile(
+    r"\b(?:huvudsakligt syfte med batteriet|purpose of the battery|battery.{0,20}purpose)\b",
+    re.I,
+)
+_BOOKING_CONFIRMED = re.compile(
+    r"\b(?:call|samtal).{0,30}\b(?:booked|confirmed|bokat|bekräftat)\b"
+    r"|\b(?:booked|confirmed|bokat|bekräftat).{0,30}\b(?:call|samtal)\b",
     re.I,
 )
 
@@ -431,6 +442,79 @@ def evaluate_semantic_human_review_oracles(
         )
     else:
         results.append(_oracle_pass("semantic_question_relevance", "question_utility", "clean"))
+
+    if "solar_battery_combined_new" in semantic_ids and "existing_installation" in selected:
+        results.append(
+            _oracle_fail(
+                "combined_new_install_question_alignment",
+                "question_utility",
+                "existing_installation",
+            )
+        )
+    else:
+        results.append(
+            _oracle_pass("combined_new_install_question_alignment", "question_utility", "aligned")
+        )
+
+    if consultation_intent == "consultation_charger_vs_solar":
+        domain_fail = False
+        if "intended_purpose" in selected:
+            domain_fail = True
+        labels = " ".join(plan_v2.question_surface_labels or plan_v2.selected_question_labels or ())
+        if _BATTERY_DOMAIN_QUESTION.search(labels) or _BATTERY_DOMAIN_QUESTION.search(reply_body or ""):
+            domain_fail = True
+        if domain_fail:
+            results.append(
+                _oracle_fail(
+                    "consultation_question_domain_alignment",
+                    "question_utility",
+                    "battery_domain_in_charger_vs_solar",
+                )
+            )
+        else:
+            results.append(
+                _oracle_pass(
+                    "consultation_question_domain_alignment",
+                    "question_utility",
+                    "aligned",
+                )
+            )
+    else:
+        results.append(
+            _oracle_pass("consultation_question_domain_alignment", "question_utility", "n/a")
+        )
+
+    if consultation_intent == "consultation_booking":
+        operational = {"preferred_call_times", "consultation_focus", "preferred_contact_method"}
+        lowered_body = (reply_body or "").lower()
+        if not selected.intersection(operational):
+            results.append(
+                _oracle_fail(
+                    "booking_request_operationalized",
+                    "conversation_quality",
+                    "no_operational_questions",
+                )
+            )
+        elif _BOOKING_CONFIRMED.search(reply_body or ""):
+            results.append(
+                _oracle_fail(
+                    "booking_request_operationalized",
+                    "conversation_quality",
+                    "booking_confirmed_claim",
+                )
+            )
+        else:
+            results.append(
+                _oracle_pass(
+                    "booking_request_operationalized",
+                    "conversation_quality",
+                    "operationalized",
+                )
+            )
+    else:
+        results.append(
+            _oracle_pass("booking_request_operationalized", "conversation_quality", "n/a")
+        )
 
     if _MALFORMED_QUESTION.search(reply_body or ""):
         results.append(

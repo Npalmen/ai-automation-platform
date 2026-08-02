@@ -25,7 +25,9 @@ _GRAMMATICAL_BAD_SV = re.compile(
     r"|\bom (?:du|ni) har om (?:du|ni) har\b"
     r"|\bkan (?:du|ni) skicka vilken\b"
     r"|\bbekräfta om det finns redan\b"
-    r"|\bkan (?:du|ni) bekräfta huruvida\b",
+    r"|\bkan (?:du|ni) bekräfta huruvida\b"
+    r"|\bdessutom,?\s*om\b"
+    r"|\bom lastbalansering behövs\b",
     re.I,
 )
 _GRAMMATICAL_BAD_EN = re.compile(

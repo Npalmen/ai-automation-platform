@@ -17,8 +17,14 @@ _QUESTION_LABELS_SV: dict[str, str] = {
     "intended_purpose": "huvudsakligt syfte med batteriet",
     "battery_preference": "önskad batteristorlek eller kapacitet",
     "charging_points": "antal laddpunkter och önskad placering",
-    "main_fuse": "huvudsäkring eller tillgänglig kapacitet",
-    "load_balancing_need": "om lastbalansering behövs till laddboxen",
+    "main_fuse": "Vilken storlek har huvudsäkringen?",
+    "load_balancing_need": "Behöver ni även lastbalansering till laddboxen?",
+    "energy_priority_goal": "ert huvudsakliga mål (laddning, lägre elkostnad eller investering)",
+    "ev_ownership_or_plan": "om ni har eller planerar elbil",
+    "charging_need": "ert ungefärliga laddbehov",
+    "preferred_call_times": "två eller tre tider som passar för ett samtal",
+    "consultation_focus": "vilka frågor ni främst vill gå igenom",
+    "preferred_contact_method": "vilken kontaktväg ni föredrar",
     "housing_association_context": "om det gäller privat, företag eller BRF",
     "system_type": "vilken typ av anläggning det gäller",
     "symptom": "en beskrivning av felet eller symptomet",
@@ -53,8 +59,14 @@ _QUESTION_LABELS_EN: dict[str, str] = {
     "intended_purpose": "the main purpose of the battery",
     "battery_preference": "your preferred battery size or capacity",
     "charging_points": "how many charging points you need and where they should be placed",
-    "main_fuse": "your main fuse rating or available capacity",
-    "load_balancing_need": "whether you need load balancing",
+    "main_fuse": "What size is your main fuse or available capacity?",
+    "load_balancing_need": "Do you also need load balancing for the charger?",
+    "energy_priority_goal": "your main goal (charging, lower electricity costs, or investment)",
+    "ev_ownership_or_plan": "whether you have or are planning an electric car",
+    "charging_need": "your approximate charging needs",
+    "preferred_call_times": "two or three times that would suit you for a call",
+    "consultation_focus": "which questions you mainly want to cover",
+    "preferred_contact_method": "your preferred contact method",
     "housing_association_context": "whether this is for a private home, business, or housing association",
     "system_type": "which type of installation this concerns",
     "symptom": "a description of the fault or symptom",
@@ -178,12 +190,25 @@ def contextual_question_surface(
     language: str,
     city_phrase: str | None = None,
     pronoun_register: str = "ni",
+    service_family: str | None = None,
 ) -> str:
     labels = _QUESTION_LABELS_EN if language == "en" else _QUESTION_LABELS_SV
     if field == "address" and city_phrase:
         if language == "en":
             return f"the installation address in {city_phrase}"
         return f"adressen i {city_phrase}"
+    if field == "energy_priority_goal":
+        if service_family == "solar_battery_combined":
+            if language == "en":
+                return "the main goal or function for the battery part of the installation"
+            return "batteriets huvudsakliga mål eller funktion"
+        if language == "en":
+            return "your main goal (charging, lower electricity costs, or investment)"
+        return "ert huvudsakliga mål (laddning, lägre elkostnad eller investering)"
+    if field == "attachment" and service_family in {"existing_installation_support", "complaint_warranty"}:
+        if language == "en":
+            return "Please send photos or drawings if you have any."
+        return "Skicka gärna bilder eller ritningar om sådana finns."
     label = labels.get(field)
     if label is not None:
         return _adjust_sv_register(label, pronoun_register) if language == "sv" else label
@@ -200,6 +225,7 @@ def build_question_surface_labels(
     language: str,
     city_phrase: str | None = None,
     pronoun_register: str = "ni",
+    service_family: str | None = None,
 ) -> tuple[str, ...]:
     return tuple(
         contextual_question_surface(
@@ -207,6 +233,7 @@ def build_question_surface_labels(
             language=language,
             city_phrase=city_phrase,
             pronoun_register=pronoun_register,
+            service_family=service_family,
         )
         for field in selected_questions
     )
@@ -222,9 +249,12 @@ def compose_question_block(
         return ""
 
     if len(questions) == 1:
+        q = questions[0]
+        if q.endswith("?"):
+            return q
         if language == "en":
-            return f"To move forward, could you share {questions[0]}?"
-        return f"För att vi ska kunna gå vidare behöver vi {questions[0]}."
+            return f"To move forward, could you share {q}?"
+        return f"För att vi ska kunna gå vidare behöver vi {q}."
 
     if len(questions) <= 3:
         if language == "sv":

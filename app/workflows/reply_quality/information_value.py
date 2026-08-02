@@ -41,6 +41,12 @@ _FIELD_LABELS: dict[str, str] = {
     "existing_solar_system": "Beskrivning av befintlig solcellsanläggning",
     "current_inverter": "Vilken växelriktare/system du har idag",
     "intended_purpose": "Huvudsakligt syfte med batteriet",
+    "energy_priority_goal": "Huvudsakliga mål med installationen",
+    "ev_ownership_or_plan": "Om ni har eller planerar elbil",
+    "charging_need": "Ungefärligt laddbehov",
+    "preferred_call_times": "Tider som passar för samtal",
+    "consultation_focus": "Frågor att gå igenom under samtalet",
+    "preferred_contact_method": "Föredragen kontaktväg",
     "battery_preference": "Önskad batteristorlek eller kapacitet",
     "charging_points": "Antal laddpunkter och önskad placering",
     "main_fuse": "Huvudsäkring eller tillgänglig kapacitet",
@@ -233,9 +239,7 @@ def build_information_value_plan(
         if required not in candidates:
             candidates.append(required)
 
-    if consultation_intent == "consultation_booking":
-        budget = 0
-    elif consultation_intent:
+    if consultation_intent:
         budget = min(budget, 4)
 
     scored: list[tuple[int, str]] = []
@@ -254,6 +258,16 @@ def build_information_value_plan(
         if consultation_intent and field in {"project_description", "requested_service"}:
             excluded.append(field)
             reasons.append(f"exclude:{field}:consultation_intent")
+            continue
+
+        if consultation_intent == "consultation_charger_vs_solar" and field == "intended_purpose":
+            excluded.append(field)
+            reasons.append(f"exclude:{field}:consultation_domain")
+            continue
+
+        if "solar_battery_combined_new" in semantic_ids and field == "existing_installation":
+            excluded.append(field)
+            reasons.append(f"exclude:{field}:combined_new_install")
             continue
 
         if case_reference and field in {"case_reference", "customer_identifier", "status_dimension"}:
@@ -340,7 +354,16 @@ def build_information_value_plan(
             and not solar_verified
         ):
             score += 45
-        if consultation_intent and field in {"annual_consumption", "existing_installation", "intended_purpose"}:
+        if consultation_intent and field in {
+            "annual_consumption",
+            "existing_installation",
+            "intended_purpose",
+            "energy_priority_goal",
+            "ev_ownership_or_plan",
+            "charging_need",
+            "preferred_call_times",
+            "consultation_focus",
+        }:
             score += 25
         scored.append((score, field))
 
@@ -354,7 +377,12 @@ def build_information_value_plan(
     )
     known = list(final_evidence.evidenced_question_fields)
     labels = [
-        contextual_question_surface(field, language=language, city_phrase=city_phrase)
+        contextual_question_surface(
+            field,
+            language=language,
+            city_phrase=city_phrase,
+            service_family=playbook.service_family,
+        )
         for field in selected
     ]
     for field in selected:

@@ -104,6 +104,7 @@ def build_customer_reply_plan_v2(
     scenario_family: str | None = None,
     mentions_attachment_gap: bool = False,
     attachment_state: str | None = None,
+    existing_solar_verified: bool = True,
 ) -> CustomerReplyPlanV2:
     from app.workflows.reply_quality.next_step_surface import build_next_step_surface
 
@@ -119,6 +120,7 @@ def build_customer_reply_plan_v2(
         scenario_family=scenario_family,
         mentions_attachment_gap=mentions_attachment_gap,
         attachment_state=attachment_state,
+        existing_solar_verified=existing_solar_verified,
     )
     next_step_statement = next_surface.statement
     return CustomerReplyPlanV2(
