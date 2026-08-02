@@ -121,19 +121,20 @@ _PLAYBOOKS: dict[str, ReplyServicePlaybook] = {
         next_steps=("collect_minimum_site_facts", "clarify_service_scope"),
         required={
             "collect_minimum_site_facts": (
-                "existing_solar_system",
+                "existing_installation",
                 "current_inverter",
                 "intended_purpose",
                 "address",
             ),
         },
         priority=(
-            "existing_solar_system",
+            "existing_installation",
             "current_inverter",
             "intended_purpose",
             "address",
             "annual_consumption",
             "battery_preference",
+            "existing_solar_system",
         ),
     ),
     "battery_installation": _pb(
@@ -142,12 +143,14 @@ _PLAYBOOKS: dict[str, ReplyServicePlaybook] = {
         next_steps=("collect_minimum_site_facts",),
         required={
             "collect_minimum_site_facts": (
+                "existing_installation",
                 "existing_solar_system",
                 "current_inverter",
                 "address",
             ),
         },
         priority=(
+            "existing_installation",
             "existing_solar_system",
             "current_inverter",
             "intended_purpose",

@@ -5,10 +5,31 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from app.workflows.reply_quality.service_playbooks import ReplyServicePlaybook
+from app.workflows.reply_quality.semantic_fact_predicates import (
+    is_battery_retrofit_intent,
+)
 from app.workflows.reply_quality.thread_context import ThreadReplyContext
 
-POLICY_VERSION = "acknowledgement_plan_v1"
+POLICY_VERSION = "acknowledgement_plan_v2"
+
+_FOLLOWUP_ACK_TOKENS_SV = ("igen", "återkomst", "uppföljning", "kompletterande")
+_FOLLOWUP_ACK_TOKENS_EN = ("again", "follow-up", "follow up", "additional information")
+
+
+def _continuation_ack_allowed(*, thread: ThreadReplyContext, message_text: str = "") -> bool:
+    """Follow-up acknowledgement wording requires verified continuation evidence."""
+    if thread.is_continuation:
+        return True
+    lowered = (message_text or "").lower()
+    if any(token in lowered for token in ("kompletterande", "following up", "follow-up", "follow up", "bifogar nu")):
+        return True
+    return False
+
+
+def _contains_followup_ack_tokens(statement: str, *, language: str) -> bool:
+    lowered = (statement or "").lower()
+    tokens = _FOLLOWUP_ACK_TOKENS_EN if language == "en" else _FOLLOWUP_ACK_TOKENS_SV
+    return any(token in lowered for token in tokens)
 
 
 @dataclass(frozen=True)
@@ -54,7 +75,9 @@ def build_acknowledgement_plan(
     pronoun_register: str = "ni",
     mentions_battery: bool = False,
     mentions_attachment_gap: bool = False,
+    attachment_state: str | None = None,
     scenario_family: str | None = None,
+    message_text: str = "",
 ) -> AcknowledgementPlan:
     family = playbook.service_family
     service = _service_phrase(family=family, language=language)
@@ -121,7 +144,11 @@ def build_acknowledgement_plan(
         )
 
     if family == "existing_installation_support":
-        followup_family = bool(scenario_family and scenario_family.endswith("_followup"))
+        followup_family = bool(
+            scenario_family
+            and scenario_family.endswith("_followup")
+            and _continuation_ack_allowed(thread=thread, message_text=message_text)
+        )
         if thread.is_continuation:
             if language == "en":
                 statement = (
@@ -291,6 +318,36 @@ def build_acknowledgement_plan(
             policy_version=POLICY_VERSION,
         )
 
+    if attachment_state == "attachment_promised":
+        if family == "ev_charger":
+            statement = (
+                "Thank you for your charger enquiry. We note you will attach supporting documents."
+                if language == "en"
+                else (
+                    "Tack för er förfrågan om laddbox. Vi noterar att ni återkommer med bifogat underlag."
+                    if register == "ni"
+                    else "Tack för din förfrågan om laddbox. Vi noterar att du återkommer med bifogat underlag."
+                )
+            )
+        else:
+            statement = (
+                "Thank you for your enquiry. We note you will attach supporting documents."
+                if language == "en"
+                else (
+                    "Tack för er förfrågan. Vi noterar att ni återkommer med bifogat underlag."
+                    if register == "ni"
+                    else "Tack för din förfrågan. Vi noterar att du återkommer med bifogat underlag."
+                )
+            )
+        claims.append("attachment_promised_acknowledged")
+        evidence.append("input:attachment_promised")
+        return AcknowledgementPlan(
+            statement=statement,
+            claims=tuple(claims),
+            evidence=tuple(evidence),
+            policy_version=POLICY_VERSION,
+        )
+
     if family == "general_consultation":
         statement = (
             "Thank you for your consultation enquiry."
@@ -343,15 +400,33 @@ def build_acknowledgement_plan(
         )
         )
     elif family == "battery_installation":
-        statement = (
-            "Thank you for your enquiry about battery storage."
-            if language == "en"
-            else (
-            "Tack för att ni hör av er om batterilager."
-            if register == "ni"
-            else "Tack för att du hör av dig om batterilager."
-        )
-        )
+        if is_battery_retrofit_intent(message_text):
+            if location_phrase:
+                statement = (
+                    f"Thank you for getting in touch about adding battery storage to your solar panels in {location_phrase}."
+                    if language == "en"
+                    else f"Tack för att ni hör av er om att komplettera solcellerna med batteri i {location_phrase}."
+                )
+            else:
+                statement = (
+                    "Thank you for getting in touch about adding battery storage to your existing solar installation."
+                    if language == "en"
+                    else (
+                        "Tack för att ni hör av er om att komplettera befintliga solceller med batterilager."
+                        if register == "ni"
+                        else "Tack för att du hör av dig om att komplettera befintliga solceller med batterilager."
+                    )
+                )
+        else:
+            statement = (
+                "Thank you for your enquiry about battery storage."
+                if language == "en"
+                else (
+                    "Tack för att ni hör av er om batterilager."
+                    if register == "ni"
+                    else "Tack för att du hör av dig om batterilager."
+                )
+            )
     elif family == "ev_charger":
         statement = (
             "Thank you for your enquiry about an EV charger."
@@ -363,7 +438,11 @@ def build_acknowledgement_plan(
         )
         )
     elif family == "solar_installation":
-        followup_family = bool(scenario_family and scenario_family.endswith("_followup"))
+        followup_family = bool(
+            scenario_family
+            and scenario_family.endswith("_followup")
+            and _continuation_ack_allowed(thread=thread, message_text=message_text)
+        )
         if followup_family:
             statement = (
                 "Thank you for getting back to us about the solar quote."
@@ -397,6 +476,30 @@ def build_acknowledgement_plan(
 
     claims.append("first_contact_acknowledgement")
     evidence.append(f"mode:{acknowledgement_mode}")
+    if not _continuation_ack_allowed(thread=thread, message_text=message_text) and _contains_followup_ack_tokens(
+        statement, language=language
+    ):
+        if family == "solar_installation":
+            statement = (
+                "Thank you for your solar installation enquiry."
+                if language == "en"
+                else (
+                    "Tack för er förfrågan om solcellsinstallation."
+                    if register == "ni"
+                    else "Tack för din förfrågan om solcellsinstallation."
+                )
+            )
+        elif family == "existing_installation_support":
+            statement = (
+                "Thank you for contacting us about your existing installation."
+                if language == "en"
+                else (
+                    "Tack för att ni hör av er om er befintliga anläggning."
+                    if register == "ni"
+                    else "Tack för att du hör av dig om din befintliga anläggning."
+                )
+            )
+        evidence.append("thread:new_thread_no_followup_wording")
     return AcknowledgementPlan(
         statement=statement,
         claims=tuple(claims),

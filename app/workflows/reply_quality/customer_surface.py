@@ -11,7 +11,7 @@ _QUESTION_LABELS_SV: dict[str, str] = {
     "roof_type": "vilken typ av tak huset har och ungefärlig takyta",
     "annual_consumption": "er ungefärliga årsförbrukning (kWh)",
     "battery_interest": "om ni vill titta på batterilagring samtidigt",
-    "existing_installation": "om det redan finns en solcellsanläggning",
+    "existing_installation": "finns det redan en solcellsanläggning",
     "existing_solar_system": "en kort beskrivning av befintlig solcellsanläggning",
     "current_inverter": "vilken växelriktare eller vilket system ni har idag",
     "intended_purpose": "huvudsakligt syfte med batteriet",

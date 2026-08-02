@@ -25,6 +25,10 @@ from app.workflows.reply_quality.plan_v2 import (
 )
 from app.workflows.reply_quality.renderer import RenderResult, render_coworker_reply_with_validation
 from app.workflows.reply_quality.reply_language import decide_reply_language, localized_greeting
+from app.workflows.reply_quality.semantic_fact_predicates import (
+    attachment_state,
+    is_battery_retrofit_intent,
+)
 from app.workflows.reply_quality.service_playbooks import get_reply_playbook
 from app.workflows.reply_quality.thread_context import (
     acknowledgement_mode_for_thread,
@@ -112,6 +116,8 @@ def build_coworker_reply_plan_v2(
     greeting = localized_greeting(language=language, signature_name=signature_name)
 
     service_type = str(input_data.get("_force_service_type") or missing_fact_plan.service_type)
+    if is_battery_retrofit_intent(combined_text):
+        service_type = "battery_storage"
     intent = business_intent or "lead"
     playbook = get_reply_playbook(service_type, business_intent=intent)
     thread = build_thread_reply_context(
@@ -171,19 +177,8 @@ def build_coworker_reply_plan_v2(
     mentions_battery = any(
         token in combined_text.lower() for token in ("batteri", "battery storage", "battery")
     )
-    mentions_attachment_gap = any(
-        token in combined_text.lower()
-        for token in (
-            "saknar ritning",
-            "not attached",
-            "utan bifogad",
-            "saknas i det här mailet",
-            "bifogar bilder",
-            "bifogar nu",
-            "bifogar takmätning",
-            "skickar den strax",
-        )
-    )
+    attach_state = attachment_state(combined_text)
+    mentions_attachment_gap = attach_state in {"attachment_missing", "attachment_missing_drawing"}
     pronoun = pronoun_register_for_plan(service_family=playbook.service_family, language=language)
     acknowledgement = build_acknowledgement_plan(
         playbook=playbook,
@@ -198,7 +193,9 @@ def build_coworker_reply_plan_v2(
         pronoun_register=pronoun,
         mentions_battery=mentions_battery,
         mentions_attachment_gap=mentions_attachment_gap,
+        attachment_state=attach_state,
         scenario_family=scenario_family,
+        message_text=combined_text,
     )
     verified = _internal_verified_fact_ids(
         service_type=service_type,
@@ -227,6 +224,7 @@ def build_coworker_reply_plan_v2(
         pronoun_register=pronoun,
         scenario_family=scenario_family,
         mentions_attachment_gap=mentions_attachment_gap,
+        attachment_state=attach_state,
     )
     return plan
 

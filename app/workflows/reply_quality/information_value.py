@@ -17,10 +17,14 @@ from app.workflows.reply_quality.fact_extraction import (
     extract_customer_facts,
     normalize_case_reference,
 )
+from app.workflows.reply_quality.semantic_fact_predicates import (
+    attachment_state,
+    existing_solar_verified,
+)
 from app.workflows.reply_quality.operational_next_step import OperationalNextStep
 from app.workflows.reply_quality.service_playbooks import ReplyServicePlaybook
 
-POLICY_VERSION = "information_value_plan_v3"
+POLICY_VERSION = "information_value_plan_v4"
 
 _FIELD_LABELS: dict[str, str] = {
     "address": "Adress eller ort för installationen/ärendet",
@@ -95,6 +99,7 @@ def _field_known(
     entities: dict[str, Any],
     text: str,
     extracted_known: set[str],
+    fact_ids: set[str],
 ) -> bool:
     if field in extracted_known:
         return True
@@ -107,10 +112,27 @@ def _field_known(
     if field == "discovery_time":
         return extract_discovery_time_phrase(text) is not None
     if field == "address":
-        city = extract_city_phrase(text=text, entities=entities)
-        if city and re.search(r"\b\d{1,4}\b|\bgatan\b|\bvägen\b|\bstreet\b", text, re.I):
-            return _profile_field_present(field, text, entities)
-        if city and field == "address":
+        if entities.get("address"):
+            return True
+        if re.search(r"\b\d{1,4}\b.*\b(gatan|vägen|street)\b", text, re.I) or re.search(
+            r"\bstorgatan\b", text, re.I
+        ):
+            return True
+        return False
+    if field == "housing_association_context":
+        if "property_type" in extracted_known or "housing_association_context" in extracted_known:
+            return True
+    if field == "load_balancing_need":
+        if "load_balancing_stated" in extracted_known or "load_balancing_need" in extracted_known:
+            return True
+    if field == "requested_service":
+        if "requested_service_explicit" in extracted_known or "requested_service" in extracted_known:
+            return True
+    if field == "attachment":
+        state = attachment_state(text)
+        if state in {"attachment_claimed_kwh", "attachment_present_kwh", "attachment_claimed"}:
+            return True
+        if state == "attachment_missing_drawing":
             return False
     return _profile_field_present(field, text, entities)
 
@@ -141,10 +163,15 @@ def _score_field(
         score -= 10
     if field in playbook.optional_high_value_facts:
         score += 5
-    if field == "attachment" and any(
-        token in text for token in ("saknar ritning", "saknar", "not attached", "bifogar", "bifogade")
-    ):
-        score += 60
+    if field == "attachment":
+        state = attachment_state(text)
+        if state in {"attachment_claimed", "attachment_claimed_kwh", "attachment_present_kwh"}:
+            return -100
+        if any(
+            token in text
+            for token in ("saknar ritning", "not attached", "inte bifogat", "not attached yet")
+        ):
+            score += 60
     return score
 
 
@@ -162,7 +189,7 @@ def build_information_value_plan(
     entities = dict(entities or {})
     text = _combined_text(input_data)
     extracted = extract_customer_facts(input_data=input_data, entities=entities)
-    extracted_known = set(extracted.known_question_fields)
+    extracted_known = set(extracted.known_question_fields) | set(extracted.fact_ids)
     city_phrase = extracted.location_city or extract_city_phrase(
         text=input_data.get("message_text", "") + " " + input_data.get("subject", ""),
         entities=entities,
@@ -191,9 +218,15 @@ def build_information_value_plan(
     excluded: list[str] = []
     reasons: list[str] = []
 
+    attach_state = attachment_state(text)
+
     for field in candidates:
         present = field in known or _field_known(
-            field, entities=entities, text=text, extracted_known=extracted_known
+            field,
+            entities=entities,
+            text=text,
+            extracted_known=extracted_known,
+            fact_ids=set(extracted.fact_ids),
         )
         if case_reference and field in {"case_reference", "customer_identifier", "status_dimension"}:
             present = True
@@ -205,6 +238,35 @@ def build_information_value_plan(
             r"\b\d{1,4}\b|\bgatan\b|\bvägen\b|\bstreet\b", text, re.I
         ):
             present = False
+        if field in {"roof_type", "property_type"} and "battery_retrofit" in extracted_known:
+            present = True
+            reasons.append(f"exclude:{field}:battery_retrofit")
+        if field == "existing_solar_system" and not existing_solar_verified(
+            set(extracted.fact_ids), extracted_known
+        ):
+            present = True
+            reasons.append(f"exclude:{field}:no_verified_solar")
+        if field == "current_inverter" and not existing_solar_verified(
+            set(extracted.fact_ids), extracted_known
+        ):
+            present = True
+            reasons.append(f"exclude:{field}:no_verified_solar")
+        if field == "existing_installation" and existing_solar_verified(
+            set(extracted.fact_ids), extracted_known
+        ):
+            present = True
+        if field == "attachment" and attach_state in {
+            "attachment_claimed_kwh",
+            "attachment_present_kwh",
+        }:
+            present = True
+        if field == "annual_consumption" and attach_state in {
+            "attachment_claimed_kwh",
+            "attachment_present_kwh",
+        }:
+            present = True
+        if field == "requested_service" and "requested_service_explicit" in extracted_known:
+            present = True
         if present:
             known.append(field)
             excluded.append(field)
@@ -230,6 +292,12 @@ def build_information_value_plan(
                 reasons.append("exclude:contact_name:known")
                 continue
             score -= 20
+        if (
+            field == "existing_installation"
+            and playbook.service_family == "battery_installation"
+            and not existing_solar_verified(set(extracted.fact_ids), extracted_known)
+        ):
+            score += 45
         scored.append((score, field))
 
     scored.sort(key=lambda item: (-item[0], item[1]))

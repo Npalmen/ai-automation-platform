@@ -22,6 +22,12 @@ from app.workflows.reply_quality.post_render_validator import validate_post_rend
 from app.workflows.reply_quality.reply_language import authoritative_reply_language
 from app.workflows.reply_quality.plan_v2 import CustomerReplyPlanV2
 from app.workflows.reply_quality.provenance import ReplyRenderProvenance
+from app.workflows.reply_quality.semantic_fact_predicates import (
+    attachment_state,
+    detect_semantic_fact_ids,
+    existing_solar_verified,
+    is_battery_retrofit_intent,
+)
 
 THRESHOLD_VERSION = "coworker_reply_thresholds_v4"
 
@@ -138,6 +144,166 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip().lower())
 
 
+_FOLLOWUP_ACK_FORBIDDEN_ON_NEW = re.compile(
+    r"\b(igen|återkomst|uppföljning|kompletterande|again|follow[- ]up)\b",
+    re.I,
+)
+_MALFORMED_QUESTION = re.compile(
+    r"\bom (?:du|ni) har om (?:du|ni) har\b|\bkan (?:du|ni) skicka vilken\b|if you have if you have",
+    re.I,
+)
+
+
+def _semantic_known_fields(fact_ids: set[str]) -> set[str]:
+    from app.workflows.reply_quality.semantic_fact_predicates import semantic_known_question_fields
+
+    return semantic_known_question_fields(fact_ids)
+
+
+def evaluate_semantic_human_review_oracles(
+    *,
+    scenario: ProfileScenario,
+    reply_body: str,
+    plan_v2: CustomerReplyPlanV2 | None,
+) -> list[CoworkerOracleResult]:
+    """Blocking oracles for semantic human-review closure."""
+    if plan_v2 is None:
+        return []
+
+    text = f"{scenario.input.subject} {scenario.input.message_text}"
+    lowered = (reply_body or "").lower()
+    setup = scenario.customer_state_setup or {}
+    thread_state = setup.get("thread_state", "new_thread")
+    results: list[CoworkerOracleResult] = []
+    extracted = extract_customer_facts(
+        input_data={"subject": scenario.input.subject, "message_text": scenario.input.message_text}
+    )
+    semantic_ids = detect_semantic_fact_ids(text)
+    selected = set(plan_v2.selected_questions or ())
+
+    if "requested_service" in selected and (
+        "requested_service_explicit" in semantic_ids
+        or "requested_service" in extracted.known_question_fields
+    ):
+        results.append(
+            _oracle_fail("explicit_service_reask", "question_utility", "requested_service")
+        )
+    else:
+        results.append(_oracle_pass("explicit_service_reask", "question_utility", "clean"))
+
+    if "housing_association_context" in selected and semantic_ids.intersection(
+        {"property_type_villa", "property_type_private"}
+    ):
+        results.append(
+            _oracle_fail("property_context_reask", "question_utility", "housing_association_context")
+        )
+    else:
+        results.append(_oracle_pass("property_context_reask", "question_utility", "clean"))
+
+    if "load_balancing_need" in selected and "load_balancing_stated" in semantic_ids:
+        results.append(
+            _oracle_fail("requested_feature_reask", "question_utility", "load_balancing_need")
+        )
+    else:
+        results.append(_oracle_pass("requested_feature_reask", "question_utility", "clean"))
+
+    if thread_state == "new_thread" and _FOLLOWUP_ACK_FORBIDDEN_ON_NEW.search(
+        plan_v2.acknowledgement_statement or ""
+    ):
+        if not any(
+            token in text.lower()
+            for token in ("kompletterande", "following up", "follow-up", "follow up", "bifogar nu", "again")
+        ):
+            results.append(
+                _oracle_fail(
+                    "thread_acknowledgement_evidence",
+                    "conversation_quality",
+                    "followup_wording_without_evidence",
+                )
+            )
+        else:
+            results.append(
+                _oracle_pass("thread_acknowledgement_evidence", "conversation_quality", "evidence_present")
+            )
+    else:
+        results.append(
+            _oracle_pass("thread_acknowledgement_evidence", "conversation_quality", "allowed")
+        )
+
+    attach = attachment_state(text)
+    if attach in {"attachment_claimed_kwh", "attachment_present_kwh"} and re.search(
+        r"\b(?:skicka|send)\b.{0,24}\bigen\b", lowered
+    ):
+        results.append(
+            _oracle_fail("attachment_state_alignment", "conversation_quality", "resend_with_claimed_kwh")
+        )
+    elif attach == "attachment_missing_drawing" and "resend" in lowered and thread_state == "new_thread":
+        results.append(
+            _oracle_fail("attachment_state_alignment", "conversation_quality", "resend_without_prior_send")
+        )
+    else:
+        results.append(_oracle_pass("attachment_state_alignment", "conversation_quality", "aligned"))
+
+    if extracted.location_city and "property_address" not in semantic_ids:
+        if "address" in extracted.known_question_fields and plan_v2.location_phrase:
+            results.append(
+                _oracle_fail("city_address_granularity", "question_utility", "city_treated_as_address")
+            )
+        else:
+            results.append(_oracle_pass("city_address_granularity", "question_utility", "clean"))
+    else:
+        results.append(_oracle_pass("city_address_granularity", "question_utility", "clean"))
+
+    retrofit = is_battery_retrofit_intent(text)
+    if retrofit and selected.intersection({"roof_type", "property_type"}):
+        results.append(
+            _oracle_fail("service_playbook_alignment", "question_utility", "retrofit_asks_solar_install_facts")
+        )
+    else:
+        results.append(_oracle_pass("service_playbook_alignment", "question_utility", "aligned"))
+
+    if not existing_solar_verified(semantic_ids, set(extracted.known_question_fields)) and (
+        "existing_solar_system" in selected or "current_inverter" in selected
+    ):
+        if "existing_installation" not in selected:
+            results.append(
+                _oracle_fail(
+                    "conditional_fact_premise",
+                    "question_utility",
+                    "solar_questions_without_verified_installation",
+                )
+            )
+        else:
+            results.append(_oracle_pass("conditional_fact_premise", "question_utility", "installation_first"))
+    else:
+        results.append(_oracle_pass("conditional_fact_premise", "question_utility", "clean"))
+
+    irrelevant = [
+        field
+        for field in selected
+        if field in extracted.known_question_fields or field in _semantic_known_fields(semantic_ids)
+    ]
+    if irrelevant:
+        results.append(
+            _oracle_fail(
+                "semantic_question_relevance",
+                "question_utility",
+                ",".join(sorted(irrelevant)[:3]),
+            )
+        )
+    else:
+        results.append(_oracle_pass("semantic_question_relevance", "question_utility", "clean"))
+
+    if _MALFORMED_QUESTION.search(reply_body or ""):
+        results.append(
+            _oracle_fail("malformed_natural_question", "surface_quality", "malformed_question_phrase")
+        )
+    else:
+        results.append(_oracle_pass("malformed_natural_question", "surface_quality", "natural"))
+
+    return results
+
+
 def evaluate_coworker_reply_oracles(
     *,
     scenario: ProfileScenario,
@@ -161,6 +327,13 @@ def evaluate_coworker_reply_oracles(
     results.extend(evaluate_input_realism_oracles(scenario=scenario))
     results.extend(evaluate_scenario_family_alignment(scenario=scenario))
     results.extend(evaluate_valid_reference_oracle(scenario=scenario))
+    results.extend(
+        evaluate_semantic_human_review_oracles(
+            scenario=scenario,
+            reply_body=reply_body,
+            plan_v2=plan_v2,
+        )
+    )
     body = _normalize(reply_body)
 
     for marker in setup.get("required_markers") or []:
