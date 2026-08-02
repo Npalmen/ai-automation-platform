@@ -2,14 +2,22 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
 from app.service_profiles.qualification import _profile_field_present
+
+from app.workflows.reply_quality.customer_surface import (
+    contextual_question_surface,
+    extract_case_reference,
+    extract_city_phrase,
+    extract_discovery_time_phrase,
+)
 from app.workflows.reply_quality.operational_next_step import OperationalNextStep
 from app.workflows.reply_quality.service_playbooks import ReplyServicePlaybook
 
-POLICY_VERSION = "information_value_plan_v1"
+POLICY_VERSION = "information_value_plan_v2"
 
 _FIELD_LABELS: dict[str, str] = {
     "address": "Adress eller ort för installationen/ärendet",
@@ -79,6 +87,20 @@ def _combined_text(input_data: dict[str, Any]) -> str:
 
 
 def _field_known(field: str, *, entities: dict[str, Any], text: str) -> bool:
+    if field == "case_reference":
+        return extract_case_reference(text) is not None
+    if field == "status_dimension" and any(
+        token in text for token in ("status", "läge", "hur ligger", "var står")
+    ):
+        return True
+    if field == "discovery_time":
+        return extract_discovery_time_phrase(text) is not None
+    if field == "address":
+        city = extract_city_phrase(text=text, entities=entities)
+        if city and re.search(r"\b\d{1,4}\b|\bgatan\b|\bvägen\b|\bstreet\b", text, re.I):
+            return _profile_field_present(field, text, entities)
+        if city and field == "address":
+            return False
     return _profile_field_present(field, text, entities)
 
 
@@ -122,11 +144,16 @@ def build_information_value_plan(
 ) -> InformationValuePlan:
     entities = dict(entities or {})
     text = _combined_text(input_data)
+    city_phrase = extract_city_phrase(text=input_data.get("message_text", "") + " " + input_data.get("subject", ""), entities=entities)
+    case_reference = extract_case_reference(text)
     budget = (
         playbook.maximum_questions_followup
         if is_followup
         else playbook.maximum_questions_first_reply
     )
+
+    if playbook.service_family == "job_status" and case_reference:
+        budget = 0
 
     known: list[str] = list(known_fact_fields)
     candidates = list(playbook.question_priority)
@@ -140,6 +167,12 @@ def build_information_value_plan(
 
     for field in candidates:
         present = field in known or _field_known(field, entities=entities, text=text)
+        if case_reference and field in {"case_reference", "customer_identifier", "status_dimension"}:
+            present = True
+        if city_phrase and field == "address" and not re.search(
+            r"\b\d{1,4}\b|\bgatan\b|\bvägen\b|\bstreet\b", text, re.I
+        ):
+            present = False
         if present:
             known.append(field)
             excluded.append(field)
@@ -168,7 +201,10 @@ def build_information_value_plan(
 
     scored.sort(key=lambda item: (-item[0], item[1]))
     selected = [field for score, field in scored if score > 0][:budget]
-    labels = [_FIELD_LABELS.get(field, field.replace("_", " ").capitalize()) for field in selected]
+    labels = [
+        contextual_question_surface(field, language="sv", city_phrase=city_phrase)
+        for field in selected
+    ]
     for field in selected:
         reasons.append(f"select:{field}:operational_value")
 
