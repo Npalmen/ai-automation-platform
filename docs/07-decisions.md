@@ -829,15 +829,17 @@ Reference: `docs/plans/production-pilot-p1-observability-fix-plan.md`, `app/prod
 
 ## DEC-049 — Inbox quality qualification registry and hermetic gate (2026-08-01)
 
-**Status:** Active — PD-IQH-001 PR-4 (`release/inbox-quality-qualification`)
+**Status:** Closed — PD-IQH Todo J closure @ `128aacee5567d4d8ed762e25192c766494e7b634` (PR #134)
 
 | # | Rule | Consequence |
 |---|------|-------------|
 | 1 | **Hermetic first** | `run_hermetic_quality_qualification` must PASS (96/96, hard-safety 100%, PTB-SEM-0024 blocking) before live quality canary |
-| 2 | **Registry PENDING until live PASS** | `PROFILE_DRIVEN_SEMI_AUTO_QUALITY_QUALIFIED` stays PENDING until 12-scenario canary + 32-scenario campaign PASS |
+| 2 | **Registry VALID after live PASS** | `PROFILE_DRIVEN_SEMI_AUTO_QUALITY_QUALIFIED` registered VALID after Gate Q5 + 12-scenario canary + 32-scenario campaign PASS |
 | 3 | **Automatic qualifications unchanged** | `PROFILE_DRIVEN_AUTOMATIC_GMAIL_QUALIFIED` and `PROFILE_DRIVEN_TESTBOT_PASS` remain PENDING |
 | 4 | **Live budgets locked** | Canary max 6 sends / min 6 no-send; campaign max 16 sends / 32 scenarios / min 12 families |
 | 5 | **No live execution without readiness** | `runner_ready_for_live_execution` requires quality qualification VALID + runtime SHA + OAuth |
+
+**Closure evidence:** Gate Q5 PASS; canary 12/12; campaign 32/32; 5 Gmail sends all provider-accepted and recipient-verified; 0 unauthorized/duplicate/wrong-recipient/cross-tenant sends; Release Gate `30727136242`; Regression Main `30727136229`.
 
 **Reference:** `app/evaluation/profile_testbot/qualification/`, `app/evaluation/regression/qualification_registry.yaml`
 
