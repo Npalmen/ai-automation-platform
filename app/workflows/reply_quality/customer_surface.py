@@ -34,6 +34,11 @@ _QUESTION_LABELS_SV: dict[str, str] = {
     "attachment": "bilder eller ritningar om ni har",
     "phone_or_email": "hur vi bäst når er för uppföljning",
     "contact_name": "ert namn",
+    "case_reference": "ärendenummer eller orderreferens",
+    "customer_identifier": "adressen eller namnet som ärendet gäller",
+    "status_dimension": "vad ni vill ha status på",
+    "issue_summary": "en kort sammanfattning av ärendet",
+    "issue_description": "en beskrivning av reklamationen",
 }
 
 _QUESTION_LABELS_EN: dict[str, str] = {
@@ -65,16 +70,23 @@ _QUESTION_LABELS_EN: dict[str, str] = {
     "attachment": "photos or drawings if you have them",
     "phone_or_email": "the best way to reach you for follow-up",
     "contact_name": "your name",
+    "case_reference": "the case or order number",
+    "customer_identifier": "the address or name connected to the case",
+    "status_dimension": "what you would like status on",
+    "issue_summary": "a brief summary of the case",
+    "issue_description": "a description of the complaint",
 }
 
 
 def extract_case_reference(text: str) -> str | None:
     lowered = text.lower()
     patterns = (
-        r"\bärende\s*(?:nr\.?|nummer)?\s*(\d{3,})\b",
-        r"\bcase\s*(?:no\.?|number)?\s*(\d{3,})\b",
-        r"\bstatus\s+på\s+vårt\s+ärende\s+(\d{3,})\b",
-        r"\border\s*(?:no\.?|number)?\s*(\d{3,})\b",
+        r"\bärende\s*(?:nr\.?|nummer)?\s*(\d+)\b",
+        r"\bcase\s*(?:no\.?|number)?\s*(\d+)\b",
+        r"\bstatus\s+på\s+vårt\s+ärende\s+(\d+)\b",
+        r"\border\s*(?:no\.?|number)?\s*(\d+)\b",
+        r"\boffertförfrågan\s*(\d+)\b",
+        r"\bquote\s*(?:request|enquiry)?\s*(?:no\.?|number)?\s*(\d+)\b",
     )
     for pattern in patterns:
         match = re.search(pattern, lowered, re.I)
@@ -118,7 +130,14 @@ def contextual_question_surface(
         if language == "en":
             return f"the property address in {city_phrase}"
         return f"adressen till fastigheten i {city_phrase}"
-    return labels.get(field, field.replace("_", " "))
+    label = labels.get(field)
+    if label is not None:
+        return label
+    # Never expose raw schema field ids to customers.
+    normalized = field.replace("_", " ")
+    if language == "en":
+        return f"some additional details about {normalized}"
+    return f"ytterligare uppgifter om {normalized}"
 
 
 def build_question_surface_labels(

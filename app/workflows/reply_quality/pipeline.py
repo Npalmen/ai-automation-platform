@@ -120,6 +120,7 @@ def build_coworker_reply_plan_v2(
         known_fact_fields=missing_fact_plan.known_facts,
         is_followup=thread.is_continuation,
         phone_required_by_profile=False,
+        language=language,
     )
     location_phrase = extract_city_phrase(text=combined_text, entities=entities)
     if not location_phrase:

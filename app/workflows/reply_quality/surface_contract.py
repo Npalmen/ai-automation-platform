@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-POLICY_VERSION = "customer_surface_contract_v1"
+POLICY_VERSION = "customer_surface_contract_v2"
 
 _INTERNAL_METADATA_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\bservice\s*:", re.I),
@@ -47,6 +47,25 @@ _ROBOTIC_SEGMENTS = (
     "next step is to collect",
 )
 
+_UNLOCALIZED_FACT_LABEL_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\bcase reference\b", re.I),
+    re.compile(r"\bcustomer identifier\b", re.I),
+    re.compile(r"\bstatus dimension\b", re.I),
+    re.compile(r"\bissue summary\b", re.I),
+    re.compile(r"\bissue description\b", re.I),
+    re.compile(r"\bcase reference och customer identifier\b", re.I),
+    re.compile(r"\bcase reference and customer identifier\b", re.I),
+)
+
+_INTERNAL_ENGLISH_IN_SV = re.compile(
+    r"\b(case reference|customer identifier|issue summary|status dimension|kind regards|thank you for your)\b",
+    re.I,
+)
+_INTERNAL_SWEDISH_IN_EN = re.compile(
+    r"\b(hej,|vänliga hälsningar|för att vi ska|tack för din|ärendenummer)\b",
+    re.I,
+)
+
 
 def detect_internal_metadata_leaks(body: str) -> list[str]:
     issues: list[str] = []
@@ -64,6 +83,17 @@ def detect_unresolved_placeholders(body: str) -> list[str]:
     return issues
 
 
+def detect_unlocalized_fact_labels(body: str) -> list[str]:
+    issues: list[str] = []
+    text = body or ""
+    for pattern in _UNLOCALIZED_FACT_LABEL_PATTERNS:
+        if pattern.search(text):
+            issues.append(f"unlocalized_fact_label:{pattern.pattern}")
+    if re.search(r"\b[a-z]{3,}_[a-z]{3,}\b", text):
+        issues.append("unlocalized_fact_label:snake_case_field")
+    return issues
+
+
 def detect_mixed_language(body: str, *, expected_language: str) -> list[str]:
     text = body or ""
     sv_hits = len(_SV_INDICATORS.findall(text))
@@ -73,10 +103,14 @@ def detect_mixed_language(body: str, *, expected_language: str) -> list[str]:
     if expected_language == "sv" and sv_hits >= 2 and en_hits >= 2:
         return ["mixed_language:sv_expected_en_fragments"]
     if expected_language == "en":
-        if re.search(r"\b(hej,|vänliga hälsningar|för att vi ska)\b", text, re.I):
+        if re.search(r"\b(hej,|vänliga hälsningar|för att vi ska|tack för att ni)\b", text, re.I):
+            return ["mixed_language:sv_fragment_in_en_reply"]
+        if _INTERNAL_SWEDISH_IN_EN.search(text):
             return ["mixed_language:sv_fragment_in_en_reply"]
     if expected_language == "sv":
         if re.search(r"\b(hi,|kind regards|thank you for your)\b", text, re.I):
+            return ["mixed_language:en_fragment_in_sv_reply"]
+        if _INTERNAL_ENGLISH_IN_SV.search(text):
             return ["mixed_language:en_fragment_in_sv_reply"]
     return []
 
@@ -103,6 +137,7 @@ def validate_customer_surface(
     issues: list[str] = []
     issues.extend(detect_internal_metadata_leaks(body))
     issues.extend(detect_unresolved_placeholders(body))
+    issues.extend(detect_unlocalized_fact_labels(body))
     issues.extend(detect_mixed_language(body, expected_language=expected_language))
     issues.extend(detect_robotic_template_composition(body))
     issues.extend(detect_key_value_fragments(body))
