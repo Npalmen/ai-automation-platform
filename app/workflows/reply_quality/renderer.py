@@ -58,26 +58,59 @@ def render_coworker_reply_with_validation(
     sent_body: str | None = None,
 ) -> RenderResult:
     fallback_reason: str | None = plan.fallback_reason
-    renderer_type = LLM_RENDERER
-    llm_used = True
-    model_id = MODEL_ID
-    prompt_version = PROMPT_VERSION
+    fallback_tier = "none"
+    live_body: str | None = None
+    live_validation: dict[str, Any] | None = None
 
     body, llm_meta = render_constrained_llm_reply(plan)
+    if llm_meta.get("live_call"):
+        live_body = body
+        live_validation = validate_post_render_reply(plan=plan, body=body)
+        llm_meta = {
+            **llm_meta,
+            "live_validation_outcome": "pass" if live_validation["passed"] else "fail",
+            "live_validation_issues": list(live_validation.get("issues") or []),
+            "live_body_hash": hash_body(body),
+            "live_body": body,
+        }
+
     validation = validate_post_render_reply(plan=plan, body=body)
 
-    if not validation["passed"]:
+    if llm_meta.get("live_call") and live_validation and not live_validation["passed"]:
+        fallback_reason = ",".join(live_validation["issues"][:3]) or "post_render_validation_failed"
+        body = compose_constrained_reply_hermetic(plan)
+        validation = validate_post_render_reply(plan=plan, body=body)
+        fallback_tier = "hermetic"
+        llm_meta = {**llm_meta, "fallback_from_live_validation": True}
+
+    elif not llm_meta.get("live_call") and not validation["passed"]:
         fallback_reason = ",".join(validation["issues"][:3]) or "post_render_validation_failed"
         body = compose_constrained_reply_hermetic(plan)
         validation = validate_post_render_reply(plan=plan, body=body)
-        if not validation["passed"]:
-            body = _render_safe_fallback(plan)
-            validation = validate_post_render_reply(plan=plan, body=body)
-            renderer_type = DETERMINISTIC_RENDERER
-            llm_used = False
-            model_id = None
-            prompt_version = None
-            fallback_reason = fallback_reason or "deterministic_safe_fallback"
+        fallback_tier = "hermetic"
+
+    if not validation["passed"]:
+        fallback_reason = fallback_reason or ",".join(validation["issues"][:3]) or "post_render_validation_failed"
+        body = _render_safe_fallback(plan)
+        validation = validate_post_render_reply(plan=plan, body=body)
+        fallback_tier = "safe"
+
+    live_success = (
+        bool(llm_meta.get("live_call"))
+        and fallback_tier == "none"
+        and validation["passed"]
+        and (live_validation is None or live_validation["passed"])
+    )
+    if live_success:
+        renderer_type = LLM_RENDERER
+        llm_used = True
+        model_id = MODEL_ID
+        prompt_version = PROMPT_VERSION
+    else:
+        renderer_type = DETERMINISTIC_RENDERER
+        llm_used = False
+        model_id = None
+        prompt_version = PROMPT_VERSION if llm_meta.get("invocation_attempted") else None
 
     provenance = ReplyRenderProvenance(
         renderer_type=renderer_type,
@@ -85,14 +118,20 @@ def render_coworker_reply_with_validation(
         model_id=model_id,
         prompt_version=prompt_version,
         template_version=TEMPLATE_VERSION,
-        use_fallback=bool(fallback_reason),
-        fallback_reason=fallback_reason,
+        use_fallback=fallback_tier != "none",
+        fallback_reason=fallback_reason if fallback_tier != "none" else None,
         plan_hash=hash_plan(plan.to_dict()),
         body_hash=hash_body(body),
         draft_body_hash=hash_body(draft_body) if draft_body else None,
         sent_body_hash=hash_body(sent_body) if sent_body else None,
         policy_version=RENDERER_POLICY_VERSION,
     )
-    provenance_dict = provenance.to_dict()
-    provenance_dict["llm_meta"] = llm_meta
+    validation = {
+        **validation,
+        "llm_meta": {
+            **llm_meta,
+            "validation_outcome": "pass" if validation.get("passed") else "fail",
+            "fallback_tier": fallback_tier,
+        },
+    }
     return RenderResult(body=body, provenance=provenance, validation=validation)
