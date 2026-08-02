@@ -24,8 +24,7 @@ _GRAMMATICAL_BAD_SV = re.compile(
     r"\bbehöver vi vilken\b|\bbehöver vi vad\b|\bbehöver vi när\b"
     r"|\bom (?:du|ni) har om (?:du|ni) har\b"
     r"|\bkan (?:du|ni) skicka vilken\b"
-    r"|\bkan (?:du|ni) bekräfta om\b"
-    r"|\bom det finns redan\b"
+    r"|\bbekräfta om det finns redan\b"
     r"|\bkan (?:du|ni) bekräfta huruvida\b",
     re.I,
 )

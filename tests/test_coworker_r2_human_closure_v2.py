@@ -151,7 +151,9 @@ def test_malformed_confirm_om_blocked():
     from app.workflows.reply_quality.post_render_validator import _GRAMMATICAL_BAD_SV
 
     bad = "Kan ni bekräfta om det finns redan en solcellsanläggning?"
+    good = "Kan ni bekräfta om det redan finns en solcellsanläggning?"
     assert _GRAMMATICAL_BAD_SV.search(bad)
+    assert not _GRAMMATICAL_BAD_SV.search(good)
 
 
 @pytest.mark.skipif(not A144AAE_METRICS.exists(), reason="a144aae metrics snapshot missing")

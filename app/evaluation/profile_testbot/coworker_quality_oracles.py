@@ -156,8 +156,7 @@ _FOLLOWUP_ACK_FORBIDDEN_ON_NEW = re.compile(
 )
 _MALFORMED_QUESTION = re.compile(
     r"\bom (?:du|ni) har om (?:du|ni) har\b|\bkan (?:du|ni) skicka vilken\b|if you have if you have"
-    r"|\bkan (?:du|ni) bekräfta om\b"
-    r"|\bom det finns redan\b"
+    r"|\bbekräfta om det finns redan\b"
     r"|\bkan (?:du|ni) bekräfta huruvida\b",
     re.I,
 )
