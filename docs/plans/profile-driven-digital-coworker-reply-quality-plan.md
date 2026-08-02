@@ -7,13 +7,14 @@ qualification_target: PROFILE_DRIVEN_DIGITAL_COWORKER_REPLY_QUALITY_QUALIFIED
 qualification_registry_status: PENDING
 gates:
   R1_HERMETIC: PASS
-  R2_PRECHECK: PASS
-  R2_HUMAN_REVIEW: FAIL
+  R2_PRECHECK: FAIL
+  R2_HUMAN_REVIEW: PENDING
   R3_LIVE_CANARY: PENDING
   R4_LIVE_CAMPAIGN: PENDING
   R5_CLOSURE: PENDING
-human_review_failure_sha: e653186f50daa1bd8675bb71778685f3073e7e5c
-closure_branch: fix/digital-coworker-human-quality-v4
+human_review_failure_sha: 8b167280e8190be0e79d6f127416a7819f84c4d7
+human_review_package_status: NON_QUALIFYING_DIAGNOSTIC_PACKAGE
+closure_branch: fix/digital-coworker-llm-reproducibility-and-precheck
 production_activation: false
 automatic_gmail_activation: false
 todos:

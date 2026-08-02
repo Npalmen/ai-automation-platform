@@ -7,12 +7,22 @@ import os
 from typing import Any
 
 from app.workflows.reply_quality.customer_surface import localized_next_step
+from app.workflows.reply_quality.llm_reply_parser import LLMReplyParseError, parse_llm_reply_output
 from app.workflows.reply_quality.plan_v2 import CustomerReplyPlanV2
 from app.workflows.reply_quality.reply_language import localized_closing
 
 PROMPT_VERSION = "coworker_constrained_llm_v4"
 MODEL_ID = "gpt-4o-mini"
+TEMPLATE_VERSION = "digital_coworker_constrained_llm_v4"
 RENDERER_POLICY_VERSION = "constrained_llm_renderer_v1"
+
+_PRONOUN_RULES_SV = {
+    "du": "Use ONLY informal du/dig/din/ditt/dina — never ni/er/ert/era.",
+    "ni": "Use ONLY formal ni/er/ert/era — never du/dig/din/ditt/dina.",
+}
+_PRONOUN_RULES_EN = {
+    "you": "Use consistent second-person you/your throughout.",
+}
 
 
 def build_constrained_llm_payload(plan: CustomerReplyPlanV2) -> dict[str, Any]:
@@ -36,6 +46,31 @@ def build_constrained_llm_payload(plan: CustomerReplyPlanV2) -> dict[str, Any]:
         "facts_not_allowed_to_repeat": list(plan.facts_not_allowed_to_repeat),
         "thread_summary": plan.thread_context.summary,
     }
+
+
+def build_constrained_llm_prompt(plan: CustomerReplyPlanV2) -> str:
+    payload = build_constrained_llm_payload(plan)
+    language = (plan.language or "sv").lower()
+    register = plan.salutation_strategy or ("du" if language.startswith("sv") else "you")
+    if language.startswith("en"):
+        pronoun_rule = _PRONOUN_RULES_EN.get(register, _PRONOUN_RULES_EN["you"])
+    else:
+        pronoun_rule = _PRONOUN_RULES_SV.get(register, _PRONOUN_RULES_SV["ni"])
+
+    return (
+        "Compose a natural customer email reply using ONLY the approved fields in the JSON payload.\n"
+        'Return JSON: {"reply_body": "<full email text>"}\n'
+        "Hard rules:\n"
+        f"- Language: {plan.language}. {pronoun_rule}\n"
+        "- Write flowing prose paragraphs only.\n"
+        "- NEVER use schema labels, field names, key:value lines, bullet lists of internal fields, "
+        "or technical headings from the payload.\n"
+        "- Include EVERY approved question from approved_questions as natural sentences.\n"
+        "- Do not add facts, promises, or questions beyond the payload.\n"
+        "- Do not repeat facts listed in facts_not_allowed_to_repeat.\n"
+        "- Use greeting, acknowledgement, questions, next_step_statement, and signature naturally.\n"
+        f"Payload:\n{json.dumps(payload, ensure_ascii=False)}"
+    )
 
 
 def _compose_address_question(plan: CustomerReplyPlanV2) -> str | None:
@@ -160,14 +195,18 @@ def compose_constrained_reply_hermetic(plan: CustomerReplyPlanV2) -> str:
 
 
 def render_constrained_llm_reply(plan: CustomerReplyPlanV2) -> tuple[str, dict[str, Any]]:
-    """Render via constrained LLM path. Hermetic by default; live only when explicitly enabled."""
+    """Render via constrained LLM path. Hermetic composer only when live is disabled or fails."""
     payload = build_constrained_llm_payload(plan)
     use_live = os.environ.get("DIGITAL_COWORKER_LLM_RENDER", "").lower() in {"1", "true", "live"}
+    retry_attempts = max(1, int(os.environ.get("LLM_RETRY_ATTEMPTS", "1")))
     meta: dict[str, Any] = {
         "prompt_version": PROMPT_VERSION,
         "model_id": MODEL_ID if use_live else None,
-        "llm_used": True,
+        "template_version": TEMPLATE_VERSION,
+        "invocation_attempted": use_live,
         "live_call": False,
+        "provider_outcome": "skipped",
+        "validation_outcome": None,
         "payload_hash": json.dumps(payload, sort_keys=True)[:64],
     }
     if use_live:
@@ -175,15 +214,43 @@ def render_constrained_llm_reply(plan: CustomerReplyPlanV2) -> tuple[str, dict[s
             from app.ai.llm.client import get_llm_client
 
             client = get_llm_client()
-            prompt = (
-                "Compose a customer email reply using ONLY the approved fields in this JSON. "
-                "Do not add facts or questions. Keep one language and one pronoun register.\n"
-                f"{json.dumps(payload, ensure_ascii=False)}"
+            prompt = build_constrained_llm_prompt(plan)
+            result = client.generate_json_detailed(
+                prompt,
+                model=MODEL_ID,
+                retry_attempts=retry_attempts,
             )
-            body = str(client.generate_json(prompt)).strip()
-            meta["live_call"] = True
-            return body, meta
-        except Exception:
-            meta["live_call_failed"] = True
+            parsed = parse_llm_reply_output(result.output)
+            meta.update(
+                {
+                    "live_call": True,
+                    "provider_outcome": "success",
+                    "returned_model": result.returned_model,
+                    "finish_reason": result.finish_reason,
+                    "usage": result.usage,
+                    "reply_body_source_key": parsed.source_key,
+                }
+            )
+            return parsed.reply_body, meta
+        except LLMReplyParseError as exc:
+            meta.update(
+                {
+                    "live_call": True,
+                    "live_call_failed": True,
+                    "provider_outcome": "parse_failed",
+                    "provider_error_type": type(exc).__name__,
+                    "provider_error_detail": str(exc),
+                }
+            )
+        except Exception as exc:
+            meta.update(
+                {
+                    "live_call": True,
+                    "live_call_failed": True,
+                    "provider_outcome": "failed",
+                    "provider_error_type": type(exc).__name__,
+                }
+            )
     body = compose_constrained_reply_hermetic(plan)
+    meta["composer"] = "hermetic_constrained_v4"
     return body, meta

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 
 from app.workflows.reply_candidate_safety import assess_reply_candidate_safety
@@ -16,14 +17,61 @@ from app.workflows.reply_quality.surface_contract import (
     validate_customer_surface,
 )
 
-POLICY_VERSION = "post_render_validator_v1"
+POLICY_VERSION = "post_render_validator_v2"
 
 _GENERIC_NEXT_STEP_SV = "när vi har det underlaget går vi igenom förutsättningarna och återkommer"
 _GRAMMATICAL_BAD_SV = re.compile(r"\bbehöver vi vilken\b|\bbehöver vi vad\b|\bbehöver vi när\b", re.I)
 
+_QUESTION_SEMANTIC_HINTS: dict[str, tuple[str, ...]] = {
+    "orderreferens": ("orderreferens", "order", "ärendenummer", "referens", "ursprung"),
+    "ursprungligt ärende": ("ärende", "referens", "order", "ursprung"),
+    "när problemet upptäcktes": ("upptäck", "började", "startade", "sedan", "när"),
+    "bilder eller dokument": ("bild", "foto", "dokument", "underlag", "bilaga"),
+    "bilder eller ritningar": ("bild", "foto", "ritning", "dokument"),
+    "felkod": ("felkod", "display", "app", "kod"),
+    "brandsäkerhets": ("brand", "säker", "el-", "osäker"),
+    "påverka säkerheten": ("säker", "risk", "farlig", "brand"),
+    "taktyp": ("tak", "tegel", "plåt", "pannor"),
+    "takyta": ("takyta", "kvm", "kvadrat", "takarea"),
+    "årsförbrukning": ("förbrukning", "kwh", "el", "års"),
+    "elförbrukning": ("förbrukning", "kwh", "el"),
+    "bilmärke": ("bil", "märke", "modell", "fordon"),
+    "laddbox": ("laddbox", "ladd", "charger"),
+    "batteri": ("batteri", "battery", "lagring"),
+    "adress": ("adress", "gata", "väg", "plats"),
+    "type of property": ("property", "house", "townhouse", "villa", "bostad", "fastighet"),
+    "charging points": ("ladd", "charging", "punkt", "plac", "charger"),
+    "fuse rating": ("säkring", "fuse", "kapacitet", "amp", "huvudsäkring", "capacity"),
+    "when": ("when", "started", "since", "discovered"),
+    "order reference": ("order", "reference", "case", "original"),
+    "photos or documents": ("photo", "image", "document", "attachment", "picture"),
+}
+
 
 def _lang(plan: CustomerReplyPlanV2) -> str:
     return "en" if (plan.language or "sv").lower().startswith("en") else "sv"
+
+
+def _normalize_token(value: str) -> str:
+    lowered = unicodedata.normalize("NFKD", value.lower())
+    return "".join(ch for ch in lowered if not unicodedata.combining(ch))
+
+
+def _question_semantically_present(body: str, label: str) -> bool:
+    normalized = _normalize_token(body or "")
+    label_norm = _normalize_token(label)
+    if label_norm and label_norm in normalized:
+        return True
+    for hint_key, synonyms in _QUESTION_SEMANTIC_HINTS.items():
+        if _normalize_token(hint_key) in label_norm:
+            if any(_normalize_token(syn) in normalized for syn in synonyms):
+                return True
+    tokens = [_normalize_token(t) for t in re.split(r"\W+", label_norm) if len(t) > 4]
+    if tokens and sum(1 for t in tokens if t in normalized) >= min(2, len(tokens)):
+        return True
+    if tokens and any(t in normalized for t in tokens[:2]):
+        return True
+    return False
 
 
 def _pronoun_violations(body: str, *, register: str, language: str) -> list[str]:
@@ -62,12 +110,9 @@ def validate_post_render_reply(
     for label in plan.question_surface_labels:
         if not label:
             continue
-        if label.lower() in normalized:
+        if _question_semantically_present(body, label):
             continue
         if plan.service_family == "job_status":
-            continue
-        tokens = [t for t in re.split(r"\W+", label.lower()) if len(t) > 4]
-        if tokens and any(t in normalized for t in tokens[:2]):
             continue
         issues.append(f"missing_required_question:{label[:40]}")
 
