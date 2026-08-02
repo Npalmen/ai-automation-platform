@@ -109,6 +109,35 @@ class TestGoldenReplies:
         assert "vänliga hälsningar" not in body.lower()
         assert "för att vi ska" not in body.lower()
 
+    def test_ptb_dcq_0032_english_charger(self):
+        body = _render("PTB-DCQ-0032")
+        _assert_no_internal_metadata(body)
+        _assert_single_language(body, "en")
+        assert body.lower().startswith("hi,")
+        assert "charger" in body.lower() or "ev" in body.lower()
+
+    def test_ptb_dcq_0048_english_solar_battery(self):
+        body = _render("PTB-DCQ-0048")
+        _assert_no_internal_metadata(body)
+        _assert_single_language(body, "en")
+        assert body.lower().startswith("hi,")
+        assert "solar" in body.lower()
+
+    def test_ptb_dcq_0024_english_battery(self):
+        body = _render("PTB-DCQ-0024")
+        _assert_no_internal_metadata(body)
+        _assert_single_language(body, "en")
+        assert body.lower().startswith("hi,")
+        assert "battery" in body.lower()
+
+    def test_ptb_dcq_0080_status_no_internal_labels(self):
+        body = _render("PTB-DCQ-0080")
+        _assert_no_internal_metadata(body)
+        _assert_single_language(body, "sv")
+        assert "case reference" not in body.lower()
+        assert "customer identifier" not in body.lower()
+        assert "status" in body.lower() or "ärende" in body.lower()
+
 
 class TestSurfaceContract:
     def test_blocks_service_metadata(self):

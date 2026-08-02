@@ -75,6 +75,21 @@ def build_acknowledgement_plan(
             policy_version=POLICY_VERSION,
         )
 
+    if family == "job_status":
+        statement = (
+            "We have received your status request and will check the case."
+            if language == "en"
+            else "Vi har tagit emot din statusförfrågan och kontrollerar ärendet."
+        )
+        claims.append("status_request")
+        evidence.append("intent:job_status")
+        return AcknowledgementPlan(
+            statement=statement,
+            claims=tuple(claims),
+            evidence=tuple(evidence),
+            policy_version=POLICY_VERSION,
+        )
+
     if family == "complaint_warranty":
         statement = (
             "Thank you for contacting us about the complaint."

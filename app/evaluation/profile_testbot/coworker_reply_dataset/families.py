@@ -77,23 +77,39 @@ def _simple_family(
     marker_en: str,
     subjects: tuple[str, ...],
 ) -> tuple[CoworkerFamilyCell, ...]:
-    return tuple(
-        CoworkerFamilyCell(
-            subjects[i % len(subjects)],
-            f"Meddelande {i} om {marker_sv} i Uppsala.",
-            service_type,
-            intent,
-            ("new_thread", "continuation")[i % 2],
-            "en" if i % 4 == 0 else "sv",
-            "send_after_approval" if i % 5 else "draft_for_approval",
-            ("city",) if i % 3 == 0 else (),
-            i % 2 == 0,
-            True,
-            (marker_sv,) if i % 4 != 0 else (marker_en,),
-            ("pris", "bokad"),
+    cells: list[CoworkerFamilyCell] = []
+    for i in range(8):
+        language = "en" if i % 4 == 0 else "sv"
+        if language == "en":
+            if marker_en == "solar":
+                message_text = "Hi, we are interested in solar panels for our home in Uppsala."
+            elif marker_en == "battery":
+                message_text = "Hi, we are interested in battery storage for our home in Uppsala."
+            elif marker_en == "charger":
+                message_text = "Hi, we are interested in an EV charger for our home in Uppsala."
+            else:
+                message_text = f"Hi, we are interested in {marker_en} for our home in Uppsala."
+            required_markers = (marker_en,)
+        else:
+            message_text = f"Meddelande {i} om {marker_sv} i Uppsala."
+            required_markers = (marker_sv,)
+        cells.append(
+            CoworkerFamilyCell(
+                subjects[i % len(subjects)],
+                message_text,
+                service_type,
+                intent,
+                ("new_thread", "continuation")[i % 2],
+                language,
+                "send_after_approval" if i % 5 else "draft_for_approval",
+                ("city",) if i % 3 == 0 else (),
+                i % 2 == 0,
+                True,
+                required_markers,
+                ("pris", "bokad"),
+            )
         )
-        for i in range(8)
-    )
+    return tuple(cells)
 
 
 for family in COWORKER_FAMILIES:

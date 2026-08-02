@@ -141,19 +141,24 @@ def build_information_value_plan(
     known_fact_fields: tuple[str, ...] = (),
     is_followup: bool = False,
     phone_required_by_profile: bool = False,
+    language: str = "sv",
 ) -> InformationValuePlan:
     entities = dict(entities or {})
     text = _combined_text(input_data)
     city_phrase = extract_city_phrase(text=input_data.get("message_text", "") + " " + input_data.get("subject", ""), entities=entities)
     case_reference = extract_case_reference(text)
+    status_requested = bool(
+        re.search(r"\bstatus\b|uppdatera status|hur ligger|var står", text, re.I)
+    )
     budget = (
         playbook.maximum_questions_followup
         if is_followup
         else playbook.maximum_questions_first_reply
     )
 
-    if playbook.service_family == "job_status" and case_reference:
-        budget = 0
+    if playbook.service_family == "job_status":
+        if case_reference or status_requested:
+            budget = 0
 
     known: list[str] = list(known_fact_fields)
     candidates = list(playbook.question_priority)
@@ -168,6 +173,10 @@ def build_information_value_plan(
     for field in candidates:
         present = field in known or _field_known(field, entities=entities, text=text)
         if case_reference and field in {"case_reference", "customer_identifier", "status_dimension"}:
+            present = True
+        if status_requested and field in {"status_dimension", "case_reference"}:
+            present = True
+        if entities.get("email") and field == "customer_identifier":
             present = True
         if city_phrase and field == "address" and not re.search(
             r"\b\d{1,4}\b|\bgatan\b|\bvägen\b|\bstreet\b", text, re.I
@@ -202,7 +211,7 @@ def build_information_value_plan(
     scored.sort(key=lambda item: (-item[0], item[1]))
     selected = [field for score, field in scored if score > 0][:budget]
     labels = [
-        contextual_question_surface(field, language="sv", city_phrase=city_phrase)
+        contextual_question_surface(field, language=language, city_phrase=city_phrase)
         for field in selected
     ]
     for field in selected:

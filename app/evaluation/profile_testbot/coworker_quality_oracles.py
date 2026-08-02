@@ -12,13 +12,15 @@ from app.workflows.reply_quality.surface_contract import (
     detect_key_value_fragments,
     detect_mixed_language,
     detect_robotic_template_composition,
+    detect_unlocalized_fact_labels,
     detect_unresolved_placeholders,
     validate_customer_surface,
 )
+from app.workflows.reply_quality.reply_language import authoritative_reply_language
 from app.workflows.reply_quality.plan_v2 import CustomerReplyPlanV2
 from app.workflows.reply_quality.provenance import ReplyRenderProvenance
 
-THRESHOLD_VERSION = "coworker_reply_thresholds_v2"
+THRESHOLD_VERSION = "coworker_reply_thresholds_v3"
 
 COWORKER_THRESHOLDS = {
     "hard_safety_pass_rate": 1.0,
@@ -206,12 +208,13 @@ def evaluate_coworker_reply_oracles(
             )
         )
         kv_issues = detect_key_value_fragments(reply_body)
+        unlocalized = detect_unlocalized_fact_labels(reply_body)
         results.append(
             CoworkerOracleResult(
                 "customer_facing_localization_complete",
-                "fail" if kv_issues else "pass",
+                "fail" if kv_issues or unlocalized else "pass",
                 "surface_quality",
-                ";".join(kv_issues[:3]) or "localized",
+                ";".join((kv_issues + unlocalized)[:3]) or "localized",
             )
         )
         if plan_v2.case_reference_phrase and re.search(
@@ -297,9 +300,64 @@ def template_similarity_ratio(bodies: list[str], *, families: list[str] | None =
 
 
 def aggregate_coworker_results(results: list[CoworkerOracleResult]) -> dict[str, Any]:
-    blockers = [r.name for r in results if r.blocker and r.status == "fail"]
+    blockers = [
+        {"oracle_id": r.name, "status": r.status, "detail": r.detail, "category": r.category}
+        for r in results
+        if r.blocker and r.status == "fail"
+    ]
+    advisory = [
+        {"oracle_id": r.name, "status": r.status, "detail": r.detail}
+        for r in results
+        if not r.blocker or r.status != "fail"
+    ]
     return {
         "passed": not blockers,
-        "blockers": blockers,
+        "blockers": [b["oracle_id"] for b in blockers],
+        "blocking_failures": blockers,
+        "advisory_results": advisory,
         "results": [r.to_dict() for r in results],
+    }
+
+
+def expected_reply_language(
+    *,
+    scenario: ProfileScenario,
+    plan_v2: CustomerReplyPlanV2 | None,
+    input_data: dict[str, Any] | None = None,
+    profile_default_language: str = "sv",
+) -> str:
+    if plan_v2 is not None and plan_v2.language:
+        return "en" if plan_v2.language.lower().startswith("en") else "sv"
+    if input_data is not None:
+        return authoritative_reply_language(
+            input_data=input_data,
+            profile_default_language=profile_default_language,
+        ).language
+    lang = (scenario.input.language or profile_default_language).lower()
+    return "en" if lang.startswith("en") else "sv"
+
+
+def summarize_surface_quality_metrics(
+    *,
+    reply_body: str,
+    expected_language: str,
+    oracle_results: list[CoworkerOracleResult],
+) -> dict[str, Any]:
+    mixed = detect_mixed_language(reply_body, expected_language=expected_language)
+    metadata = detect_internal_metadata_leaks(reply_body)
+    unlocalized = detect_unlocalized_fact_labels(reply_body)
+    placeholders = detect_unresolved_placeholders(reply_body)
+    blocking = [r for r in oracle_results if r.blocker and r.status == "fail"]
+    return {
+        "expected_language": expected_language,
+        "mixed_language_violations": len(mixed),
+        "mixed_language_issues": mixed,
+        "internal_metadata_violations": len(metadata),
+        "internal_metadata_issues": metadata,
+        "unlocalized_fact_label_violations": len(unlocalized),
+        "unlocalized_fact_label_issues": unlocalized,
+        "unresolved_placeholder_violations": len(placeholders),
+        "blocking_oracle_failures": len(blocking),
+        "blocking_oracle_ids": [r.name for r in blocking],
+        "aggregation_consistent": (len(mixed) == 0 or any(r.name == "single_reply_language" and r.status == "fail" for r in oracle_results)),
     }

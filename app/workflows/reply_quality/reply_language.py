@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-POLICY_VERSION = "reply_language_decision_v1"
+POLICY_VERSION = "reply_language_decision_v2"
 
 _EN_MARKERS = (
     "thank",
@@ -86,12 +86,47 @@ def _score_markers(text: str, markers: tuple[str, ...]) -> int:
     return sum(1 for marker in markers if marker in lowered)
 
 
+def _strip_quoted_history(text: str) -> str:
+    """Keep only the latest non-quoted customer-authored lines."""
+    kept: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            kept.append(line)
+            continue
+        if stripped.startswith(">"):
+            continue
+        if re.match(r"^on .+ wrote:$", stripped, re.I):
+            break
+        if stripped.startswith("-----Original Message-----"):
+            break
+        kept.append(line)
+    return "\n".join(kept).strip()
+
+
 def _customer_authored_text(input_data: dict[str, Any]) -> str:
     parts = [
         str(input_data.get("message_text") or ""),
         str(input_data.get("subject") or ""),
     ]
-    return " ".join(part for part in parts if part).strip()
+    combined = " ".join(part for part in parts if part).strip()
+    return _strip_quoted_history(combined)
+
+
+def authoritative_reply_language(
+    *,
+    input_data: dict[str, Any],
+    profile_default_language: str = "sv",
+    plan_language: str | None = None,
+) -> ReplyLanguageDecision:
+    """Single language authority used by plan, renderer, validators and oracles."""
+    decision = decide_reply_language(
+        input_data=input_data,
+        profile_default_language=profile_default_language,
+    )
+    if plan_language and plan_language.lower().startswith(decision.language[:2]):
+        return decision
+    return decision
 
 
 def decide_reply_language(
