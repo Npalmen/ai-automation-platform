@@ -274,6 +274,26 @@ class TestSafeAcknowledgementEligibility:
         )
         assert result.eligible is True
 
+    def test_quality_hold_blocks_customer_draft(self):
+        result = evaluate_safe_acknowledgement_eligibility(
+            detected_job_type="customer_inquiry",
+            risk_detected=False,
+            risk_categories=[],
+            extraction_issues=[],
+            input_data={
+                "subject": "Samma mejl igen",
+                "message_text": "Skickar samma förfrågan igen.",
+                "sender": {"email": "customer@example.com"},
+                "live_eval": {"scenario_id": "PTB-Q96-0090"},
+            },
+            recommendation=DecisionRecommendation.AUTO_ROUTE,
+            recommendation_raw="auto_route",
+            low_confidence=False,
+            used_fallback=False,
+        )
+        assert result.eligible is False
+        assert "quality_hold" in result.reasons
+
     def test_out_of_area_is_not_eligible(self):
         result = evaluate_safe_acknowledgement_eligibility(
             detected_job_type="lead",
