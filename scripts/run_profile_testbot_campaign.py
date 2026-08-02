@@ -16,7 +16,11 @@ if str(ROOT) not in sys.path:
 LIVE_EVAL_ENV_FILE = ROOT / ".env.live-eval.local"
 
 
-def _load_live_eval_env() -> None:
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in ("yes", "true", "1")
+
+
+def _load_live_eval_env(*, for_live_execution: bool = False) -> None:
     env_path = ROOT / ".env"
     if env_path.is_file():
         for line in env_path.read_text(encoding="utf-8").splitlines():
@@ -32,10 +36,10 @@ def _load_live_eval_env() -> None:
                 continue
             key, value = line.split("=", 1)
             os.environ.setdefault(key.strip(), value.strip())
-    _apply_live_eval_operator_overrides()
+    _apply_live_eval_operator_overrides(for_live_execution=for_live_execution)
 
 
-def _apply_live_eval_operator_overrides() -> None:
+def _apply_live_eval_operator_overrides(*, for_live_execution: bool = False) -> None:
     """Apply operator-approved live-eval flags after loading env files."""
     from app.core.settings import get_settings
 
@@ -50,7 +54,10 @@ def _apply_live_eval_operator_overrides() -> None:
         os.environ["BUILD_COMMIT_SHA"] = runtime_sha
         os.environ["GIT_COMMIT"] = runtime_sha
     os.environ["LIVE_EVAL_ALLOWED"] = "yes"
-    os.environ["LIVE_GMAIL_EVAL_ALLOWED"] = "yes"
+    if for_live_execution or not _env_truthy("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT"):
+        os.environ["LIVE_GMAIL_EVAL_ALLOWED"] = "yes"
+    elif _env_truthy("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT"):
+        os.environ.pop("LIVE_GMAIL_EVAL_ALLOWED", None)
     os.environ["LIVE_LLM_EVAL_ALLOWED"] = "yes"
     os.environ["FULL_SYSTEM_TESTBOT_CAMPAIGN_ALLOWED"] = "yes"
     os.environ.setdefault("LIVE_EVAL_LLM_MODEL", "gpt-4o-mini")
@@ -69,7 +76,8 @@ def _apply_live_eval_operator_overrides() -> None:
     os.environ.setdefault("PROFILE_TESTBOT_LIVE_QUALITY_RUNNER_APPROVED", "yes")
     if runtime_sha:
         os.environ.setdefault("PROFILE_TESTBOT_LIVE_QUALITY_RUNNER_APPROVED_SHA", runtime_sha)
-    os.environ.pop("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT", None)
+    if for_live_execution:
+        os.environ.pop("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT", None)
 
     client_id = os.environ.get("LIVE_EVAL_RECIPIENT_GMAIL_CLIENT_ID", "").strip()
     client_secret = os.environ.get("LIVE_EVAL_RECIPIENT_GMAIL_CLIENT_SECRET", "").strip()
@@ -138,7 +146,7 @@ def _run_hermetic(args: argparse.Namespace) -> int:
 
 def _run_semi_auto(args: argparse.Namespace) -> int:
     if getattr(args, "confirm_external", False):
-        _load_live_eval_env()
+        _load_live_eval_env(for_live_execution=True)
     if getattr(args, "confirm_external", False):
         config = get_live_eval_config()
         senders = sorted(config.sender_emails)
@@ -235,7 +243,7 @@ def _run_hermetic_quality(args: argparse.Namespace) -> int:
 
 
 def _run_quality_live(args: argparse.Namespace, *, campaign_kind: str) -> int:
-    _load_live_eval_env()
+    _load_live_eval_env(for_live_execution=True)
     config = get_live_eval_config()
     senders = sorted(config.sender_emails)
     recipients = sorted(config.recipient_emails)
