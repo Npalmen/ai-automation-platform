@@ -45,7 +45,11 @@ from app.workflows.live_eval_approval_reply_authorization import (
     allows_live_eval_approval_gated_customer_reply,
     is_approval_gated_customer_reply,
 )
-from app.workflows.processors.action_dispatch_processor import _apply_dispatch_authorization
+from app.workflows.safe_ack_eligibility import evaluate_safe_ack_eligibility
+from app.workflows.processors.action_dispatch_processor import (
+    _apply_dispatch_authorization,
+    _build_inquiry_default_actions,
+)
 
 SENDER = "eval-sender-ptb@gmail.com"
 RECIPIENT = "eval-recipient-ptb@gmail.com"
@@ -119,6 +123,125 @@ def tenant_db():
     db = _sqlite_tenant_db()
     yield db
     db.close()
+
+
+class TestCustomerInquirySafeAckLiveEval:
+    def test_inquiry_default_actions_use_safe_ack_path_when_policy_allows(self):
+        input_data = {
+            "subject": "Status på ärende",
+            "message_text": "Hej, hur går det med mitt ärende?",
+            "sender": {"name": "Kund", "email": RECIPIENT},
+            "live_eval": {"scenario_id": "PTB-Q96-0012"},
+        }
+        job = Job(
+            tenant_id=LIVE_EVAL_TENANT,
+            job_type=JobType.CUSTOMER_INQUIRY,
+            input_data=input_data,
+        )
+        job.processor_history = [
+            {
+                "processor": "policy_processor",
+                "result": {
+                    "payload": {
+                        "safe_acknowledgement_path": True,
+                        "detected_job_type": "customer_inquiry",
+                        "safe_ack_eligibility": evaluate_safe_ack_eligibility(
+                            detected_job_type="customer_inquiry",
+                            risk_detected=False,
+                            risk_categories=[],
+                            extraction_issues=[],
+                            input_data=input_data,
+                            recommendation=None,
+                            recommendation_raw="auto_route",
+                            low_confidence=False,
+                            used_fallback=False,
+                        ).to_dict(),
+                    }
+                },
+            },
+            {
+                "processor": "classification_processor",
+                "result": {"payload": {"detected_job_type": "customer_inquiry"}},
+            },
+            {
+                "processor": "entity_extraction_processor",
+                "result": {"payload": {"entities": {}, "validation": {"issues": []}}},
+            },
+        ]
+        job.result = job.processor_history[-1]["result"]
+
+        actions = _build_inquiry_default_actions(job, {"followups_enabled": True})
+        reply = next(a for a in actions if a["type"] == "send_customer_auto_reply")
+        assert reply.get("_safe_acknowledgement_path") is True
+        assert reply.get("_needs_approval") is True
+        assert reply.get("_approval_reason") == "safe_acknowledgement_requires_approval"
+        assert reply.get("body")
+
+    def test_inquiry_dispatch_materialize_allowed_without_external_writes(self, tenant_db, monkeypatch):
+        monkeypatch.setenv("ENV", "test")
+        monkeypatch.setenv("LIVE_EVAL_ALLOWED", "yes")
+        monkeypatch.setenv("LIVE_GMAIL_EVAL_ALLOWED", "yes")
+        from app.evaluation.live.config import get_live_eval_config
+
+        get_live_eval_config.cache_clear()
+
+        input_data = {
+            "subject": "Status på ärende",
+            "message_text": "Hej, hur går det med mitt ärende?",
+            "sender": {"name": "Kund", "email": RECIPIENT},
+            "live_eval": {"scenario_id": "PTB-Q96-0012"},
+        }
+        job = Job(
+            tenant_id=LIVE_EVAL_TENANT,
+            job_type=JobType.CUSTOMER_INQUIRY,
+            input_data=input_data,
+        )
+        job.processor_history = [
+            {
+                "processor": "policy_processor",
+                "result": {
+                    "payload": {
+                        "decision": "manual_review",
+                        "detected_job_type": "customer_inquiry",
+                        "safe_acknowledgement_path": True,
+                        "safe_ack_eligibility": evaluate_safe_ack_eligibility(
+                            detected_job_type="customer_inquiry",
+                            risk_detected=False,
+                            risk_categories=[],
+                            extraction_issues=[],
+                            input_data=input_data,
+                            recommendation=None,
+                            recommendation_raw="auto_route",
+                            low_confidence=False,
+                            used_fallback=False,
+                        ).to_dict(),
+                    }
+                },
+            },
+            {
+                "processor": "classification_processor",
+                "result": {"payload": {"detected_job_type": "customer_inquiry"}},
+            },
+            {
+                "processor": "entity_extraction_processor",
+                "result": {"payload": {"entities": {}, "validation": {"issues": []}}},
+            },
+        ]
+        job.result = job.processor_history[-1]["result"]
+
+        built = _build_inquiry_default_actions(job, {"followups_enabled": True})
+        authorized = _apply_dispatch_authorization(
+            job,
+            built,
+            {"followups_enabled": True, "auto_actions": {"customer_inquiry": True}},
+            db=tenant_db,
+        )
+        reply = next(a for a in authorized if a["type"] == "send_customer_auto_reply")
+        assert not reply.get("_skip")
+        assert is_approval_gated_customer_reply(reply)
+        assert allows_live_eval_approval_gated_customer_reply(
+            reply, LIVE_EVAL_TENANT, tenant_db, phase="dispatch_materialize"
+        )
 
 
 class TestLiveEvalApprovalReplyAuthorization:
