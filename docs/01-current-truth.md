@@ -8,6 +8,8 @@
 
 ## Last verified date
 
+2026-08-02 (Profile-driven semi-auto quality closure — runtime SHA `128aacee5567d4d8ed762e25192c766494e7b634` PR #132+#133; post-merge Release Gate `30727136242`; Regression Main `30727136229`; Gate Q5 hermetic 96/96 PASS; live quality canary 12/12 PASS; live quality campaign 32/32 PASS on `TENANT_LIVE_EVAL` / `niklas-demo-live-eval-v1`; 5 approval-gated Gmail replies provider-accepted + recipient-verified; hold/reject/no_reply/observe scenarios with 0 unauthorized sends; `PROFILE_DRIVEN_SEMI_AUTO_QUALITY_QUALIFIED` registered; `PROFILE_DRIVEN_AUTOMATIC_GMAIL_QUALIFIED` + `PROFILE_DRIVEN_TESTBOT_PASS` remain PENDING; production activation not implied.)
+
 2026-08-01 (PD-IQH PR-3 inbox quality evaluation — runtime SHA `08309243938fdd7b8e30da7a6d2d6caafb2c5274` PR #128; post-merge Release Gate `30718372134`; Regression Main `30718372072`; hermetic quality dataset 96/96 PASS; thread/replay semantics + explicit oracle status model; `PROFILE_DRIVEN_SEMI_AUTO_QUALITY_QUALIFIED` not yet registered; live quality canary/campaign pending operator readiness.)
 
 2026-07-31 (Profile testbot semi-auto Gmail closure — runtime SHA `1c4213dcd5eac31858c2bb2ba2d590623d9d5f61` PR #123+#124; post-merge Release Gate `30659465404`; Regression Main `30659465594`; 4-scenario canary `3950058c` 4/4 PASS; full campaign `3f416a93` 40/40 PASS on `TENANT_LIVE_EVAL` / `niklas-demo-live-eval-v1`; 20 approval-gated Gmail replies provider-accepted + recipient-verified; 20 hold/reject/no_reply with 0 sends; `PROFILE_DRIVEN_SEMI_AUTO_GMAIL_QUALIFIED` registered; `PROFILE_DRIVEN_AUTOMATIC_GMAIL_QUALIFIED` + `PROFILE_DRIVEN_TESTBOT_PASS` remain PENDING; production activation not implied.)

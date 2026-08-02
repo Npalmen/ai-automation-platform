@@ -65,9 +65,10 @@ class TestQualificationRegistry:
         failures = validate_qualification_registry()
         assert failures == [], failures
 
-    def test_quality_qualification_pending(self):
+    def test_quality_qualification_valid(self):
         entry = qualification_index()[QUALIFICATION_SEMI_AUTO_QUALITY]
-        assert entry["status"] == "PENDING"
+        assert entry["status"] == "VALID"
+        assert entry["source_sha"] == "128aacee5567d4d8ed762e25192c766494e7b634"
         assert entry["contract_version"] == "inbox_quality_hermetic_v1"
 
     def test_automatic_qualifications_remain_pending(self):

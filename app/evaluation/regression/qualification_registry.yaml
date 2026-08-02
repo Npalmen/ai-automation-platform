@@ -100,8 +100,8 @@ qualifications:
   - id: PROFILE_DRIVEN_SEMI_AUTO_QUALITY_QUALIFIED
     chapter: profile-testbot
     scope: profile-driven inbox quality hermetic + live semi-auto quality qualification
-    source_workflow_run: pending
-    source_sha: pending
+    source_workflow_run: "30727136242"
+    source_sha: 128aacee5567d4d8ed762e25192c766494e7b634
     contract_version: inbox_quality_hermetic_v1
     evidence_schema: profile_quality_campaign_v1
     allowed_reuse: true
@@ -113,7 +113,7 @@ qualifications:
     expiry_policy: stale_on_contract_change
     default_production_activation: false
     live_external_write_type: gmail_reply
-    status: PENDING
+    status: VALID
     compatible_capabilities:
       - action.send_customer_auto_reply
       - approval.lifecycle
