@@ -18,6 +18,7 @@ SEMANTIC_FACT_TO_FIELDS: dict[str, frozenset[str]] = {
     "consultation_booking": frozenset({"requested_service"}),
     "existing_solar_system": frozenset({"existing_solar_system", "existing_installation"}),
     "battery_retrofit": frozenset({"existing_solar_system", "existing_installation", "battery_interest"}),
+    "solar_battery_combined_new": frozenset({"battery_interest", "requested_service"}),
     "attachment_missing": frozenset(),
     "attachment_missing_drawing": frozenset(),
     "attachment_claimed": frozenset({"attachment", "annual_consumption"}),
@@ -117,9 +118,22 @@ def detect_semantic_fact_ids(message: str) -> set[str]:
         )
         and not has_existing_solar
     )
+    wants_combined_new = bool(
+        re.search(r"installera\s+både\s+solceller\s+och\s+batteri", lowered, re.I)
+        or re.search(r"solceller\s+tillsammans\s+med\s+batteri", lowered, re.I)
+        or re.search(r"solar panels and battery", lowered, re.I)
+        or re.search(r"\boffert\s+på\s+både\s+solceller\s+och\s+batteri\b", lowered, re.I)
+        or (
+            wants_battery
+            and wants_new_solar
+            and re.search(r"\b(?:både|tillsammans|and)\b", lowered, re.I)
+        )
+    )
 
     if has_existing_solar:
         fact_ids.add("existing_solar_system")
+    if wants_combined_new and not has_existing_solar:
+        fact_ids.add("solar_battery_combined_new")
     if has_existing_solar and wants_battery and not wants_new_solar:
         fact_ids.add("battery_retrofit")
 
@@ -176,6 +190,10 @@ def semantic_known_question_fields(fact_ids: set[str]) -> set[str]:
 
 def is_battery_retrofit_intent(message: str) -> bool:
     return "battery_retrofit" in detect_semantic_fact_ids(message)
+
+
+def is_combined_new_install_intent(message: str) -> bool:
+    return "solar_battery_combined_new" in detect_semantic_fact_ids(message)
 
 
 def attachment_state(message: str) -> str | None:

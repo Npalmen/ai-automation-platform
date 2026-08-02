@@ -33,7 +33,11 @@ from app.workflows.reply_quality.fact_evidence import (
     verified_fact_labels_from_evidence,
 )
 from app.workflows.reply_quality.pipeline_routing import resolve_reply_pipeline_context
-from app.workflows.reply_quality.semantic_fact_predicates import attachment_state
+from app.workflows.reply_quality.semantic_fact_predicates import (
+    attachment_state,
+    detect_semantic_fact_ids,
+    existing_solar_verified,
+)
 from app.workflows.reply_quality.thread_context import (
     acknowledgement_mode_for_thread,
     build_thread_reply_context,
@@ -180,6 +184,7 @@ def build_coworker_reply_plan_v2(
             service_family=playbook.service_family,
             language=language,
         ),
+        service_family=playbook.service_family,
     )
     ack_mode = acknowledgement_mode_for_thread(
         thread=thread,
@@ -214,6 +219,11 @@ def build_coworker_reply_plan_v2(
         evidence=pipeline_ctx.fact_evidence,
         case_reference_phrase=case_reference_phrase,
     )
+    extracted_facts = extract_customer_facts(input_data=input_data, entities=entities)
+    solar_verified = existing_solar_verified(
+        detect_semantic_fact_ids(combined_text),
+        set(extracted_facts.known_question_fields),
+    )
     plan = build_customer_reply_plan_v2(
         greeting=greeting,
         signature_name=signature_name,
@@ -236,6 +246,7 @@ def build_coworker_reply_plan_v2(
         scenario_family=scenario_family,
         mentions_attachment_gap=mentions_attachment_gap,
         attachment_state=attach_state,
+        existing_solar_verified=solar_verified,
     )
     return plan
 

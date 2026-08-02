@@ -54,6 +54,7 @@ def build_next_step_surface(
     scenario_family: str | None = None,
     mentions_attachment_gap: bool = False,
     attachment_state: str | None = None,
+    existing_solar_verified: bool = True,
 ) -> NextStepSurfaceContract:
     """Return a service-specific next-step contract; avoid generic filler when possible."""
     lang = "en" if (language or "sv").lower().startswith("en") else "sv"
@@ -290,13 +291,13 @@ def build_next_step_surface(
                     stmt = "Vi uppdaterar underlaget och återkommer när bedömningen är klar."
             elif lang == "en":
                 stmt = (
-                    "Once we have the supplement, we will assess the roof and energy needs "
-                    "for an updated evaluation."
+                    "Once we have the supplement, we will update our assessment of the roof "
+                    "conditions and energy needs."
                 )
             else:
                 stmt = (
-                    "När vi fått de sista uppgifterna bedömer vi tak och energibehov "
-                    "för en uppdaterad bedömning."
+                    "När vi fått de sista uppgifterna uppdaterar vi bedömningen av takets "
+                    "förutsättningar och energibehov."
                 )
         elif followup:
             if lang == "en":
@@ -324,15 +325,26 @@ def build_next_step_surface(
         )
 
     if service_family == "battery_installation":
-        if lang == "en":
+        if existing_solar_verified:
+            if lang == "en":
+                stmt = (
+                    "Once we have the details, we will assess compatibility with your existing system, "
+                    "usage goals, and preliminary sizing."
+                )
+            else:
+                stmt = (
+                    "När vi har underlaget bedömer vi kompatibilitet med befintligt system, "
+                    "användningsmål och preliminär dimensionering."
+                )
+        elif lang == "en":
             stmt = (
-                "Once we have the details, we will assess compatibility with your existing system, "
-                "usage goals, and preliminary sizing."
+                "Once we have the details, we will assess a suitable setup and compatibility "
+                "with any existing system, usage goals, and preliminary sizing."
             )
         else:
             stmt = (
-                "När vi har underlaget bedömer vi kompatibilitet med befintligt system, "
-                "användningsmål och preliminär dimensionering."
+                "När vi har underlaget bedömer vi lämplig lösning och, om det finns ett "
+                "befintligt system, dess kompatibilitet, användningsmål och preliminär dimensionering."
             )
         return NextStepSurfaceContract(
             statement=stmt,
@@ -408,6 +420,7 @@ def localized_next_step(
     scenario_family: str | None = None,
     mentions_attachment_gap: bool = False,
     attachment_state: str | None = None,
+    existing_solar_verified: bool = True,
 ) -> str:
     """Backward-compatible wrapper returning only the customer-facing statement."""
     return build_next_step_surface(
@@ -421,4 +434,5 @@ def localized_next_step(
         scenario_family=scenario_family,
         mentions_attachment_gap=mentions_attachment_gap,
         attachment_state=attachment_state,
+        existing_solar_verified=existing_solar_verified,
     ).statement

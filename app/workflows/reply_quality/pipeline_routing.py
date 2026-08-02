@@ -10,6 +10,7 @@ from app.workflows.reply_quality.operational_next_step import OperationalNextSte
 from app.workflows.reply_quality.semantic_fact_predicates import (
     detect_consultation_intent,
     is_battery_retrofit_intent,
+    is_combined_new_install_intent,
 )
 from app.workflows.reply_quality.service_playbooks import (
     ReplyServicePlaybook,
@@ -52,6 +53,8 @@ def resolve_routed_service_type(
     combined = f"{subject or ''} {message_text or ''}"
     if is_battery_retrofit_intent(combined):
         return "battery_storage"
+    if is_combined_new_install_intent(combined):
+        return "solar_battery_combined_install"
     return base_service_type
 
 
