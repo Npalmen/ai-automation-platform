@@ -23,6 +23,11 @@ def is_approval_gated_customer_reply(action: dict[str, Any]) -> bool:
 
 
 def _google_mail_selected(tenant_id: str, db: Session | None) -> bool:
+    if tenant_id == LIVE_EVAL_TENANT_ID:
+        from app.evaluation.live.config import get_live_eval_config
+
+        if get_live_eval_config().gmail_enabled:
+            return True
     from app.integrations.policies import is_integration_enabled_for_tenant
 
     return is_integration_enabled_for_tenant(

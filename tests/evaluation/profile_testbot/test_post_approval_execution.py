@@ -171,6 +171,20 @@ class TestLiveEvalApprovalReplyAuthorization:
         )
         assert materialize and execute
 
+    def test_dispatch_materialize_allowed_when_live_gmail_eval_enabled_without_tenant_integration(
+        self, monkeypatch,
+    ):
+        monkeypatch.setenv("ENV", "test")
+        monkeypatch.setenv("LIVE_EVAL_ALLOWED", "yes")
+        monkeypatch.setenv("LIVE_GMAIL_EVAL_ALLOWED", "yes")
+        from app.evaluation.live.config import get_live_eval_config
+
+        get_live_eval_config.cache_clear()
+        action = _safe_ack_action(execution_allowed=False)
+        assert allows_live_eval_approval_gated_customer_reply(
+            action, LIVE_EVAL_TENANT, None, phase="dispatch_materialize"
+        )
+
 
 class TestDispatchAuthorizationSymmetry:
     def test_materialize_not_skipped_when_execute_contract_would_allow(self, tenant_db):
