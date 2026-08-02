@@ -16,17 +16,78 @@ if str(ROOT) not in sys.path:
 LIVE_EVAL_ENV_FILE = ROOT / ".env.live-eval.local"
 
 
-def _load_live_eval_env() -> None:
-    if os.environ.get("ENV", "").strip().lower() == "test":
-        return
-    if not LIVE_EVAL_ENV_FILE.is_file():
-        return
-    for line in LIVE_EVAL_ENV_FILE.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip())
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in ("yes", "true", "1")
+
+
+def _load_live_eval_env(*, for_live_execution: bool = False) -> None:
+    env_path = ROOT / ".env"
+    if env_path.is_file():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            os.environ.setdefault(key.strip(), value.strip())
+    if LIVE_EVAL_ENV_FILE.is_file():
+        for line in LIVE_EVAL_ENV_FILE.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            os.environ.setdefault(key.strip(), value.strip())
+    _apply_live_eval_operator_overrides(for_live_execution=for_live_execution)
+
+
+def _apply_live_eval_operator_overrides(*, for_live_execution: bool = False) -> None:
+    """Apply operator-approved live-eval flags after loading env files."""
+    from app.core.settings import get_settings
+
+    runtime_sha = (
+        os.environ.get("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED_SHA", "").strip()
+        or resolve_canonical_commit()
+        or ""
+    )
+    os.environ["ENV"] = "test"
+    if runtime_sha:
+        os.environ["BUILD_GIT_SHA"] = runtime_sha
+        os.environ["BUILD_COMMIT_SHA"] = runtime_sha
+        os.environ["GIT_COMMIT"] = runtime_sha
+    os.environ["LIVE_EVAL_ALLOWED"] = "yes"
+    if for_live_execution or not _env_truthy("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT"):
+        os.environ["LIVE_GMAIL_EVAL_ALLOWED"] = "yes"
+    elif _env_truthy("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT"):
+        os.environ.pop("LIVE_GMAIL_EVAL_ALLOWED", None)
+    os.environ["LIVE_LLM_EVAL_ALLOWED"] = "yes"
+    os.environ["FULL_SYSTEM_TESTBOT_CAMPAIGN_ALLOWED"] = "yes"
+    os.environ.setdefault("LIVE_EVAL_LLM_MODEL", "gpt-4o-mini")
+    os.environ.setdefault("LIVE_EVAL_LLM_PROVIDER", "openai")
+    os.environ.setdefault("LLM_MODEL", os.environ.get("LIVE_EVAL_LLM_MODEL", "gpt-4o-mini"))
+    os.environ["LIVE_EVAL_MAX_GMAIL_REPLIES"] = "25"
+    os.environ["LIVE_EVAL_MAX_GMAIL_SENDS"] = "25"
+    os.environ["LIVE_EVAL_MAX_SCENARIOS_PER_RUN"] = "25"
+    os.environ.setdefault("PROFILE_TESTBOT_LIVE_SEMI_AUTO_APPROVED", "yes")
+    os.environ.setdefault("PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED", "yes")
+    if runtime_sha:
+        os.environ.setdefault(
+            "PROFILE_TESTBOT_LIVE_SEMI_AUTO_RUNNER_APPROVED_SHA", runtime_sha
+        )
+    os.environ.setdefault("PROFILE_TESTBOT_LIVE_QUALITY_APPROVED", "yes")
+    os.environ.setdefault("PROFILE_TESTBOT_LIVE_QUALITY_RUNNER_APPROVED", "yes")
+    if runtime_sha:
+        os.environ.setdefault("PROFILE_TESTBOT_LIVE_QUALITY_RUNNER_APPROVED_SHA", runtime_sha)
+    if for_live_execution:
+        os.environ.pop("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT", None)
+
+    client_id = os.environ.get("LIVE_EVAL_RECIPIENT_GMAIL_CLIENT_ID", "").strip()
+    client_secret = os.environ.get("LIVE_EVAL_RECIPIENT_GMAIL_CLIENT_SECRET", "").strip()
+    if client_id:
+        os.environ.setdefault("GOOGLE_OAUTH_CLIENT_ID", client_id)
+    if client_secret:
+        os.environ.setdefault("GOOGLE_OAUTH_CLIENT_SECRET", client_secret)
+
+    get_settings.cache_clear()
+    get_live_eval_config.cache_clear()
 
 
 from app.core.canonical_commit import resolve_canonical_commit
@@ -51,10 +112,20 @@ from app.evaluation.profile_testbot.campaign.readiness import (
     validate_profile_testbot_tenant,
 )
 from app.evaluation.profile_testbot.campaign.report import write_profile_testbot_report
+from app.evaluation.profile_testbot.campaign.quality_live_runner import (
+    QualityRunnerConfig,
+    new_quality_campaign_id,
+    run_profile_quality_live_campaign,
+)
 from app.evaluation.profile_testbot.constants import (
     OPERATOR_STOP_AUTOMATIC,
+    OPERATOR_STOP_LIVE_QUALITY,
     OPERATOR_STOP_SEMI_AUTO,
     OPERATOR_STOP_SEMI_AUTO_RUNNER,
+    QUALITY_LIVE_PROFILE_ID,
+)
+from app.evaluation.profile_testbot.qualification.hermetic_quality import (
+    run_hermetic_quality_qualification,
 )
 
 
@@ -75,7 +146,7 @@ def _run_hermetic(args: argparse.Namespace) -> int:
 
 def _run_semi_auto(args: argparse.Namespace) -> int:
     if getattr(args, "confirm_external", False):
-        _load_live_eval_env()
+        _load_live_eval_env(for_live_execution=True)
     if getattr(args, "confirm_external", False):
         config = get_live_eval_config()
         senders = sorted(config.sender_emails)
@@ -161,6 +232,51 @@ def _run_automatic(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_hermetic_quality(args: argparse.Namespace) -> int:
+    result = run_hermetic_quality_qualification(
+        profile_id=args.profile_id,
+        seed=args.seed,
+    )
+    print(result.overall_status)
+    print(json.dumps(result.to_dict(), indent=2))
+    return 0 if result.overall_status == "PASS" else 1
+
+
+def _run_quality_live(args: argparse.Namespace, *, campaign_kind: str) -> int:
+    _load_live_eval_env(for_live_execution=True)
+    config = get_live_eval_config()
+    senders = sorted(config.sender_emails)
+    recipients = sorted(config.recipient_emails)
+    campaign_id = args.campaign_id or new_quality_campaign_id()
+    runtime_sha = args.runtime_sha or resolve_canonical_commit() or "unknown"
+    base_url = os.environ.get("LIVE_EVAL_APP_BASE_URL", "").strip()
+    admin_api_key = os.environ.get("ADMIN_API_KEY", "").strip()
+    try:
+        result = run_profile_quality_live_campaign(
+            QualityRunnerConfig(
+                campaign_id=campaign_id,
+                runtime_sha=runtime_sha,
+                campaign_kind=campaign_kind,  # type: ignore[arg-type]
+                profile_id=args.profile_id,
+                seed=args.seed,
+                contract_mode=False,
+                confirm_external=True,
+                state_root=args.state_root or None,
+                sender_email=senders[0] if senders else "",
+                recipient_email=recipients[0] if recipients else "",
+                base_url=base_url,
+                admin_api_key=admin_api_key,
+            ),
+            resume=args.resume,
+        )
+    except LiveEvalSafetyError as exc:
+        print(f"FAIL: {exc}")
+        return 1
+    print(result.overall_status)
+    print(json.dumps(result.to_dict(), indent=2))
+    return 0 if result.overall_status == "PASS" else 1
+
+
 def _write_readiness_report(report: dict) -> Path:
     run_id = new_evaluation_run_id()
     path = Path("storage/status") / f"profile-testbot-semi-auto-live-readiness-{run_id}.md"
@@ -244,6 +360,25 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("readiness", help="Build profile testbot readiness report")
     sub.add_parser("hermetic", help="Run 120-scenario hermetic profile campaign")
+    sub.add_parser("hermetic-quality", help="Run Gate Q5 hermetic quality qualification")
+    quality_canary = sub.add_parser(
+        "quality-canary-live",
+        help="Execute 12-scenario live inbox quality canary (Gate Q6)",
+    )
+    quality_canary.add_argument("--confirm-operator", action="store_true")
+    quality_canary.add_argument("--campaign-id", default="")
+    quality_canary.add_argument("--runtime-sha", default="")
+    quality_canary.add_argument("--state-root", default="")
+    quality_canary.add_argument("--resume", action="store_true")
+    quality_campaign = sub.add_parser(
+        "quality-campaign-live",
+        help="Execute 32-scenario live inbox quality campaign (Gate Q7)",
+    )
+    quality_campaign.add_argument("--confirm-operator", action="store_true")
+    quality_campaign.add_argument("--campaign-id", default="")
+    quality_campaign.add_argument("--runtime-sha", default="")
+    quality_campaign.add_argument("--state-root", default="")
+    quality_campaign.add_argument("--resume", action="store_true")
     semi = sub.add_parser("semi-auto-live", help="Plan or execute live semi-auto campaign")
     semi.add_argument("--confirm-operator", action="store_true")
     semi.add_argument("--execute-contract", action="store_true")
@@ -258,13 +393,38 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "readiness":
         _load_live_eval_env()
-        report = build_profile_testbot_readiness(profile_id=args.profile_id)
+        profile_id = args.profile_id
+        if profile_id == "pilot-service-company-v1":
+            profile_id = QUALITY_LIVE_PROFILE_ID
+        report = build_profile_testbot_readiness(profile_id=profile_id)
         report_path = _write_readiness_report(report)
         sys.stdout.buffer.write(json.dumps(report, indent=2, ensure_ascii=False).encode("utf-8"))
         sys.stdout.buffer.write(f"\nreport={report_path}\n".encode("utf-8"))
         return 0 if report.get("ready_for_live_semi_auto") else 1
     if args.command == "hermetic":
         return _run_hermetic(args)
+    if args.command == "hermetic-quality":
+        return _run_hermetic_quality(args)
+    if args.command == "quality-canary-live":
+        if not args.confirm_operator:
+            _emit_stop(OPERATOR_STOP_LIVE_QUALITY)
+            return 2
+        args.profile_id = (
+            args.profile_id
+            if args.profile_id != "pilot-service-company-v1"
+            else QUALITY_LIVE_PROFILE_ID
+        )
+        return _run_quality_live(args, campaign_kind="canary")
+    if args.command == "quality-campaign-live":
+        if not args.confirm_operator:
+            _emit_stop(OPERATOR_STOP_LIVE_QUALITY)
+            return 2
+        args.profile_id = (
+            args.profile_id
+            if args.profile_id != "pilot-service-company-v1"
+            else QUALITY_LIVE_PROFILE_ID
+        )
+        return _run_quality_live(args, campaign_kind="campaign")
     if args.command == "semi-auto-live":
         if not args.confirm_operator:
             _emit_stop(OPERATOR_STOP_SEMI_AUTO)

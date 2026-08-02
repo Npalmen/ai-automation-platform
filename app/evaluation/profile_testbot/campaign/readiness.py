@@ -221,14 +221,26 @@ def _live_quality_execution_blockers(
     ready: bool,
     live_blockers: list[str],
     quality_qualification_status: str | None,
+    hermetic_quality_pass: bool,
 ) -> list[str]:
     blockers = list(live_blockers)
     if not ready:
         blockers.append("ready_for_live_semi_auto must pass before live quality execution")
-    if quality_qualification_status != "VALID":
+    if not hermetic_quality_pass:
+        blockers.append("hermetic quality qualification (Gate Q5) must PASS")
+    if quality_qualification_status == "VALID":
+        if not _env_truthy("PROFILE_TESTBOT_LIVE_QUALITY_REQUALIFICATION_APPROVED"):
+            blockers.append(
+                f"{QUALIFICATION_SEMI_AUTO_QUALITY} already VALID; "
+                "re-qualification requires PROFILE_TESTBOT_LIVE_QUALITY_REQUALIFICATION_APPROVED=yes"
+            )
+    elif quality_qualification_status not in {"PENDING", None}:
         blockers.append(
-            f"{QUALIFICATION_SEMI_AUTO_QUALITY} must be VALID before live quality canary/campaign"
+            f"{QUALIFICATION_SEMI_AUTO_QUALITY} has invalid status "
+            f"{quality_qualification_status!r}"
         )
+    if not _env_truthy("PROFILE_TESTBOT_LIVE_QUALITY_APPROVED"):
+        blockers.append("PROFILE_TESTBOT_LIVE_QUALITY_APPROVED=yes required for live quality execution")
     return blockers
 
 
@@ -415,10 +427,18 @@ def build_profile_testbot_readiness(
         runtime_live_blockers=runtime_report.get("live_execution_blockers", []),
         semi_auto_qualification_status=live_quals[QUALIFICATION_SEMI_AUTO],
     )
+    live_quality_infra_blockers = _live_execution_blockers(
+        ready=ready,
+        mailbox_report=mailbox_report,
+        runtime_sha=runtime_report.get("authoritative_runtime_sha"),
+        runtime_live_blockers=runtime_report.get("live_execution_blockers", []),
+        semi_auto_qualification_status=None,
+    )
     live_quality_blockers = _live_quality_execution_blockers(
         ready=ready,
-        live_blockers=live_blockers,
+        live_blockers=live_quality_infra_blockers,
         quality_qualification_status=live_quals[QUALIFICATION_SEMI_AUTO_QUALITY],
+        hermetic_quality_pass=hermetic_quality.overall_status == "PASS",
     )
     runner_ready_for_live_execution = ready and not live_blockers
     runner_ready_for_live_quality_execution = ready and not live_quality_blockers
@@ -479,6 +499,7 @@ def build_profile_testbot_readiness(
         "issues": blocking_failures,
         "blockers": blocking_failures,
         "ready_for_live_semi_auto": ready,
+        "ready_for_live_quality": runner_ready_for_live_quality_execution,
         "runner_ready_for_contract_execution": ready,
         "runner_ready_for_live_execution": runner_ready_for_live_execution,
         "runner_ready_for_live_quality_execution": runner_ready_for_live_quality_execution,

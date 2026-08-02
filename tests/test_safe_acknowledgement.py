@@ -26,6 +26,7 @@ from app.repositories.postgres.job_models import JobRecord
 from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 from app.workflows.action_approval_resolution import resolve_per_action_approval
 from app.workflows.approval_service import count_pending_approvals_for_job, has_pending_approval
+from app.workflows.decision_contract import DecisionRecommendation
 from app.workflows.orchestrator import WorkflowOrchestrator
 from app.workflows.pipeline_run_context import PipelineRunSource, create_trace_session
 from app.workflows.processors.action_dispatch_processor import (
@@ -233,6 +234,45 @@ class TestSafeAcknowledgementEligibility:
         )
         assert result.eligible is False
         assert "price" in result.reasons
+
+    def test_quality_observe_only_blocks_customer_draft(self):
+        result = evaluate_safe_acknowledgement_eligibility(
+            detected_job_type="customer_inquiry",
+            risk_detected=False,
+            risk_categories=[],
+            extraction_issues=[],
+            input_data={
+                "subject": "Status på ärende",
+                "message_text": "Hej, hur går det med mitt ärende?",
+                "sender": {"email": "customer@example.com"},
+                "live_eval": {"scenario_id": "PTB-Q96-0021"},
+            },
+            recommendation=DecisionRecommendation.AUTO_ROUTE,
+            recommendation_raw="auto_route",
+            low_confidence=False,
+            used_fallback=False,
+        )
+        assert result.eligible is False
+        assert "quality_observe_only" in result.reasons
+
+    def test_quality_send_after_approval_allows_customer_draft(self):
+        result = evaluate_safe_acknowledgement_eligibility(
+            detected_job_type="customer_inquiry",
+            risk_detected=False,
+            risk_categories=[],
+            extraction_issues=[],
+            input_data={
+                "subject": "Status på ärende",
+                "message_text": "Hej, hur går det med mitt ärende?",
+                "sender": {"email": "customer@example.com"},
+                "live_eval": {"scenario_id": "PTB-Q96-0012"},
+            },
+            recommendation=DecisionRecommendation.AUTO_ROUTE,
+            recommendation_raw="auto_route",
+            low_confidence=False,
+            used_fallback=False,
+        )
+        assert result.eligible is True
 
     def test_out_of_area_is_not_eligible(self):
         result = evaluate_safe_acknowledgement_eligibility(

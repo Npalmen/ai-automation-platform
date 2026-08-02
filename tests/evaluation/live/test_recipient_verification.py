@@ -67,6 +67,16 @@ def test_rfc_message_id_normalized_from_angle_brackets():
     assert _normalize_rfc_message_id("<abc@mail.test>") == "abc@mail.test"
 
 
+def test_rfc_message_id_normalized_case_insensitive():
+    from app.evaluation.live.gmail_transport import _normalize_rfc_message_id
+
+    assert _normalize_rfc_message_id(
+        "<CAFBf1sZw4b5A0-3cJpXroUW0MtscxupRMBRpfLM2uAL3Xo+zOQ@mail.gmail.com>"
+    ) == _normalize_rfc_message_id(
+        "<cafbf1szw4b5a0-3cjpxrouw0mtscxuprmbrpflm2ual3xo+zoq@mail.gmail.com>"
+    )
+
+
 def test_recipient_search_uses_rfc822msgid_query(live_eval_env):
     run_id = "run-rfc-1"
     sender_client = MagicMock()

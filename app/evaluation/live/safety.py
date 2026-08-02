@@ -52,17 +52,25 @@ def validate_registration_request(
     if ai_mode not in ALLOWED_AI_MODES:
         raise LiveEvalSafetyError(f"ai_mode {ai_mode!r} is not allowed")
     from app.evaluation.profile_testbot.campaign.scenario_gate import (
+        is_profile_testbot_quality_scenario,
         is_profile_testbot_semi_auto_scenario,
         require_profile_testbot_live_execution_authorized,
+        require_profile_testbot_quality_live_execution_authorized,
     )
 
     profile_testbot_live_llm = (
         transport_mode == "live_gmail"
         and ai_mode == "live_llm"
-        and is_profile_testbot_semi_auto_scenario(scenario_id)
+        and (
+            is_profile_testbot_semi_auto_scenario(scenario_id)
+            or is_profile_testbot_quality_scenario(scenario_id)
+        )
     )
     if profile_testbot_live_llm:
-        require_profile_testbot_live_execution_authorized()
+        if is_profile_testbot_quality_scenario(scenario_id):
+            require_profile_testbot_quality_live_execution_authorized()
+        else:
+            require_profile_testbot_live_execution_authorized()
     elif transport_mode == "live_gmail" and ai_mode == "live_llm":
         raise LiveEvalSafetyError("live_gmail + live_llm is not allowed")
     if transport_mode == "fixture_input" and ai_mode == "fixture_ai":
@@ -214,12 +222,17 @@ def require_scenario_allowed_for_live_gmail(scenario_id: str) -> None:
     """Allow 2F.2 S01, full-system campaign scenarios, or profile testbot semi-auto."""
     from app.evaluation.live.constants import ALLOWED_2F2_SCENARIOS
     from app.evaluation.profile_testbot.campaign.scenario_gate import (
+        is_profile_testbot_quality_scenario,
         is_profile_testbot_semi_auto_scenario,
         require_profile_testbot_live_execution_authorized,
+        require_profile_testbot_quality_live_execution_authorized,
     )
 
     if is_profile_testbot_semi_auto_scenario(scenario_id):
         require_profile_testbot_live_execution_authorized()
+        return
+    if is_profile_testbot_quality_scenario(scenario_id):
+        require_profile_testbot_quality_live_execution_authorized()
         return
     if scenario_id in ALLOWED_2F2_SCENARIOS:
         return
@@ -278,6 +291,7 @@ def validate_live_gmail_registration(
         return
     require_scenario_allowed_for_live_gmail(scenario_id)
     from app.evaluation.profile_testbot.campaign.scenario_gate import (
+        is_profile_testbot_quality_scenario,
         is_profile_testbot_semi_auto_scenario,
     )
 
@@ -285,6 +299,12 @@ def validate_live_gmail_registration(
         if ai_mode not in {"fixture_ai", "live_llm"}:
             raise LiveEvalSafetyError(
                 "profile testbot live_gmail requires ai_mode fixture_ai or live_llm"
+            )
+        return
+    if is_profile_testbot_quality_scenario(scenario_id):
+        if ai_mode != "live_llm":
+            raise LiveEvalSafetyError(
+                "profile testbot quality live_gmail requires ai_mode live_llm"
             )
         return
     if ai_mode != "fixture_ai":
@@ -347,6 +367,7 @@ def validate_live_gmail_run_for_mutation(
         raise LiveEvalSafetyError("run tenant mismatch")
     require_scenario_allowed_for_live_gmail(row.scenario_id)
     from app.evaluation.profile_testbot.campaign.scenario_gate import (
+        is_profile_testbot_quality_scenario,
         is_profile_testbot_semi_auto_scenario,
     )
 
@@ -354,6 +375,11 @@ def validate_live_gmail_run_for_mutation(
         if row.ai_mode not in {"fixture_ai", "live_llm"}:
             raise LiveEvalSafetyError(
                 "profile testbot live_gmail requires ai_mode fixture_ai or live_llm"
+            )
+    elif is_profile_testbot_quality_scenario(row.scenario_id):
+        if row.ai_mode != "live_llm":
+            raise LiveEvalSafetyError(
+                "profile testbot quality live_gmail requires ai_mode live_llm"
             )
     elif row.ai_mode != "fixture_ai":
         raise LiveEvalSafetyError("fixture_ai required for live Gmail mutation")

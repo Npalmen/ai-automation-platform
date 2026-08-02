@@ -52,3 +52,11 @@ OPERATOR_STOP_SEMI_AUTO_RUNNER = (
 OPERATOR_STOP_AUTOMATIC = (
     "OPERATOR ACTION REQUIRED — Godkänn automatic Gmail canary"
 )
+OPERATOR_STOP_LIVE_QUALITY = (
+    "OPERATOR ACTION REQUIRED — Godkänn live inbox quality canary/campaign"
+)
+OPERATOR_STOP_LIVE_QUALITY_RUNNER = (
+    "OPERATOR ACTION REQUIRED — Godkänn live quality execution på mergad runner-SHA"
+)
+
+QUALITY_LIVE_PROFILE_ID = "niklas-demo-live-eval-v1"

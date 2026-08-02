@@ -301,7 +301,9 @@ def _normalize_rfc_message_id(value: str | None) -> str | None:
     text = (value or "").strip()
     if text.startswith("<") and text.endswith(">"):
         text = text[1:-1].strip()
-    return text or None
+    if not text:
+        return None
+    return text.lower()
 
 
 def _rfc822msgid_query(value: str | None) -> str | None:
