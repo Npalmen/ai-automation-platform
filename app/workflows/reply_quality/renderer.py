@@ -5,6 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from app.workflows.reply_quality.final_text_validation import (
+    build_final_customer_text_validation,
+    validate_stage,
+)
 from app.workflows.reply_quality.llm_renderer import (
     MODEL_ID,
     PROMPT_VERSION,
@@ -61,11 +65,15 @@ def render_coworker_reply_with_validation(
     fallback_tier = "none"
     live_body: str | None = None
     live_validation: dict[str, Any] | None = None
+    stage_results: list[dict[str, Any]] = []
 
     body, llm_meta = render_constrained_llm_reply(plan)
     if llm_meta.get("live_call"):
         live_body = body
         live_validation = validate_post_render_reply(plan=plan, body=body)
+        stage_results.append(
+            validate_stage(plan=plan, body=body, validation_stage="raw_llm")
+        )
         llm_meta = {
             **llm_meta,
             "live_validation_outcome": "pass" if live_validation["passed"] else "fail",
@@ -75,11 +83,18 @@ def render_coworker_reply_with_validation(
         }
 
     validation = validate_post_render_reply(plan=plan, body=body)
+    if not llm_meta.get("live_call"):
+        stage_results.append(
+            validate_stage(plan=plan, body=body, validation_stage="raw_llm")
+        )
 
     if llm_meta.get("live_call") and live_validation and not live_validation["passed"]:
         fallback_reason = ",".join(live_validation["issues"][:3]) or "post_render_validation_failed"
         body = compose_constrained_reply_hermetic(plan)
         validation = validate_post_render_reply(plan=plan, body=body)
+        stage_results.append(
+            validate_stage(plan=plan, body=body, validation_stage="deterministic_fallback")
+        )
         fallback_tier = "hermetic"
         llm_meta = {**llm_meta, "fallback_from_live_validation": True}
 
@@ -87,18 +102,43 @@ def render_coworker_reply_with_validation(
         fallback_reason = ",".join(validation["issues"][:3]) or "post_render_validation_failed"
         body = compose_constrained_reply_hermetic(plan)
         validation = validate_post_render_reply(plan=plan, body=body)
+        stage_results.append(
+            validate_stage(plan=plan, body=body, validation_stage="deterministic_fallback")
+        )
         fallback_tier = "hermetic"
 
     if not validation["passed"]:
         fallback_reason = fallback_reason or ",".join(validation["issues"][:3]) or "post_render_validation_failed"
         body = _render_safe_fallback(plan)
         validation = validate_post_render_reply(plan=plan, body=body)
+        stage_results.append(
+            validate_stage(plan=plan, body=body, validation_stage="safe_fallback")
+        )
         fallback_tier = "safe"
+
+    final_validation = build_final_customer_text_validation(
+        plan=plan,
+        body=body,
+        stage_results=stage_results,
+    )
+    if not final_validation["passed"]:
+        fallback_reason = fallback_reason or ",".join(final_validation["issues"][:3]) or "final_customer_text_failed"
+        body = ""
+        fallback_tier = "no_reply"
+        validation = validate_post_render_reply(plan=plan, body=body)
+        stage_results.append(
+            validate_stage(plan=plan, body=body, validation_stage="no_reply")
+        )
+        final_validation = build_final_customer_text_validation(
+            plan=plan,
+            body=body,
+            stage_results=stage_results,
+        )
 
     live_success = (
         bool(llm_meta.get("live_call"))
         and fallback_tier == "none"
-        and validation["passed"]
+        and final_validation["passed"]
         and (live_validation is None or live_validation["passed"])
     )
     if live_success:
@@ -128,10 +168,23 @@ def render_coworker_reply_with_validation(
     )
     validation = {
         **validation,
+        "final_customer_text_validation": final_validation,
         "llm_meta": {
             **llm_meta,
-            "validation_outcome": "pass" if validation.get("passed") else "fail",
+            "validation_outcome": "pass" if final_validation.get("passed") else "fail",
             "fallback_tier": fallback_tier,
+            "raw_llm_validator_failures": sum(
+                1 for s in stage_results if s.get("validation_stage") == "raw_llm" and not s.get("passed")
+            ),
+            "deterministic_fallback_count": sum(
+                1 for s in stage_results if s.get("validation_stage") == "deterministic_fallback"
+            ),
+            "fallback_validator_failures": sum(
+                1
+                for s in stage_results
+                if s.get("validation_stage") in {"deterministic_fallback", "safe_fallback"} and not s.get("passed")
+            ),
+            "final_customer_text_validator_failures": 0 if final_validation.get("passed") else 1,
         },
     }
     return RenderResult(body=body, provenance=provenance, validation=validation)

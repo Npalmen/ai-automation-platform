@@ -7,6 +7,7 @@ import os
 from typing import Any
 
 from app.workflows.reply_quality.customer_surface import localized_next_step, pronoun_surface_contract
+from app.workflows.reply_quality.question_surface_composition import compose_customer_question_block
 from app.workflows.reply_quality.llm_reply_parser import LLMReplyParseError, parse_llm_reply_output
 from app.workflows.reply_quality.plan_v2 import CustomerReplyPlanV2
 from app.workflows.reply_quality.reply_language import localized_closing
@@ -162,16 +163,18 @@ def _join_questions_sv(questions: tuple[str, ...], register: str) -> str:
 
 def _render_question_block(plan: CustomerReplyPlanV2) -> str:
     language = "en" if (plan.language or "sv").lower().startswith("en") else "sv"
-    register = plan.salutation_strategy or ("du" if plan.service_family == "existing_installation_support" else "ni")
+    register = plan.salutation_strategy or ("du" if plan.service_family in {"existing_installation_support", "complaint_warranty"} else "ni")
     labels = list(plan.question_surface_labels)
     fields = list(plan.selected_questions)
     if "address" in fields and plan.location_phrase:
         idx = fields.index("address")
         labels[idx] = _compose_address_question(plan) or labels[idx]
-    questions = tuple(labels)
-    if language == "en":
-        return _join_questions_en(questions)
-    return _join_questions_sv(questions, register)
+    return compose_customer_question_block(
+        tuple(fields),
+        tuple(labels),
+        language=language,
+        register=register,
+    )
 
 
 def _join_questions_en(questions: tuple[str, ...]) -> str:

@@ -17,7 +17,7 @@ from app.workflows.reply_quality.surface_contract import (
     validate_customer_surface,
 )
 
-POLICY_VERSION = "post_render_validator_v3"
+POLICY_VERSION = "post_render_validator_v4"
 
 _GENERIC_NEXT_STEP_SV = "när vi har det underlaget går vi igenom förutsättningarna och återkommer"
 _GRAMMATICAL_BAD_SV = re.compile(
@@ -27,11 +27,14 @@ _GRAMMATICAL_BAD_SV = re.compile(
     r"|\bbekräfta om det finns redan\b"
     r"|\bkan (?:du|ni) bekräfta huruvida\b"
     r"|\bdessutom,?\s*om\b"
-    r"|\bom lastbalansering behövs\b",
+    r"|\bom lastbalansering behövs\b"
+    r"|\b(?:skicka|send).+\boch om\b"
+    r"|\bkan (?:du|ni) skicka .+ och om\b",
     re.I,
 )
 _GRAMMATICAL_BAD_EN = re.compile(
-    r"\bif you have if you have\b|\bcould you please send which\b",
+    r"\bif you have if you have\b|\bcould you please send which\b"
+    r"|\b(?:send|could you).+\band whether\b.*\band whether\b",
     re.I,
 )
 

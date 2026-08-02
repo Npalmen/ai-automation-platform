@@ -107,6 +107,7 @@ def multi_turn_vs_first_contact_duplicates(
 class PackagePrecheckResult:
     package_precheck_pass: bool
     scenario_oracles_pass: bool
+    final_customer_text_pass: bool
     fallback_rate_pass: bool
     provider_integrity_pass: bool
     provenance_pass: bool
@@ -123,12 +124,21 @@ class PackagePrecheckResult:
     template_similarity: float
     gate_failures: list[str] = field(default_factory=list)
     renderer_distribution: dict[str, int] = field(default_factory=dict)
+    raw_llm_validator_failures: int = 0
+    deterministic_fallback_count: int = 0
+    fallback_validator_failures: int = 0
+    final_customer_text_validator_failures: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "package_precheck_pass": self.package_precheck_pass,
             "scenario_oracles_pass": self.scenario_oracles_pass,
+            "final_customer_text_pass": self.final_customer_text_pass,
+            "final_customer_text_validator_failures": self.final_customer_text_validator_failures,
             "renderer_pass": self.fallback_rate_pass and self.provider_integrity_pass,
+            "raw_llm_validator_failures": self.raw_llm_validator_failures,
+            "deterministic_fallback_count": self.deterministic_fallback_count,
+            "fallback_validator_failures": self.fallback_validator_failures,
             "fallback_rate_pass": self.fallback_rate_pass,
             "provider_integrity_pass": self.provider_integrity_pass,
             "provenance_pass": self.provenance_pass,
@@ -162,6 +172,11 @@ def evaluate_package_precheck(
     provider_outcomes: Sequence[str],
     live_validation_outcomes: Sequence[str | None],
     aggregation_consistent: Sequence[bool],
+    final_customer_text_pass: Sequence[bool] | None = None,
+    raw_llm_validator_failures: int = 0,
+    deterministic_fallback_count: int = 0,
+    fallback_validator_failures: int = 0,
+    final_customer_text_validator_failures: int = 0,
     renderer_distribution: dict[str, int] | None = None,
 ) -> PackagePrecheckResult:
     n = len(scenario_pass)
@@ -170,6 +185,20 @@ def evaluate_package_precheck(
     scenario_oracles_pass = all(scenario_pass)
     if not scenario_oracles_pass:
         gate_failures.append("scenario_oracles_not_all_pass")
+
+    if final_customer_text_pass is None:
+        final_customer_text_pass_list = [True] * n
+    else:
+        final_customer_text_pass_list = list(final_customer_text_pass)
+    final_customer_text_pass_gate = all(final_customer_text_pass_list)
+    computed_final_failures = sum(1 for ok in final_customer_text_pass_list if not ok)
+    if final_customer_text_validator_failures == 0:
+        final_customer_text_validator_failures = computed_final_failures
+    if final_customer_text_validator_failures > 0:
+        gate_failures.append(
+            f"final_customer_text_validator_failures {final_customer_text_validator_failures} > 0"
+        )
+        final_customer_text_pass_gate = False
 
     fallback_count = sum(1 for f in use_fallback if f)
     fallback_rate = fallback_count / max(n, 1)
@@ -254,6 +283,7 @@ def evaluate_package_precheck(
 
     package_precheck_pass = (
         scenario_oracles_pass
+        and final_customer_text_pass_gate
         and fallback_rate_pass
         and provider_integrity_pass
         and provenance_pass
@@ -265,6 +295,7 @@ def evaluate_package_precheck(
     return PackagePrecheckResult(
         package_precheck_pass=package_precheck_pass,
         scenario_oracles_pass=scenario_oracles_pass,
+        final_customer_text_pass=final_customer_text_pass_gate,
         fallback_rate_pass=fallback_rate_pass,
         provider_integrity_pass=provider_integrity_pass,
         provenance_pass=provenance_pass,
@@ -281,4 +312,8 @@ def evaluate_package_precheck(
         template_similarity=similarity,
         gate_failures=gate_failures,
         renderer_distribution=dict(renderer_distribution or {}),
+        raw_llm_validator_failures=raw_llm_validator_failures,
+        deterministic_fallback_count=deterministic_fallback_count,
+        fallback_validator_failures=fallback_validator_failures,
+        final_customer_text_validator_failures=final_customer_text_validator_failures,
     )

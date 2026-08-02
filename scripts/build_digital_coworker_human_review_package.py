@@ -197,6 +197,7 @@ class RenderedScenario:
     proxy_score: dict[str, Any]
     template_skeleton: str
     audit: dict[str, Any] | None = None
+    render_validation: dict[str, Any] | None = None
 
 
 def _map_evidence_source(raw: str) -> str:
@@ -405,6 +406,7 @@ def render_scenario_full(scenario: ProfileScenario) -> RenderedScenario:
     body = ""
     plan_v2: CustomerReplyPlanV2 | None = None
     provenance: dict[str, Any] = {}
+    render_validation: dict[str, Any] = {}
     render_result = None
     if eligibility.eligible:
         prev_enabled = os.environ.get("DIGITAL_COWORKER_REPLY_ENABLED")
@@ -440,7 +442,8 @@ def render_scenario_full(scenario: ProfileScenario) -> RenderedScenario:
         if rendered is not None:
             body, plan_v2, render_result, _meta = rendered
             provenance = render_result.provenance.to_dict()
-            llm_meta = render_result.validation.get("llm_meta") or {}
+            render_validation = dict(render_result.validation or {})
+            llm_meta = render_validation.get("llm_meta") or {}
             provenance["llm_meta"] = llm_meta
 
     from app.evaluation.profile_testbot.coworker_quality_oracles import _structural_skeleton
@@ -450,6 +453,7 @@ def render_scenario_full(scenario: ProfileScenario) -> RenderedScenario:
         reply_body=body,
         plan_v2=plan_v2,
         provenance=render_result.provenance if render_result is not None else None,
+        render_validation=render_validation or None,
     )
     proxy = score_reply_for_review(
         scenario_id=scenario.scenario_id,
@@ -485,6 +489,7 @@ def render_scenario_full(scenario: ProfileScenario) -> RenderedScenario:
         proxy_score=proxy.to_dict(),
         template_skeleton=_structural_skeleton(body),
         audit=audit,
+        render_validation=render_validation or None,
     )
 
 
@@ -672,14 +677,17 @@ def build_reports(*, merge_sha: str) -> dict[str, Path]:
         blocking_oracle_total += surface_metrics["blocking_oracle_failures"]
         if not surface_metrics["aggregation_consistent"]:
             aggregation_contradictions += 1
+        final_gate = (item.render_validation or {}).get("final_customer_text_validation") or {}
+        scenario_pass = agg["passed"] and bool(final_gate.get("passed", True))
         pack_quality_rows.append(
             {
                 "scenario_id": s.scenario_id,
                 "expected_language": exp_lang,
                 "blocking_oracle_failures": agg["blocking_failures"],
                 "surface_metrics": surface_metrics,
-                "scenario_pass": agg["passed"],
-                "overall_pass": agg["passed"],
+                "scenario_pass": scenario_pass,
+                "overall_pass": scenario_pass,
+                "final_customer_text_validation": final_gate,
                 "fact_integrity_audit": item.audit or {},
             }
         )
@@ -688,6 +696,23 @@ def build_reports(*, merge_sha: str) -> dict[str, Path]:
         str((r.scenario.customer_state_setup or {}).get("thread_state") or "new_thread")
         for r in rendered
     ]
+    raw_llm_validator_failures = sum(
+        int((r.render_validation or {}).get("llm_meta", {}).get("raw_llm_validator_failures") or 0)
+        for r in rendered
+    )
+    deterministic_fallback_count = sum(
+        int((r.render_validation or {}).get("llm_meta", {}).get("deterministic_fallback_count") or 0)
+        for r in rendered
+    )
+    fallback_validator_failures = sum(
+        int((r.render_validation or {}).get("llm_meta", {}).get("fallback_validator_failures") or 0)
+        for r in rendered
+    )
+    final_customer_text_validator_failures = sum(
+        1
+        for r in rendered
+        if not ((r.render_validation or {}).get("final_customer_text_validation") or {}).get("passed", True)
+    )
     precheck = evaluate_package_precheck(
         scenario_pass=[row["scenario_pass"] for row in pack_quality_rows],
         bodies=[r.body for r in rendered],
@@ -708,6 +733,14 @@ def build_reports(*, merge_sha: str) -> dict[str, Path]:
             for r in rendered
         ],
         aggregation_consistent=[row["surface_metrics"]["aggregation_consistent"] for row in pack_quality_rows],
+        final_customer_text_pass=[
+            bool((row.get("final_customer_text_validation") or {}).get("passed", True))
+            for row in pack_quality_rows
+        ],
+        raw_llm_validator_failures=raw_llm_validator_failures,
+        deterministic_fallback_count=deterministic_fallback_count,
+        fallback_validator_failures=fallback_validator_failures,
+        final_customer_text_validator_failures=final_customer_text_validator_failures,
         renderer_distribution=renderer_counts,
     )
     package_qualification = (
@@ -849,6 +882,13 @@ def build_reports(*, merge_sha: str) -> dict[str, Path]:
                 "### Validatorresultat (live)",
                 f"- issues: `{(item.provenance.get('llm_meta') or {}).get('live_validation_issues') or []}`",
                 "",
+                "### Final customer text validation",
+                f"- passed: `{(item.render_validation or {}).get('final_customer_text_validation', {}).get('passed', 'n/a')}`",
+                f"- validation_stage: `{(item.render_validation or {}).get('final_customer_text_validation', {}).get('validation_stage', 'n/a')}`",
+                f"- validator_version: `{(item.render_validation or {}).get('final_customer_text_validation', {}).get('validator_version', 'n/a')}`",
+                f"- validated_body_hash: `{(item.render_validation or {}).get('final_customer_text_validation', {}).get('validated_body_hash', 'n/a')}`",
+                f"- issues: `{(item.render_validation or {}).get('final_customer_text_validation', {}).get('issues') or []}`",
+                "",
                 "### Renderer",
                 f"- mode: `{_renderer_label(item.provenance)}`",
                 f"- template_version: `{item.provenance.get('template_version', 'n/a')}`",
@@ -972,6 +1012,10 @@ def build_reports(*, merge_sha: str) -> dict[str, Path]:
             "surface_violations": surface_total,
             "blocking_oracle_failures": blocking_oracle_total,
             "aggregation_contradictions": aggregation_contradictions,
+            "raw_llm_validator_failures": raw_llm_validator_failures,
+            "deterministic_fallback_count": deterministic_fallback_count,
+            "fallback_validator_failures": fallback_validator_failures,
+            "final_customer_text_validator_failures": final_customer_text_validator_failures,
             "scenario_quality": pack_quality_rows,
         },
         "proxy_scores": [r.proxy_score for r in rendered],

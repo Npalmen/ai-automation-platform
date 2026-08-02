@@ -136,9 +136,14 @@ def detect_semantic_placeholders(body: str) -> list[str]:
 def detect_robotic_template_composition(body: str) -> list[str]:
     lowered = (body or "").lower()
     hits = sum(1 for segment in _ROBOTIC_SEGMENTS if segment in lowered)
+    issues: list[str] = []
     if hits >= 2:
-        return ["natural_surface:robotic_segment_stack"]
-    return []
+        issues.append("natural_surface:robotic_segment_stack")
+    if re.search(r"\b(?:skicka|send).+\boch om\b", body or "", re.I):
+        issues.append("natural_surface:send_clause_with_om_object")
+    if re.search(r"\bkan (?:du|ni) skicka .+ och om\b", body or "", re.I):
+        issues.append("natural_surface:malformed_send_and_om")
+    return issues
 
 
 def detect_key_value_fragments(body: str) -> list[str]:
