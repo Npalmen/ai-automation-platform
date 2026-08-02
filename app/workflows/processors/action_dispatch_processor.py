@@ -873,8 +873,14 @@ def _build_inquiry_default_actions(
         c in (risk.get("categories") or []) for c in ("complaint",)
     )
 
+    safe_ack_action = _build_safe_acknowledgement_action(
+        job,
+        automation_settings=settings,
+    )
+    if safe_ack_action is not None:
+        actions.append(safe_ack_action)
     # Customer auto-reply: empathetic and action-oriented.
-    if not followups_enabled:
+    elif not followups_enabled:
         actions.append(_build_skipped_action("send_customer_auto_reply", "followups_enabled=false"))
     elif not customer_to:
         actions.append(_build_skipped_action("send_customer_auto_reply", "no_customer_email"))
