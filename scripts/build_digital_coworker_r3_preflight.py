@@ -244,6 +244,12 @@ def build_preflight_reports(
         manifest=manifest_stub,
         campaign_id=campaign_id,
     )
+    redacted_recipient = _redact_email(recipient)
+    for row in render_rows:
+        row.setdefault(
+            "planned_recipient",
+            redacted_recipient if row.get("planned_gmail_send") else None,
+        )
     diagnostic_rows: list[dict[str, Any]] = []
     if phase == "postdeploy":
         previous_render_env = _configure_render_env()
