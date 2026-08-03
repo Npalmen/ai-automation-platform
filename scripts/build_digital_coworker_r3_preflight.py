@@ -33,6 +33,11 @@ from app.evaluation.profile_testbot.qualification.coworker_r3_execution import (
 from app.evaluation.profile_testbot.qualification.coworker_r3_frozen_bodies import (  # noqa: E402
     resolve_frozen_send_bodies,
 )
+from app.evaluation.profile_testbot.qualification.coworker_r3_registration_contract import (  # noqa: E402
+    R3_FROZEN_EXECUTION_MODE,
+    R3_FROZEN_LIVE_CANARY_CAMPAIGN_TYPE,
+    validate_r3_campaign_registration_contract,
+)
 
 PROFILE_ID = "niklas-demo-live-eval-v1"
 TENANT_ID = "TENANT_LIVE_EVAL"
@@ -293,6 +298,33 @@ def build_preflight_reports(
     if secret_issues:
         readiness.stop_conditions.append(f"report secret scan failed: {secret_issues}")
 
+    if phase == "postdeploy":
+        registration = validate_r3_campaign_registration_contract(
+            manifest={
+                "campaign_type": R3_FROZEN_LIVE_CANARY_CAMPAIGN_TYPE,
+                "execution_mode": R3_FROZEN_EXECUTION_MODE,
+                "manifest_hash": manifest.manifest_hash,
+                "tenant_id": TENANT_ID,
+                "send_budget": len(planned_sends),
+                "hold_reject_no_reply_count": len(no_send_rows),
+                "scenario_ids": manifest.scenario_ids,
+                "approved_send_body_hashes": R3_APPROVED_SEND_BODY_HASHES,
+                "approved_send_body_texts": resolve_frozen_send_bodies(manifest_stub),
+                "runner_sha": runner_sha,
+            },
+            runtime_sha=instrumentation_merge_sha,
+            recipient_email=recipient,
+            render_rows=render_rows,
+        )
+        if not registration.registration_contract_valid:
+            readiness.stop_conditions.extend(registration.registration_blockers)
+        readiness.registration_contract_valid = registration.registration_contract_valid
+        readiness.campaign_type_valid = registration.campaign_type_valid
+        readiness.execution_mode_valid = registration.execution_mode_valid
+        readiness.scenario_registry_valid = registration.scenario_registry_valid
+        readiness.live_gmail_policy_valid = registration.live_gmail_policy_valid
+        readiness.registration_blockers = registration.registration_blockers
+
     if phase == "predeploy":
         readiness.predeploy_preflight_pass = not readiness.stop_conditions
     else:
@@ -321,7 +353,8 @@ def build_preflight_reports(
         "campaign_id": campaign_id,
         "profile_id": PROFILE_ID,
         "tenant_id": TENANT_ID,
-        "campaign_type": manifest.campaign_type,
+        "campaign_type": R3_FROZEN_LIVE_CANARY_CAMPAIGN_TYPE,
+        "execution_mode": R3_FROZEN_EXECUTION_MODE,
         "manifest_hash": manifest.manifest_hash,
         "scenario_ids": manifest.scenario_ids,
         "family_distribution": manifest.family_distribution,

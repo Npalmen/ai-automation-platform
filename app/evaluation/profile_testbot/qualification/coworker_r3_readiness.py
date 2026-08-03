@@ -34,7 +34,7 @@ R3_INSTRUMENTATION_ALLOWLIST: tuple[str, ...] = (
     "app/evaluation/profile_testbot/qualification/coworker_r3_execution.py",
     "app/evaluation/profile_testbot/qualification/coworker_r3_frozen_bodies.py",
     "app/evaluation/profile_testbot/qualification/coworker_r3_frozen_bind.py",
-    "app/evaluation/profile_testbot/qualification/coworker_r3_readiness.py",
+    "app/evaluation/profile_testbot/qualification/coworker_r3_registration_contract.py",
     "app/evaluation/profile_testbot/qualification/r3_approved_send_bodies.json",
     "app/evaluation/live/routes.py",
     "app/evaluation/live/schemas.py",
@@ -45,7 +45,7 @@ R3_INSTRUMENTATION_ALLOWLIST: tuple[str, ...] = (
     "tests/test_coworker_r3_frozen_bodies.py",
     "tests/test_coworker_r3_frozen_bind.py",
     "tests/test_coworker_r3_live_execution.py",
-    "tests/test_coworker_r3_readiness.py",
+    "tests/test_coworker_r3_registration_contract.py",
 )
 
 # Human-approved send body hashes from R3_RENDER_REVIEW (d2e86c1 predeploy).
@@ -115,6 +115,12 @@ class CoworkerR3ReadinessResult:
     unrelated_qualification_context: list[str] = field(default_factory=list)
     body_hash_drift: dict[str, dict[str, str]] = field(default_factory=dict)
     human_render_rereview_required: bool = False
+    registration_contract_valid: bool | None = None
+    campaign_type_valid: bool | None = None
+    execution_mode_valid: bool | None = None
+    scenario_registry_valid: bool | None = None
+    live_gmail_policy_valid: bool | None = None
+    registration_blockers: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -146,6 +152,12 @@ class CoworkerR3ReadinessResult:
             "unrelated_qualification_context": self.unrelated_qualification_context,
             "body_hash_drift": self.body_hash_drift,
             "human_render_rereview_required": self.human_render_rereview_required,
+            "registration_contract_valid": self.registration_contract_valid,
+            "campaign_type_valid": self.campaign_type_valid,
+            "execution_mode_valid": self.execution_mode_valid,
+            "scenario_registry_valid": self.scenario_registry_valid,
+            "live_gmail_policy_valid": self.live_gmail_policy_valid,
+            "registration_blockers": self.registration_blockers,
             "gmail_sent": False,
             "gmail_drafts_created": False,
         }

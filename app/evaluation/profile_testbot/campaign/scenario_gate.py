@@ -44,6 +44,14 @@ def is_profile_testbot_quality_scenario(scenario_id: str) -> bool:
     return normalized in locked_profile_testbot_quality_scenario_ids()
 
 
+def is_r3_frozen_live_canary_scenario(scenario_id: str) -> bool:
+    from app.evaluation.profile_testbot.qualification.coworker_r3_registration_contract import (
+        is_r3_frozen_live_canary_scenario as _is_r3,
+    )
+
+    return _is_r3(scenario_id)
+
+
 def _env_truthy(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in ("yes", "true", "1")
 
