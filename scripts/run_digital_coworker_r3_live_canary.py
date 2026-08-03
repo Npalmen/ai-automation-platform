@@ -54,6 +54,7 @@ def _load_live_eval_env(*, runtime_sha: str) -> None:
     os.environ["PROFILE_TESTBOT_LIVE_QUALITY_APPROVED"] = "yes"
     os.environ["PROFILE_TESTBOT_LIVE_QUALITY_RUNNER_APPROVED"] = "yes"
     os.environ["PROFILE_TESTBOT_LIVE_QUALITY_RUNNER_APPROVED_SHA"] = runtime_sha
+    os.environ["R3_FROZEN_APPROVAL_BIND_ALLOWED"] = "yes"
     os.environ.pop("PROFILE_TESTBOT_OFFLINE_MAILBOX_CONTRACT", None)
 
     client_id = os.environ.get("LIVE_EVAL_RECIPIENT_GMAIL_CLIENT_ID", "").strip()
@@ -126,6 +127,8 @@ def main() -> int:
     if result.mode == "dry_run":
         if readiness.get("r3_canary_ready_for_execution"):
             print("R3 dry-run PASS — r3_canary_ready_for_execution=true (no Gmail sent)")
+            if readiness.get("manual_execution_confirmation"):
+                print(readiness["manual_execution_confirmation"])
             return 0
         print("R3 dry-run BLOCKED", file=sys.stderr)
         print(result.stop_reason or readiness.get("execution_blockers"), file=sys.stderr)

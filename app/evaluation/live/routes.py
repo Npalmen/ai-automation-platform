@@ -60,6 +60,8 @@ from app.evaluation.live.schemas import (
     ProcessFixtureInputResponse,
     RecipientCleanupRequest,
     RuntimeReadinessResponse,
+    R3BindFrozenApprovalBodyRequest,
+    R3BindFrozenApprovalBodyResponse,
 )
 from app.evaluation.live.safety import (
     require_gmail_eval_enabled,
@@ -555,4 +557,54 @@ def gmail_readiness(
         ready=report.ready,
         issues=report.issues,
         checks=report.checks,
+    )
+
+
+@router.post("/r3/bind-frozen-approval-body", response_model=R3BindFrozenApprovalBodyResponse)
+def bind_frozen_approval_body(
+    body: R3BindFrozenApprovalBodyRequest,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin_api_key),
+):
+    import os
+
+    from app.evaluation.profile_testbot.qualification.coworker_r3_frozen_bodies import (
+        r3_send_body_hash,
+    )
+    from app.repositories.postgres.approval_repository import ApprovalRequestRepository
+
+    if os.environ.get("R3_FROZEN_APPROVAL_BIND_ALLOWED", "").strip().lower() not in (
+        "yes",
+        "true",
+        "1",
+    ):
+        raise HTTPException(status_code=403, detail="R3 frozen approval bind not allowed")
+    require_live_eval_enabled()
+    require_gmail_eval_enabled()
+    try:
+        require_tenant_allowed(body.tenant_id)
+    except LiveEvalSafetyError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    digest = r3_send_body_hash(body.frozen_body)
+    if digest != body.expected_body_hash:
+        raise HTTPException(status_code=400, detail="frozen body hash mismatch")
+    record = ApprovalRequestRepository.get_by_approval_id(
+        db=db,
+        tenant_id=body.tenant_id,
+        approval_id=body.approval_id,
+    )
+    if record is None or record.job_id != body.job_id:
+        raise HTTPException(status_code=404, detail="approval not found")
+    if str(record.state or "") != "pending":
+        raise HTTPException(status_code=409, detail="approval not pending")
+    delivery = dict(record.delivery_payload or {})
+    delivery["body"] = body.frozen_body
+    record.delivery_payload = delivery
+    db.commit()
+    db.refresh(record)
+    return R3BindFrozenApprovalBodyResponse(
+        approval_id=body.approval_id,
+        job_id=body.job_id,
+        body_hash=digest,
+        bound=True,
     )

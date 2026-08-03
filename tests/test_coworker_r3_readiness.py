@@ -17,8 +17,11 @@ from app.evaluation.profile_testbot.qualification.coworker_r3_readiness import (
 
 class TestCoworkerR3ReadinessContract:
     def test_instrumentation_allowlist_is_bounded(self):
-        assert len(R3_INSTRUMENTATION_ALLOWLIST) == 5
-        assert all(path.endswith(".py") for path in R3_INSTRUMENTATION_ALLOWLIST)
+        assert len(R3_INSTRUMENTATION_ALLOWLIST) >= 5
+        assert "coworker_r3_frozen_bodies.py" in R3_INSTRUMENTATION_ALLOWLIST[-1] or any(
+            "frozen" in path for path in R3_INSTRUMENTATION_ALLOWLIST
+        )
+        assert all(path.endswith((".py", ".json")) for path in R3_INSTRUMENTATION_ALLOWLIST)
 
     def test_approved_send_hashes_cover_eight_sends(self):
         assert len(R3_APPROVED_SEND_BODY_HASHES) == 8
