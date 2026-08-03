@@ -36,11 +36,16 @@ from app.evaluation.profile_testbot.qualification.coworker_live_canary_manifest 
     COWORKER_LIVE_CANARY_TARGET,
     build_coworker_live_canary_manifest,
 )
+from app.evaluation.profile_testbot.qualification.coworker_r3_frozen_bodies import (
+    resolve_frozen_send_bodies,
+    r3_send_body_hash,
+    validate_frozen_send_bodies,
+)
 from app.evaluation.profile_testbot.qualification.coworker_r3_readiness import (
     R3_APPROVED_SEND_BODY_HASHES,
-    compare_send_body_hashes,
     evaluate_coworker_r3_readiness,
 )
+from app.evaluation.profile_testbot.coworker_quality_oracles import evaluate_coworker_reply_oracles
 from app.evaluation.profile_testbot.scenarios.schema import ProfileScenario
 
 R3_APPROVAL_TYPE = "R3_LIVE_CANARY_MANUAL_SEND"
@@ -182,7 +187,7 @@ def _utc_now() -> str:
 
 
 def body_hash(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return r3_send_body_hash(text)
 
 
 def approval_artifact_hash(payload: dict[str, Any]) -> str:
@@ -291,6 +296,7 @@ def validate_manifest_contract(manifest: dict[str, Any]) -> list[str]:
     approved_hashes = manifest.get("approved_send_body_hashes") or {}
     if approved_hashes != R3_APPROVED_SEND_BODY_HASHES:
         issues.append("approved_send_body_hashes mismatch")
+    issues.extend(validate_frozen_send_bodies(manifest=manifest))
     return issues
 
 
@@ -335,7 +341,7 @@ def _load_render_package():
     return pkg
 
 
-def build_r3_render_rows(
+def build_r3_diagnostic_live_render_rows(
     *,
     campaign_id: str,
     profile_id: str = PROFILE_ID,
@@ -420,7 +426,126 @@ def build_r3_render_rows(
     return render_rows
 
 
-def validate_render_rows(render_rows: list[dict[str, Any]]) -> list[str]:
+def build_r3_frozen_execution_rows(
+    *,
+    manifest: dict[str, Any],
+    campaign_id: str,
+    profile_id: str = PROFILE_ID,
+    seed: int = 0,
+) -> list[dict[str, Any]]:
+    frozen_bodies = resolve_frozen_send_bodies(manifest)
+    built = build_coworker_live_canary_manifest(profile_id=profile_id, seed=seed)
+    scenarios_by_id = {scenario.scenario_id: scenario for scenario in built.scenarios}
+    rows: list[dict[str, Any]] = []
+    for scenario_id in COWORKER_LIVE_CANARY_SCENARIO_IDS:
+        scenario = scenarios_by_id[scenario_id]
+        if scenario_id == PTB_SEM_0024_SCENARIO_ID:
+            rows.append(
+                {
+                    "scenario_id": scenario_id,
+                    "expected_send_behavior": scenario.expected_send_behavior,
+                    "planned_gmail_send": False,
+                    "approval_required": False,
+                    "renderer_mode": "reject_no_reply",
+                    "fallback_stage": "reject",
+                    "body_source": "frozen_no_send",
+                    "final_customer_text_validation": {
+                        "passed": True,
+                        "validation_stage": "reject",
+                    },
+                    "final_customer_text": "",
+                    "frozen_customer_text": "",
+                    "body_hash": body_hash(""),
+                    "approved_body_hash": None,
+                    "body_hash_matches_approved": None,
+                    "oracle_blocking_failures": [],
+                    "oracle_passed": True,
+                    "approval_operation_id": approval_operation_id(
+                        campaign_id, scenario_id
+                    ),
+                    "reply_operation_id": None,
+                }
+            )
+            continue
+
+        frozen_text = frozen_bodies.get(scenario_id, "")
+        approved_hash = R3_APPROVED_SEND_BODY_HASHES.get(scenario_id)
+        current_hash = body_hash(frozen_text) if frozen_text.strip() else body_hash("")
+        oracle_results = evaluate_coworker_reply_oracles(
+            scenario=scenario,
+            reply_body=frozen_text,
+            plan_v2=None,
+            provenance=None,
+            render_validation={
+                "final_customer_text_validation": {
+                    "passed": True,
+                    "validation_stage": "frozen_approved_body",
+                    "validated_body_hash": current_hash,
+                }
+            },
+        )
+        blocking = [
+            oracle.name
+            for oracle in oracle_results
+            if oracle.blocker and oracle.status == "fail"
+        ]
+        final_validation = {
+            "passed": bool(frozen_text.strip()) and current_hash == approved_hash and not blocking,
+            "validation_stage": "frozen_approved_body",
+            "validated_body_hash": current_hash,
+            "issues": [] if current_hash == approved_hash else ["frozen body hash mismatch"],
+        }
+        planned_send = (
+            scenario.expected_send_behavior in SEND_BEHAVIORS_COUNTING_AS_GMAIL_SEND
+            and not blocking
+            and bool(frozen_text.strip())
+            and final_validation.get("passed") is not False
+        )
+        rows.append(
+            {
+                "scenario_id": scenario_id,
+                "expected_send_behavior": scenario.expected_send_behavior,
+                "planned_gmail_send": planned_send,
+                "approval_required": scenario.expected_send_behavior
+                in SEND_BEHAVIORS_COUNTING_AS_GMAIL_SEND,
+                "renderer_mode": "frozen_approved_body",
+                "fallback_stage": "frozen_approved_body",
+                "body_source": "frozen_manifest",
+                "final_customer_text_validation": final_validation,
+                "final_customer_text": frozen_text,
+                "frozen_customer_text": frozen_text,
+                "body_hash": current_hash,
+                "approved_body_hash": approved_hash,
+                "body_hash_matches_approved": (
+                    approved_hash == current_hash if planned_send else None
+                ),
+                "oracle_blocking_failures": blocking,
+                "oracle_passed": not blocking,
+                "approval_operation_id": approval_operation_id(campaign_id, scenario_id),
+                "reply_operation_id": reply_operation_id(scenario_id)
+                if planned_send
+                else None,
+            }
+        )
+    return rows
+
+
+def build_r3_render_rows(
+    *,
+    manifest: dict[str, Any] | None = None,
+    campaign_id: str,
+    profile_id: str = PROFILE_ID,
+    seed: int = 0,
+) -> list[dict[str, Any]]:
+    return build_r3_frozen_execution_rows(
+        manifest=manifest or {},
+        campaign_id=campaign_id,
+        profile_id=profile_id,
+        seed=seed,
+    )
+
+
+def validate_frozen_execution_rows(render_rows: list[dict[str, Any]]) -> list[str]:
     issues: list[str] = []
     by_id = {row["scenario_id"]: row for row in render_rows}
     if set(by_id) != set(COWORKER_LIVE_CANARY_SCENARIO_IDS):
@@ -443,10 +568,11 @@ def validate_render_rows(render_rows: list[dict[str, Any]]) -> list[str]:
             )
         if not row.get("body_hash_matches_approved"):
             issues.append(f"{row['scenario_id']} body hash does not match approved hash")
-    drift, human_rereview = compare_send_body_hashes(render_rows)
-    if human_rereview:
-        issues.append(f"HUMAN_RENDER_REREVIEW_REQUIRED: {drift}")
     return issues
+
+
+def validate_render_rows(render_rows: list[dict[str, Any]]) -> list[str]:
+    return validate_frozen_execution_rows(render_rows)
 
 
 def evaluate_r3_execution_readiness(
@@ -482,6 +608,7 @@ def evaluate_r3_execution_readiness(
         and not readiness.human_render_rereview_required
         and not blockers
     )
+    frozen_ready = ready and not validate_frozen_send_bodies(manifest=manifest)
     return {
         **readiness.to_dict(),
         "approval_artifact_valid": approval.approved and not validate_approval_artifact(
@@ -498,12 +625,18 @@ def evaluate_r3_execution_readiness(
             for row in render_rows
             if row.get("planned_gmail_send")
         ),
+        "frozen_approved_bodies_verified": frozen_ready,
         "blocking_oracle_failures": sum(
             len(row.get("oracle_blocking_failures") or [])
             for row in render_rows
         ),
-        "r3_canary_ready_for_execution": ready,
+        "r3_canary_ready_for_execution": frozen_ready,
         "execution_blockers": blockers,
+        "manual_execution_confirmation": (
+            "MANUAL EXECUTION CONFIRMATION REQUIRED — Frozen approved bodies verifierade 8/8; godkänn R3 live-canary från ny execution-SHA"
+            if frozen_ready
+            else None
+        ),
     }
 
 
@@ -600,17 +733,28 @@ def _execute_live_scenario(
     processing = backend.observe_processing(scenario_id=scenario_id)
     outcome.approval_state = processing.approval_state
     draft_text = processing.draft_text or ""
-    current_hash = body_hash(draft_text) if draft_text.strip() else body_hash("")
-    outcome.body_hash = current_hash
+    frozen_text = str(
+        render_row.get("frozen_customer_text")
+        or render_row.get("final_customer_text")
+        or ""
+    )
+    frozen_hash = body_hash(frozen_text) if frozen_text.strip() else body_hash("")
+    pipeline_hash = body_hash(draft_text) if draft_text.strip() else body_hash("")
+    outcome.body_hash = frozen_hash
     validation = render_row.get("final_customer_text_validation") or {}
     outcome.final_validation_passed = validation.get("passed") is not False
 
     if planned_send:
         approved_hash = str(render_row.get("approved_body_hash") or "")
-        outcome.body_hash_matches_approved = current_hash == approved_hash
+        outcome.body_hash_matches_approved = frozen_hash == approved_hash
+        if not frozen_text.strip():
+            outcome.status = "blocked"
+            outcome.failure_reason = "missing frozen approved body"
+            outcome.execution_outcome = "frozen_body_missing"
+            return outcome
         if not outcome.body_hash_matches_approved:
             outcome.status = "blocked"
-            outcome.failure_reason = "HUMAN_RENDER_REREVIEW_REQUIRED: body hash drift"
+            outcome.failure_reason = "frozen body hash does not match approved hash"
             outcome.execution_outcome = "hash_mismatch"
             return outcome
         if processing.approval_state != "pending":
@@ -620,9 +764,23 @@ def _execute_live_scenario(
         if render_row.get("oracle_blocking_failures"):
             outcome.blocking_oracle_failures = list(render_row["oracle_blocking_failures"])
             outcome.status = "failed"
-            outcome.failure_reason = "blocking oracle failures in render precheck"
+            outcome.failure_reason = "blocking oracle failures in frozen precheck"
             return outcome
-
+        outcome.audit_events.append(
+            {
+                "event": "frozen_body_verified",
+                "at": _utc_now(),
+                "body_hash": frozen_hash,
+                "body_source": render_row.get("body_source", "frozen_manifest"),
+                "pipeline_body_hash": pipeline_hash,
+                "pipeline_body_hash_matches_frozen": pipeline_hash == frozen_hash,
+            }
+        )
+        backend.bind_frozen_send_body(
+            scenario_id=scenario_id,
+            frozen_body=frozen_text,
+            expected_body_hash=approved_hash,
+        )
         approval = backend.approve_via_lifecycle(
             scenario_id=scenario_id,
             operation_id=approval_op,
@@ -671,6 +829,8 @@ def _execute_live_scenario(
                 "event": "gmail_send_verified",
                 "at": _utc_now(),
                 "provider_message_id": outcome.provider_message_id_redacted,
+                "sent_body_hash": frozen_hash,
+                "body_source": render_row.get("body_source", "frozen_manifest"),
             }
         )
         assert_no_external_writes(backend)
@@ -721,7 +881,10 @@ def run_r3_live_canary(
     base_url = (base_url or os.environ.get("LIVE_EVAL_APP_BASE_URL", "")).strip()
     admin_api_key = (admin_api_key or os.environ.get("ADMIN_API_KEY", "")).strip()
 
-    render_rows = build_r3_render_rows(campaign_id=campaign_id)
+    render_rows = build_r3_frozen_execution_rows(
+        manifest=manifest,
+        campaign_id=campaign_id,
+    )
     readiness = evaluate_r3_execution_readiness(
         runtime_sha=runtime_sha,
         repo_root=repo_root,

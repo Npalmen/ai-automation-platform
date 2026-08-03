@@ -369,6 +369,63 @@ class LiveSemiAutoBackend:
             reply_action_operation_id=reply_operation_id,
         )
 
+    def bind_frozen_send_body(
+        self,
+        *,
+        scenario_id: str,
+        frozen_body: str,
+        expected_body_hash: str,
+    ) -> None:
+        from app.evaluation.profile_testbot.qualification.coworker_r3_frozen_bodies import (
+            r3_send_body_hash,
+        )
+
+        digest = r3_send_body_hash(frozen_body)
+        if digest != expected_body_hash:
+            raise LiveEvalSafetyError(
+                f"frozen body hash mismatch for {scenario_id}: expected={expected_body_hash}"
+            )
+        ctx = self._run_context(scenario_id)
+        if not ctx.job_id:
+            raise LiveEvalSafetyError("frozen body bind blocked: missing job_id")
+        pending = list_job_approvals(
+            base_url=self.base_url,
+            admin_api_key=self.admin_api_key,
+            tenant_id=self.tenant_id,
+            job_id=ctx.job_id,
+        )
+        target = next(
+            (
+                row
+                for row in pending
+                if row.state == "pending"
+                and row.next_on_approve in ("action_execute", "email_send")
+            ),
+            None,
+        )
+        if target is None:
+            raise LiveEvalSafetyError("frozen body bind blocked: no pending approval")
+        response = httpx.post(
+            f"{self.base_url.rstrip('/')}/admin/live-eval/r3/bind-frozen-approval-body",
+            headers={
+                "X-Admin-API-Key": self.admin_api_key,
+                "X-Tenant-ID": self.tenant_id,
+            },
+            json={
+                "tenant_id": self.tenant_id,
+                "job_id": ctx.job_id,
+                "approval_id": target.approval_id,
+                "scenario_id": scenario_id,
+                "frozen_body": frozen_body,
+                "expected_body_hash": expected_body_hash,
+            },
+            timeout=30.0,
+        )
+        if response.status_code >= 400:
+            raise LiveEvalSafetyError(
+                f"frozen body bind failed: http_status={response.status_code}"
+            )
+
     def verify_reply(
         self,
         *,

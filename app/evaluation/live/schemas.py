@@ -193,3 +193,31 @@ class DeliveryObservationResponse(BaseModel):
     confirmed: dict[str, Any] | None = None
     rejection_reasons: list[str] = Field(default_factory=list)
 
+
+class R3BindFrozenApprovalBodyRequest(BaseModel):
+    tenant_id: str
+    job_id: str
+    approval_id: str
+    scenario_id: str
+    frozen_body: str
+    expected_body_hash: str
+
+
+class R3FrozenBindAuditResponse(BaseModel):
+    scenario_id: str
+    canonical_body_hash: str
+    body_source: str
+    bound_at: str
+    tenant_id: str
+    approval_id: str
+    job_id: str
+
+
+class R3BindFrozenApprovalBodyResponse(BaseModel):
+    approval_id: str
+    job_id: str
+    scenario_id: str
+    body_hash: str
+    bound: bool = True
+    audit: R3FrozenBindAuditResponse
+

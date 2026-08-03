@@ -34,6 +34,9 @@ from app.evaluation.profile_testbot.qualification.coworker_r3_execution import (
     validate_scenario_allowlist,
     write_execution_reports,
 )
+from app.evaluation.profile_testbot.qualification.coworker_r3_frozen_bodies import (
+    load_r3_approved_send_body_texts,
+)
 from app.evaluation.profile_testbot.qualification.coworker_r3_readiness import (
     CoworkerR3ReadinessResult,
 )
@@ -41,6 +44,7 @@ from app.evaluation.profile_testbot.scenarios.schema import ProfileScenario, Pro
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APPROVED_RECIPIENT = "niklas@sol-f.se"
+FROZEN_BODIES = load_r3_approved_send_body_texts()
 
 
 def _approval_payload(**overrides) -> dict:
@@ -82,6 +86,7 @@ def _render_rows_pass() -> list[dict]:
     for scenario_id in COWORKER_LIVE_CANARY_SCENARIO_IDS:
         planned_send = scenario_id in R3_SEND_SCENARIO_IDS
         approved = R3_APPROVED_SEND_BODY_HASHES.get(scenario_id)
+        frozen_text = FROZEN_BODIES.get(scenario_id, "") if planned_send else ""
         current = approved or body_hash("")
         rows.append(
             {
@@ -91,6 +96,9 @@ def _render_rows_pass() -> list[dict]:
                 "body_hash": current,
                 "approved_body_hash": approved,
                 "body_hash_matches_approved": True if planned_send else None,
+                "frozen_customer_text": frozen_text,
+                "final_customer_text": frozen_text,
+                "body_source": "frozen_manifest",
                 "final_customer_text_validation": {"passed": True},
                 "oracle_blocking_failures": [],
                 "oracle_passed": True,
@@ -214,7 +222,7 @@ class TestR3ExecutionValidation:
         rows[0]["body_hash"] = "different"
         rows[0]["body_hash_matches_approved"] = False
         issues = validate_render_rows(rows)
-        assert any("HUMAN_RENDER_REREVIEW_REQUIRED" in item for item in issues)
+        assert any("body hash does not match approved hash" in item for item in issues)
 
     def test_final_validation_fail_blocked(self):
         rows = _render_rows_pass()
@@ -332,8 +340,10 @@ class TestR3Execute:
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.load_customer_profile")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.get_live_eval_config")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.build_r3_render_rows")
+    @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.build_r3_frozen_execution_rows")
     def test_body_hash_drift_stops_before_send(
         self,
+        mock_frozen_render,
         mock_render,
         mock_config,
         mock_profile,
@@ -348,6 +358,11 @@ class TestR3Execute:
             recipient_emails=[APPROVED_RECIPIENT],
         )
         rows = [row for row in _render_rows_pass() if row["scenario_id"] == "PTB-DCQ-0000"]
+        rows[0]["frozen_customer_text"] = "tampered frozen body"
+        rows[0]["final_customer_text"] = rows[0]["frozen_customer_text"]
+        rows[0]["body_hash"] = body_hash(rows[0]["frozen_customer_text"])
+        rows[0]["body_hash_matches_approved"] = False
+        mock_frozen_render.return_value = rows
         mock_render.return_value = rows
         mock_profile.return_value = MagicMock()
         scenario = self._scenario("PTB-DCQ-0000", "send_after_approval")
@@ -368,6 +383,7 @@ class TestR3Execute:
             approval_state="pending",
             draft_text="different body text",
         )
+        backend.bind_frozen_send_body = MagicMock()
 
         with patch(
             "app.evaluation.profile_testbot.qualification.coworker_r3_execution.COWORKER_LIVE_CANARY_SCENARIO_IDS",
@@ -382,8 +398,9 @@ class TestR3Execute:
                 backend=backend,
             )
         assert result.overall_status in {"FAIL", "PARTIAL"}
-        assert result.human_render_rereview_required is True
+        assert result.human_render_rereview_required is False
         backend.approve_via_lifecycle.assert_not_called()
+        backend.bind_frozen_send_body.assert_not_called()
 
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.evaluate_r3_execution_readiness")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.build_coworker_live_canary_manifest")
@@ -539,8 +556,9 @@ class TestR3Execute:
         backend.observe_intake.return_value = MagicMock(tenant_id=LIVE_EVAL_TENANT_ID)
         backend.observe_processing.return_value = MagicMock(
             approval_state="pending",
-            draft_text="approved-body",
+            draft_text="pipeline draft differs",
         )
+        backend.bind_frozen_send_body = MagicMock()
         backend.approve_via_lifecycle.return_value = MagicMock(
             already_resolved=False,
             reply_action_operation_id="reply-op",
@@ -556,9 +574,6 @@ class TestR3Execute:
         )
 
         with patch(
-            "app.evaluation.profile_testbot.qualification.coworker_r3_execution.body_hash",
-            return_value=approved_hash,
-        ), patch(
             "app.evaluation.profile_testbot.qualification.coworker_r3_execution.COWORKER_LIVE_CANARY_SCENARIO_IDS",
             ("PTB-DCQ-0000",),
         ):

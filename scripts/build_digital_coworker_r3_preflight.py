@@ -26,6 +26,13 @@ from app.evaluation.profile_testbot.qualification.coworker_r3_readiness import (
     assert_r3_code_equivalence,
     evaluate_coworker_r3_readiness,
 )
+from app.evaluation.profile_testbot.qualification.coworker_r3_execution import (  # noqa: E402
+    build_r3_diagnostic_live_render_rows,
+    build_r3_frozen_execution_rows,
+)
+from app.evaluation.profile_testbot.qualification.coworker_r3_frozen_bodies import (  # noqa: E402
+    resolve_frozen_send_bodies,
+)
 
 PROFILE_ID = "niklas-demo-live-eval-v1"
 TENANT_ID = "TENANT_LIVE_EVAL"
@@ -116,7 +123,9 @@ def _reply_operation_id(scenario_id: str) -> str:
 
 
 def _body_hash(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    from app.workflows.reply_quality.provenance import hash_body
+
+    return hash_body(text)
 
 
 def _scan_for_secrets(payload: str) -> list[str]:
@@ -230,107 +239,18 @@ def build_preflight_reports(
     config = get_live_eval_config()
     recipient = sorted(config.recipient_emails)[0] if config.recipient_emails else ""
 
-    render_rows: list[dict[str, Any]] = []
-    previous_render_env = _configure_render_env()
-    try:
-        for scenario in manifest.scenarios:
-            if scenario.scenario_id == PTB_SEM_0024_SCENARIO_ID:
-                render_rows.append(
-                    {
-                        "scenario_id": scenario.scenario_id,
-                        "family": scenario.family,
-                        "expected_send_behavior": scenario.expected_send_behavior,
-                        "planned_gmail_send": False,
-                        "approval_required": False,
-                        "renderer_mode": "reject_no_reply",
-                        "raw_llm_outcome": "skipped_adversarial_reject",
-                        "fallback_outcome": "n/a",
-                        "fallback_stage": "reject",
-                        "final_customer_text_validation": {
-                            "passed": True,
-                            "validation_stage": "reject",
-                        },
-                        "final_customer_text": "",
-                        "planned_recipient": None,
-                        "approval_operation_id": _approval_operation_id(
-                            campaign_id, scenario.scenario_id
-                        ),
-                        "reply_operation_id": None,
-                        "body_hash": _body_hash(""),
-                        "oracle_blocking_failures": [],
-                        "oracle_passed": True,
-                    }
-                )
-                continue
-
-            item = render_scenario_full(scenario)
-            llm_meta = item.provenance.get("llm_meta") or {}
-            final_validation = (item.render_validation or {}).get(
-                "final_customer_text_validation"
-            ) or {}
-            blocking = [
-                o for o in item.oracles if o.get("blocking") and o.get("status") == "fail"
-            ]
-            planned_send = (
-                scenario.expected_send_behavior in SEND_BEHAVIORS_COUNTING_AS_GMAIL_SEND
-                and not blocking
-                and bool(item.body.strip())
-                and final_validation.get("passed") is not False
-            )
-            body_hash = item.provenance.get("body_hash") or _body_hash(item.body)
-            render_rows.append(
-                {
-                    "scenario_id": scenario.scenario_id,
-                    "family": scenario.family,
-                    "expected_send_behavior": scenario.expected_send_behavior,
-                    "planned_gmail_send": planned_send,
-                    "approval_required": scenario.expected_send_behavior
-                    in SEND_BEHAVIORS_COUNTING_AS_GMAIL_SEND,
-                    "renderer_mode": renderer_label(item.provenance),
-                    "raw_llm_outcome": llm_meta.get("provider_outcome", "n/a"),
-                    "fallback_outcome": item.provenance.get("fallback_reason") or "none",
-                    "fallback_stage": final_validation.get("validation_stage", "n/a"),
-                    "final_customer_text_validation": final_validation,
-                    "final_customer_text": redact_text(item.body),
-                    "planned_recipient": _redact_email(recipient) if planned_send else None,
-                    "approval_operation_id": _approval_operation_id(
-                        campaign_id, scenario.scenario_id
-                    ),
-                    "reply_operation_id": _reply_operation_id(scenario.scenario_id)
-                    if planned_send
-                    else None,
-                    "body_hash": body_hash,
-                    "approved_body_hash": R3_APPROVED_SEND_BODY_HASHES.get(
-                        scenario.scenario_id
-                    ),
-                    "body_hash_matches_approved": (
-                        R3_APPROVED_SEND_BODY_HASHES.get(scenario.scenario_id) == body_hash
-                        if planned_send
-                        else None
-                    ),
-                    "oracle_blocking_failures": [o.get("name") for o in blocking],
-                    "oracle_passed": not blocking,
-                }
-            )
-            if blocking:
-                scenario_stop_conditions.append(
-                    f"{scenario.scenario_id} blocking oracle failures: "
-                    + ", ".join(o.get("name") or "?" for o in blocking)
-                )
-            if final_validation.get("passed") is False:
-                scenario_stop_conditions.append(
-                    f"{scenario.scenario_id} final customer text validation failed"
-                )
-            if (
-                scenario.expected_send_behavior in NO_SEND_BEHAVIORS
-                and item.body.strip()
-                and scenario.expected_send_behavior == "reject"
-            ):
-                scenario_stop_conditions.append(
-                    f"{scenario.scenario_id} reject scenario produced body"
-                )
-    finally:
-        _restore_render_env(previous_render_env)
+    manifest_stub = {"approved_send_body_hashes": R3_APPROVED_SEND_BODY_HASHES}
+    render_rows = build_r3_frozen_execution_rows(
+        manifest=manifest_stub,
+        campaign_id=campaign_id,
+    )
+    diagnostic_rows: list[dict[str, Any]] = []
+    if phase == "postdeploy":
+        previous_render_env = _configure_render_env()
+        try:
+            diagnostic_rows = build_r3_diagnostic_live_render_rows(campaign_id=campaign_id)
+        finally:
+            _restore_render_env(previous_render_env)
 
     planned_sends = [row for row in render_rows if row["planned_gmail_send"]]
     no_send_rows = [row for row in render_rows if not row["planned_gmail_send"]]
@@ -405,6 +325,7 @@ def build_preflight_reports(
         "planned_gmail_send_scenario_ids": [r["scenario_id"] for r in planned_sends],
         "planned_no_send_scenario_ids": [r["scenario_id"] for r in no_send_rows],
         "approved_send_body_hashes": R3_APPROVED_SEND_BODY_HASHES,
+        "approved_send_body_texts": resolve_frozen_send_bodies(manifest_stub),
         "code_equivalence": code_equiv.to_dict(),
         "gmail_sent": False,
         "gmail_drafts_created": False,
