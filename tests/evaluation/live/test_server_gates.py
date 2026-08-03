@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.dependencies import get_db
+from app.evaluation.live.recipient_gmail_readiness import RecipientGmailReadinessResult
 from app.evaluation.live.routes import router as live_eval_router
 from app.repositories.postgres.live_eval_models import LiveEvalRunRow
 
@@ -97,7 +98,22 @@ def test_delivery_readonly_allowed_without_mutation_gate(live_eval_client, db, m
     )
     db.add(row)
     db.commit()
-    with patch("app.evaluation.live.routes.observe_delivery_candidates") as observe:
+    with (
+        patch(
+            "app.evaluation.live.recipient_gmail_readiness.run_recipient_gmail_readiness",
+            return_value=RecipientGmailReadinessResult(
+                recipient_oauth_configured=True,
+                recipient_token_refresh_passed=True,
+                recipient_gmail_api_passed=True,
+                recipient_mailbox_identity_match=True,
+                recipient_required_scopes_present=True,
+                recipient_list_labels_passed=True,
+                recipient_read_query_passed=True,
+                recipient_delivery_observation_ready=True,
+            ),
+        ),
+        patch("app.evaluation.live.routes.observe_delivery_candidates") as observe,
+    ):
         observe.return_value = type(
             "R",
             (),
