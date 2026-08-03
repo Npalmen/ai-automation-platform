@@ -24,7 +24,7 @@ ALLOWED_RUN_TRANSITIONS: dict[str, frozenset[str]] = {
 }
 
 ALLOWED_TRANSPORT_MODES = frozenset({"live_gmail", "fixture_input"})
-ALLOWED_AI_MODES = frozenset({"fixture_ai", "live_llm"})
+ALLOWED_AI_MODES = frozenset({"fixture_ai", "live_llm", "r3_frozen_approved_body"})
 
 ALLOWED_2F3_SCENARIOS = frozenset({"S01_lead_laddbox_quality"})
 

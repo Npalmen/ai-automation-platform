@@ -44,6 +44,9 @@ def validate_registration_request(
     expected_recipient: str | None = None,
     llm_provider: str | None = None,
     llm_requested_model: str | None = None,
+    campaign_type: str | None = None,
+    execution_mode: str | None = None,
+    manifest_hash: str | None = None,
     config: LiveEvalConfig | None = None,
 ) -> LiveEvalConfig:
     config = require_tenant_allowed(tenant_id, config)
@@ -57,6 +60,32 @@ def validate_registration_request(
         require_profile_testbot_live_execution_authorized,
         require_profile_testbot_quality_live_execution_authorized,
     )
+    from app.evaluation.profile_testbot.qualification.coworker_r3_registration_contract import (
+        R3RegistrationContractRequest,
+        require_r3_registration_contract,
+    )
+
+    if transport_mode == "live_gmail" and ai_mode == "r3_frozen_approved_body":
+        require_r3_registration_contract(
+            R3RegistrationContractRequest(
+                tenant_id=tenant_id,
+                scenario_id=scenario_id,
+                transport_mode=transport_mode,
+                ai_mode=ai_mode,
+                campaign_type=campaign_type,
+                execution_mode=execution_mode,
+                expected_sender=expected_sender,
+                expected_recipient=expected_recipient,
+                manifest_hash=manifest_hash,
+            )
+        )
+        sender = (expected_sender or "").strip().lower()
+        recipient = (expected_recipient or "").strip().lower()
+        if sender not in config.sender_emails:
+            raise LiveEvalSafetyError("expected_sender is not allowlisted")
+        if recipient not in config.recipient_emails:
+            raise LiveEvalSafetyError("expected_recipient is not allowlisted")
+        return config
 
     profile_testbot_live_llm = (
         transport_mode == "live_gmail"
@@ -236,6 +265,12 @@ def require_scenario_allowed_for_live_gmail(scenario_id: str) -> None:
         return
     if scenario_id in ALLOWED_2F2_SCENARIOS:
         return
+    from app.evaluation.profile_testbot.qualification.coworker_r3_registration_contract import (
+        is_r3_frozen_live_canary_scenario,
+    )
+
+    if is_r3_frozen_live_canary_scenario(scenario_id):
+        return
     from app.evaluation.live.campaign.gates import (
         require_campaign_enabled,
         require_campaign_scenario_allowed,
@@ -286,6 +321,7 @@ def validate_live_gmail_registration(
     transport_mode: str,
     scenario_id: str,
     ai_mode: str,
+    campaign_type: str | None = None,
 ) -> None:
     if transport_mode != "live_gmail":
         return
@@ -294,7 +330,20 @@ def validate_live_gmail_registration(
         is_profile_testbot_quality_scenario,
         is_profile_testbot_semi_auto_scenario,
     )
+    from app.evaluation.profile_testbot.qualification.coworker_r3_registration_contract import (
+        is_r3_frozen_live_canary_scenario,
+    )
 
+    if is_r3_frozen_live_canary_scenario(scenario_id):
+        if ai_mode != "r3_frozen_approved_body":
+            raise LiveEvalSafetyError(
+                "R3 frozen live canary requires ai_mode r3_frozen_approved_body"
+            )
+        if campaign_type and campaign_type != "coworker_r3_frozen_live_canary":
+            raise LiveEvalSafetyError(
+                "R3 frozen live canary requires campaign_type coworker_r3_frozen_live_canary"
+            )
+        return
     if is_profile_testbot_semi_auto_scenario(scenario_id):
         if ai_mode not in {"fixture_ai", "live_llm"}:
             raise LiveEvalSafetyError(

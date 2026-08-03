@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
+import httpx
+
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.profile_testbot.campaign.semi_auto_live_backend import LiveSemiAutoBackend
@@ -40,6 +42,12 @@ from app.evaluation.profile_testbot.qualification.coworker_r3_frozen_bodies impo
     resolve_frozen_send_bodies,
     r3_send_body_hash,
     validate_frozen_send_bodies,
+)
+from app.evaluation.profile_testbot.qualification.coworker_r3_registration_contract import (
+    R3_FROZEN_EXECUTION_MODE,
+    R3_FROZEN_LIVE_CANARY_CAMPAIGN_TYPE,
+    validate_r3_campaign_registration_contract,
+    validate_r3_manifest_registration_contract,
 )
 from app.evaluation.profile_testbot.qualification.coworker_r3_readiness import (
     R3_APPROVED_SEND_BODY_HASHES,
@@ -277,27 +285,7 @@ def validate_scenario_allowlist(scenario_ids: list[str]) -> list[str]:
 
 
 def validate_manifest_contract(manifest: dict[str, Any]) -> list[str]:
-    issues: list[str] = []
-    if manifest.get("campaign_type") != COWORKER_LIVE_CANARY_CAMPAIGN_TYPE:
-        issues.append(
-            f"campaign_type {manifest.get('campaign_type')!r} != {COWORKER_LIVE_CANARY_CAMPAIGN_TYPE!r}"
-        )
-    if manifest.get("manifest_hash") != COWORKER_LIVE_CANARY_MANIFEST_HASH:
-        issues.append("manifest hash drift")
-    if manifest.get("tenant_id") != LIVE_EVAL_TENANT_ID:
-        issues.append(f"manifest tenant {manifest.get('tenant_id')!r} != {LIVE_EVAL_TENANT_ID}")
-    if manifest.get("send_budget") != COWORKER_LIVE_CANARY_SEND_MAX:
-        issues.append(f"send_budget {manifest.get('send_budget')} != {COWORKER_LIVE_CANARY_SEND_MAX}")
-    expected_no_send = COWORKER_LIVE_CANARY_TARGET - COWORKER_LIVE_CANARY_SEND_MAX
-    hold_count = manifest.get("hold_reject_no_reply_count")
-    if hold_count != expected_no_send:
-        issues.append(f"no-send count {hold_count} != {expected_no_send}")
-    issues.extend(validate_scenario_allowlist(list(manifest.get("scenario_ids") or [])))
-    approved_hashes = manifest.get("approved_send_body_hashes") or {}
-    if approved_hashes != R3_APPROVED_SEND_BODY_HASHES:
-        issues.append("approved_send_body_hashes mismatch")
-    issues.extend(validate_frozen_send_bodies(manifest=manifest))
-    return issues
+    return validate_r3_manifest_registration_contract(manifest)
 
 
 def validate_approval_artifact(
@@ -598,6 +586,13 @@ def evaluate_r3_execution_readiness(
     blockers.extend(validate_manifest_contract(manifest))
     blockers.extend(validate_approval_artifact(approval, recipient_email=recipient_email, runtime_sha=runtime_sha))
     blockers.extend(validate_render_rows(render_rows))
+    registration = validate_r3_campaign_registration_contract(
+        manifest=manifest,
+        runtime_sha=runtime_sha,
+        recipient_email=recipient_email,
+        render_rows=render_rows,
+    )
+    blockers.extend(registration.registration_blockers)
     blockers = list(dict.fromkeys(blockers))
     ready = (
         readiness.postdeploy_preflight_pass
@@ -606,11 +601,13 @@ def evaluate_r3_execution_readiness(
         and approval.approved
         and recipient_matches_approval(recipient_email)
         and not readiness.human_render_rereview_required
+        and registration.registration_contract_valid
         and not blockers
     )
     frozen_ready = ready and not validate_frozen_send_bodies(manifest=manifest)
     return {
         **readiness.to_dict(),
+        **registration.to_dict(),
         "approval_artifact_valid": approval.approved and not validate_approval_artifact(
             approval, recipient_email=recipient_email, runtime_sha=runtime_sha
         ),
@@ -713,11 +710,16 @@ def _execute_live_scenario(
     if idempotency_key in backend.sent_keys:
         raise LiveEvalSafetyError(f"duplicate replay blocked: {idempotency_key}")
 
-    send_result = backend.send_test_message(
-        campaign_id=campaign_id,
-        scenario=scenario,
-        idempotency_key=idempotency_key,
-    )
+    try:
+        send_result = backend.send_test_message(
+            campaign_id=campaign_id,
+            scenario=scenario,
+            idempotency_key=idempotency_key,
+        )
+    except httpx.HTTPStatusError as exc:
+        outcome.status = "failed"
+        outcome.failure_reason = f"live_run_registration: {exc.response.text}"
+        return outcome
     outcome.audit_events.append(
         {
             "event": "inbound_sent",
@@ -976,6 +978,10 @@ def run_r3_live_canary(
             recipient_email=recipient_email,
             base_url=base_url,
             admin_api_key=admin_api_key,
+            registration_ai_mode=R3_FROZEN_EXECUTION_MODE,
+            registration_campaign_type=R3_FROZEN_LIVE_CANARY_CAMPAIGN_TYPE,
+            registration_execution_mode=R3_FROZEN_EXECUTION_MODE,
+            registration_manifest_hash=str(manifest.get("manifest_hash") or ""),
         )
 
     claimed_operations: set[str] = set()
@@ -1007,6 +1013,13 @@ def run_r3_live_canary(
                 planned_gmail_send=bool(row.get("planned_gmail_send")),
                 status="failed",
                 failure_reason=str(exc),
+            )
+        except httpx.HTTPStatusError as exc:
+            result = R3ScenarioOutcome(
+                scenario_id=scenario_id,
+                planned_gmail_send=bool(row.get("planned_gmail_send")),
+                status="failed",
+                failure_reason=f"live_run_registration: {exc.response.text}",
             )
         outcomes.append(result)
         if result.status == "sent":

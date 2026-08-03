@@ -54,6 +54,9 @@ def register_live_eval_run(
         expected_recipient=request.expected_recipient,
         llm_provider=request.llm_provider,
         llm_requested_model=request.llm_requested_model,
+        campaign_type=request.campaign_type,
+        execution_mode=request.execution_mode,
+        manifest_hash=request.manifest_hash,
     )
     from app.evaluation.live.safety import validate_live_gmail_registration
 
@@ -61,6 +64,7 @@ def register_live_eval_run(
         transport_mode=request.transport_mode,
         scenario_id=request.scenario_id,
         ai_mode=request.ai_mode,
+        campaign_type=request.campaign_type,
     )
     fixture_bundle_id = resolve_fixture_bundle_id(
         scenario_id=request.scenario_id,

@@ -14,7 +14,11 @@ class LiveEvalRunRegisterRequest(BaseModel):
     scenario_id: str
     attempt_id: int = Field(ge=1)
     transport_mode: Literal["live_gmail", "fixture_input"] = "live_gmail"
-    ai_mode: Literal["fixture_ai", "live_llm"]
+    ai_mode: Literal["fixture_ai", "live_llm", "r3_frozen_approved_body"]
+    campaign_type: str | None = None
+    execution_mode: str | None = None
+    campaign_id: str | None = None
+    manifest_hash: str | None = None
     expected_sender: str | None = None
     expected_recipient: str | None = None
     llm_provider: str | None = None

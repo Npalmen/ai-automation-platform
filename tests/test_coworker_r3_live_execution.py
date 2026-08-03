@@ -71,7 +71,8 @@ def _approval_payload(**overrides) -> dict:
 
 def _manifest_payload() -> dict:
     return {
-        "campaign_type": "coworker-reply-live-canary",
+        "campaign_type": "coworker_r3_frozen_live_canary",
+        "execution_mode": "r3_frozen_approved_body",
         "manifest_hash": COWORKER_LIVE_CANARY_MANIFEST_HASH,
         "tenant_id": LIVE_EVAL_TENANT_ID,
         "scenario_ids": list(COWORKER_LIVE_CANARY_SCENARIO_IDS),

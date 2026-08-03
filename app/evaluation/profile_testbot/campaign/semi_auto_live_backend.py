@@ -140,6 +140,10 @@ class LiveSemiAutoBackend:
     base_url: str = ""
     admin_api_key: str = ""
     config: LiveEvalConfig | None = None
+    registration_ai_mode: str = "live_llm"
+    registration_campaign_type: str | None = None
+    registration_execution_mode: str | None = None
+    registration_manifest_hash: str | None = None
     sent_keys: set[str] = field(default_factory=set)
     approval_operations: dict[str, str] = field(default_factory=dict)
     runs: dict[str, _ScenarioRunContext] = field(default_factory=dict)
@@ -193,11 +197,19 @@ class LiveSemiAutoBackend:
                 "scenario_id": scenario.scenario_id,
                 "attempt_id": ctx.attempt_id,
                 "transport_mode": "live_gmail",
-                "ai_mode": "live_llm",
+                "ai_mode": self.registration_ai_mode,
+                "campaign_type": self.registration_campaign_type,
+                "execution_mode": self.registration_execution_mode,
+                "campaign_id": campaign_id,
+                "manifest_hash": self.registration_manifest_hash,
                 "expected_sender": self.sender_email,
                 "expected_recipient": self.recipient_email,
-                "llm_provider": (self.config.llm_provider if self.config else "") or None,
-                "llm_requested_model": (self.config.llm_model if self.config else "") or None,
+                "llm_provider": (self.config.llm_provider if self.config else "") or None
+                if self.registration_ai_mode == "live_llm"
+                else None,
+                "llm_requested_model": (self.config.llm_model if self.config else "") or None
+                if self.registration_ai_mode == "live_llm"
+                else None,
             }
         )
 

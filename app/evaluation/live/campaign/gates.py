@@ -50,6 +50,12 @@ def require_scenario_allowed_for_live_gmail(scenario_id: str) -> None:
     """Unified allowlist for 2F.2 S01 and full-system campaign scenarios."""
     if scenario_id in ALLOWED_2F2_SCENARIOS:
         return
+    from app.evaluation.profile_testbot.qualification.coworker_r3_registration_contract import (
+        is_r3_frozen_live_canary_scenario,
+    )
+
+    if is_r3_frozen_live_canary_scenario(scenario_id):
+        return
     require_campaign_enabled()
     require_campaign_scenario_allowed(scenario_id)
 
