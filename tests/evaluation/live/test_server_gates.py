@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -112,8 +112,15 @@ def test_delivery_readonly_allowed_without_mutation_gate(live_eval_client, db, m
                 recipient_delivery_observation_ready=True,
             ),
         ),
+        patch(
+            "app.evaluation.live.delivery_mailbox_reader.resolve_delivery_mailbox_reader",
+        ) as resolve_reader,
         patch("app.evaluation.live.routes.observe_delivery_candidates") as observe,
     ):
+        from tests.evaluation.live.delivery_reader_mocks import tenant_adapter_reader_resolution
+
+        adapter = MagicMock()
+        resolve_reader.return_value = tenant_adapter_reader_resolution(adapter)
         observe.return_value = type(
             "R",
             (),

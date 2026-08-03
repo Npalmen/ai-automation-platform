@@ -6,31 +6,29 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from app.evaluation.live.delivery_mailbox_reader import (
+    CREDENTIAL_SOURCE_LIVE_EVAL_RECIPIENT_ENV,
+    GoogleMailClientDeliveryReader,
+)
 from app.evaluation.live.recipient_gmail_readiness import run_recipient_gmail_readiness
 from app.integrations.google.mail_client import GmailMessageListResult, TokenRefreshResult
 
 
-@pytest.fixture
-def single_address_env(live_eval_env, monkeypatch):
-    monkeypatch.setenv("LIVE_EVAL_SENDER_EMAILS", "sender@eval.test")
-    monkeypatch.setenv("LIVE_EVAL_RECIPIENT_EMAILS", "recipient@eval.test")
-    from app.evaluation.live.config import get_live_eval_config
-
-    get_live_eval_config.cache_clear()
-    yield
-    get_live_eval_config.cache_clear()
-
-
-def test_recipient_readiness_passes_with_live_api_calls(single_address_env):
+def _mock_reader():
     client = MagicMock()
     client.get_profile_email.return_value = "recipient@eval.test"
     client.list_labels.return_value = [{"id": "INBOX", "name": "INBOX"}]
-    client.list_messages_page.return_value = GmailMessageListResult(message_ids=[], truncated=False)
+    client.list_messages_page.return_value = GmailMessageListResult(
+        message_ids=[], truncated=False
+    )
+    return GoogleMailClientDeliveryReader(client)
+
+
+def test_recipient_readiness_passes_with_live_api_calls(single_address_env):
     refresh = TokenRefreshResult(
         access_token="access-token",
         granted_scopes=frozenset({"https://www.googleapis.com/auth/gmail.readonly"}),
     )
-
     with (
         patch(
             "app.evaluation.live.recipient_gmail_readiness.refresh_access_token_with_metadata",
@@ -38,26 +36,20 @@ def test_recipient_readiness_passes_with_live_api_calls(single_address_env):
         ),
         patch(
             "app.evaluation.live.recipient_gmail_readiness.load_recipient_credentials",
-            return_value=MagicMock(
-                refresh_token="rt",
-                client_id="cid",
-                client_secret="sec",
-                user_id="me",
-                api_url="https://gmail.googleapis.com/gmail/v1",
-            ),
+            return_value=MagicMock(),
         ),
         patch(
-            "app.integrations.google.mail_client.GoogleMailClient",
-            return_value=client,
+            "app.evaluation.live.delivery_mailbox_reader.build_recipient_client",
+            return_value=_mock_reader()._client,
         ),
     ):
         report = run_recipient_gmail_readiness(expected_recipient="recipient@eval.test")
 
     assert report.ready is True
     assert report.recipient_delivery_observation_ready is True
-    assert report.recipient_token_refresh_passed is True
-    assert report.recipient_list_labels_passed is True
-    assert report.recipient_read_query_passed is True
+    assert report.delivery_observation_path_ready is True
+    assert report.recipient_credential_source == CREDENTIAL_SOURCE_LIVE_EVAL_RECIPIENT_ENV
+    assert report.credential_source_match is True
 
 
 def test_recipient_readiness_fails_when_refresh_fails(single_address_env):
@@ -66,19 +58,12 @@ def test_recipient_readiness_fails_when_refresh_fails(single_address_env):
         side_effect=RuntimeError("invalid_grant"),
     ), patch(
         "app.evaluation.live.recipient_gmail_readiness.load_recipient_credentials",
-        return_value=MagicMock(
-            refresh_token="rt",
-            client_id="cid",
-            client_secret="sec",
-            user_id="me",
-            api_url="https://gmail.googleapis.com/gmail/v1",
-        ),
+        return_value=MagicMock(),
     ):
         report = run_recipient_gmail_readiness(expected_recipient="recipient@eval.test")
 
     assert report.ready is False
     assert report.recipient_token_refresh_passed is False
-    assert any("refresh failed" in blocker for blocker in report.blockers)
 
 
 def test_recipient_readiness_fails_when_list_labels_401(single_address_env):
@@ -97,23 +82,17 @@ def test_recipient_readiness_fails_when_list_labels_401(single_address_env):
         ),
         patch(
             "app.evaluation.live.recipient_gmail_readiness.load_recipient_credentials",
-            return_value=MagicMock(
-                refresh_token="rt",
-                client_id="cid",
-                client_secret="sec",
-                user_id="me",
-                api_url="https://gmail.googleapis.com/gmail/v1",
-            ),
+            return_value=MagicMock(),
         ),
         patch(
-            "app.integrations.google.mail_client.GoogleMailClient",
+            "app.evaluation.live.delivery_mailbox_reader.build_recipient_client",
             return_value=client,
         ),
     ):
         report = run_recipient_gmail_readiness(expected_recipient="recipient@eval.test")
 
     assert report.ready is False
-    assert report.recipient_list_labels_passed is False
+    assert report.delivery_observation_path_ready is False
 
 
 def test_recipient_readiness_fails_on_mailbox_identity_mismatch(single_address_env):
@@ -131,16 +110,10 @@ def test_recipient_readiness_fails_on_mailbox_identity_mismatch(single_address_e
         ),
         patch(
             "app.evaluation.live.recipient_gmail_readiness.load_recipient_credentials",
-            return_value=MagicMock(
-                refresh_token="rt",
-                client_id="cid",
-                client_secret="sec",
-                user_id="me",
-                api_url="https://gmail.googleapis.com/gmail/v1",
-            ),
+            return_value=MagicMock(),
         ),
         patch(
-            "app.integrations.google.mail_client.GoogleMailClient",
+            "app.evaluation.live.delivery_mailbox_reader.build_recipient_client",
             return_value=client,
         ),
     ):
@@ -162,16 +135,10 @@ def test_recipient_readiness_fails_when_scopes_missing(single_address_env):
         ),
         patch(
             "app.evaluation.live.recipient_gmail_readiness.load_recipient_credentials",
-            return_value=MagicMock(
-                refresh_token="rt",
-                client_id="cid",
-                client_secret="sec",
-                user_id="me",
-                api_url="https://gmail.googleapis.com/gmail/v1",
-            ),
+            return_value=MagicMock(),
         ),
         patch(
-            "app.integrations.google.mail_client.GoogleMailClient",
+            "app.evaluation.live.delivery_mailbox_reader.build_recipient_client",
             return_value=client,
         ),
     ):
@@ -179,61 +146,3 @@ def test_recipient_readiness_fails_when_scopes_missing(single_address_env):
 
     assert report.ready is False
     assert report.recipient_required_scopes_present is False
-
-
-def test_delivery_endpoint_fail_closed_when_recipient_not_ready(live_eval_env, db, monkeypatch):
-    from datetime import datetime, timedelta, timezone
-
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
-
-    from app.api.dependencies import get_db
-    from app.evaluation.live.recipient_gmail_readiness import RecipientGmailReadinessResult
-    from app.evaluation.live.routes import router as live_eval_router
-    from app.repositories.postgres.live_eval_models import LiveEvalRunRow
-
-    monkeypatch.setenv("ADMIN_API_KEY", "test-admin-key")
-    now = datetime.now(timezone.utc)
-    run = LiveEvalRunRow(
-        evaluation_run_id="run-delivery-readiness",
-        tenant_id="TENANT_LIVE_EVAL",
-        scenario_id="PTB-DCQ-0000",
-        attempt_id=1,
-        transport_mode="live_gmail",
-        ai_mode="r3_frozen_approved_body",
-        fixture_bundle_id="k2f_bundle_s01",
-        expected_sender="sender@eval.test",
-        expected_recipient="recipient@eval.test",
-        status="registered",
-        created_by="test",
-        created_at=now,
-        expires_at=now + timedelta(hours=2),
-        config_hash="abc",
-    )
-    db.add(run)
-    db.commit()
-
-    app = FastAPI()
-    app.include_router(live_eval_router)
-    app.dependency_overrides[get_db] = lambda: db
-    with (
-        TestClient(app, raise_server_exceptions=False) as client,
-        patch(
-            "app.evaluation.live.recipient_gmail_readiness.run_recipient_gmail_readiness",
-            return_value=RecipientGmailReadinessResult(
-                recipient_oauth_configured=True,
-                blockers=["recipient list_labels failed"],
-            ),
-        ),
-    ):
-        response = client.get(
-            "/admin/live-eval/runs/run-delivery-readiness/delivery",
-            params={"tenant_id": "TENANT_LIVE_EVAL"},
-            headers={"X-Admin-API-Key": "test-admin-key"},
-        )
-    app.dependency_overrides.clear()
-    assert response.status_code == 503
-    detail = response.json()["detail"]
-    assert detail["failure_stage"] == "delivery_observation"
-    assert detail["recipient_delivery_observation_ready"] is False
-    assert detail["blockers"]

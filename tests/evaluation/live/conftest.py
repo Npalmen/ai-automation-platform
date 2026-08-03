@@ -24,6 +24,18 @@ def isolate_github_step_summary(monkeypatch, tmp_path):
 
 
 @pytest.fixture
+def single_address_env(live_eval_env, monkeypatch):
+  """Single sender/recipient pair for Gmail readiness and resolver tests."""
+  monkeypatch.setenv("LIVE_EVAL_SENDER_EMAILS", "sender@eval.test")
+  monkeypatch.setenv("LIVE_EVAL_RECIPIENT_EMAILS", "recipient@eval.test")
+  from app.evaluation.live.config import get_live_eval_config
+
+  get_live_eval_config.cache_clear()
+  yield
+  get_live_eval_config.cache_clear()
+
+
+@pytest.fixture
 def live_eval_env(monkeypatch):
     monkeypatch.setenv("ENV", "test")
     monkeypatch.setenv("LIVE_EVAL_ALLOWED", "yes")

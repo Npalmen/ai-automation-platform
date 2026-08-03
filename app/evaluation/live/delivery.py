@@ -17,11 +17,14 @@ from app.evaluation.live.constants import (
     RUN_STATUS_REGISTERED,
     TERMINAL_RUN_STATUSES,
 )
+from app.evaluation.live.delivery_mailbox_reader import (
+    DeliveryMailboxReader,
+    DeliveryMailboxReaderResolution,
+    resolve_delivery_mailbox_reader,
+    resolve_intake_label_id_from_reader,
+)
 from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.live.subject_parser import parse_body_marker, parse_subject_token
-from app.integrations.enums import IntegrationType
-from app.integrations.factory import get_integration_adapter
-from app.integrations.service import get_integration_connection_config
 from app.repositories.postgres.live_eval_models import LiveEvalRunRow
 
 _DELIVERY_CANDIDATE_CAP = 2
@@ -64,6 +67,7 @@ def _recipient_from_message(msg: dict[str, Any]) -> str:
 
 
 def resolve_intake_label_id(adapter, label_name: str) -> str | None:
+    """Resolve intake label id via tenant integration adapter (legacy helper)."""
     labels_result = adapter.execute_action(action="list_labels", payload={})
     labels = labels_result.get("labels") or []
     for item in labels:
@@ -71,6 +75,25 @@ def resolve_intake_label_id(adapter, label_name: str) -> str | None:
             label_id = item.get("id")
             return str(label_id) if label_id else None
     return None
+
+
+def _resolve_reader_or_raise(
+    db: Session,
+    row: LiveEvalRunRow,
+    *,
+    config: LiveEvalConfig,
+    reader_resolution: DeliveryMailboxReaderResolution | None = None,
+) -> DeliveryMailboxReader:
+    resolution = reader_resolution or resolve_delivery_mailbox_reader(
+        db=db,
+        row=row,
+        config=config,
+    )
+    if not resolution.ready:
+        detail = "; ".join(resolution.blockers) or "delivery mailbox reader not ready"
+        raise LiveEvalSafetyError(detail)
+    assert resolution.reader is not None
+    return resolution.reader
 
 
 def _label_id_present(msg: dict[str, Any], label_id: str) -> bool:
@@ -183,29 +206,23 @@ def observe_delivery_candidates(
     config: LiveEvalConfig | None = None,
     unread_only: bool = True,
     bound_message_id: str | None = None,
+    reader_resolution: DeliveryMailboxReaderResolution | None = None,
 ) -> DeliveryObservationResult:
     config = config or get_live_eval_config()
     assert_delivery_observation_allowed(row)
 
-    connection_config = get_integration_connection_config(
-        tenant_id=row.tenant_id,
-        integration_type=IntegrationType.GOOGLE_MAIL,
-        db=db,
+    reader = _resolve_reader_or_raise(
+        db,
+        row,
+        config=config,
+        reader_resolution=reader_resolution,
     )
-    adapter = get_integration_adapter(
-        integration_type=IntegrationType.GOOGLE_MAIL,
-        connection_config=connection_config,
-    )
-    intake_label_id = resolve_intake_label_id(adapter, config.intake_label)
+    intake_label_id = resolve_intake_label_id_from_reader(reader, config.intake_label)
     if not intake_label_id:
         raise LiveEvalSafetyError(f"intake label {config.intake_label!r} not found")
 
     if bound_message_id and row.status == RUN_STATUS_ACTIVE:
-        detail = adapter.execute_action(
-            action="get_message",
-            payload={"message_id": bound_message_id},
-        )
-        msg = detail.get("message") or {}
+        msg = reader.get_message(bound_message_id)
         ok, reason = validate_delivery_candidate(
             msg, row=row, config=config, intake_label_id=intake_label_id
         )
@@ -239,7 +256,7 @@ def observe_delivery_candidates(
         run_created_at=row.created_at,
         unread_only=unread_only,
     )
-    page = adapter.client.list_messages_page(
+    page = reader.list_messages_page(
         max_results=_DELIVERY_CANDIDATE_CAP,
         query=query,
     )
@@ -257,11 +274,7 @@ def observe_delivery_candidates(
     valid: list[DeliveryCandidate] = []
 
     for message_id in stub_ids:
-        detail = adapter.execute_action(
-            action="get_message",
-            payload={"message_id": message_id},
-        )
-        msg = detail.get("message") or {}
+        msg = reader.get_message(message_id)
         ok, reason = validate_delivery_candidate(
             msg, row=row, config=config, intake_label_id=intake_label_id
         )

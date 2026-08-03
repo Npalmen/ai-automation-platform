@@ -88,18 +88,8 @@ def test_delivery_route_records_google_mail_telemetry(api_client, db):
     )
     with (
         patch(
-            "app.evaluation.live.recipient_gmail_readiness.run_recipient_gmail_readiness",
-            return_value=RecipientGmailReadinessResult(
-                recipient_oauth_configured=True,
-                recipient_token_refresh_passed=True,
-                recipient_gmail_api_passed=True,
-                recipient_mailbox_identity_match=True,
-                recipient_required_scopes_present=True,
-                recipient_list_labels_passed=True,
-                recipient_read_query_passed=True,
-                recipient_delivery_observation_ready=True,
-            ),
-        ),
+            "app.evaluation.live.delivery_mailbox_reader.resolve_delivery_mailbox_reader",
+        ) as resolve_reader,
         patch(
             "app.evaluation.live.routes.observe_delivery_candidates",
             return_value=DeliveryObservationResult(
@@ -111,6 +101,9 @@ def test_delivery_route_records_google_mail_telemetry(api_client, db):
             ),
         ),
     ):
+        from tests.evaluation.live.delivery_reader_mocks import tenant_adapter_reader_resolution
+
+        resolve_reader.return_value = tenant_adapter_reader_resolution(MagicMock())
         response = api_client.get(
             "/admin/live-eval/runs/run-telemetry-1/delivery",
             params={"tenant_id": "TENANT_LIVE_EVAL"},
