@@ -62,6 +62,7 @@ from app.evaluation.live.schemas import (
     RuntimeReadinessResponse,
     R3BindFrozenApprovalBodyRequest,
     R3BindFrozenApprovalBodyResponse,
+    R3FrozenBindAuditResponse,
 )
 from app.evaluation.live.safety import (
     require_gmail_eval_enabled,
@@ -568,10 +569,11 @@ def bind_frozen_approval_body(
 ):
     import os
 
-    from app.evaluation.profile_testbot.qualification.coworker_r3_frozen_bodies import (
-        r3_send_body_hash,
+    from app.evaluation.profile_testbot.qualification.coworker_r3_frozen_bind import (
+        R3FrozenBindError,
+        R3FrozenBindRequest,
+        bind_frozen_approval_body_record,
     )
-    from app.repositories.postgres.approval_repository import ApprovalRequestRepository
 
     if os.environ.get("R3_FROZEN_APPROVAL_BIND_ALLOWED", "").strip().lower() not in (
         "yes",
@@ -585,26 +587,25 @@ def bind_frozen_approval_body(
         require_tenant_allowed(body.tenant_id)
     except LiveEvalSafetyError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    digest = r3_send_body_hash(body.frozen_body)
-    if digest != body.expected_body_hash:
-        raise HTTPException(status_code=400, detail="frozen body hash mismatch")
-    record = ApprovalRequestRepository.get_by_approval_id(
-        db=db,
-        tenant_id=body.tenant_id,
-        approval_id=body.approval_id,
-    )
-    if record is None or record.job_id != body.job_id:
-        raise HTTPException(status_code=404, detail="approval not found")
-    if str(record.state or "") != "pending":
-        raise HTTPException(status_code=409, detail="approval not pending")
-    delivery = dict(record.delivery_payload or {})
-    delivery["body"] = body.frozen_body
-    record.delivery_payload = delivery
-    db.commit()
-    db.refresh(record)
+    try:
+        result = bind_frozen_approval_body_record(
+            db,
+            R3FrozenBindRequest(
+                tenant_id=body.tenant_id,
+                job_id=body.job_id,
+                approval_id=body.approval_id,
+                scenario_id=body.scenario_id,
+                frozen_body=body.frozen_body,
+                expected_body_hash=body.expected_body_hash,
+            ),
+        )
+    except R3FrozenBindError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
     return R3BindFrozenApprovalBodyResponse(
-        approval_id=body.approval_id,
-        job_id=body.job_id,
-        body_hash=digest,
-        bound=True,
+        approval_id=result.approval_id,
+        job_id=result.job_id,
+        scenario_id=result.scenario_id,
+        body_hash=result.body_hash,
+        bound=result.bound,
+        audit=R3FrozenBindAuditResponse(**result.audit.to_dict()),
     )

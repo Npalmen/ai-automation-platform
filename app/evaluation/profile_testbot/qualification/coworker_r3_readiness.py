@@ -33,6 +33,7 @@ R3_INSTRUMENTATION_ALLOWLIST: tuple[str, ...] = (
     "app/evaluation/profile_testbot/qualification/coworker_live_canary_manifest.py",
     "app/evaluation/profile_testbot/qualification/coworker_r3_execution.py",
     "app/evaluation/profile_testbot/qualification/coworker_r3_frozen_bodies.py",
+    "app/evaluation/profile_testbot/qualification/coworker_r3_frozen_bind.py",
     "app/evaluation/profile_testbot/qualification/coworker_r3_readiness.py",
     "app/evaluation/profile_testbot/qualification/r3_approved_send_bodies.json",
     "app/evaluation/live/routes.py",
@@ -42,6 +43,7 @@ R3_INSTRUMENTATION_ALLOWLIST: tuple[str, ...] = (
     "scripts/run_digital_coworker_r3_live_canary.py",
     "tests/test_coworker_live_canary_manifest.py",
     "tests/test_coworker_r3_frozen_bodies.py",
+    "tests/test_coworker_r3_frozen_bind.py",
     "tests/test_coworker_r3_live_execution.py",
     "tests/test_coworker_r3_readiness.py",
 )

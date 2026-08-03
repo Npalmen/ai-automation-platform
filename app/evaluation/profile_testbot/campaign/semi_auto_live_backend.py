@@ -415,6 +415,7 @@ class LiveSemiAutoBackend:
                 "tenant_id": self.tenant_id,
                 "job_id": ctx.job_id,
                 "approval_id": target.approval_id,
+                "scenario_id": scenario_id,
                 "frozen_body": frozen_body,
                 "expected_body_hash": expected_body_hash,
             },
