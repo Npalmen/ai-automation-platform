@@ -18,6 +18,8 @@ import httpx
 
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.errors import LiveEvalSafetyError
+from app.evaluation.live.gmail_transport import run_sender_readiness_read_only
+from app.evaluation.live.recipient_gmail_readiness import run_recipient_gmail_readiness
 from app.evaluation.profile_testbot.campaign.semi_auto_live_backend import LiveSemiAutoBackend
 from app.evaluation.profile_testbot.campaign.semi_auto_safety import (
     assert_hold_scenario_no_send,
@@ -88,6 +90,27 @@ R3_NO_SEND_SCENARIO_IDS: frozenset[str] = frozenset(
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 ExecutionMode = Literal["dry_run", "execute"]
 
+ORPHANED_R3_INBOUND_TRIGGERS: tuple[dict[str, Any], ...] = (
+    {
+        "orphan_id": "orphaned_attempt_2",
+        "attempt": 2,
+        "scenario_id": "PTB-DCQ-0000",
+        "campaign_id": "e7876c9b-22d3-4baf-95ed-0b11fc15806b",
+        "evaluation_run_id": "0a307286-41d7-4b98-8d8b-32b120618210",
+        "classification": "inbound_trigger_sent",
+        "inbound_trigger_sent": True,
+        "approved_reply_sent": False,
+        "draft_created": False,
+        "sender_message_id_redacted": "19fc…0b09",
+        "recipient_message_id_redacted": "19fc…2713",
+        "trigger_body_hash": "2ed7d1f0d03cbab262a9443ed9666938596d6a3076ac7c28a06e31cbb88d000a",
+        "subject": "KROWOLF-EVAL/0a307286-41d7-4b98-8d8b-32b120618210/PTB-DCQ-0000/1 | Offert solceller Uppsala",
+        "sent_at": "2026-08-03T20:53:14Z",
+        "reuse_blocked": True,
+        "exclude_from_approved_reply_count": True,
+    },
+)
+
 
 @dataclass
 class R3ApprovalArtifact:
@@ -124,6 +147,7 @@ class R3ScenarioOutcome:
     blocking_oracle_failures: list[str] = field(default_factory=list)
     audit_events: list[dict[str, Any]] = field(default_factory=list)
     failure_reason: str | None = None
+    failure_stage: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -143,6 +167,7 @@ class R3ScenarioOutcome:
             "blocking_oracle_failures": self.blocking_oracle_failures,
             "audit_events": self.audit_events,
             "failure_reason": self.failure_reason,
+            "failure_stage": self.failure_stage,
         }
 
 
@@ -166,6 +191,8 @@ class R3ExecutionResult:
     readiness: dict[str, Any] = field(default_factory=dict)
     external_writes: dict[str, int] = field(default_factory=dict)
     secret_scan_issues: list[str] = field(default_factory=list)
+    failure_stage: str | None = None
+    orphaned_inbound_triggers: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -187,6 +214,8 @@ class R3ExecutionResult:
             "readiness": self.readiness,
             "external_writes": self.external_writes,
             "secret_scan_issues": self.secret_scan_issues,
+            "failure_stage": self.failure_stage,
+            "orphaned_inbound_triggers": self.orphaned_inbound_triggers,
         }
 
 
@@ -196,6 +225,93 @@ def _utc_now() -> str:
 
 def body_hash(text: str) -> str:
     return r3_send_body_hash(text)
+
+
+def _sanitize_http_detail(response: httpx.Response | None) -> str:
+    if response is None:
+        return "no response body"
+    text = (response.text or "").strip()
+    if EMAIL_RE.search(text):
+        return "HTTP error response redacted (possible secret/email content)"
+    return text[:240]
+
+
+def _format_stage_failure(stage: str, *, detail: str, http_status: int | None = None) -> str:
+    if http_status is not None:
+        return f"{stage}: HTTP {http_status} — {detail}"
+    return f"{stage}: {detail}"
+
+
+def _failed_scenario_outcome(
+    *,
+    scenario_id: str,
+    planned_gmail_send: bool,
+    failure_stage: str,
+    failure_reason: str,
+) -> R3ScenarioOutcome:
+    return R3ScenarioOutcome(
+        scenario_id=scenario_id,
+        planned_gmail_send=planned_gmail_send,
+        status="failed",
+        failure_stage=failure_stage,
+        failure_reason=failure_reason,
+    )
+
+
+def validate_r3_pre_execute_gates(
+    *,
+    runtime_sha: str,
+    repo_root: Path,
+    render_rows: list[dict[str, Any]],
+    approval: R3ApprovalArtifact,
+    recipient_email: str,
+    manifest: dict[str, Any],
+) -> dict[str, Any]:
+    blockers: list[str] = []
+    config = get_live_eval_config()
+    senders = sorted(config.sender_emails)
+    sender_email = senders[0] if senders else ""
+
+    sender_readiness = run_sender_readiness_read_only(
+        expected_sender=sender_email,
+        expected_recipient=recipient_email,
+        config=config,
+    )
+    recipient_readiness = run_recipient_gmail_readiness(
+        expected_recipient=recipient_email,
+        config=config,
+    )
+    readiness = evaluate_r3_execution_readiness(
+        runtime_sha=runtime_sha,
+        repo_root=repo_root,
+        render_rows=render_rows,
+        approval=approval,
+        recipient_email=recipient_email,
+        manifest=manifest,
+    )
+    if not sender_readiness.ready:
+        blockers.extend(sender_readiness.issues)
+    if not recipient_readiness.ready:
+        blockers.extend(recipient_readiness.blockers)
+    blockers.extend(readiness.get("execution_blockers") or [])
+    blockers = list(dict.fromkeys(blockers))
+    ready = (
+        sender_readiness.ready
+        and recipient_readiness.ready
+        and readiness.get("r3_canary_ready_for_execution")
+        and not blockers
+    )
+    return {
+        "ready": bool(ready),
+        "failure_stage": None if ready else "pre_execute_readiness",
+        "blockers": blockers,
+        "sender_readiness": {
+            "ready": sender_readiness.ready,
+            "issues": sender_readiness.issues,
+        },
+        "recipient_readiness": recipient_readiness.to_dict(),
+        "registration_contract_valid": readiness.get("registration_contract_valid"),
+    }
 
 
 def approval_artifact_hash(payload: dict[str, Any]) -> str:
@@ -718,21 +834,62 @@ def _execute_live_scenario(
         )
     except httpx.HTTPStatusError as exc:
         outcome.status = "failed"
-        outcome.failure_reason = f"live_run_registration: {exc.response.text}"
+        outcome.failure_stage = "live_run_registration"
+        outcome.failure_reason = _format_stage_failure(
+            "live_run_registration",
+            detail=_sanitize_http_detail(exc.response),
+            http_status=exc.response.status_code if exc.response else None,
+        )
+        return outcome
+    except LiveEvalSafetyError as exc:
+        outcome.status = "failed"
+        outcome.failure_stage = "inbound_trigger_send"
+        outcome.failure_reason = _format_stage_failure("inbound_trigger_send", detail=str(exc))
         return outcome
     outcome.audit_events.append(
         {
-            "event": "inbound_sent",
+            "event": "inbound_trigger_sent",
             "at": _utc_now(),
             "idempotency_key": idempotency_key,
             "provider_message_id": redact_provider_id(send_result.provider_message_id),
+            "classification": "inbound_trigger_sent",
         }
     )
 
-    intake = backend.observe_intake(scenario_id=scenario_id, campaign_id=campaign_id)
+    try:
+        intake = backend.observe_intake(scenario_id=scenario_id, campaign_id=campaign_id)
+    except httpx.HTTPStatusError as exc:
+        outcome.status = "failed"
+        outcome.failure_stage = "delivery_observation"
+        outcome.failure_reason = _format_stage_failure(
+            "delivery_observation",
+            detail=_sanitize_http_detail(exc.response),
+            http_status=exc.response.status_code if exc.response else None,
+        )
+        return outcome
+    except LiveEvalSafetyError as exc:
+        outcome.status = "failed"
+        outcome.failure_stage = "intake_observation"
+        outcome.failure_reason = _format_stage_failure("intake_observation", detail=str(exc))
+        return outcome
     if intake.tenant_id != LIVE_EVAL_TENANT_ID:
         raise LiveEvalSafetyError("cross-tenant intake blocked")
-    processing = backend.observe_processing(scenario_id=scenario_id)
+    try:
+        processing = backend.observe_processing(scenario_id=scenario_id)
+    except httpx.HTTPStatusError as exc:
+        outcome.status = "failed"
+        outcome.failure_stage = "processing_observation"
+        outcome.failure_reason = _format_stage_failure(
+            "processing_observation",
+            detail=_sanitize_http_detail(exc.response),
+            http_status=exc.response.status_code if exc.response else None,
+        )
+        return outcome
+    except LiveEvalSafetyError as exc:
+        outcome.status = "failed"
+        outcome.failure_stage = "processing_observation"
+        outcome.failure_reason = _format_stage_failure("processing_observation", detail=str(exc))
+        return outcome
     outcome.approval_state = processing.approval_state
     draft_text = processing.draft_text or ""
     frozen_text = str(
@@ -914,9 +1071,45 @@ def run_r3_live_canary(
                 readiness.get("human_render_rereview_required")
             ),
             stop_reason="; ".join(readiness.get("execution_blockers") or ["not ready"]),
+            failure_stage="pre_execute_readiness",
             scenario_outcomes=[],
             readiness=readiness,
+            orphaned_inbound_triggers=list(ORPHANED_R3_INBOUND_TRIGGERS),
         )
+
+    if mode == "execute":
+        pre_execute = validate_r3_pre_execute_gates(
+            runtime_sha=runtime_sha,
+            repo_root=repo_root,
+            render_rows=render_rows,
+            approval=approval,
+            recipient_email=recipient_email,
+            manifest=manifest,
+        )
+        readiness = {**readiness, **pre_execute}
+        if not pre_execute.get("ready"):
+            return R3ExecutionResult(
+                mode=mode,
+                campaign_id=campaign_id,
+                runtime_sha=runtime_sha,
+                manifest_hash=str(manifest.get("manifest_hash") or ""),
+                approval_artifact_hash=approval.artifact_hash,
+                overall_status="BLOCKED",
+                planned_sends=COWORKER_LIVE_CANARY_SEND_MAX,
+                successful_sends=0,
+                failed_sends=0,
+                unknown_outcomes=0,
+                no_send_verified=0,
+                duplicates_blocked=0,
+                human_render_rereview_required=bool(
+                    readiness.get("human_render_rereview_required")
+                ),
+                stop_reason="; ".join(pre_execute.get("blockers") or ["pre_execute_readiness"]),
+                failure_stage="pre_execute_readiness",
+                scenario_outcomes=[],
+                readiness=readiness,
+                orphaned_inbound_triggers=list(ORPHANED_R3_INBOUND_TRIGGERS),
+            )
 
     profile = load_customer_profile(PROFILE_ID)
     built = build_coworker_live_canary_manifest(profile_id=PROFILE_ID, seed=0)
@@ -924,6 +1117,15 @@ def run_r3_live_canary(
     render_by_id = {row["scenario_id"]: row for row in render_rows}
 
     if mode == "dry_run":
+        pre_execute = validate_r3_pre_execute_gates(
+            runtime_sha=runtime_sha,
+            repo_root=repo_root,
+            render_rows=render_rows,
+            approval=approval,
+            recipient_email=recipient_email,
+            manifest=manifest,
+        )
+        readiness = {**readiness, **pre_execute}
         dry_outcomes = []
         for scenario_id in COWORKER_LIVE_CANARY_SCENARIO_IDS:
             row = render_by_id[scenario_id]
@@ -947,13 +1149,14 @@ def run_r3_live_canary(
             )
         blob = json.dumps(readiness, ensure_ascii=False)
         secret_issues = scan_for_secrets(blob)
+        dry_status = "DRY_RUN_PASS" if pre_execute.get("ready") else "DRY_RUN_BLOCKED"
         return R3ExecutionResult(
             mode=mode,
             campaign_id=campaign_id,
             runtime_sha=runtime_sha,
             manifest_hash=str(manifest.get("manifest_hash") or ""),
             approval_artifact_hash=approval.artifact_hash,
-            overall_status="DRY_RUN_PASS",
+            overall_status=dry_status,
             planned_sends=COWORKER_LIVE_CANARY_SEND_MAX,
             successful_sends=0,
             failed_sends=0,
@@ -961,10 +1164,12 @@ def run_r3_live_canary(
             no_send_verified=sum(1 for row in dry_outcomes if not row.planned_gmail_send),
             duplicates_blocked=0,
             human_render_rereview_required=False,
-            stop_reason=None,
+            stop_reason=None if dry_status == "DRY_RUN_PASS" else "; ".join(pre_execute.get("blockers") or []),
+            failure_stage=None if dry_status == "DRY_RUN_PASS" else "pre_execute_readiness",
             scenario_outcomes=dry_outcomes,
             readiness=readiness,
             secret_scan_issues=secret_issues,
+            orphaned_inbound_triggers=list(ORPHANED_R3_INBOUND_TRIGGERS),
         )
 
     assert_tenant_isolated(LIVE_EVAL_TENANT_ID)
@@ -991,6 +1196,7 @@ def run_r3_live_canary(
     unknown_outcomes = 0
     no_send_verified = 0
     stop_reason: str | None = None
+    failure_stage: str | None = None
     overall_status = "PASS"
 
     send_budget_remaining = COWORKER_LIVE_CANARY_SEND_MAX
@@ -1008,18 +1214,22 @@ def run_r3_live_canary(
                 gmail_send_budget_remaining=send_budget_remaining,
             )
         except LiveEvalSafetyError as exc:
-            result = R3ScenarioOutcome(
+            result = _failed_scenario_outcome(
                 scenario_id=scenario_id,
                 planned_gmail_send=bool(row.get("planned_gmail_send")),
-                status="failed",
+                failure_stage="reconciliation",
                 failure_reason=str(exc),
             )
         except httpx.HTTPStatusError as exc:
-            result = R3ScenarioOutcome(
+            result = _failed_scenario_outcome(
                 scenario_id=scenario_id,
                 planned_gmail_send=bool(row.get("planned_gmail_send")),
-                status="failed",
-                failure_reason=f"live_run_registration: {exc.response.text}",
+                failure_stage="delivery_observation",
+                failure_reason=_format_stage_failure(
+                    "delivery_observation",
+                    detail=_sanitize_http_detail(exc.response),
+                    http_status=exc.response.status_code if exc.response else None,
+                ),
             )
         outcomes.append(result)
         if result.status == "sent":
@@ -1036,6 +1246,7 @@ def run_r3_live_canary(
             failed_sends += 1 if result.planned_gmail_send else 0
             stop_reason = result.failure_reason
             overall_status = "FAIL" if result.planned_gmail_send else "PARTIAL"
+            failure_stage = result.failure_stage
             break
 
     if overall_status == "PASS":
@@ -1064,9 +1275,11 @@ def run_r3_live_canary(
             for o in outcomes
         ),
         stop_reason=stop_reason,
+        failure_stage=failure_stage,
         scenario_outcomes=outcomes,
         readiness=readiness,
         external_writes=dict(backend.external_writes),
+        orphaned_inbound_triggers=list(ORPHANED_R3_INBOUND_TRIGGERS),
     )
     blob = json.dumps(report.to_dict(), ensure_ascii=False)
     report.secret_scan_issues = scan_for_secrets(blob)

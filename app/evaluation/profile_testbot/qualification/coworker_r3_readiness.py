@@ -10,6 +10,10 @@ from typing import Any, Literal
 
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.campaign.gates import validate_no_production_resources
+from app.evaluation.live.recipient_gmail_readiness import (
+    RecipientGmailReadinessResult,
+    run_recipient_gmail_readiness,
+)
 from app.evaluation.profile_testbot.campaign.mailbox_readiness import (
     verify_profile_testbot_mailboxes,
 )
@@ -37,6 +41,7 @@ R3_INSTRUMENTATION_ALLOWLIST: tuple[str, ...] = (
     "app/evaluation/profile_testbot/qualification/coworker_r3_registration_contract.py",
     "app/evaluation/profile_testbot/qualification/r3_approved_send_bodies.json",
     "app/evaluation/live/routes.py",
+    "app/evaluation/live/recipient_gmail_readiness.py",
     "app/evaluation/live/schemas.py",
     "app/evaluation/profile_testbot/campaign/semi_auto_live_backend.py",
     "scripts/build_digital_coworker_r3_preflight.py",
@@ -121,9 +126,18 @@ class CoworkerR3ReadinessResult:
     scenario_registry_valid: bool | None = None
     live_gmail_policy_valid: bool | None = None
     registration_blockers: list[str] = field(default_factory=list)
+    recipient_oauth_configured: bool | None = None
+    recipient_token_refresh_passed: bool | None = None
+    recipient_gmail_api_passed: bool | None = None
+    recipient_mailbox_identity_match: bool | None = None
+    recipient_required_scopes_present: bool | None = None
+    recipient_list_labels_passed: bool | None = None
+    recipient_read_query_passed: bool | None = None
+    recipient_delivery_observation_ready: bool | None = None
+    recipient_readiness_blockers: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "phase": self.phase,
             "qualified_reply_sha": self.qualified_reply_sha,
             "instrumentation_merge_sha": self.instrumentation_merge_sha,
@@ -160,7 +174,17 @@ class CoworkerR3ReadinessResult:
             "registration_blockers": self.registration_blockers,
             "gmail_sent": False,
             "gmail_drafts_created": False,
+            "recipient_oauth_configured": self.recipient_oauth_configured,
+            "recipient_token_refresh_passed": self.recipient_token_refresh_passed,
+            "recipient_gmail_api_passed": self.recipient_gmail_api_passed,
+            "recipient_mailbox_identity_match": self.recipient_mailbox_identity_match,
+            "recipient_required_scopes_present": self.recipient_required_scopes_present,
+            "recipient_list_labels_passed": self.recipient_list_labels_passed,
+            "recipient_read_query_passed": self.recipient_read_query_passed,
+            "recipient_delivery_observation_ready": self.recipient_delivery_observation_ready,
+            "recipient_readiness_blockers": self.recipient_readiness_blockers,
         }
+        return payload
 
 
 def _env_truthy(name: str) -> bool:
@@ -246,6 +270,7 @@ def _r3_specific_blockers(
     oauth_ready: bool,
     mailbox_report: dict[str, Any],
     tenant_id: str,
+    recipient_readiness: RecipientGmailReadinessResult | None = None,
 ) -> list[str]:
     blockers: list[str] = []
     if tenant_id != LIVE_EVAL_TENANT_ID:
@@ -256,7 +281,9 @@ def _r3_specific_blockers(
         if not issues:
             blockers.append(f"{blocked_tenant} must be blocked for R3 canary")
     if not oauth_ready:
-        blockers.append("Gmail OAuth env not ready (refresh tokens + client id required)")
+        blockers.append("Gmail OAuth readiness failed (live recipient API verification required)")
+    if recipient_readiness is not None and not recipient_readiness.ready:
+        blockers.extend(recipient_readiness.blockers)
     if not _env_truthy("LIVE_GMAIL_EVAL_ALLOWED"):
         blockers.append("LIVE_GMAIL_EVAL_ALLOWED=yes required for R3 canary")
     if not os.environ.get("LIVE_EVAL_APP_BASE_URL", "").strip():
@@ -333,7 +360,15 @@ def evaluate_coworker_r3_readiness(
         config=config,
     )
     oauth = _oauth_readiness()
-    oauth_ready = bool(oauth.get("oauth_ready"))
+    recipient_readiness: RecipientGmailReadinessResult | None = None
+    if phase == "postdeploy" and _env_truthy("LIVE_GMAIL_EVAL_ALLOWED"):
+        recipient_readiness = run_recipient_gmail_readiness(
+            expected_recipient=recipient,
+            config=config,
+        )
+        oauth_ready = recipient_readiness.ready
+    else:
+        oauth_ready = bool(oauth.get("oauth_ready"))
 
     require_remote = phase == "postdeploy" and _env_truthy("LIVE_GMAIL_EVAL_ALLOWED")
     runtime_report = evaluate_eval_stack_runtime_sha(
@@ -361,6 +396,7 @@ def evaluate_coworker_r3_readiness(
             oauth_ready=oauth_ready,
             mailbox_report=mailbox_report,
             tenant_id=tenant_id,
+            recipient_readiness=recipient_readiness,
         )
     )
 
@@ -459,4 +495,31 @@ def evaluate_coworker_r3_readiness(
         unrelated_qualification_context=unrelated_context,
         body_hash_drift=body_hash_drift,
         human_render_rereview_required=human_render_rereview_required,
+        recipient_oauth_configured=(
+            recipient_readiness.recipient_oauth_configured if recipient_readiness else None
+        ),
+        recipient_token_refresh_passed=(
+            recipient_readiness.recipient_token_refresh_passed if recipient_readiness else None
+        ),
+        recipient_gmail_api_passed=(
+            recipient_readiness.recipient_gmail_api_passed if recipient_readiness else None
+        ),
+        recipient_mailbox_identity_match=(
+            recipient_readiness.recipient_mailbox_identity_match if recipient_readiness else None
+        ),
+        recipient_required_scopes_present=(
+            recipient_readiness.recipient_required_scopes_present if recipient_readiness else None
+        ),
+        recipient_list_labels_passed=(
+            recipient_readiness.recipient_list_labels_passed if recipient_readiness else None
+        ),
+        recipient_read_query_passed=(
+            recipient_readiness.recipient_read_query_passed if recipient_readiness else None
+        ),
+        recipient_delivery_observation_ready=(
+            recipient_readiness.recipient_delivery_observation_ready if recipient_readiness else None
+        ),
+        recipient_readiness_blockers=(
+            list(recipient_readiness.blockers) if recipient_readiness else []
+        ),
     )

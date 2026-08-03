@@ -243,6 +243,7 @@ class TestR3ExecutionValidation:
 
 
 class TestR3DryRun:
+    @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.validate_r3_pre_execute_gates")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.get_live_eval_config")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.build_r3_render_rows")
     @patch(
@@ -253,9 +254,16 @@ class TestR3DryRun:
         mock_readiness,
         mock_render,
         mock_config,
+        mock_pre_execute,
         approval_file: Path,
         manifest_file: Path,
     ):
+        mock_pre_execute.return_value = {
+            "ready": True,
+            "blockers": [],
+            "failure_stage": None,
+            "registration_contract_valid": True,
+        }
         mock_config.return_value = MagicMock(
             sender_emails=["sender@eval.test"],
             recipient_emails=[APPROVED_RECIPIENT],
@@ -306,6 +314,16 @@ class TestR3DryRun:
         assert result.overall_status == "BLOCKED"
 
 
+def _ready_pre_execute_gates() -> dict:
+    return {
+        "ready": True,
+        "blockers": [],
+        "failure_stage": None,
+        "registration_contract_valid": True,
+        "recipient_delivery_observation_ready": True,
+    }
+
+
 class TestR3Execute:
     def _ready_execution_readiness(self) -> dict:
         return {
@@ -336,6 +354,7 @@ class TestR3Execute:
             expected_send_behavior=behavior,
         )
 
+    @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.validate_r3_pre_execute_gates")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.evaluate_r3_execution_readiness")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.build_coworker_live_canary_manifest")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.load_customer_profile")
@@ -350,9 +369,11 @@ class TestR3Execute:
         mock_profile,
         mock_manifest,
         mock_eval_ready,
+        mock_pre_execute,
         approval_file: Path,
         manifest_file: Path,
     ):
+        mock_pre_execute.return_value = _ready_pre_execute_gates()
         mock_eval_ready.return_value = self._ready_execution_readiness()
         mock_config.return_value = MagicMock(
             sender_emails=["sender@eval.test"],
@@ -403,6 +424,7 @@ class TestR3Execute:
         backend.approve_via_lifecycle.assert_not_called()
         backend.bind_frozen_send_body.assert_not_called()
 
+    @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.validate_r3_pre_execute_gates")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.evaluate_r3_execution_readiness")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.build_coworker_live_canary_manifest")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.load_customer_profile")
@@ -415,9 +437,11 @@ class TestR3Execute:
         mock_profile,
         mock_manifest,
         mock_eval_ready,
+        mock_pre_execute,
         approval_file: Path,
         manifest_file: Path,
     ):
+        mock_pre_execute.return_value = _ready_pre_execute_gates()
         from app.evaluation.profile_testbot.campaign.semi_auto_contract import ReplyVerification
 
         mock_eval_ready.return_value = self._ready_execution_readiness()
@@ -470,6 +494,7 @@ class TestR3Execute:
         backend.approve_via_lifecycle.assert_not_called()
         assert result.no_send_verified == 1
 
+    @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.validate_r3_pre_execute_gates")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.evaluate_r3_execution_readiness")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.build_coworker_live_canary_manifest")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.load_customer_profile")
@@ -482,9 +507,11 @@ class TestR3Execute:
         mock_profile,
         mock_manifest,
         mock_eval_ready,
+        mock_pre_execute,
         approval_file: Path,
         manifest_file: Path,
     ):
+        mock_pre_execute.return_value = _ready_pre_execute_gates()
         mock_eval_ready.return_value = self._ready_execution_readiness()
         mock_config.return_value = MagicMock(
             sender_emails=["sender@eval.test"],
@@ -515,6 +542,7 @@ class TestR3Execute:
             )
         assert result.overall_status in {"FAIL", "PARTIAL"}
 
+    @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.validate_r3_pre_execute_gates")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.evaluate_r3_execution_readiness")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.build_coworker_live_canary_manifest")
     @patch("app.evaluation.profile_testbot.qualification.coworker_r3_execution.load_customer_profile")
@@ -527,9 +555,11 @@ class TestR3Execute:
         mock_profile,
         mock_manifest,
         mock_eval_ready,
+        mock_pre_execute,
         approval_file: Path,
         manifest_file: Path,
     ):
+        mock_pre_execute.return_value = _ready_pre_execute_gates()
         from app.evaluation.profile_testbot.campaign.semi_auto_contract import ReplyVerification
 
         mock_eval_ready.return_value = self._ready_execution_readiness()

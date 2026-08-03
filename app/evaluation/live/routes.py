@@ -184,8 +184,33 @@ def get_live_eval_delivery(
     except LiveEvalSafetyError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    from app.evaluation.live.recipient_gmail_readiness import run_recipient_gmail_readiness
+
+    config = get_live_eval_config()
+    recipient = sorted(config.recipient_emails)[0] if config.recipient_emails else ""
+    recipient_readiness = run_recipient_gmail_readiness(expected_recipient=recipient, config=config)
+    if not recipient_readiness.ready:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "failure_stage": "delivery_observation",
+                "recipient_delivery_observation_ready": False,
+                "blockers": recipient_readiness.blockers,
+            },
+        )
+
     bound_id = row.root_gmail_message_id if row.status == RUN_STATUS_ACTIVE else None
-    result = observe_delivery_candidates(db, row, bound_message_id=bound_id)
+    try:
+        result = observe_delivery_candidates(db, row, bound_message_id=bound_id)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "failure_stage": "delivery_observation",
+                "recipient_delivery_observation_ready": False,
+                "blockers": [f"delivery observation failed: {type(exc).__name__}"],
+            },
+        ) from exc
     if result.confirmed is not None:
         from app.evaluation.live.registry import trusted_snapshot_from_row
 
@@ -523,6 +548,25 @@ def runtime_readiness(
         tenant_allowlist_ok=bool(config.tenant_ids),
         database_ok=database_ok,
     )
+
+
+@router.get("/recipient-gmail-readiness")
+def recipient_gmail_readiness(
+    tenant_id: str = Query(...),
+    _admin=Depends(require_admin_api_key),
+):
+    require_live_eval_enabled()
+    require_gmail_eval_enabled()
+    require_tenant_allowed(tenant_id)
+    config = get_live_eval_config()
+    recipient = sorted(config.recipient_emails)[0] if config.recipient_emails else ""
+    from app.evaluation.live.recipient_gmail_readiness import run_recipient_gmail_readiness
+
+    report = run_recipient_gmail_readiness(expected_recipient=recipient, config=config)
+    payload = report.to_dict()
+    payload["ready"] = report.ready
+    payload["tenant_id"] = tenant_id
+    return payload
 
 
 @router.post("/runs/{evaluation_run_id}/status", response_model=LiveEvalRunResponse)
