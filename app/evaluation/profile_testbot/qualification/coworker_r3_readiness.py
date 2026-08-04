@@ -52,6 +52,11 @@ R3_INSTRUMENTATION_ALLOWLIST: tuple[str, ...] = (
     "app/evaluation/live/gmail_intake.py",
     "app/evaluation/live/safety.py",
     "app/evaluation/profile_testbot/qualification/coworker_r3_mutation_contract.py",
+    "app/evaluation/profile_testbot/qualification/coworker_r3_reply_provider.py",
+    "app/evaluation/profile_testbot/qualification/coworker_r3_approval_materialization_contract.py",
+    "app/workflows/orchestrator.py",
+    "app/workflows/processors/action_dispatch_processor.py",
+    "app/workflows/decision_record.py",
     "app/evaluation/live/schemas.py",
     "app/evaluation/profile_testbot/campaign/semi_auto_live_backend.py",
     "scripts/build_digital_coworker_r3_preflight.py",
@@ -165,6 +170,16 @@ class CoworkerR3ReadinessResult:
     tenant_google_mail_used: bool | None = None
     stub_fallback_possible: bool | None = None
     reply_provider_blockers: list[str] = field(default_factory=list)
+    approval_materialization_contract_valid: bool | None = None
+    approval_materialization_send_ready_count: int | None = None
+    approval_materialization_no_send_ready_count: int | None = None
+    r3_hold_override_scenarios: list[str] = field(default_factory=list)
+    r3_hold_override_count: int | None = None
+    approval_materialization_ready: bool | None = None
+    ptb_dcq_0088_base_policy_authorization: str | None = None
+    ptb_dcq_0088_override_eligible: bool | None = None
+    ptb_dcq_0088_expected_approval_state: str | None = None
+    approval_materialization_blockers: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         payload = {
@@ -233,6 +248,16 @@ class CoworkerR3ReadinessResult:
             "tenant_google_mail_used": self.tenant_google_mail_used,
             "stub_fallback_possible": self.stub_fallback_possible,
             "reply_provider_blockers": self.reply_provider_blockers,
+            "approval_materialization_contract_valid": self.approval_materialization_contract_valid,
+            "approval_materialization_send_ready_count": self.approval_materialization_send_ready_count,
+            "approval_materialization_no_send_ready_count": self.approval_materialization_no_send_ready_count,
+            "r3_hold_override_scenarios": list(self.r3_hold_override_scenarios),
+            "r3_hold_override_count": self.r3_hold_override_count,
+            "approval_materialization_ready": self.approval_materialization_ready,
+            "PTB-DCQ-0088_base_policy_authorization": self.ptb_dcq_0088_base_policy_authorization,
+            "PTB-DCQ-0088_override_eligible": self.ptb_dcq_0088_override_eligible,
+            "PTB-DCQ-0088_expected_approval_state": self.ptb_dcq_0088_expected_approval_state,
+            "approval_materialization_blockers": list(self.approval_materialization_blockers),
         }
         return payload
 
@@ -521,6 +546,35 @@ def evaluate_coworker_r3_readiness(
             )
 
     stop_conditions = list(dict.fromkeys(stop_conditions))
+
+    from app.evaluation.profile_testbot.qualification.coworker_r3_approval_materialization_contract import (
+        run_r3_approval_materialization_readiness,
+    )
+    from app.evaluation.profile_testbot.qualification.coworker_live_canary_manifest import (
+        COWORKER_LIVE_CANARY_MANIFEST_HASH,
+        COWORKER_LIVE_CANARY_SCENARIO_IDS,
+    )
+
+    approval_mat = run_r3_approval_materialization_readiness(
+        manifest={
+            "manifest_hash": COWORKER_LIVE_CANARY_MANIFEST_HASH,
+            "scenarios": list(COWORKER_LIVE_CANARY_SCENARIO_IDS),
+        },
+        approval_artifact={
+            "runtime_sha": runner_sha,
+            "manifest_hash": COWORKER_LIVE_CANARY_MANIFEST_HASH,
+            "manual_execution_approved": True,
+            "body_hashes_approved": True,
+            "campaign_type": "coworker_r3_frozen_live_canary",
+            "execution_mode": "r3_frozen_approved_body",
+        },
+        runtime_sha=runner_sha,
+    )
+    if not approval_mat.get("approval_materialization_contract_valid"):
+        stop_conditions.extend(approval_mat.get("blockers") or [])
+        stop_conditions.append("approval_materialization_contract_valid is false")
+    stop_conditions = list(dict.fromkeys(stop_conditions))
+
     tenant_isolation_verified = bool(
         readiness.get("production_pilot_tenant_blocked")
         and readiness.get("demo_tenant_blocked")
@@ -679,4 +733,24 @@ def evaluate_coworker_r3_readiness(
             if reply_provider_readiness
             else []
         ),
+        approval_materialization_contract_valid=bool(
+            approval_mat.get("approval_materialization_contract_valid")
+        ),
+        approval_materialization_send_ready_count=int(
+            approval_mat.get("approval_materialization_send_ready_count") or 0
+        ),
+        approval_materialization_no_send_ready_count=int(
+            approval_mat.get("approval_materialization_no_send_ready_count") or 0
+        ),
+        r3_hold_override_scenarios=list(approval_mat.get("r3_hold_override_scenarios") or []),
+        r3_hold_override_count=int(approval_mat.get("r3_hold_override_count") or 0),
+        approval_materialization_ready=bool(approval_mat.get("approval_materialization_ready")),
+        ptb_dcq_0088_base_policy_authorization=approval_mat.get(
+            "PTB-DCQ-0088_base_policy_authorization"
+        ),
+        ptb_dcq_0088_override_eligible=approval_mat.get("PTB-DCQ-0088_override_eligible"),
+        ptb_dcq_0088_expected_approval_state=approval_mat.get(
+            "PTB-DCQ-0088_expected_approval_state"
+        ),
+        approval_materialization_blockers=list(approval_mat.get("blockers") or []),
     )

@@ -35,6 +35,16 @@ ALLOWED_METADATA_KEYS = frozenset({
     "supersedes_decision_id",
     "reconciliation_required",
     "evaluation_run_id",
+    "base_policy_authorization",
+    "r3_override_applied",
+    "r3_override_contract",
+    "r3_override_authorization",
+    "r3_override_reason",
+    "scenario_id",
+    "manifest_hash",
+    "runner_sha",
+    "frozen_body_hash",
+    "approval_artifact_hash",
 })
 
 

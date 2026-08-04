@@ -181,6 +181,26 @@ def _apply_dispatch_authorization(
             policy_decision=policy_decision,
             pre_authorized=bool(action.get("_pre_authorized")) or resume_after_job_approval,
         )
+        if (
+            annotated.get("_skip")
+            and policy_decision == "hold_for_review"
+            and str(action.get("type") or "") == "send_customer_auto_reply"
+        ):
+            try:
+                from app.evaluation.profile_testbot.qualification.coworker_r3_approval_materialization_contract import (
+                    apply_r3_hold_override_to_action,
+                )
+
+                overridden, _resolution = apply_r3_hold_override_to_action(
+                    job=job,
+                    action=action,
+                    policy_payload=policy_payload,
+                    db=db,
+                )
+                if overridden.get("_r3_override_applied") is True:
+                    annotated = overridden
+            except Exception:
+                pass
         if not annotated.get("_skip") and _dispatch_integration_gate_applies(job.tenant_id, db):
             spec = classify_action(annotated.get("type"))
             if spec is not None and spec.effect == ActionEffect.EXTERNAL_WRITE:

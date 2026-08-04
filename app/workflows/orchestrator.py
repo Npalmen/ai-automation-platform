@@ -239,6 +239,20 @@ class WorkflowOrchestrator:
             return True
 
         if decision == "hold_for_review":
+            try:
+                from app.evaluation.profile_testbot.qualification.coworker_r3_approval_materialization_contract import (
+                    should_materialize_r3_action_dispatch_despite_hold,
+                )
+
+                if should_materialize_r3_action_dispatch_despite_hold(
+                    job=job,
+                    db=self.db,
+                    policy_payload=policy_payload,
+                ):
+                    return False
+            except Exception:
+                # Fail closed to ordinary hold skip on unexpected probe errors.
+                pass
             return True
 
         if recommended_next_step == "awaiting_approval":

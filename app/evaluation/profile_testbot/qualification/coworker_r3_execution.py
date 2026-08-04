@@ -60,6 +60,11 @@ from app.evaluation.profile_testbot.qualification.coworker_r3_readiness import (
     R3_APPROVED_SEND_BODY_HASHES,
     evaluate_coworker_r3_readiness,
 )
+from app.evaluation.profile_testbot.qualification.coworker_r3_approval_materialization_contract import (
+    ORPHANED_ATTEMPT_7_CAMPAIGN_ID,
+    ORPHANED_ATTEMPT_7_ORPHAN_GROUP_ID,
+    ORPHANED_ATTEMPT_7_SCENARIO_RUNS,
+)
 from app.evaluation.profile_testbot.coworker_quality_oracles import evaluate_coworker_reply_oracles
 from app.evaluation.profile_testbot.scenarios.schema import ProfileScenario
 
@@ -194,7 +199,39 @@ ORPHANED_R3_INBOUND_TRIGGERS: tuple[dict[str, Any], ...] = (
         "never_resume": True,
         "never_retry": True,
     },
+) + tuple(
+    {
+        "orphan_id": ORPHANED_ATTEMPT_7_ORPHAN_GROUP_ID,
+        "orphan_group_id": ORPHANED_ATTEMPT_7_ORPHAN_GROUP_ID,
+        "classification": "partial_campaign_stopped",
+        "attempt": 7,
+        "campaign_id": ORPHANED_ATTEMPT_7_CAMPAIGN_ID,
+        "scenario_id": row["scenario_id"],
+        "evaluation_run_id": row["evaluation_run_id"],
+        "inbound_trigger_sent": row.get("inbound_trigger_sent", True),
+        "approved_reply_sent": bool(row.get("approved_reply_sent")),
+        "draft_created": False,
+        "provider": row.get("provider"),
+        "provider_message_id_redacted": row.get("provider_message_id_redacted"),
+        "provider_thread_id_redacted": row.get("provider_thread_id_redacted"),
+        "sender_message_id_redacted": row.get("inbound_message_id_redacted"),
+        "recipient_message_id_redacted": row.get("inbound_message_id_redacted"),
+        "execution_outcome": row.get("execution_outcome"),
+        "body_hash": row.get("body_hash"),
+        "exclude_from_approved_reply_count": True,
+        "reuse_blocked": True,
+        "never_resume": True,
+        "never_retry": True,
+        "run_status": "aborted",
+        "approval_state": row.get("approval_state"),
+        "policy_authorization": row.get("policy_authorization"),
+        "external_write_historical": bool(row.get("external_write_historical")),
+    }
+    for row in ORPHANED_ATTEMPT_7_SCENARIO_RUNS
 )
+
+# Attempt 7 registry is defined inline above via ORPHANED_ATTEMPT_7_SCENARIO_RUNS.
+
 
 
 @dataclass
@@ -421,6 +458,28 @@ def validate_r3_pre_execute_gates(
         blockers.append("stub_fallback_possible must be false for R3 reply provider")
     if reply_provider_readiness.get("tenant_google_mail_used"):
         blockers.append("tenant_google_mail_used must be false for R3 reply provider")
+
+    from app.evaluation.profile_testbot.qualification.coworker_r3_approval_materialization_contract import (
+        run_r3_approval_materialization_readiness,
+    )
+
+    approval_mat = run_r3_approval_materialization_readiness(
+        manifest=manifest,
+        approval_artifact=approval.payload,
+        runtime_sha=runtime_sha,
+    )
+    if not approval_mat.get("approval_materialization_contract_valid"):
+        blockers.extend(approval_mat.get("blockers") or [])
+        blockers.append("approval materialization contract not ready — block before inbound trigger")
+    if int(approval_mat.get("approval_materialization_send_ready_count") or 0) != 8:
+        blockers.append("approval_materialization_send_ready_count must be 8")
+    if int(approval_mat.get("approval_materialization_no_send_ready_count") or 0) != 7:
+        blockers.append("approval_materialization_no_send_ready_count must be 7")
+    if approval_mat.get("PTB-DCQ-0088_expected_approval_state") != "pending":
+        blockers.append("PTB-DCQ-0088 expected_approval_state must be pending via R3 override")
+    if approval_mat.get("PTB-DCQ-0088_base_policy_authorization") != "hold_for_review":
+        blockers.append("PTB-DCQ-0088 base policy must remain hold_for_review")
+
     if recipient_readiness.recipient_credential_source != "live_eval_recipient_env":
         blockers.append("recipient credential source must be live_eval_recipient_env")
     if recipient_readiness.delivery_observation_credential_source != "live_eval_recipient_env":
@@ -452,6 +511,26 @@ def validate_r3_pre_execute_gates(
         "reply_provider_ready": bool(reply_provider_readiness.get("reply_provider_ready")),
         "reply_provider_source": reply_provider_readiness.get("reply_provider_source"),
         "stub_fallback_possible": bool(reply_provider_readiness.get("stub_fallback_possible")),
+        "approval_materialization_readiness": approval_mat,
+        "approval_materialization_contract_valid": bool(
+            approval_mat.get("approval_materialization_contract_valid")
+        ),
+        "approval_materialization_send_ready_count": int(
+            approval_mat.get("approval_materialization_send_ready_count") or 0
+        ),
+        "approval_materialization_no_send_ready_count": int(
+            approval_mat.get("approval_materialization_no_send_ready_count") or 0
+        ),
+        "r3_hold_override_scenarios": list(approval_mat.get("r3_hold_override_scenarios") or []),
+        "r3_hold_override_count": int(approval_mat.get("r3_hold_override_count") or 0),
+        "PTB-DCQ-0088_base_policy_authorization": approval_mat.get(
+            "PTB-DCQ-0088_base_policy_authorization"
+        ),
+        "PTB-DCQ-0088_override_eligible": approval_mat.get("PTB-DCQ-0088_override_eligible"),
+        "PTB-DCQ-0088_expected_approval_state": approval_mat.get(
+            "PTB-DCQ-0088_expected_approval_state"
+        ),
+        "approval_materialization_ready": bool(approval_mat.get("approval_materialization_ready")),
         "recipient_credential_source": recipient_readiness.recipient_credential_source,
         "delivery_observation_credential_source": recipient_readiness.delivery_observation_credential_source,
         "credential_source_match": recipient_readiness.credential_source_match,
