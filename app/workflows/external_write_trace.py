@@ -142,6 +142,58 @@ def _live_eval_integration_type(action_type: str | None) -> str:
     return "other"
 
 
+def _latest_outcome_metadata(
+    db: Session,
+    *,
+    tenant_id: str,
+    action_operation_id: str,
+) -> dict[str, Any]:
+    rows = DecisionRecordRepository.list_for_operation(
+        db,
+        tenant_id=tenant_id,
+        action_operation_id=action_operation_id,
+    )
+    for row in reversed(rows):
+        if row.record_type == "execution_outcome" and isinstance(row.metadata_json, dict):
+            return dict(row.metadata_json)
+    return {}
+
+
+def _is_timeout_after_send_risk(exc: BaseException) -> bool:
+    name = type(exc).__name__.lower()
+    if isinstance(exc, TimeoutError):
+        return True
+    if "timeout" in name:
+        return True
+    try:
+        import httpx
+
+        if isinstance(exc, httpx.TimeoutException):
+            return True
+    except ImportError:
+        pass
+    return False
+
+
+def _classify_adapter_result_status(
+    result: dict[str, Any],
+    *,
+    action: dict[str, Any] | None = None,
+) -> tuple[ExecutionStatus, dict[str, Any]]:
+    """Map adapter result to execution status. Stub never SUCCEEDED; missing id → unknown."""
+    meta = _adapter_outcome_metadata(result, action=action)
+    if not is_real_provider_execution_result(result):
+        # Use reconciliation_required so the same operation_id cannot auto-retry.
+        meta["reconciliation_required"] = True
+        return ExecutionStatus.FAILED, meta
+
+    if not meta.get("provider_message_id"):
+        meta["reconciliation_required"] = True
+        return ExecutionStatus.OUTCOME_UNKNOWN, meta
+
+    return ExecutionStatus.SUCCEEDED, meta
+
+
 def execute_external_write_with_trace(
     *,
     db: Session | None,
@@ -183,6 +235,16 @@ def execute_external_write_with_trace(
             "idempotent": True,
             "action_operation_id": operation_id,
         }
+
+    if state == ExecutionStatus.FAILED.value:
+        prior_meta = _latest_outcome_metadata(
+            db, tenant_id=job.tenant_id, action_operation_id=operation_id
+        )
+        if prior_meta.get("reconciliation_required"):
+            raise ReconciliationRequired(
+                f"action_operation_id {operation_id} blocks automatic adapter retry "
+                f"(state={state}, reconciliation_required=true)"
+            )
 
     live_eval_snap = None
     live_eval_operation_key = None
@@ -234,13 +296,27 @@ def execute_external_write_with_trace(
     try:
         result = adapter_fn()
     except Exception as exc:
+        from app.evaluation.live.errors import LiveEvalSafetyError
+
+        outcome_status = (
+            ExecutionStatus.OUTCOME_UNKNOWN
+            if _is_timeout_after_send_risk(exc)
+            else ExecutionStatus.FAILED
+        )
+        outcome_meta: dict[str, Any] = {
+            "error_class": type(exc).__name__,
+        }
+        if outcome_status == ExecutionStatus.OUTCOME_UNKNOWN:
+            outcome_meta["reconciliation_required"] = True
+        elif isinstance(exc, (LiveEvalSafetyError, ExternalWriteBlocked)):
+            outcome_meta["reconciliation_required"] = True
         if db is not None and live_eval_snap is not None and live_eval_operation_key:
             from app.evaluation.live.telemetry import record_live_eval_external_event
 
             record_live_eval_external_event(
                 db,
                 operation_key=live_eval_operation_key,
-                outcome="failed",
+                outcome="failed" if outcome_status == ExecutionStatus.FAILED else "unknown",
                 category=_live_eval_category_for_action(action_type),
                 operation=str(action_type or "unknown"),
                 integration_type=_live_eval_integration_type(action_type),
@@ -249,7 +325,7 @@ def execute_external_write_with_trace(
                 action_operation_id=operation_id,
                 snapshot=live_eval_snap,
                 job_input_data=getattr(job, "input_data", None),
-                metadata={"error_class": type(exc).__name__},
+                metadata=outcome_meta,
             )
         record_execution_outcome(
             db,
@@ -259,10 +335,78 @@ def execute_external_write_with_trace(
             operation_id=operation_id,
             fingerprint=fingerprint,
             key_version=key_version,
-            status=ExecutionStatus.FAILED,
-            metadata={"error_class": type(exc).__name__},
+            status=outcome_status,
+            metadata=outcome_meta,
         )
+        if outcome_status == ExecutionStatus.OUTCOME_UNKNOWN:
+            raise ReconciliationRequired(
+                f"provider timeout after send risk for {operation_id} — reconciliation required"
+            ) from exc
         raise
+
+    outcome_status, outcome_meta = _classify_adapter_result_status(result, action=action)
+
+    # Non-R3 development/harness stub paths remain executable (legacy SUCCEEDED).
+    # Trusted R3 frozen canary never treats stub/skipped as succeeded.
+    r3_context = False
+    try:
+        from app.evaluation.profile_testbot.qualification.coworker_r3_reply_provider import (
+            is_r3_frozen_customer_reply_context,
+        )
+
+        r3_context = is_r3_frozen_customer_reply_context(action=action, job=job, db=db)
+    except Exception:
+        r3_context = False
+
+    if (
+        not r3_context
+        and outcome_status == ExecutionStatus.FAILED
+        and not is_real_provider_execution_result(result)
+    ):
+        outcome_status = ExecutionStatus.SUCCEEDED
+        outcome_meta = _adapter_outcome_metadata(result, action=action)
+
+    if outcome_status != ExecutionStatus.SUCCEEDED:
+        if db is not None and live_eval_snap is not None and live_eval_operation_key:
+            from app.evaluation.live.telemetry import record_live_eval_external_event
+
+            record_live_eval_external_event(
+                db,
+                operation_key=live_eval_operation_key,
+                outcome=(
+                    "failed"
+                    if outcome_status == ExecutionStatus.FAILED
+                    else "unknown"
+                ),
+                category=_live_eval_category_for_action(action_type),
+                operation=str(action_type or "unknown"),
+                integration_type=_live_eval_integration_type(action_type),
+                target=str(action.get("to") or "")[:120] or None,
+                job_id=getattr(job, "job_id", None),
+                pipeline_run_id=trace.pipeline_run.pipeline_run_id if trace else None,
+                action_operation_id=operation_id,
+                snapshot=live_eval_snap,
+                job_input_data=getattr(job, "input_data", None),
+                metadata=outcome_meta,
+            )
+        record_execution_outcome(
+            db,
+            trace,
+            job,
+            action,
+            operation_id=operation_id,
+            fingerprint=fingerprint,
+            key_version=key_version,
+            status=outcome_status,
+            metadata=outcome_meta,
+        )
+        if outcome_status == ExecutionStatus.OUTCOME_UNKNOWN:
+            raise ReconciliationRequired(
+                f"real provider result missing provider_message_id for {operation_id}"
+            )
+        raise ExternalWriteBlocked(
+            f"external write result is stub/skipped — not succeeded for {operation_id}"
+        )
 
     try:
         record_execution_outcome(
@@ -274,7 +418,7 @@ def execute_external_write_with_trace(
             fingerprint=fingerprint,
             key_version=key_version,
             status=ExecutionStatus.SUCCEEDED,
-            metadata=_adapter_outcome_metadata(result, action=action),
+            metadata=outcome_meta,
         )
     except Exception as persist_exc:
         logger.error(
@@ -293,7 +437,10 @@ def execute_external_write_with_trace(
                 fingerprint=fingerprint,
                 key_version=key_version,
                 status=ExecutionStatus.OUTCOME_UNKNOWN,
-                metadata={"reconciliation_required": True, "error_class": type(persist_exc).__name__},
+                metadata={
+                    "reconciliation_required": True,
+                    "error_class": type(persist_exc).__name__,
+                },
             )
         except Exception:
             pass
@@ -318,7 +465,7 @@ def execute_external_write_with_trace(
             action_operation_id=operation_id,
             snapshot=live_eval_snap,
             job_input_data=getattr(job, "input_data", None),
-            metadata=_adapter_outcome_metadata(result, action=action),
+            metadata=outcome_meta,
         )
 
     result["action_operation_id"] = operation_id

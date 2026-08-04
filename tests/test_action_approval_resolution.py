@@ -146,7 +146,12 @@ class TestActionApprovalResolution:
         ):
             mock_adapter.return_value.execute_action.return_value = {
                 "provider": "gmail",
-                "message_id": "m1",
+                "status": "success",
+                "external_id": "m1",
+                "payload": {
+                    "google_message_id": "m1",
+                    "thread_id": "t1",
+                },
             }
             with patch.dict("os.environ", {"DECISION_RECORD_ENFORCE_WRITES": "true"}):
                 from app.core.settings import get_settings
@@ -211,7 +216,12 @@ class TestActionApprovalResolution:
         def _adapter(*_a, **_k):
             adapter_calls["n"] += 1
             mock = MagicMock()
-            mock.execute_action.return_value = {"provider": "gmail", "message_id": "m1"}
+            mock.execute_action.return_value = {
+                "provider": "gmail",
+                "status": "success",
+                "external_id": "m1",
+                "payload": {"google_message_id": "m1", "thread_id": "t1"},
+            }
             return mock
 
         with (

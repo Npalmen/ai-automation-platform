@@ -362,6 +362,7 @@ def get_process_delivery_readiness(
         allow_orphan_probe=evaluation_run_id in {
             "ccd9916f-c4b7-4b1c-aabc-fb2da09f89cf",
             "b5bbe7ab-7148-4366-8fba-bd92921481f4",
+            "afaf7ec3-69d7-433a-9ba7-8338a0a508c0",
         },
     )
     payload = result.to_dict()
@@ -718,6 +719,43 @@ def recipient_gmail_readiness(
     payload["ready"] = report.ready
     payload["tenant_id"] = tenant_id
     return payload
+
+
+@router.get("/r3-reply-provider-readiness")
+def r3_reply_provider_readiness(
+    tenant_id: str = Query(...),
+    _admin=Depends(require_admin_api_key),
+):
+    """Write-free R3 reply provider resolution probe — no Gmail send."""
+    require_live_eval_enabled()
+    require_gmail_eval_enabled()
+    require_tenant_allowed(tenant_id)
+    from app.evaluation.profile_testbot.qualification.coworker_r3_reply_provider import (
+        run_r3_live_reply_provider_readiness,
+    )
+
+    return run_r3_live_reply_provider_readiness(tenant_id=tenant_id)
+
+
+@router.get("/runs/{evaluation_run_id}/orphan-reply-probe", response_model=dict)
+def get_orphan_reply_probe(
+    evaluation_run_id: str,
+    tenant_id: str = Query(...),
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin_api_key),
+):
+    """Read-only attempt-6 reply orphan probe — no resume, send, or process."""
+    require_live_eval_enabled()
+    require_tenant_allowed(tenant_id)
+    from app.evaluation.profile_testbot.qualification.coworker_r3_reply_provider import (
+        probe_orphaned_attempt_6_reply,
+    )
+
+    return probe_orphaned_attempt_6_reply(
+        db,
+        evaluation_run_id=evaluation_run_id,
+        tenant_id=tenant_id,
+    )
 
 
 @router.get("/tenant-intake-readiness")
