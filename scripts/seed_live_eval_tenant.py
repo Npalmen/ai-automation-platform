@@ -54,6 +54,9 @@ def _validate_guards(tenant_id: str, *, apply: bool) -> list[str]:
     if not apply:
         return issues
 
+    if issues:
+        return issues
+
     db = SessionLocal()
     try:
         existing = db.get(TenantConfigRecord, tenant_id)
