@@ -65,6 +65,15 @@ R3_ORPHAN_ATTEMPT_EVALUATION_RUN_IDS: frozenset[str] = frozenset(
         "ccd9916f-c4b7-4b1c-aabc-fb2da09f89cf",  # attempt 4
         "b5bbe7ab-7148-4366-8fba-bd92921481f4",  # attempt 5
         "afaf7ec3-69d7-433a-9ba7-8338a0a508c0",  # attempt 6
+        # attempt 7 (partial campaign) — all eight evaluation_run_ids
+        "ef992348-f944-4ae1-8cc4-574e31276059",
+        "1ab63fb7-a515-4e47-9ff3-55a42d193073",
+        "a508d07f-beef-4482-97b1-a38f39586007",
+        "1ab48b51-d5ee-46a9-903e-c2a4bf4c0f5c",
+        "43d56dab-41ab-4a1a-9b83-2958c033a03e",
+        "24522e6d-c1a0-48c1-92b8-6baecb8ad995",
+        "f51cd732-3ac0-47e9-9462-e37c4e770b82",
+        "f1be25bc-aecb-4b94-bb65-46a0aae0bf01",
     }
 )
 
@@ -76,6 +85,22 @@ R3_ORPHAN_RECIPIENT_MESSAGE_ID_SUFFIXES: frozenset[str] = frozenset(
         "2713",  # attempt 2
         "be91",  # attempt 3 sender (recipient unknown at registration)
         "cdb3",  # attempt 4
+        # attempt 7 inbound / reply message-id suffixes
+        "f9a0",
+        "ca62",
+        "fbce",
+        "87aa",
+        "dcc8",
+        "7a74",
+        "ff1c",
+        "44f1",
+        "59c1",
+        "78f7",
+        "4d6b",
+        "77c9",
+        "4413",
+        "c4e4",
+        "5283",
     }
 )
 

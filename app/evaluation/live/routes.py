@@ -737,6 +737,52 @@ def r3_reply_provider_readiness(
     return run_r3_live_reply_provider_readiness(tenant_id=tenant_id)
 
 
+@router.get("/r3-approval-materialization-readiness")
+def r3_approval_materialization_readiness(
+    tenant_id: str = Query(...),
+    runtime_sha: str | None = Query(None),
+    _admin=Depends(require_admin_api_key),
+):
+    """Write-free R3 approval materialization probe — no job/approval/Gmail writes."""
+    require_live_eval_enabled()
+    require_tenant_allowed(tenant_id)
+    from app.core.settings import get_settings
+    from app.evaluation.profile_testbot.qualification.coworker_live_canary_manifest import (
+        COWORKER_LIVE_CANARY_MANIFEST_HASH,
+        COWORKER_LIVE_CANARY_SCENARIO_IDS,
+    )
+    from app.evaluation.profile_testbot.qualification.coworker_r3_approval_materialization_contract import (
+        run_r3_approval_materialization_readiness,
+    )
+
+    settings = get_settings()
+    if str(getattr(settings, "ENV", "") or "").lower() != "test":
+        raise HTTPException(status_code=403, detail="eval-only endpoint requires ENV=test")
+
+    sha = (runtime_sha or "").strip() or str(
+        getattr(settings, "BUILD_COMMIT_SHA", "") or ""
+    ).strip()
+    payload = run_r3_approval_materialization_readiness(
+        manifest={
+            "manifest_hash": COWORKER_LIVE_CANARY_MANIFEST_HASH,
+            "scenarios": list(COWORKER_LIVE_CANARY_SCENARIO_IDS),
+        },
+        approval_artifact={
+            "runtime_sha": sha,
+            "manifest_hash": COWORKER_LIVE_CANARY_MANIFEST_HASH,
+            "manual_execution_approved": True,
+            "body_hashes_approved": True,
+            "campaign_type": "coworker_r3_frozen_live_canary",
+            "execution_mode": "r3_frozen_approved_body",
+        },
+        runtime_sha=sha,
+    )
+    payload["tenant_id"] = tenant_id
+    payload["gmail_sent"] = False
+    payload["gmail_drafts_created"] = False
+    return payload
+
+
 @router.get("/runs/{evaluation_run_id}/orphan-reply-probe", response_model=dict)
 def get_orphan_reply_probe(
     evaluation_run_id: str,
