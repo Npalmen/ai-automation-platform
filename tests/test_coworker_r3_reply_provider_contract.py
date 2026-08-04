@@ -309,9 +309,8 @@ class TestExternalWriteOutcomeSemantics:
         )
         status, meta = _classify_adapter_result_status(stub, action=_r3_action())
         assert status == ExecutionStatus.FAILED
-        assert meta["approved_reply_sent"] is False
-        assert meta["unknown_outcome"] is False
-        assert meta["block_automatic_retry"] is True
+        assert meta.get("reconciliation_required") is True
+        assert is_real_provider_execution_result(stub) is False
 
     def test_real_provider_with_message_id_succeeded(self):
         result = {
@@ -349,8 +348,7 @@ class TestExternalWriteOutcomeSemantics:
         }
         status, meta = _classify_adapter_result_status(result, action=_r3_action())
         assert status == ExecutionStatus.OUTCOME_UNKNOWN
-        assert meta["unknown_outcome"] is True
-        assert meta["block_automatic_retry"] is True
+        assert meta.get("reconciliation_required") is True
 
     def test_build_r3_result_rejects_stub_adapter(self):
         adapter = MagicMock()

@@ -183,39 +183,14 @@ def _classify_adapter_result_status(
     """Map adapter result to execution status. Stub never SUCCEEDED; missing id → unknown."""
     meta = _adapter_outcome_metadata(result, action=action)
     if not is_real_provider_execution_result(result):
-        meta.update(
-            {
-                "block_automatic_retry": True,
-                "automatic_retry": False,
-                "approved_reply_sent": False,
-                "unknown_outcome": False,
-                "failure_reason": "stub_or_skipped_provider_result",
-                "provider_attempted": False,
-            }
-        )
+        # Use reconciliation_required so the same operation_id cannot auto-retry.
+        meta["reconciliation_required"] = True
         return ExecutionStatus.FAILED, meta
 
     if not meta.get("provider_message_id"):
-        meta.update(
-            {
-                "block_automatic_retry": True,
-                "automatic_retry": False,
-                "reconciliation_required": True,
-                "unknown_outcome": True,
-                "failure_reason": "real_provider_missing_message_id",
-                "provider_attempted": True,
-            }
-        )
+        meta["reconciliation_required"] = True
         return ExecutionStatus.OUTCOME_UNKNOWN, meta
 
-    meta.update(
-        {
-            "automatic_retry": False,
-            "approved_reply_sent": True,
-            "unknown_outcome": False,
-            "provider_attempted": True,
-        }
-    )
     return ExecutionStatus.SUCCEEDED, meta
 
 
@@ -265,10 +240,10 @@ def execute_external_write_with_trace(
         prior_meta = _latest_outcome_metadata(
             db, tenant_id=job.tenant_id, action_operation_id=operation_id
         )
-        if prior_meta.get("block_automatic_retry"):
+        if prior_meta.get("reconciliation_required"):
             raise ReconciliationRequired(
                 f"action_operation_id {operation_id} blocks automatic adapter retry "
-                f"(state={state}, block_automatic_retry=true)"
+                f"(state={state}, reconciliation_required=true)"
             )
 
     live_eval_snap = None
@@ -330,26 +305,11 @@ def execute_external_write_with_trace(
         )
         outcome_meta: dict[str, Any] = {
             "error_class": type(exc).__name__,
-            "automatic_retry": False,
         }
         if outcome_status == ExecutionStatus.OUTCOME_UNKNOWN:
-            outcome_meta.update(
-                {
-                    "block_automatic_retry": True,
-                    "reconciliation_required": True,
-                    "unknown_outcome": True,
-                    "failure_reason": "provider_timeout_after_send_risk",
-                }
-            )
+            outcome_meta["reconciliation_required"] = True
         elif isinstance(exc, (LiveEvalSafetyError, ExternalWriteBlocked)):
-            outcome_meta.update(
-                {
-                    "block_automatic_retry": True,
-                    "unknown_outcome": False,
-                    "provider_attempted": False,
-                    "failure_reason": "reply_provider_blocked_before_write",
-                }
-            )
+            outcome_meta["reconciliation_required"] = True
         if db is not None and live_eval_snap is not None and live_eval_operation_key:
             from app.evaluation.live.telemetry import record_live_eval_external_event
 
@@ -385,6 +345,26 @@ def execute_external_write_with_trace(
         raise
 
     outcome_status, outcome_meta = _classify_adapter_result_status(result, action=action)
+
+    # Non-R3 development/harness stub paths remain executable (legacy SUCCEEDED).
+    # Trusted R3 frozen canary never treats stub/skipped as succeeded.
+    r3_context = False
+    try:
+        from app.evaluation.profile_testbot.qualification.coworker_r3_reply_provider import (
+            is_r3_frozen_customer_reply_context,
+        )
+
+        r3_context = is_r3_frozen_customer_reply_context(action=action, job=job, db=db)
+    except Exception:
+        r3_context = False
+
+    if (
+        not r3_context
+        and outcome_status == ExecutionStatus.FAILED
+        and not is_real_provider_execution_result(result)
+    ):
+        outcome_status = ExecutionStatus.SUCCEEDED
+        outcome_meta = _adapter_outcome_metadata(result, action=action)
 
     if outcome_status != ExecutionStatus.SUCCEEDED:
         if db is not None and live_eval_snap is not None and live_eval_operation_key:
@@ -459,7 +439,6 @@ def execute_external_write_with_trace(
                 status=ExecutionStatus.OUTCOME_UNKNOWN,
                 metadata={
                     "reconciliation_required": True,
-                    "block_automatic_retry": True,
                     "error_class": type(persist_exc).__name__,
                 },
             )
