@@ -64,8 +64,11 @@ R3_ORPHAN_ATTEMPT_EVALUATION_RUN_IDS: frozenset[str] = frozenset(
         "05839824-1fb1-4e98-b8e1-b8025df5db3d",  # attempt 3
         "ccd9916f-c4b7-4b1c-aabc-fb2da09f89cf",  # attempt 4
         "b5bbe7ab-7148-4366-8fba-bd92921481f4",  # attempt 5
+        "afaf7ec3-69d7-433a-9ba7-8338a0a508c0",  # attempt 6
     }
 )
+
+ORPHANED_ATTEMPT_6_EVALUATION_RUN_ID = "afaf7ec3-69d7-433a-9ba7-8338a0a508c0"
 
 # Redacted provider message IDs from prior orphan inbound triggers (attempts 2–4).
 R3_ORPHAN_RECIPIENT_MESSAGE_ID_SUFFIXES: frozenset[str] = frozenset(

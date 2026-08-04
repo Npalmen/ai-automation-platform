@@ -87,7 +87,35 @@ def _build_stub_result(
     }
 
 
-def _build_email_result(action: dict[str, Any], *, db: "Session | None" = None) -> dict[str, Any]:
+def _build_email_result(
+    action: dict[str, Any],
+    *,
+    db: "Session | None" = None,
+    job=None,
+    trace=None,
+) -> dict[str, Any]:
+    from app.evaluation.live.errors import LiveEvalSafetyError
+    from app.evaluation.profile_testbot.qualification.coworker_r3_reply_provider import (
+        build_r3_email_result_from_resolution,
+        is_r3_frozen_customer_reply_context,
+        resolve_r3_live_reply_provider,
+    )
+
+    # Trusted R3 frozen live-canary: recipient-env Gmail only — never stub / tenant GOOGLE_MAIL.
+    if is_r3_frozen_customer_reply_context(action=action, job=job, db=db):
+        resolution = resolve_r3_live_reply_provider(
+            db=db,
+            job=job,
+            action=action,
+            trace=trace,
+        )
+        if not resolution.ready:
+            raise LiveEvalSafetyError(
+                "R3 reply provider not ready before external write: "
+                + "; ".join(resolution.blockers or ["unknown"])
+            )
+        return build_r3_email_result_from_resolution(action, resolution)
+
     tenant_id = _get_tenant_id(action)
     to = _ensure_str(action.get("to"), "to")
     subject = _ensure_str(action.get("subject"), "subject")
@@ -439,7 +467,7 @@ def execute_action(
 
     def _run_adapter() -> dict[str, Any]:
         if action_type in ("send_email", "send_customer_auto_reply", "send_internal_handoff"):
-            result = _build_email_result(action, db=db)
+            result = _build_email_result(action, db=db, job=job, trace=trace)
             result["type"] = action_type
             return result
 

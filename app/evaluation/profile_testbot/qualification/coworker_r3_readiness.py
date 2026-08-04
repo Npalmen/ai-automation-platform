@@ -156,6 +156,15 @@ class CoworkerR3ReadinessResult:
     intake_cutoff_age_seconds: int | None = None
     intake_cutoff_fresh: bool | None = None
     tenant_intake_blockers: list[str] = field(default_factory=list)
+    reply_provider_ready: bool | None = None
+    reply_provider_source: str | None = None
+    reply_adapter_provider: str | None = None
+    reply_mailbox_identity_match: bool | None = None
+    reply_send_scope_verified: bool | None = None
+    reply_read_scope_verified: bool | None = None
+    tenant_google_mail_used: bool | None = None
+    stub_fallback_possible: bool | None = None
+    reply_provider_blockers: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         payload = {
@@ -215,6 +224,15 @@ class CoworkerR3ReadinessResult:
             "intake_cutoff_age_seconds": self.intake_cutoff_age_seconds,
             "intake_cutoff_fresh": self.intake_cutoff_fresh,
             "tenant_intake_blockers": self.tenant_intake_blockers,
+            "reply_provider_ready": self.reply_provider_ready,
+            "reply_provider_source": self.reply_provider_source,
+            "reply_adapter_provider": self.reply_adapter_provider,
+            "reply_mailbox_identity_match": self.reply_mailbox_identity_match,
+            "reply_send_scope_verified": self.reply_send_scope_verified,
+            "reply_read_scope_verified": self.reply_read_scope_verified,
+            "tenant_google_mail_used": self.tenant_google_mail_used,
+            "stub_fallback_possible": self.stub_fallback_possible,
+            "reply_provider_blockers": self.reply_provider_blockers,
         }
         return payload
 
@@ -304,6 +322,7 @@ def _r3_specific_blockers(
     tenant_id: str,
     recipient_readiness: RecipientGmailReadinessResult | None = None,
     tenant_intake: TenantIntakeReadinessResult | None = None,
+    reply_provider_readiness: dict[str, Any] | None = None,
 ) -> list[str]:
     blockers: list[str] = []
     if tenant_id != LIVE_EVAL_TENANT_ID:
@@ -319,6 +338,16 @@ def _r3_specific_blockers(
         blockers.append("Gmail OAuth readiness failed (live recipient API verification required)")
     if recipient_readiness is not None and not recipient_readiness.ready:
         blockers.extend(recipient_readiness.blockers)
+    if reply_provider_readiness is not None:
+        if not reply_provider_readiness.get("reply_provider_ready"):
+            blockers.extend(reply_provider_readiness.get("blockers") or [])
+            blockers.append("R3 reply provider not ready")
+        if reply_provider_readiness.get("reply_provider_source") != "live_eval_recipient_env":
+            blockers.append("reply_provider_source must be live_eval_recipient_env")
+        if reply_provider_readiness.get("stub_fallback_possible"):
+            blockers.append("stub_fallback_possible must be false")
+        if reply_provider_readiness.get("tenant_google_mail_used"):
+            blockers.append("tenant_google_mail_used must be false")
     if not _env_truthy("LIVE_GMAIL_EVAL_ALLOWED"):
         blockers.append("LIVE_GMAIL_EVAL_ALLOWED=yes required for R3 canary")
     if not os.environ.get("LIVE_EVAL_APP_BASE_URL", "").strip():
@@ -397,6 +426,7 @@ def evaluate_coworker_r3_readiness(
     oauth = _oauth_readiness()
     recipient_readiness: RecipientGmailReadinessResult | None = None
     tenant_intake: TenantIntakeReadinessResult | None = None
+    reply_provider_readiness: dict[str, Any] | None = None
     if phase == "postdeploy":
         db = SessionLocal()
         try:
@@ -404,11 +434,22 @@ def evaluate_coworker_r3_readiness(
         finally:
             db.close()
     if phase == "postdeploy" and _env_truthy("LIVE_GMAIL_EVAL_ALLOWED"):
+        from app.evaluation.profile_testbot.qualification.coworker_r3_reply_provider import (
+            run_r3_live_reply_provider_readiness,
+        )
+
         recipient_readiness = run_recipient_gmail_readiness(
             expected_recipient=recipient,
             config=config,
         )
-        oauth_ready = recipient_readiness.ready
+        reply_provider_readiness = run_r3_live_reply_provider_readiness(
+            tenant_id=tenant_id,
+            expected_recipient=recipient,
+            expected_sender=sender,
+        )
+        oauth_ready = recipient_readiness.ready and bool(
+            reply_provider_readiness.get("reply_provider_ready")
+        )
     else:
         oauth_ready = bool(oauth.get("oauth_ready"))
 
@@ -440,6 +481,7 @@ def evaluate_coworker_r3_readiness(
             tenant_id=tenant_id,
             recipient_readiness=recipient_readiness,
             tenant_intake=tenant_intake,
+            reply_provider_readiness=reply_provider_readiness,
         )
     )
 
@@ -592,4 +634,49 @@ def evaluate_coworker_r3_readiness(
         ),
         intake_cutoff_fresh=tenant_intake.intake_cutoff_fresh if tenant_intake else None,
         tenant_intake_blockers=list(tenant_intake.blockers) if tenant_intake else [],
+        reply_provider_ready=(
+            bool(reply_provider_readiness.get("reply_provider_ready"))
+            if reply_provider_readiness
+            else None
+        ),
+        reply_provider_source=(
+            reply_provider_readiness.get("reply_provider_source")
+            if reply_provider_readiness
+            else None
+        ),
+        reply_adapter_provider=(
+            reply_provider_readiness.get("reply_adapter_provider")
+            if reply_provider_readiness
+            else None
+        ),
+        reply_mailbox_identity_match=(
+            reply_provider_readiness.get("reply_mailbox_identity_match")
+            if reply_provider_readiness
+            else None
+        ),
+        reply_send_scope_verified=(
+            reply_provider_readiness.get("reply_send_scope_verified")
+            if reply_provider_readiness
+            else None
+        ),
+        reply_read_scope_verified=(
+            reply_provider_readiness.get("reply_read_scope_verified")
+            if reply_provider_readiness
+            else None
+        ),
+        tenant_google_mail_used=(
+            reply_provider_readiness.get("tenant_google_mail_used")
+            if reply_provider_readiness
+            else None
+        ),
+        stub_fallback_possible=(
+            reply_provider_readiness.get("stub_fallback_possible")
+            if reply_provider_readiness
+            else None
+        ),
+        reply_provider_blockers=(
+            list(reply_provider_readiness.get("blockers") or [])
+            if reply_provider_readiness
+            else []
+        ),
     )

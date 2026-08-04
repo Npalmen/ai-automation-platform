@@ -23,6 +23,9 @@ from app.evaluation.live.tenant_intake_readiness import run_r3_tenant_intake_rea
 from app.evaluation.profile_testbot.constants import LIVE_EVAL_TENANT_ID
 from app.repositories.postgres.database import SessionLocal
 from app.evaluation.live.recipient_gmail_readiness import run_recipient_gmail_readiness
+from app.evaluation.profile_testbot.qualification.coworker_r3_reply_provider import (
+    run_r3_live_reply_provider_readiness,
+)
 from app.evaluation.profile_testbot.campaign.semi_auto_live_backend import LiveSemiAutoBackend
 from app.evaluation.profile_testbot.campaign.semi_auto_safety import (
     assert_hold_scenario_no_send,
@@ -158,6 +161,38 @@ ORPHANED_R3_INBOUND_TRIGGERS: tuple[dict[str, Any], ...] = (
         "sent_at": "2026-08-04T18:11:56Z",
         "reuse_blocked": True,
         "exclude_from_approved_reply_count": True,
+    },
+    {
+        "orphan_id": "orphaned_attempt_6",
+        "attempt": 6,
+        "scenario_id": "PTB-DCQ-0000",
+        "campaign_id": "13ce2349-0a9d-4b2f-a06b-fc194fe7e86b",
+        "evaluation_run_id": "afaf7ec3-69d7-433a-9ba7-8338a0a508c0",
+        "classification": "reply_execution_stubbed",
+        "failure_stage": "reply_execution_observation",
+        "failure_substage": "reply_provider_contract",
+        "failure_reason": "internal_stub_without_provider_message_id",
+        "inbound_trigger_sent": True,
+        "job_created": True,
+        "frozen_body_bound": True,
+        "approval_created": True,
+        "approval_executed": True,
+        "external_provider_attempted": False,
+        "approved_reply_sent": False,
+        "draft_created": False,
+        "reply_provider_message_id": None,
+        "adapter_provider": "internal_stub",
+        "provider_status": "stubbed",
+        "automatic_retry": False,
+        "unknown_outcome": False,
+        "run_status": "aborted",
+        "sender_message_id_redacted": "19fc…7f4e",
+        "recipient_message_id_redacted": "19fc…7f4e",
+        "sent_at": "2026-08-04T21:10:00Z",
+        "reuse_blocked": True,
+        "exclude_from_approved_reply_count": True,
+        "never_resume": True,
+        "never_retry": True,
     },
 )
 
@@ -349,6 +384,11 @@ def validate_r3_pre_execute_gates(
         expected_recipient=recipient_email,
         config=config,
     )
+    reply_provider_readiness = run_r3_live_reply_provider_readiness(
+        tenant_id=LIVE_EVAL_TENANT_ID,
+        expected_recipient=recipient_email,
+        expected_sender=sender_email,
+    )
     db = SessionLocal()
     try:
         tenant_intake = run_r3_tenant_intake_readiness(
@@ -372,6 +412,15 @@ def validate_r3_pre_execute_gates(
         blockers.extend(sender_readiness.issues)
     if not recipient_readiness.ready:
         blockers.extend(recipient_readiness.blockers)
+    if not reply_provider_readiness.get("reply_provider_ready"):
+        blockers.extend(reply_provider_readiness.get("blockers") or [])
+        blockers.append("R3 reply provider not ready — block before inbound trigger")
+    if reply_provider_readiness.get("reply_provider_source") != "live_eval_recipient_env":
+        blockers.append("reply_provider_source must be live_eval_recipient_env")
+    if reply_provider_readiness.get("stub_fallback_possible"):
+        blockers.append("stub_fallback_possible must be false for R3 reply provider")
+    if reply_provider_readiness.get("tenant_google_mail_used"):
+        blockers.append("tenant_google_mail_used must be false for R3 reply provider")
     if recipient_readiness.recipient_credential_source != "live_eval_recipient_env":
         blockers.append("recipient credential source must be live_eval_recipient_env")
     if recipient_readiness.delivery_observation_credential_source != "live_eval_recipient_env":
@@ -385,6 +434,7 @@ def validate_r3_pre_execute_gates(
     ready = (
         sender_readiness.ready
         and recipient_readiness.ready
+        and bool(reply_provider_readiness.get("reply_provider_ready"))
         and tenant_intake.tenant_intake_ready
         and readiness.get("r3_canary_ready_for_execution")
         and not blockers
@@ -398,6 +448,10 @@ def validate_r3_pre_execute_gates(
             "issues": sender_readiness.issues,
         },
         "recipient_readiness": recipient_readiness.to_dict(),
+        "reply_provider_readiness": reply_provider_readiness,
+        "reply_provider_ready": bool(reply_provider_readiness.get("reply_provider_ready")),
+        "reply_provider_source": reply_provider_readiness.get("reply_provider_source"),
+        "stub_fallback_possible": bool(reply_provider_readiness.get("stub_fallback_possible")),
         "recipient_credential_source": recipient_readiness.recipient_credential_source,
         "delivery_observation_credential_source": recipient_readiness.delivery_observation_credential_source,
         "credential_source_match": recipient_readiness.credential_source_match,
