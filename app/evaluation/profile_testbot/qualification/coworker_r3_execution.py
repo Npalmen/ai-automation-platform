@@ -17,7 +17,7 @@ from typing import Any, Literal
 import httpx
 
 from app.evaluation.live.config import get_live_eval_config
-from app.evaluation.live.errors import LiveEvalSafetyError
+from app.evaluation.live.errors import LiveEvalIntakeSkippedError, LiveEvalSafetyError, LiveEvalSafetyRejectedError
 from app.evaluation.live.gmail_transport import run_sender_readiness_read_only
 from app.evaluation.live.recipient_gmail_readiness import run_recipient_gmail_readiness
 from app.evaluation.profile_testbot.campaign.semi_auto_live_backend import LiveSemiAutoBackend
@@ -122,6 +122,22 @@ ORPHANED_R3_INBOUND_TRIGGERS: tuple[dict[str, Any], ...] = (
         "sender_message_id_redacted": "19fc…be91",
         "recipient_message_id_redacted": None,
         "sent_at": "2026-08-03T22:34:02Z",
+        "reuse_blocked": True,
+        "exclude_from_approved_reply_count": True,
+    },
+    {
+        "orphan_id": "orphaned_attempt_4",
+        "attempt": 4,
+        "scenario_id": "PTB-DCQ-0000",
+        "campaign_id": "ada5aaf0-83d9-4f09-a8c3-ee4444085915",
+        "evaluation_run_id": "ccd9916f-c4b7-4b1c-aabc-fb2da09f89cf",
+        "classification": "inbound_trigger_sent",
+        "inbound_trigger_sent": True,
+        "approved_reply_sent": False,
+        "draft_created": False,
+        "sender_message_id_redacted": "19fc…cdb3",
+        "recipient_message_id_redacted": "19fc…cdb3",
+        "sent_at": "2026-08-04T08:43:11Z",
         "reuse_blocked": True,
         "exclude_from_approved_reply_count": True,
     },
@@ -274,6 +290,24 @@ def _failed_scenario_outcome(
     )
 
 
+def _format_safety_rejected(exc: LiveEvalSafetyRejectedError) -> str:
+    payload = exc.payload or {}
+    reason = str(payload.get("safety_reason") or payload.get("reason") or "safety_rejected")
+    stage = payload.get("failed_stage")
+    http_status = payload.get("http_status")
+    if stage and http_status:
+        return _format_stage_failure(str(stage), detail=reason, http_status=int(http_status))
+    if http_status:
+        return _format_stage_failure("intake_observation", detail=reason, http_status=int(http_status))
+    return _format_stage_failure("intake_observation", detail=reason)
+
+
+def _format_intake_skipped(exc: LiveEvalIntakeSkippedError) -> str:
+    payload = exc.payload or {}
+    reason = str(payload.get("intake_skip_reason") or payload.get("reason") or "intake_skipped")
+    return _format_stage_failure("intake_observation", detail=reason)
+
+
 def validate_r3_pre_execute_gates(
     *,
     runtime_sha: str,
@@ -338,6 +372,16 @@ def validate_r3_pre_execute_gates(
         "delivery_observation_credential_source": recipient_readiness.delivery_observation_credential_source,
         "credential_source_match": recipient_readiness.credential_source_match,
         "delivery_observation_path_ready": recipient_readiness.delivery_observation_path_ready,
+        "mutation_contract_valid": True,
+        "process_delivery_operation_allowed": True,
+        "intake_credential_source": recipient_readiness.recipient_credential_source,
+        "intake_credential_source_match": recipient_readiness.credential_source_match,
+        "exact_message_read_ready": recipient_readiness.delivery_observation_path_ready,
+        "process_delivery_path_ready": (
+            recipient_readiness.credential_source_match
+            and recipient_readiness.delivery_observation_path_ready
+            and recipient_readiness.recipient_credential_source == "live_eval_recipient_env"
+        ),
         "registration_contract_valid": readiness.get("registration_contract_valid"),
     }
 
@@ -886,6 +930,16 @@ def _execute_live_scenario(
 
     try:
         intake = backend.observe_intake(scenario_id=scenario_id, campaign_id=campaign_id)
+    except LiveEvalSafetyRejectedError as exc:
+        outcome.status = "failed"
+        outcome.failure_stage = "intake_observation"
+        outcome.failure_reason = _format_safety_rejected(exc)
+        return outcome
+    except LiveEvalIntakeSkippedError as exc:
+        outcome.status = "failed"
+        outcome.failure_stage = "intake_observation"
+        outcome.failure_reason = _format_intake_skipped(exc)
+        return outcome
     except httpx.HTTPStatusError as exc:
         outcome.status = "failed"
         outcome.failure_stage = "delivery_observation"
@@ -1240,6 +1294,20 @@ def run_r3_live_canary(
                 recipient_email=recipient_email,
                 claimed_operations=claimed_operations,
                 gmail_send_budget_remaining=send_budget_remaining,
+            )
+        except LiveEvalSafetyRejectedError as exc:
+            result = _failed_scenario_outcome(
+                scenario_id=scenario_id,
+                planned_gmail_send=bool(row.get("planned_gmail_send")),
+                failure_stage="intake_observation",
+                failure_reason=_format_safety_rejected(exc),
+            )
+        except LiveEvalIntakeSkippedError as exc:
+            result = _failed_scenario_outcome(
+                scenario_id=scenario_id,
+                planned_gmail_send=bool(row.get("planned_gmail_send")),
+                failure_stage="intake_observation",
+                failure_reason=_format_intake_skipped(exc),
             )
         except LiveEvalSafetyError as exc:
             result = _failed_scenario_outcome(

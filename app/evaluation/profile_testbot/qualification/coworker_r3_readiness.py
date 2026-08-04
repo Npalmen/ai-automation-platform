@@ -43,6 +43,9 @@ R3_INSTRUMENTATION_ALLOWLIST: tuple[str, ...] = (
     "app/evaluation/live/routes.py",
     "app/evaluation/live/recipient_gmail_readiness.py",
     "app/evaluation/live/delivery_mailbox_reader.py",
+    "app/evaluation/live/gmail_intake.py",
+    "app/evaluation/live/safety.py",
+    "app/evaluation/profile_testbot/qualification/coworker_r3_mutation_contract.py",
     "app/evaluation/live/schemas.py",
     "app/evaluation/profile_testbot/campaign/semi_auto_live_backend.py",
     "scripts/build_digital_coworker_r3_preflight.py",
@@ -51,7 +54,7 @@ R3_INSTRUMENTATION_ALLOWLIST: tuple[str, ...] = (
     "tests/test_coworker_r3_frozen_bodies.py",
     "tests/test_coworker_r3_frozen_bind.py",
     "tests/test_coworker_r3_live_execution.py",
-    "tests/test_coworker_r3_registration_contract.py",
+    "tests/test_coworker_r3_mutation_contract.py",
 )
 
 # Human-approved send body hashes from R3_RENDER_REVIEW (d2e86c1 predeploy).

@@ -79,6 +79,8 @@ def process_gmail_message_by_id(
     intake_query: str | None = None,
     live_eval_run_id: str | None = None,
     skip_slack_notify: bool = False,
+    mailbox_resolution=None,
+    skip_gmail_post_pipeline: bool = False,
 ) -> dict[str, Any]:
     """
     Process exactly one Gmail message by ID through the standard intake chain.
@@ -86,28 +88,80 @@ def process_gmail_message_by_id(
     """
     query_used = intake_query or f"label:krowolf-live-eval"
 
-    connection_config = get_integration_connection_config(
-        tenant_id=tenant_id,
-        integration_type=IntegrationType.GOOGLE_MAIL,
-        db=db,
+    from app.evaluation.live.delivery_mailbox_reader import (
+        CREDENTIAL_SOURCE_LIVE_EVAL_RECIPIENT_ENV,
+        DeliveryMailboxReaderResolution,
     )
-    config = get_live_eval_config()
-    canonical_recipient, identity_error = resolve_canonical_recipient_email(
-        connection_config,
-        metadata=connection_config.get("metadata_json") or {},
-        allowlist=config.recipient_emails,
+    from app.evaluation.profile_testbot.qualification.coworker_r3_mutation_contract import (
+        ReaderMailboxAdapter,
     )
-    if identity_error:
-        return {
-            "status": "failed",
-            "message_id": message_id,
-            "reason": identity_error,
-            "safety_reason": identity_error,
-        }
-    adapter = get_integration_adapter(
-        integration_type=IntegrationType.GOOGLE_MAIL,
-        connection_config=connection_config,
-    )
+
+    adapter = None
+    canonical_recipient: str | None = None
+    if mailbox_resolution is not None:
+        if not isinstance(mailbox_resolution, DeliveryMailboxReaderResolution):
+            return {
+                "status": "failed",
+                "message_id": message_id,
+                "reason": "invalid mailbox_resolution",
+                "safety_reason": "invalid mailbox_resolution",
+            }
+        if mailbox_resolution.credential_source != CREDENTIAL_SOURCE_LIVE_EVAL_RECIPIENT_ENV:
+            return {
+                "status": "failed",
+                "message_id": message_id,
+                "reason": "R3 intake requires live_eval_recipient_env",
+                "safety_reason": "R3 intake requires live_eval_recipient_env",
+            }
+        if not mailbox_resolution.ready or mailbox_resolution.reader is None:
+            blockers = "; ".join(mailbox_resolution.blockers or ["mailbox reader not ready"])
+            return {
+                "status": "failed",
+                "message_id": message_id,
+                "reason": blockers,
+                "safety_reason": blockers,
+            }
+        adapter = ReaderMailboxAdapter(mailbox_resolution.reader)
+        try:
+            canonical_recipient = mailbox_resolution.reader.get_profile_email().strip().lower()
+        except Exception as exc:
+            return {
+                "status": "failed",
+                "message_id": message_id,
+                "reason": str(exc),
+                "safety_reason": str(exc),
+            }
+        config = get_live_eval_config()
+        if canonical_recipient not in config.recipient_emails:
+            return {
+                "status": "failed",
+                "message_id": message_id,
+                "reason": "mailbox identity does not match allowlist",
+                "safety_reason": "mailbox identity does not match allowlist",
+            }
+    else:
+        connection_config = get_integration_connection_config(
+            tenant_id=tenant_id,
+            integration_type=IntegrationType.GOOGLE_MAIL,
+            db=db,
+        )
+        config = get_live_eval_config()
+        canonical_recipient, identity_error = resolve_canonical_recipient_email(
+            connection_config,
+            metadata=connection_config.get("metadata_json") or {},
+            allowlist=config.recipient_emails,
+        )
+        if identity_error:
+            return {
+                "status": "failed",
+                "message_id": message_id,
+                "reason": identity_error,
+                "safety_reason": identity_error,
+            }
+        adapter = get_integration_adapter(
+            integration_type=IntegrationType.GOOGLE_MAIL,
+            connection_config=connection_config,
+        )
 
     existing_by_msg = JobRepository.get_by_gmail_message_id(db, tenant_id, message_id)
     if existing_by_msg is not None:
@@ -283,9 +337,11 @@ def process_gmail_message_by_id(
         )
         return {"status": "failed", "message_id": message_id, "reason": str(exc)}
 
-    outcome = post_pipeline_gmail_message_outcome(
-        db, tenant_id, processed_job, message_id, adapter
-    )
+    outcome = {"marked_handled": False}
+    if not skip_gmail_post_pipeline:
+        outcome = post_pipeline_gmail_message_outcome(
+            db, tenant_id, processed_job, message_id, adapter
+        )
 
     notified = False
     if not skip_slack_notify:
