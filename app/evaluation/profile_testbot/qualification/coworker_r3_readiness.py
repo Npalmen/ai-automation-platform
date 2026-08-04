@@ -14,6 +14,11 @@ from app.evaluation.live.recipient_gmail_readiness import (
     RecipientGmailReadinessResult,
     run_recipient_gmail_readiness,
 )
+from app.evaluation.live.tenant_intake_readiness import (
+    TenantIntakeReadinessResult,
+    run_r3_tenant_intake_readiness,
+)
+from app.repositories.postgres.database import SessionLocal
 from app.evaluation.profile_testbot.campaign.mailbox_readiness import (
     verify_profile_testbot_mailboxes,
 )
@@ -42,6 +47,7 @@ R3_INSTRUMENTATION_ALLOWLIST: tuple[str, ...] = (
     "app/evaluation/profile_testbot/qualification/r3_approved_send_bodies.json",
     "app/evaluation/live/routes.py",
     "app/evaluation/live/recipient_gmail_readiness.py",
+    "app/evaluation/live/tenant_intake_readiness.py",
     "app/evaluation/live/delivery_mailbox_reader.py",
     "app/evaluation/live/gmail_intake.py",
     "app/evaluation/live/safety.py",
@@ -144,6 +150,12 @@ class CoworkerR3ReadinessResult:
     delivery_mailbox_identity_match: bool | None = None
     delivery_observation_path_ready: bool | None = None
     recipient_readiness_blockers: list[str] = field(default_factory=list)
+    tenant_intake_ready: bool | None = None
+    tenant_config_exists: bool | None = None
+    intake_cutoff_at_redacted: str | None = None
+    intake_cutoff_age_seconds: int | None = None
+    intake_cutoff_fresh: bool | None = None
+    tenant_intake_blockers: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         payload = {
@@ -197,6 +209,12 @@ class CoworkerR3ReadinessResult:
             "delivery_mailbox_identity_match": self.delivery_mailbox_identity_match,
             "delivery_observation_path_ready": self.delivery_observation_path_ready,
             "recipient_readiness_blockers": self.recipient_readiness_blockers,
+            "tenant_intake_ready": self.tenant_intake_ready,
+            "tenant_config_exists": self.tenant_config_exists,
+            "intake_cutoff_at_redacted": self.intake_cutoff_at_redacted,
+            "intake_cutoff_age_seconds": self.intake_cutoff_age_seconds,
+            "intake_cutoff_fresh": self.intake_cutoff_fresh,
+            "tenant_intake_blockers": self.tenant_intake_blockers,
         }
         return payload
 
@@ -285,11 +303,14 @@ def _r3_specific_blockers(
     mailbox_report: dict[str, Any],
     tenant_id: str,
     recipient_readiness: RecipientGmailReadinessResult | None = None,
+    tenant_intake: TenantIntakeReadinessResult | None = None,
 ) -> list[str]:
     blockers: list[str] = []
     if tenant_id != LIVE_EVAL_TENANT_ID:
         blockers.append(f"tenant mismatch: expected {LIVE_EVAL_TENANT_ID}, got {tenant_id}")
     blockers.extend(validate_profile_testbot_tenant(tenant_id))
+    if tenant_intake is not None and not tenant_intake.tenant_intake_ready:
+        blockers.extend(tenant_intake.blockers)
     for blocked_tenant in ("T_NIKLAS_DEMO_001", "TENANT_PRODUCTION_PILOT_01"):
         issues = validate_no_production_resources(tenant_id=blocked_tenant)
         if not issues:
@@ -375,6 +396,13 @@ def evaluate_coworker_r3_readiness(
     )
     oauth = _oauth_readiness()
     recipient_readiness: RecipientGmailReadinessResult | None = None
+    tenant_intake: TenantIntakeReadinessResult | None = None
+    if phase == "postdeploy":
+        db = SessionLocal()
+        try:
+            tenant_intake = run_r3_tenant_intake_readiness(db, tenant_id=tenant_id)
+        finally:
+            db.close()
     if phase == "postdeploy" and _env_truthy("LIVE_GMAIL_EVAL_ALLOWED"):
         recipient_readiness = run_recipient_gmail_readiness(
             expected_recipient=recipient,
@@ -411,6 +439,7 @@ def evaluate_coworker_r3_readiness(
             mailbox_report=mailbox_report,
             tenant_id=tenant_id,
             recipient_readiness=recipient_readiness,
+            tenant_intake=tenant_intake,
         )
     )
 
@@ -553,4 +582,14 @@ def evaluate_coworker_r3_readiness(
         recipient_readiness_blockers=(
             list(recipient_readiness.blockers) if recipient_readiness else []
         ),
+        tenant_intake_ready=tenant_intake.tenant_intake_ready if tenant_intake else None,
+        tenant_config_exists=tenant_intake.tenant_config_exists if tenant_intake else None,
+        intake_cutoff_at_redacted=(
+            tenant_intake.intake_cutoff_at_redacted if tenant_intake else None
+        ),
+        intake_cutoff_age_seconds=(
+            tenant_intake.intake_cutoff_age_seconds if tenant_intake else None
+        ),
+        intake_cutoff_fresh=tenant_intake.intake_cutoff_fresh if tenant_intake else None,
+        tenant_intake_blockers=list(tenant_intake.blockers) if tenant_intake else [],
     )

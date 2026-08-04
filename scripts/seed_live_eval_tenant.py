@@ -65,11 +65,23 @@ def _validate_guards(tenant_id: str, *, apply: bool) -> list[str]:
     return issues
 
 
+def _previous_cutoff_at(row: TenantConfigRecord | None) -> str | None:
+    if row is None:
+        return None
+    intake = dict((row.settings or {}).get("intake") or {})
+    raw = intake.get("intake_cutoff_at") or intake.get("activation_cutoff_at")
+    return str(raw) if raw else None
+
+
 def _seed_tenant(tenant_id: str) -> dict:
     db = SessionLocal()
     try:
         row = db.get(TenantConfigRecord, tenant_id)
+        previous_cutoff = _previous_cutoff_at(row)
+        applied_cutoff = seed_intake_cutoff_at()
+        tenant_created = False
         if row is None:
+            tenant_created = True
             row = TenantConfigRecord(
                 tenant_id=tenant_id,
                 name=f"Live Eval {tenant_id}",
@@ -82,7 +94,7 @@ def _seed_tenant(tenant_id: str) -> dict:
                 settings={
                     "intake": {
                         "enabled": True,
-                        "intake_cutoff_at": seed_intake_cutoff_at(),
+                        "intake_cutoff_at": applied_cutoff,
                     },
                     "live_eval": {"seeded": True},
                 },
@@ -93,12 +105,27 @@ def _seed_tenant(tenant_id: str) -> dict:
             settings = dict(row.settings or {})
             intake = dict(settings.get("intake") or {})
             intake["enabled"] = True
-            intake["intake_cutoff_at"] = seed_intake_cutoff_at()
+            intake["intake_cutoff_at"] = applied_cutoff
             settings["intake"] = intake
             settings.setdefault("live_eval", {})["seeded"] = True
             row.settings = settings
         db.commit()
-        return {"tenant_id": tenant_id, "status": "seeded", "is_test_tenant": True}
+
+        from app.evaluation.live.tenant_intake_readiness import run_r3_tenant_intake_readiness
+
+        readiness = run_r3_tenant_intake_readiness(db, tenant_id=tenant_id)
+        cutoff_age = readiness.intake_cutoff_age_seconds
+        return {
+            "tenant_id": tenant_id,
+            "status": "seeded",
+            "is_test_tenant": True,
+            "tenant_created": tenant_created,
+            "tenant_updated": not tenant_created,
+            "previous_cutoff_at": previous_cutoff,
+            "applied_cutoff_at": applied_cutoff,
+            "cutoff_age_seconds": cutoff_age,
+            "tenant_intake_ready_after_seed": readiness.tenant_intake_ready,
+        }
     finally:
         db.close()
 

@@ -82,6 +82,7 @@ def runtime_sha_env(monkeypatch):
 def _seed_eval_tenant(db) -> None:
     from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 
+    cutoff = (datetime.now(timezone.utc) - timedelta(seconds=60)).replace(microsecond=0).isoformat()
     db.add(
         TenantConfigRecord(
             tenant_id=LIVE_EVAL_TENANT_ID,
@@ -93,7 +94,7 @@ def _seed_eval_tenant(db) -> None:
             allowed_integrations=["google_mail"],
             enabled_job_types=["lead", "customer_inquiry", "invoice"],
             settings={
-                "intake": {"enabled": True, "intake_cutoff_at": "1970-01-01T00:00:00+00:00"},
+                "intake": {"enabled": True, "intake_cutoff_at": cutoff},
                 "live_eval": {"seeded": True},
             },
         )
@@ -285,13 +286,14 @@ def test_process_gmail_message_by_id_uses_injected_reader(db, monkeypatch):
     _seed_eval_tenant(db)
     client = MagicMock()
     client.get_profile_email.return_value = R3_RECIPIENT
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     client.get_message.return_value = {
         "from": f"Sender <{R3_SENDER}>",
         "to": R3_RECIPIENT,
         "subject": "Offert solceller",
         "body_text": "Hej, jag vill ha offert på solceller",
         "thread_id": "t1",
-        "internal_date_ms": 1_700_000_000_000,
+        "internal_date_ms": now_ms,
     }
     reader = GoogleMailClientDeliveryReader(client)
     resolution = DeliveryMailboxReaderResolution(
@@ -324,6 +326,7 @@ def test_process_gmail_message_by_id_normal_tenant_path_unchanged(db, monkeypatc
 
     _seed_eval_tenant(db)
     adapter = MagicMock()
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     adapter.execute_action.return_value = {
         "message": {
             "from": f"Sender <{R3_SENDER}>",
@@ -331,7 +334,7 @@ def test_process_gmail_message_by_id_normal_tenant_path_unchanged(db, monkeypatc
             "subject": "Offert solceller",
             "body_text": "Hej, jag vill ha offert",
             "thread_id": "t1",
-            "internal_date_ms": 1_700_000_000_000,
+            "internal_date_ms": now_ms,
         }
     }
     monkeypatch.setattr(
@@ -463,7 +466,7 @@ def test_orphan_intake_probe_does_not_create_job(db, live_eval_env, monkeypatch)
 def test_validate_r3_process_delivery_readiness_without_db_row_fields(db, live_eval_env):
     row = _r3_row()
     db.add(row)
-    db.commit()
+    _seed_eval_tenant(db)
     with patch(
         "app.evaluation.profile_testbot.qualification.coworker_r3_mutation_contract.resolve_delivery_mailbox_reader",
         return_value=DeliveryMailboxReaderResolution(

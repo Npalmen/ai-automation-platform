@@ -351,6 +351,7 @@ def get_process_delivery_readiness(
     from app.evaluation.profile_testbot.qualification.coworker_r3_mutation_contract import (
         validate_r3_process_delivery_readiness,
     )
+    from app.evaluation.live.tenant_intake_readiness import run_r3_tenant_intake_readiness
 
     result = validate_r3_process_delivery_readiness(
         db,
@@ -360,9 +361,22 @@ def get_process_delivery_readiness(
         probe_exact_message=probe_exact_message,
         allow_orphan_probe=evaluation_run_id in {
             "ccd9916f-c4b7-4b1c-aabc-fb2da09f89cf",
+            "b5bbe7ab-7148-4366-8fba-bd92921481f4",
         },
     )
-    return result.to_dict()
+    payload = result.to_dict()
+    tenant_intake = run_r3_tenant_intake_readiness(db, tenant_id=tenant_id)
+    payload.update(
+        {
+            "tenant_intake_ready": tenant_intake.tenant_intake_ready,
+            "tenant_config_exists": tenant_intake.tenant_config_exists,
+            "intake_cutoff_at_redacted": tenant_intake.intake_cutoff_at_redacted,
+            "intake_cutoff_age_seconds": tenant_intake.intake_cutoff_age_seconds,
+            "intake_cutoff_fresh": tenant_intake.intake_cutoff_fresh,
+            "tenant_intake_blockers": list(tenant_intake.blockers),
+        }
+    )
+    return payload
 
 
 @router.get("/runs/{evaluation_run_id}/observation", response_model=dict)
@@ -702,6 +716,22 @@ def recipient_gmail_readiness(
     report = run_recipient_gmail_readiness(expected_recipient=recipient, config=config)
     payload = report.to_dict()
     payload["ready"] = report.ready
+    payload["tenant_id"] = tenant_id
+    return payload
+
+
+@router.get("/tenant-intake-readiness")
+def tenant_intake_readiness(
+    tenant_id: str = Query(...),
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin_api_key),
+):
+    require_live_eval_enabled()
+    require_tenant_allowed(tenant_id)
+    from app.evaluation.live.tenant_intake_readiness import run_r3_tenant_intake_readiness
+
+    report = run_r3_tenant_intake_readiness(db, tenant_id=tenant_id)
+    payload = report.to_dict()
     payload["tenant_id"] = tenant_id
     return payload
 
