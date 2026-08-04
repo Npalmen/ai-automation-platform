@@ -42,6 +42,7 @@ R3_INSTRUMENTATION_ALLOWLIST: tuple[str, ...] = (
     "app/evaluation/profile_testbot/qualification/r3_approved_send_bodies.json",
     "app/evaluation/live/routes.py",
     "app/evaluation/live/recipient_gmail_readiness.py",
+    "app/evaluation/live/delivery_mailbox_reader.py",
     "app/evaluation/live/schemas.py",
     "app/evaluation/profile_testbot/campaign/semi_auto_live_backend.py",
     "scripts/build_digital_coworker_r3_preflight.py",
@@ -134,6 +135,11 @@ class CoworkerR3ReadinessResult:
     recipient_list_labels_passed: bool | None = None
     recipient_read_query_passed: bool | None = None
     recipient_delivery_observation_ready: bool | None = None
+    recipient_credential_source: str | None = None
+    delivery_observation_credential_source: str | None = None
+    credential_source_match: bool | None = None
+    delivery_mailbox_identity_match: bool | None = None
+    delivery_observation_path_ready: bool | None = None
     recipient_readiness_blockers: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -182,6 +188,11 @@ class CoworkerR3ReadinessResult:
             "recipient_list_labels_passed": self.recipient_list_labels_passed,
             "recipient_read_query_passed": self.recipient_read_query_passed,
             "recipient_delivery_observation_ready": self.recipient_delivery_observation_ready,
+            "recipient_credential_source": self.recipient_credential_source,
+            "delivery_observation_credential_source": self.delivery_observation_credential_source,
+            "credential_source_match": self.credential_source_match,
+            "delivery_mailbox_identity_match": self.delivery_mailbox_identity_match,
+            "delivery_observation_path_ready": self.delivery_observation_path_ready,
             "recipient_readiness_blockers": self.recipient_readiness_blockers,
         }
         return payload
@@ -518,6 +529,23 @@ def evaluate_coworker_r3_readiness(
         ),
         recipient_delivery_observation_ready=(
             recipient_readiness.recipient_delivery_observation_ready if recipient_readiness else None
+        ),
+        recipient_credential_source=(
+            recipient_readiness.recipient_credential_source if recipient_readiness else None
+        ),
+        delivery_observation_credential_source=(
+            recipient_readiness.delivery_observation_credential_source
+            if recipient_readiness
+            else None
+        ),
+        credential_source_match=(
+            recipient_readiness.credential_source_match if recipient_readiness else None
+        ),
+        delivery_mailbox_identity_match=(
+            recipient_readiness.delivery_mailbox_identity_match if recipient_readiness else None
+        ),
+        delivery_observation_path_ready=(
+            recipient_readiness.delivery_observation_path_ready if recipient_readiness else None
         ),
         recipient_readiness_blockers=(
             list(recipient_readiness.blockers) if recipient_readiness else []

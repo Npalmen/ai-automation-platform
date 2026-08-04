@@ -115,12 +115,11 @@ def test_delivery_truncated_gmail_list_correlation_failure(db, run_row, live_eva
     adapter.execute_action.return_value = {
         "labels": [{"name": "krowolf-live-eval", "id": "Label_krowolf"}],
     }
+    from tests.evaluation.live.delivery_reader_mocks import tenant_adapter_reader_resolution
+
     with patch(
-        "app.evaluation.live.delivery.get_integration_connection_config",
-        return_value={},
-    ), patch(
-        "app.evaluation.live.delivery.get_integration_adapter",
-        return_value=adapter,
+        "app.evaluation.live.delivery.resolve_delivery_mailbox_reader",
+        return_value=tenant_adapter_reader_resolution(adapter),
     ):
         result = observe_delivery_candidates(db, run_row)
     assert result.truncated is True
@@ -142,12 +141,11 @@ def test_delivery_one_valid_candidate(db, run_row, live_eval_env):
         {"labels": [{"name": "krowolf-live-eval", "id": "Label_krowolf"}]},
         {"message": msg},
     ]
+    from tests.evaluation.live.delivery_reader_mocks import tenant_adapter_reader_resolution
+
     with patch(
-        "app.evaluation.live.delivery.get_integration_connection_config",
-        return_value={},
-    ), patch(
-        "app.evaluation.live.delivery.get_integration_adapter",
-        return_value=adapter,
+        "app.evaluation.live.delivery.resolve_delivery_mailbox_reader",
+        return_value=tenant_adapter_reader_resolution(adapter),
     ):
         result = observe_delivery_candidates(db, run_row)
     assert result.valid_count == 1

@@ -99,12 +99,11 @@ def test_observe_delivery_duplicate_detected(db, run_row, live_eval_env):
         {"message": {**msg, "message_id": "m2"}},
     ]
 
+    from tests.evaluation.live.delivery_reader_mocks import tenant_adapter_reader_resolution
+
     with patch(
-        "app.evaluation.live.delivery.get_integration_connection_config",
-        return_value={},
-    ), patch(
-        "app.evaluation.live.delivery.get_integration_adapter",
-        return_value=adapter,
+        "app.evaluation.live.delivery.resolve_delivery_mailbox_reader",
+        return_value=tenant_adapter_reader_resolution(adapter),
     ):
         result = observe_delivery_candidates(db, run_row)
     assert result.duplicate_detected is True

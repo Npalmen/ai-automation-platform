@@ -184,24 +184,56 @@ def get_live_eval_delivery(
     except LiveEvalSafetyError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    from app.evaluation.live.delivery_mailbox_reader import (
+        CREDENTIAL_SOURCE_LIVE_EVAL_RECIPIENT_ENV,
+        is_r3_frozen_live_eval_run,
+        resolve_delivery_mailbox_reader,
+    )
     from app.evaluation.live.recipient_gmail_readiness import run_recipient_gmail_readiness
 
     config = get_live_eval_config()
     recipient = sorted(config.recipient_emails)[0] if config.recipient_emails else ""
-    recipient_readiness = run_recipient_gmail_readiness(expected_recipient=recipient, config=config)
-    if not recipient_readiness.ready:
+    reader_resolution = resolve_delivery_mailbox_reader(db=db, row=row, config=config)
+    blockers: list[str] = []
+    recipient_credential_source = None
+    credential_source_match = None
+    if is_r3_frozen_live_eval_run(row):
+        recipient_readiness = run_recipient_gmail_readiness(
+            expected_recipient=recipient,
+            config=config,
+            db=db,
+            row=row,
+        )
+        recipient_credential_source = recipient_readiness.recipient_credential_source
+        credential_source_match = recipient_readiness.credential_source_match
+        blockers.extend(recipient_readiness.blockers)
+        if not recipient_readiness.ready:
+            pass
+        elif reader_resolution.credential_source != CREDENTIAL_SOURCE_LIVE_EVAL_RECIPIENT_ENV:
+            blockers.append("R3 delivery observation requires live_eval_recipient_env")
+    if not reader_resolution.ready:
+        blockers.extend(reader_resolution.blockers)
+    if blockers:
         raise HTTPException(
             status_code=503,
             detail={
                 "failure_stage": "delivery_observation",
                 "recipient_delivery_observation_ready": False,
-                "blockers": recipient_readiness.blockers,
+                "recipient_credential_source": recipient_credential_source,
+                "delivery_observation_credential_source": reader_resolution.credential_source,
+                "credential_source_match": credential_source_match,
+                "blockers": list(dict.fromkeys(blockers)),
             },
         )
 
     bound_id = row.root_gmail_message_id if row.status == RUN_STATUS_ACTIVE else None
     try:
-        result = observe_delivery_candidates(db, row, bound_message_id=bound_id)
+        result = observe_delivery_candidates(
+            db,
+            row,
+            bound_message_id=bound_id,
+            reader_resolution=reader_resolution,
+        )
     except Exception as exc:
         raise HTTPException(
             status_code=503,
@@ -248,6 +280,31 @@ def get_live_eval_delivery(
         ),
         rejection_reasons=result.rejection_reasons,
     )
+
+
+@router.get("/runs/{evaluation_run_id}/orphan-delivery-probe", response_model=dict)
+def get_orphan_delivery_probe(
+    evaluation_run_id: str,
+    tenant_id: str = Query(...),
+    classification: str = Query("orphaned_attempt_3_delivery_probe_verified"),
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin_api_key),
+):
+    """Read-only delivery observation probe — no run status change, no Gmail writes."""
+    require_live_eval_enabled()
+    require_gmail_eval_enabled()
+    require_tenant_allowed(tenant_id)
+    row = LiveEvalRunRepository.get_run(db, evaluation_run_id, tenant_id=tenant_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    from app.evaluation.live.delivery_mailbox_reader import probe_orphan_delivery_observation
+
+    result = probe_orphan_delivery_observation(
+        db,
+        row=row,
+        classification=classification,
+    )
+    return result.to_dict()
 
 
 @router.get("/runs/{evaluation_run_id}/observation", response_model=dict)

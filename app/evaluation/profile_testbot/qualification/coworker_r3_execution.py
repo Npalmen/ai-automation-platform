@@ -109,6 +109,22 @@ ORPHANED_R3_INBOUND_TRIGGERS: tuple[dict[str, Any], ...] = (
         "reuse_blocked": True,
         "exclude_from_approved_reply_count": True,
     },
+    {
+        "orphan_id": "orphaned_attempt_3",
+        "attempt": 3,
+        "scenario_id": "PTB-DCQ-0000",
+        "campaign_id": "118b52fe-a7dc-4fbc-a8be-63a88c550e91",
+        "evaluation_run_id": "05839824-1fb1-4e98-b8e1-b8025df5db3d",
+        "classification": "inbound_trigger_sent",
+        "inbound_trigger_sent": True,
+        "approved_reply_sent": False,
+        "draft_created": False,
+        "sender_message_id_redacted": "19fc…be91",
+        "recipient_message_id_redacted": None,
+        "sent_at": "2026-08-03T22:34:02Z",
+        "reuse_blocked": True,
+        "exclude_from_approved_reply_count": True,
+    },
 )
 
 
@@ -293,6 +309,14 @@ def validate_r3_pre_execute_gates(
         blockers.extend(sender_readiness.issues)
     if not recipient_readiness.ready:
         blockers.extend(recipient_readiness.blockers)
+    if recipient_readiness.recipient_credential_source != "live_eval_recipient_env":
+        blockers.append("recipient credential source must be live_eval_recipient_env")
+    if recipient_readiness.delivery_observation_credential_source != "live_eval_recipient_env":
+        blockers.append("delivery observation credential source must be live_eval_recipient_env")
+    if not recipient_readiness.credential_source_match:
+        blockers.append("recipient and delivery observation credential sources must match")
+    if not recipient_readiness.delivery_observation_path_ready:
+        blockers.append("delivery observation path probe failed")
     blockers.extend(readiness.get("execution_blockers") or [])
     blockers = list(dict.fromkeys(blockers))
     ready = (
@@ -310,6 +334,10 @@ def validate_r3_pre_execute_gates(
             "issues": sender_readiness.issues,
         },
         "recipient_readiness": recipient_readiness.to_dict(),
+        "recipient_credential_source": recipient_readiness.recipient_credential_source,
+        "delivery_observation_credential_source": recipient_readiness.delivery_observation_credential_source,
+        "credential_source_match": recipient_readiness.credential_source_match,
+        "delivery_observation_path_ready": recipient_readiness.delivery_observation_path_ready,
         "registration_contract_valid": readiness.get("registration_contract_valid"),
     }
 
