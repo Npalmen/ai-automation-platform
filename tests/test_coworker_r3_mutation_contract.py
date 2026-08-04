@@ -219,7 +219,7 @@ def test_r3_scenario_outside_registry_blocked():
         )
 
 
-def test_unknown_r3_mutation_operation_blocked():
+def test_unknown_r3_mutation_operation_blocked(live_eval_env):
     row = _r3_row()
     with pytest.raises(LiveEvalSafetyError, match="unknown R3 mutation operation"):
         validate_r3_frozen_live_run_contract(
@@ -482,7 +482,7 @@ def test_validate_r3_process_delivery_readiness_without_db_row_fields(db, live_e
     assert result.intake_credential_source == CREDENTIAL_SOURCE_LIVE_EVAL_RECIPIENT_ENV
 
 
-def test_bind_operation_requires_active_run():
+def test_bind_operation_requires_active_run(live_eval_env):
     row = _r3_row(status="registered")
     with pytest.raises(LiveEvalSafetyError, match="does not allow mutation"):
         validate_r3_frozen_live_run_contract(

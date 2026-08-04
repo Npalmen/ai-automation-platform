@@ -435,7 +435,6 @@ def validate_live_gmail_run_for_mutation(
         )
         return
 
-    require_scenario_allowed_for_live_gmail(row.scenario_id)
     from app.evaluation.profile_testbot.campaign.scenario_gate import (
         is_profile_testbot_quality_scenario,
         is_profile_testbot_semi_auto_scenario,
@@ -455,6 +454,8 @@ def validate_live_gmail_run_for_mutation(
         raise LiveEvalSafetyError("fixture_ai required for live Gmail mutation")
     if row.transport_mode != "live_gmail":
         raise LiveEvalSafetyError("transport_mode must be live_gmail")
+
+    require_scenario_allowed_for_live_gmail(row.scenario_id)
     now = datetime.now(timezone.utc)
     expires_at = row.expires_at
     if expires_at.tzinfo is None:
