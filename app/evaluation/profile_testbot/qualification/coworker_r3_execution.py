@@ -19,6 +19,9 @@ import httpx
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.errors import LiveEvalIntakeSkippedError, LiveEvalSafetyError, LiveEvalSafetyRejectedError
 from app.evaluation.live.gmail_transport import run_sender_readiness_read_only
+from app.evaluation.live.tenant_intake_readiness import run_r3_tenant_intake_readiness
+from app.evaluation.profile_testbot.constants import LIVE_EVAL_TENANT_ID
+from app.repositories.postgres.database import SessionLocal
 from app.evaluation.live.recipient_gmail_readiness import run_recipient_gmail_readiness
 from app.evaluation.profile_testbot.campaign.semi_auto_live_backend import LiveSemiAutoBackend
 from app.evaluation.profile_testbot.campaign.semi_auto_safety import (
@@ -26,7 +29,6 @@ from app.evaluation.profile_testbot.campaign.semi_auto_safety import (
     assert_no_external_writes,
     assert_tenant_isolated,
 )
-from app.evaluation.profile_testbot.constants import LIVE_EVAL_TENANT_ID
 from app.evaluation.profile_testbot.profile_contract import load_customer_profile
 from app.evaluation.profile_testbot.qualification.constants import (
     PTB_SEM_0024_SCENARIO_ID,
@@ -138,6 +140,22 @@ ORPHANED_R3_INBOUND_TRIGGERS: tuple[dict[str, Any], ...] = (
         "sender_message_id_redacted": "19fc…cdb3",
         "recipient_message_id_redacted": "19fc…cdb3",
         "sent_at": "2026-08-04T08:43:11Z",
+        "reuse_blocked": True,
+        "exclude_from_approved_reply_count": True,
+    },
+    {
+        "orphan_id": "orphaned_attempt_5",
+        "attempt": 5,
+        "scenario_id": "PTB-DCQ-0000",
+        "campaign_id": "d3550a0a-8beb-48a5-b433-78684ea00c3b",
+        "evaluation_run_id": "b5bbe7ab-7148-4366-8fba-bd92921481f4",
+        "classification": "inbound_trigger_sent",
+        "inbound_trigger_sent": True,
+        "approved_reply_sent": False,
+        "draft_created": False,
+        "sender_message_id_redacted": "19fc…6263",
+        "recipient_message_id_redacted": None,
+        "sent_at": "2026-08-04T18:11:56Z",
         "reuse_blocked": True,
         "exclude_from_approved_reply_count": True,
     },
@@ -331,6 +349,17 @@ def validate_r3_pre_execute_gates(
         expected_recipient=recipient_email,
         config=config,
     )
+    db = SessionLocal()
+    try:
+        tenant_intake = run_r3_tenant_intake_readiness(
+            db,
+            tenant_id=LIVE_EVAL_TENANT_ID,
+            manifest=manifest,
+        )
+    finally:
+        db.close()
+    if not tenant_intake.tenant_intake_ready:
+        blockers.extend(tenant_intake.blockers)
     readiness = evaluate_r3_execution_readiness(
         runtime_sha=runtime_sha,
         repo_root=repo_root,
@@ -356,6 +385,7 @@ def validate_r3_pre_execute_gates(
     ready = (
         sender_readiness.ready
         and recipient_readiness.ready
+        and tenant_intake.tenant_intake_ready
         and readiness.get("r3_canary_ready_for_execution")
         and not blockers
     )
@@ -383,6 +413,12 @@ def validate_r3_pre_execute_gates(
             and recipient_readiness.recipient_credential_source == "live_eval_recipient_env"
         ),
         "registration_contract_valid": readiness.get("registration_contract_valid"),
+        "tenant_intake_ready": tenant_intake.tenant_intake_ready,
+        "tenant_config_exists": tenant_intake.tenant_config_exists,
+        "intake_cutoff_at_redacted": tenant_intake.intake_cutoff_at_redacted,
+        "intake_cutoff_age_seconds": tenant_intake.intake_cutoff_age_seconds,
+        "intake_cutoff_fresh": tenant_intake.intake_cutoff_fresh,
+        "tenant_intake_blockers": list(tenant_intake.blockers),
     }
 
 

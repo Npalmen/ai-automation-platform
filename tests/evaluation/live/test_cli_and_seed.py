@@ -77,3 +77,44 @@ def test_seed_script_defaults_to_dry_run(monkeypatch):
         text=True,
     )
     assert completed.returncode == 0
+
+
+def test_seed_script_apply_requires_seed_flag(monkeypatch):
+    monkeypatch.setenv("ENV", "test")
+    monkeypatch.setenv("LIVE_EVAL_ALLOWED", "yes")
+    monkeypatch.setenv("LIVE_EVAL_TENANT_IDS", "TENANT_LIVE_EVAL")
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "seed_live_eval_tenant.py"),
+            "--tenant-id",
+            "TENANT_LIVE_EVAL",
+            "--apply",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 1
+    assert "LIVE_EVAL_SEED_ALLOWED" in completed.stderr
+
+
+def test_seed_script_refuses_production_db(monkeypatch):
+    monkeypatch.setenv("ENV", "test")
+    monkeypatch.setenv("LIVE_EVAL_ALLOWED", "yes")
+    monkeypatch.setenv("LIVE_EVAL_SEED_ALLOWED", "yes")
+    monkeypatch.setenv("LIVE_EVAL_TENANT_IDS", "TENANT_LIVE_EVAL")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user@prod-db.amazonaws.com/app")
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "seed_live_eval_tenant.py"),
+            "--tenant-id",
+            "TENANT_LIVE_EVAL",
+            "--apply",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 1

@@ -25,6 +25,7 @@ from app.evaluation.live.delivery_mailbox_reader import (
     resolve_intake_label_id_from_reader,
 )
 from app.evaluation.live.errors import LiveEvalSafetyError
+from app.evaluation.live.tenant_intake_readiness import run_r3_tenant_intake_readiness
 from app.evaluation.live.pipeline_runtime import resolve_api_build_git_sha
 from app.evaluation.profile_testbot.constants import LIVE_EVAL_TENANT_ID
 from app.evaluation.profile_testbot.qualification.coworker_live_canary_manifest import (
@@ -62,6 +63,7 @@ R3_ORPHAN_ATTEMPT_EVALUATION_RUN_IDS: frozenset[str] = frozenset(
         "0a307286-41d7-4b98-8d8b-32b120618210",  # attempt 2
         "05839824-1fb1-4e98-b8e1-b8025df5db3d",  # attempt 3
         "ccd9916f-c4b7-4b1c-aabc-fb2da09f89cf",  # attempt 4
+        "b5bbe7ab-7148-4366-8fba-bd92921481f4",  # attempt 5
     }
 )
 
@@ -300,6 +302,11 @@ def validate_r3_process_delivery_readiness(
     """Write-free process-delivery readiness for R3 frozen runs."""
     config = config or get_live_eval_config()
     result = R3ProcessDeliveryReadinessResult()
+
+    tenant_intake = run_r3_tenant_intake_readiness(db, tenant_id=tenant_id)
+    if not tenant_intake.tenant_intake_ready:
+        result.blockers.extend(tenant_intake.blockers)
+        return result
 
     try:
         validate_r3_frozen_live_run_contract(
