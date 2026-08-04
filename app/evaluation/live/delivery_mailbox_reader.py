@@ -385,3 +385,177 @@ def probe_orphan_delivery_observation(
         and not result.blockers
     )
     return result
+
+
+@dataclass
+class OrphanIntakeProbeResult:
+    classification: str
+    verified: bool
+    credential_source: str | None = None
+    evaluation_run_id: str | None = None
+    scenario_id: str | None = None
+    mutation_contract_valid: bool = False
+    process_delivery_operation_allowed: bool = False
+    intake_credential_source: str | None = None
+    intake_credential_source_match: bool = False
+    exact_message_read_ready: bool = False
+    recipient_message_binding_valid: bool = False
+    process_delivery_path_ready: bool = False
+    classification_computed: bool = False
+    sender_match: bool = False
+    recipient_match: bool = False
+    subject_token_match: bool = False
+    body_marker_match: bool = False
+    scenario_match: bool = False
+    mailbox_identity_match: bool = False
+    recipient_message_id_redacted: str | None = None
+    job_created: bool = False
+    run_status_changed: bool = False
+    gmail_mutations_performed: bool = False
+    blockers: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "classification": self.classification,
+            "verified": self.verified,
+            "credential_source": self.credential_source,
+            "evaluation_run_id": self.evaluation_run_id,
+            "scenario_id": self.scenario_id,
+            "mutation_contract_valid": self.mutation_contract_valid,
+            "process_delivery_operation_allowed": self.process_delivery_operation_allowed,
+            "intake_credential_source": self.intake_credential_source,
+            "intake_credential_source_match": self.intake_credential_source_match,
+            "exact_message_read_ready": self.exact_message_read_ready,
+            "recipient_message_binding_valid": self.recipient_message_binding_valid,
+            "process_delivery_path_ready": self.process_delivery_path_ready,
+            "classification_computed": self.classification_computed,
+            "sender_match": self.sender_match,
+            "recipient_match": self.recipient_match,
+            "subject_token_match": self.subject_token_match,
+            "body_marker_match": self.body_marker_match,
+            "scenario_match": self.scenario_match,
+            "mailbox_identity_match": self.mailbox_identity_match,
+            "recipient_message_id_redacted": self.recipient_message_id_redacted,
+            "job_created": self.job_created,
+            "run_status_changed": self.run_status_changed,
+            "gmail_mutations_performed": self.gmail_mutations_performed,
+            "blockers": list(self.blockers),
+        }
+
+
+def probe_orphan_intake_observation(
+    db: Session,
+    *,
+    row: LiveEvalRunRow,
+    classification: str = "orphaned_attempt_4_intake_probe_verified",
+    config: LiveEvalConfig | None = None,
+) -> OrphanIntakeProbeResult:
+    """Read-only exact-message intake probe — no job, no run mutation, no Gmail writes."""
+    from email.utils import parseaddr
+
+    from app.evaluation.live.subject_parser import parse_body_marker, parse_subject_token
+    from app.evaluation.profile_testbot.qualification.coworker_r3_mutation_contract import (
+        resolve_verified_delivery_message_id,
+        validate_r3_process_delivery_readiness,
+    )
+    from app.workflows.processors.classification_processor import classify_email_type
+
+    config = config or get_live_eval_config()
+    initial_status = row.status
+    result = OrphanIntakeProbeResult(
+        classification=classification,
+        verified=False,
+        evaluation_run_id=row.evaluation_run_id,
+        scenario_id=row.scenario_id,
+    )
+
+    verified_message_id = resolve_verified_delivery_message_id(db, row=row, config=config)
+    if not verified_message_id:
+        result.blockers.append("no verified delivery candidate for orphan intake probe")
+        return result
+
+    readiness = validate_r3_process_delivery_readiness(
+        db,
+        row=row,
+        tenant_id=row.tenant_id,
+        recipient_message_id=verified_message_id,
+        config=config,
+        probe_exact_message=True,
+        allow_orphan_probe=True,
+    )
+    result.mutation_contract_valid = readiness.mutation_contract_valid
+    result.process_delivery_operation_allowed = readiness.process_delivery_operation_allowed
+    result.intake_credential_source = readiness.intake_credential_source
+    result.intake_credential_source_match = readiness.intake_credential_source_match
+    result.exact_message_read_ready = readiness.exact_message_read_ready
+    result.recipient_message_binding_valid = readiness.recipient_message_binding_valid
+    result.process_delivery_path_ready = readiness.process_delivery_path_ready
+    result.credential_source = readiness.intake_credential_source
+    result.recipient_message_id_redacted = _redact_provider_id(verified_message_id)
+    if readiness.blockers:
+        result.blockers.extend(readiness.blockers)
+
+    resolution = resolve_delivery_mailbox_reader(db=db, row=row, config=config)
+    if resolution.ready and resolution.reader is not None:
+        try:
+            profile_email = resolution.reader.get_profile_email().strip().lower()
+            expected = (row.expected_recipient or "").strip().lower()
+            result.mailbox_identity_match = not expected or profile_email == expected
+            if not result.mailbox_identity_match:
+                result.blockers.append("mailbox identity mismatch")
+        except Exception as exc:
+            result.blockers.append(f"mailbox identity probe failed: {type(exc).__name__}")
+
+        try:
+            msg = resolution.reader.get_message(verified_message_id)
+            subject = str(msg.get("subject") or "")
+            body_text = str(msg.get("body_text") or "")
+            token = parse_subject_token(subject)
+            result.subject_token_match = token is not None and token.evaluation_run_id == row.evaluation_run_id
+            result.scenario_match = token is not None and token.scenario_id == row.scenario_id
+            marker = parse_body_marker(body_text)
+            result.body_marker_match = marker is not None
+            sender_email = str(msg.get("from") or "")
+            _, sender = parseaddr(sender_email)
+            result.sender_match = sender.strip().lower() == (row.expected_sender or "").strip().lower()
+            recipient = str(msg.get("to") or msg.get("delivered_to") or "")
+            _, recipient_parsed = parseaddr(recipient)
+            result.recipient_match = (
+                recipient_parsed.strip().lower() == (row.expected_recipient or "").strip().lower()
+            )
+            try:
+                classify_email_type(subject, body_text)
+                result.classification_computed = True
+            except Exception:
+                result.blockers.append("classification could not be computed")
+        except Exception as exc:
+            result.blockers.append(f"intake message probe failed: {type(exc).__name__}")
+
+    db.refresh(row)
+    result.run_status_changed = row.status != initial_status
+    if result.run_status_changed:
+        result.blockers.append("run status changed during read-only probe")
+    result.job_created = bool(row.root_job_id)
+    if result.job_created:
+        result.blockers.append("job exists on orphan run — probe must not create jobs")
+
+    result.verified = (
+        result.mutation_contract_valid
+        and result.process_delivery_operation_allowed
+        and result.intake_credential_source_match
+        and result.exact_message_read_ready
+        and result.recipient_message_binding_valid
+        and result.process_delivery_path_ready
+        and result.classification_computed
+        and result.sender_match
+        and result.recipient_match
+        and result.subject_token_match
+        and result.body_marker_match
+        and result.scenario_match
+        and result.mailbox_identity_match
+        and not result.job_created
+        and not result.run_status_changed
+        and not result.gmail_mutations_performed
+        and not result.blockers
+    )
+    return result

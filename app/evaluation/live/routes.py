@@ -307,6 +307,64 @@ def get_orphan_delivery_probe(
     return result.to_dict()
 
 
+@router.get("/runs/{evaluation_run_id}/orphan-intake-probe", response_model=dict)
+def get_orphan_intake_probe(
+    evaluation_run_id: str,
+    tenant_id: str = Query(...),
+    classification: str = Query("orphaned_attempt_4_intake_probe_verified"),
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin_api_key),
+):
+    """Read-only exact-message intake probe — no job, no run mutation, no Gmail writes."""
+    require_live_eval_enabled()
+    require_gmail_eval_enabled()
+    require_tenant_allowed(tenant_id)
+    row = LiveEvalRunRepository.get_run(db, evaluation_run_id, tenant_id=tenant_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    from app.evaluation.live.delivery_mailbox_reader import probe_orphan_intake_observation
+
+    result = probe_orphan_intake_observation(
+        db,
+        row=row,
+        classification=classification,
+    )
+    return result.to_dict()
+
+
+@router.get("/runs/{evaluation_run_id}/process-delivery-readiness", response_model=dict)
+def get_process_delivery_readiness(
+    evaluation_run_id: str,
+    tenant_id: str = Query(...),
+    recipient_gmail_message_id: str | None = Query(None),
+    probe_exact_message: bool = Query(False),
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin_api_key),
+):
+    """Write-free R3 process-delivery readiness check."""
+    require_live_eval_enabled()
+    require_gmail_eval_enabled()
+    require_tenant_allowed(tenant_id)
+    row = LiveEvalRunRepository.get_run(db, evaluation_run_id, tenant_id=tenant_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    from app.evaluation.profile_testbot.qualification.coworker_r3_mutation_contract import (
+        validate_r3_process_delivery_readiness,
+    )
+
+    result = validate_r3_process_delivery_readiness(
+        db,
+        row=row,
+        tenant_id=tenant_id,
+        recipient_message_id=recipient_gmail_message_id,
+        probe_exact_message=probe_exact_message,
+        allow_orphan_probe=evaluation_run_id in {
+            "ccd9916f-c4b7-4b1c-aabc-fb2da09f89cf",
+        },
+    )
+    return result.to_dict()
+
+
 @router.get("/runs/{evaluation_run_id}/observation", response_model=dict)
 def get_live_eval_observation(
     evaluation_run_id: str,
@@ -441,25 +499,24 @@ def process_live_eval_delivery(
             intake_detail={"status": "skipped", "reason": "duplicate", "job_id": row.root_job_id},
         )
 
+    from app.evaluation.live.delivery_mailbox_reader import (
+        is_r3_frozen_live_eval_run,
+        resolve_delivery_mailbox_reader,
+        resolve_intake_label_id_from_reader,
+    )
+    from app.evaluation.profile_testbot.qualification.coworker_r3_mutation_contract import (
+        R3_MUTATION_PROCESS_DELIVERY,
+        ReaderMailboxAdapter,
+    )
+
     try:
-        if row.status == RUN_STATUS_REGISTERED:
-            validate_live_gmail_run_for_mutation(
-                row,
-                tenant_id=body.tenant_id,
-                recipient_message_id=body.recipient_gmail_message_id,
-            )
-        elif row.status == RUN_STATUS_ACTIVE:
-            validate_live_gmail_run_for_mutation(
-                row,
-                tenant_id=body.tenant_id,
-                recipient_message_id=body.recipient_gmail_message_id,
-            )
-        else:
-            validate_live_gmail_run_for_mutation(
-                row,
-                tenant_id=body.tenant_id,
-                recipient_message_id=body.recipient_gmail_message_id,
-            )
+        validate_live_gmail_run_for_mutation(
+            row,
+            tenant_id=body.tenant_id,
+            recipient_message_id=body.recipient_gmail_message_id,
+            mutation_operation=R3_MUTATION_PROCESS_DELIVERY,
+            db=db,
+        )
     except LiveEvalSafetyError as exc:
         raise _safety_http_exception(
             exc,
@@ -471,23 +528,44 @@ def process_live_eval_delivery(
             root_job_created=bool(row.root_job_id),
         ) from exc
 
-    connection_config = get_integration_connection_config(
-        tenant_id=body.tenant_id,
-        integration_type=IntegrationType.GOOGLE_MAIL,
-        db=db,
-    )
-    adapter = get_integration_adapter(
-        integration_type=IntegrationType.GOOGLE_MAIL,
-        connection_config=connection_config,
-    )
-    intake_label_id = resolve_intake_label_id(adapter, get_live_eval_config().intake_label)
+    config = get_live_eval_config()
+    r3_run = is_r3_frozen_live_eval_run(row)
+    mailbox_resolution = None
+    if r3_run:
+        mailbox_resolution = resolve_delivery_mailbox_reader(db=db, row=row, config=config)
+        if not mailbox_resolution.ready or mailbox_resolution.reader is None:
+            raise _safety_http_exception(
+                "; ".join(mailbox_resolution.blockers or ["R3 mailbox reader not ready"]),
+                evaluation_run_id=evaluation_run_id,
+                scenario_id=row.scenario_id,
+                attempt_id=row.attempt_id,
+                tenant_id=body.tenant_id,
+                failed_stage="triggering_intake",
+                root_job_created=bool(row.root_job_id),
+            )
+        adapter = ReaderMailboxAdapter(mailbox_resolution.reader)
+        intake_label_id = resolve_intake_label_id_from_reader(
+            mailbox_resolution.reader,
+            config.intake_label,
+        )
+    else:
+        connection_config = get_integration_connection_config(
+            tenant_id=body.tenant_id,
+            integration_type=IntegrationType.GOOGLE_MAIL,
+            db=db,
+        )
+        adapter = get_integration_adapter(
+            integration_type=IntegrationType.GOOGLE_MAIL,
+            connection_config=connection_config,
+        )
+        intake_label_id = resolve_intake_label_id(adapter, config.intake_label)
     detail = adapter.execute_action(
         action="get_message",
         payload={"message_id": body.recipient_gmail_message_id},
     )
     msg = detail.get("message") or {}
     ok, reason = validate_delivery_candidate(
-        msg, row=row, config=None, intake_label_id=intake_label_id
+        msg, row=row, config=config, intake_label_id=intake_label_id
     )
     if not ok:
         raise _safety_http_exception(
@@ -500,7 +578,7 @@ def process_live_eval_delivery(
             root_job_created=bool(row.root_job_id),
         )
 
-    intake_query = f'label:{get_live_eval_config().intake_label} subject:"KROWOLF-EVAL/{evaluation_run_id}"'
+    intake_query = f'label:{config.intake_label} subject:"KROWOLF-EVAL/{evaluation_run_id}"'
     intake_result = process_gmail_message_by_id(
         db,
         body.tenant_id,
@@ -508,6 +586,8 @@ def process_live_eval_delivery(
         intake_query=intake_query,
         live_eval_run_id=evaluation_run_id,
         skip_slack_notify=True,
+        mailbox_resolution=mailbox_resolution,
+        skip_gmail_post_pipeline=r3_run,
     )
     record_pipeline_execution_build_sha()
     if intake_result.get("status") == "failed":

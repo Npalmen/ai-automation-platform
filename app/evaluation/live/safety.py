@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 
+from sqlalchemy.orm import Session
+
 from app.evaluation.live.config import LiveEvalConfig, get_live_eval_config
 from app.evaluation.live.constants import (
     ALLOWED_AI_MODES,
@@ -410,11 +412,29 @@ def validate_live_gmail_run_for_mutation(
     recipient_message_id: str | None = None,
     mutation_operation: str | None = None,
     cleanup_phase: str | None = None,
+    db: Session | None = None,
 ) -> None:
     require_tenant_allowed(tenant_id)
     if row.tenant_id != tenant_id:
         raise LiveEvalSafetyError("run tenant mismatch")
-    require_scenario_allowed_for_live_gmail(row.scenario_id)
+
+    from app.evaluation.live.delivery_mailbox_reader import is_r3_frozen_live_eval_run
+    from app.evaluation.profile_testbot.qualification.coworker_r3_mutation_contract import (
+        R3_MUTATION_PROCESS_DELIVERY,
+        validate_r3_frozen_live_run_contract,
+    )
+
+    if is_r3_frozen_live_eval_run(row):
+        operation = mutation_operation or R3_MUTATION_PROCESS_DELIVERY
+        validate_r3_frozen_live_run_contract(
+            row,
+            tenant_id=tenant_id,
+            operation=operation,
+            recipient_message_id=recipient_message_id,
+            db=db,
+        )
+        return
+
     from app.evaluation.profile_testbot.campaign.scenario_gate import (
         is_profile_testbot_quality_scenario,
         is_profile_testbot_semi_auto_scenario,
@@ -434,6 +454,8 @@ def validate_live_gmail_run_for_mutation(
         raise LiveEvalSafetyError("fixture_ai required for live Gmail mutation")
     if row.transport_mode != "live_gmail":
         raise LiveEvalSafetyError("transport_mode must be live_gmail")
+
+    require_scenario_allowed_for_live_gmail(row.scenario_id)
     now = datetime.now(timezone.utc)
     expires_at = row.expires_at
     if expires_at.tzinfo is None:
