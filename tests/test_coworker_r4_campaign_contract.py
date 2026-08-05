@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 from app.evaluation.profile_testbot.qualification.coworker_r4_candidates import (
     generate_r4_candidates,
@@ -36,6 +38,47 @@ from app.evaluation.profile_testbot.qualification.coworker_r4_registry import (
     R4_SEND_SCENARIO_IDS,
     R4_SERVICE_PREQUAL_IDS,
 )
+from app.workflows.reply_quality.llm_renderer import (
+    MODEL_ID,
+    PROMPT_VERSION,
+    RENDERER_POLICY_VERSION,
+    compose_constrained_reply_hermetic,
+)
+from app.workflows.reply_quality.provenance import LLM_RENDERER
+
+
+def _mock_live_success(plan, **kwargs):
+    body = compose_constrained_reply_hermetic(plan)
+    meta = {
+        "prompt_version": PROMPT_VERSION,
+        "model_id": MODEL_ID,
+        "requested_model_id": MODEL_ID,
+        "template_version": "digital_coworker_constrained_llm_v5",
+        "renderer_policy_version": RENDERER_POLICY_VERSION,
+        "invocation_attempted": True,
+        "live_call": True,
+        "provider_outcome": "success",
+        "returned_model": "gpt-4o-mini-2024-07-18",
+        "returned_model_id": "gpt-4o-mini-2024-07-18",
+        "finish_reason": "stop",
+        "prompt_tokens": 1,
+        "completion_tokens": 2,
+        "total_tokens": 3,
+        "provider_attempt_count": 1,
+        "prompt_payload_hash": "payload",
+        "require_live": True,
+        "fallback_used": False,
+        "fallback_tier": "none",
+    }
+    return body, meta
+
+
+@pytest.fixture
+def llm_ready_env(monkeypatch):
+    monkeypatch.setenv("DIGITAL_COWORKER_LLM_RENDER", "true")
+    monkeypatch.setenv("LLM_API_KEY", "test-key-not-real")
+    monkeypatch.setenv("LLM_API_URL", "https://api.openai.com/v1/chat/completions")
+
 
 
 def test_r4_registry_coverage_locked():
@@ -99,8 +142,12 @@ def test_r4_contract_rejects_r3_frozen_and_hold_override():
     assert "automatic_gmail" in joined
 
 
-def test_r4_candidates_write_free_and_body_hashes(tmp_path: Path):
-    result = generate_r4_candidates(runtime_sha=R3_QUALIFYING_SHA)
+def test_r4_candidates_write_free_and_body_hashes(llm_ready_env, tmp_path: Path):
+    with patch(
+        "app.workflows.reply_quality.renderer.render_constrained_llm_reply",
+        side_effect=_mock_live_success,
+    ):
+        result = generate_r4_candidates(runtime_sha=R3_QUALIFYING_SHA, require_live_llm=True)
     assert result["gmail_sends"] == 0
     assert result["gmail_drafts"] == 0
     assert result["external_writes"] == 0
@@ -108,22 +155,27 @@ def test_r4_candidates_write_free_and_body_hashes(tmp_path: Path):
     assert result["no_send_candidate_count"] == 16
     assert result["r3_hold_override_generalized"] is False
     assert result["human_review_complete"] is False
+    assert result["constrained_llm_candidate_count"] == 20
+    assert result["deterministic_renderer_count"] == 0
     for row in result["send_candidates"]:
         assert row.get("body_hash")
+        assert row.get("renderer_type") == LLM_RENDERER
         assert row.get("r3_hold_override_applied") is False
         assert "rendered_body" in row
     # Complaint scenario must not silently inherit R3 override.
     c088 = next(r for r in result["send_candidates"] if r["scenario_id"] == "PTB-DCQ-0088")
     assert c088["r3_hold_override_applied"] is False
-    assert result["overall_status"] in {"PASS", "BLOCKED"}
-    if result["overall_status"] != "PASS":
-        # Still require structural integrity even if oracle blockers exist.
-        assert all(r.get("body_hash") for r in result["send_candidates"])
+    assert result["overall_status"] == "PASS"
 
 
-def test_r4_human_review_pending_by_default():
-    candidates = generate_r4_candidates(runtime_sha=R3_QUALIFYING_SHA)
+def test_r4_human_review_pending_by_default(llm_ready_env):
+    with patch(
+        "app.workflows.reply_quality.renderer.render_constrained_llm_reply",
+        side_effect=_mock_live_success,
+    ):
+        candidates = generate_r4_candidates(runtime_sha=R3_QUALIFYING_SHA, require_live_llm=True)
     package = build_r4_human_review_package(candidates, runtime_sha=R3_QUALIFYING_SHA)
+    assert package["human_review_authorized"] is True
     assert package["human_review_complete"] is False
     assert package["send_review_count"] == len(candidates["send_candidates"])
     assert all(r["review_status"] == "PENDING" for r in package["reviews"])
@@ -132,26 +184,30 @@ def test_r4_human_review_pending_by_default():
     assert state["pending_reviews"] == package["send_review_count"]
 
 
-def test_r4_readiness_and_dry_run_no_execute(tmp_path: Path):
+def test_r4_readiness_and_dry_run_no_execute(llm_ready_env, tmp_path: Path):
     manifest = build_r4_campaign_manifest(runtime_sha=R3_QUALIFYING_SHA)
-    candidates = generate_r4_candidates(runtime_sha=R3_QUALIFYING_SHA)
-    review = build_r4_human_review_package(candidates, runtime_sha=R3_QUALIFYING_SHA)
-    ready = evaluate_coworker_r4_readiness(
-        runtime_sha=R3_QUALIFYING_SHA,
-        manifest=manifest,
-        candidates=candidates,
-        human_review=review,
-        skip_live_probes=True,
-    )
-    assert ready["r3_prerequisite_pass"] is True
-    assert ready["manual_execution_confirmation_required"] is True
-    assert ready["r4_campaign_ready_for_manual_execution"] is False
+    with patch(
+        "app.workflows.reply_quality.renderer.render_constrained_llm_reply",
+        side_effect=_mock_live_success,
+    ):
+        candidates = generate_r4_candidates(runtime_sha=R3_QUALIFYING_SHA, require_live_llm=True)
+        review = build_r4_human_review_package(candidates, runtime_sha=R3_QUALIFYING_SHA)
+        ready = evaluate_coworker_r4_readiness(
+            runtime_sha=R3_QUALIFYING_SHA,
+            manifest=manifest,
+            candidates=candidates,
+            human_review=review,
+            skip_live_probes=True,
+        )
+        assert ready["r3_prerequisite_pass"] is True
+        assert ready["manual_execution_confirmation_required"] is True
+        assert ready["r4_campaign_ready_for_manual_execution"] is False
 
-    result = run_r4_live_campaign(
-        mode="dry_run",
-        expected_runtime_sha=R3_QUALIFYING_SHA,
-        status_dir=tmp_path,
-    )
+        result = run_r4_live_campaign(
+            mode="dry_run",
+            expected_runtime_sha=R3_QUALIFYING_SHA,
+            status_dir=tmp_path,
+        )
     assert result["gmail_sends"] == 0
     assert result["gmail_drafts"] == 0
     assert result["external_writes"] == 0

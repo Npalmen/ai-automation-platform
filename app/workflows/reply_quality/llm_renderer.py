@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from typing import Any
@@ -273,21 +274,62 @@ def compose_constrained_reply_hermetic(plan: CustomerReplyPlanV2) -> str:
     return f"{plan.greeting}\n\n{middle}{signature}"
 
 
-def render_constrained_llm_reply(plan: CustomerReplyPlanV2) -> tuple[str, dict[str, Any]]:
-    """Render via constrained LLM path. Hermetic composer only when live is disabled or fails."""
+def render_constrained_llm_reply(
+    plan: CustomerReplyPlanV2,
+    *,
+    require_live: bool = False,
+    temperature: float | None = None,
+    retry_attempts: int | None = None,
+) -> tuple[str, dict[str, Any]]:
+    """Render via constrained LLM path.
+
+    Default: hermetic composer when live is disabled or fails.
+    require_live=True: never fall back to hermetic; return empty body + failure meta.
+    """
     payload = build_constrained_llm_payload(plan)
+    payload_hash = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
     use_live = os.environ.get("DIGITAL_COWORKER_LLM_RENDER", "").lower() in {"1", "true", "live"}
-    retry_attempts = max(1, int(os.environ.get("LLM_RETRY_ATTEMPTS", "1")))
+    if require_live:
+        use_live = True
+    attempts = (
+        max(1, int(retry_attempts))
+        if retry_attempts is not None
+        else max(1, int(os.environ.get("LLM_RETRY_ATTEMPTS", "1")))
+    )
+    if require_live:
+        attempts = max(attempts, 2)
+    temp = 0.0 if require_live and temperature is None else temperature
     meta: dict[str, Any] = {
         "prompt_version": PROMPT_VERSION,
         "model_id": MODEL_ID if use_live else None,
+        "requested_model_id": MODEL_ID if use_live else None,
         "template_version": TEMPLATE_VERSION,
+        "renderer_policy_version": RENDERER_POLICY_VERSION,
         "invocation_attempted": use_live,
         "live_call": False,
-        "provider_outcome": "skipped",
+        "provider_outcome": "skipped" if not use_live else "pending",
         "validation_outcome": None,
-        "payload_hash": json.dumps(payload, sort_keys=True)[:64],
+        "payload_hash": payload_hash,
+        "prompt_payload_hash": payload_hash,
+        "provider_attempt_count": 0,
+        "require_live": require_live,
     }
+    if require_live and os.environ.get("DIGITAL_COWORKER_LLM_RENDER", "").lower() not in {
+        "1",
+        "true",
+        "live",
+    }:
+        meta.update(
+            {
+                "provider_outcome": "blocked_llm_render_disabled",
+                "invocation_attempted": False,
+                "live_call": False,
+            }
+        )
+        return "", meta
+
     if use_live:
         try:
             from app.ai.llm.client import get_llm_client
@@ -297,16 +339,23 @@ def render_constrained_llm_reply(plan: CustomerReplyPlanV2) -> tuple[str, dict[s
             result = client.generate_json_detailed(
                 prompt,
                 model=MODEL_ID,
-                retry_attempts=retry_attempts,
+                retry_attempts=attempts,
+                temperature=temp,
             )
             parsed = parse_llm_reply_output(result.output)
+            usage = result.usage or {}
             meta.update(
                 {
                     "live_call": True,
                     "provider_outcome": "success",
                     "returned_model": result.returned_model,
+                    "returned_model_id": result.returned_model,
                     "finish_reason": result.finish_reason,
-                    "usage": result.usage,
+                    "usage": usage,
+                    "prompt_tokens": int(usage.get("prompt_tokens") or 0),
+                    "completion_tokens": int(usage.get("completion_tokens") or 0),
+                    "total_tokens": int(usage.get("total_tokens") or 0),
+                    "provider_attempt_count": attempts,
                     "reply_body_source_key": parsed.source_key,
                 }
             )
@@ -319,8 +368,11 @@ def render_constrained_llm_reply(plan: CustomerReplyPlanV2) -> tuple[str, dict[s
                     "provider_outcome": "parse_failed",
                     "provider_error_type": type(exc).__name__,
                     "provider_error_detail": str(exc),
+                    "provider_attempt_count": attempts,
                 }
             )
+            if require_live:
+                return "", meta
         except Exception as exc:
             meta.update(
                 {
@@ -328,8 +380,15 @@ def render_constrained_llm_reply(plan: CustomerReplyPlanV2) -> tuple[str, dict[s
                     "live_call_failed": True,
                     "provider_outcome": "failed",
                     "provider_error_type": type(exc).__name__,
+                    "provider_attempt_count": attempts,
                 }
             )
+            if require_live:
+                return "", meta
+    if require_live:
+        meta["provider_outcome"] = meta.get("provider_outcome") or "failed"
+        return "", meta
     body = compose_constrained_reply_hermetic(plan)
     meta["composer"] = "hermetic_constrained_v4"
+    meta["provider_outcome"] = meta.get("provider_outcome") or "skipped"
     return body, meta

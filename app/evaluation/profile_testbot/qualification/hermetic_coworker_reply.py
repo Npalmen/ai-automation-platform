@@ -21,11 +21,7 @@ from app.evaluation.profile_testbot.coworker_reply_dataset import (
 )
 from app.evaluation.profile_testbot.profile_contract import load_customer_profile
 from app.evaluation.profile_testbot.scenarios.schema import ProfileScenario
-from app.workflows.missing_fact_plan import build_missing_fact_plan
-from app.workflows.reply_quality.pipeline import build_and_render_coworker_reply
-from app.workflows.reply_quality.customer_surface import extract_city_phrase
 from app.workflows.reply_quality.provenance import ReplyRenderProvenance
-from app.workflows.safe_ack_eligibility import evaluate_safe_ack_eligibility
 
 HERMETIC_COWORKER_CONTRACT_VERSION = "coworker_reply_hermetic_v1"
 
@@ -72,94 +68,32 @@ def _render_scenario_reply(
     *,
     signature_name: str = "Niklas",
 ) -> tuple[str, dict[str, Any] | None, ReplyRenderProvenance | None]:
-    setup = scenario.customer_state_setup or {}
-    input_data = {
-        "subject": scenario.input.subject,
-        "message_text": scenario.input.message_text,
-        "language": scenario.input.language,
-        "_force_service_type": setup.get("service_type"),
-        "_coworker_hermetic_eval": True,
-        "_coworker_scenario_family": setup.get("coworker_family") or scenario.family,
-        "sender": {
-            "name": scenario.input.sender_name,
-            "email": scenario.input.sender_email,
-        },
-    }
-    entities = {"email": scenario.input.sender_email}
-    for key in setup.get("known_entities") or []:
-        if key == "city":
-            entities[key] = (
-                extract_city_phrase(text=scenario.input.message_text, entities={}) or "Uppsala"
-            )
-        else:
-            entities[key] = f"known-{key}"
-    missing = build_missing_fact_plan(
-        input_data=input_data,
-        entities=entities,
-        service_type=setup.get("service_type"),
+    """Hermetic/default R1 render path (keeps deterministic fallback behavior)."""
+    from app.evaluation.profile_testbot.qualification.qualification_scenario_plan import (
+        build_qualification_scenario_inputs,
+        build_qualification_scenario_reply_plan,
     )
-    eligibility = evaluate_safe_ack_eligibility(
-        detected_job_type="lead",
-        risk_detected=False,
-        risk_categories=[],
-        extraction_issues=[],
-        input_data=input_data,
-        recommendation=None,
-        recommendation_raw="manual_review",
-        low_confidence=True,
-        used_fallback=False,
-        business_intent={"primary_intent": setup.get("business_intent")},
+    from app.workflows.reply_quality.renderer import render_coworker_reply_with_validation
+
+    plan_v2 = build_qualification_scenario_reply_plan(
+        scenario,
+        signature_name=signature_name,
     )
-    playbook_intent = str(setup.get("business_intent") or "lead")
-    coworker_family = setup.get("coworker_family")
-    if coworker_family == "complaint_warranty":
-        playbook_intent = "support_complaint"
-    if not eligibility.eligible and playbook_intent in {"support_status", "support_complaint"}:
-        eligibility = evaluate_safe_ack_eligibility(
-            detected_job_type="lead",
-            risk_detected=False,
-            risk_categories=[],
-            extraction_issues=[],
-            input_data=input_data,
-            recommendation=None,
-            recommendation_raw="manual_review",
-            low_confidence=True,
-            used_fallback=False,
-            business_intent={"primary_intent": "lead"},
-        )
-        if coworker_family == "complaint_warranty":
-            playbook_intent = "support_complaint"
-        elif coworker_family in {"existing_support_symptom", "existing_support_followup"}:
-            playbook_intent = "support_status"
-        else:
-            playbook_intent = str(setup.get("business_intent") or "lead")
-    if not eligibility.eligible:
+    if plan_v2 is None:
         return "", None, None
 
-    # Force coworker path in hermetic evaluation
+    # Preserve hermetic eval markers used by downstream pipeline helpers.
+    _input_data, _entities = build_qualification_scenario_inputs(scenario)
     prev = os.environ.get("DIGITAL_COWORKER_REPLY_ENABLED")
     os.environ["DIGITAL_COWORKER_REPLY_ENABLED"] = "true"
     try:
-        rendered = build_and_render_coworker_reply(
-            greeting="Hej,",
-            signature_name=signature_name,
-            missing_fact_plan=missing,
-            eligibility=eligibility,
-            input_data=input_data,
-            entities=entities,
-            business_intent=playbook_intent,
-            thread_state=str(setup.get("thread_state") or "new_thread"),
-        )
+        render_result = render_coworker_reply_with_validation(plan_v2)
     finally:
         if prev is None:
             os.environ.pop("DIGITAL_COWORKER_REPLY_ENABLED", None)
         else:
             os.environ["DIGITAL_COWORKER_REPLY_ENABLED"] = prev
-
-    if rendered is None:
-        return "", None, None
-    body, plan_v2, render_result, _meta = rendered
-    return body, plan_v2.to_dict(), render_result.provenance
+    return render_result.body, plan_v2.to_dict(), render_result.provenance
 
 
 def run_hermetic_coworker_reply_qualification(

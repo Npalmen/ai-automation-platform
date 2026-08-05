@@ -128,9 +128,21 @@ def evaluate_coworker_r4_readiness(
     if candidates is not None:
         if candidates.get("overall_status") != "PASS":
             blockers.append("candidate_package_not_pass")
+        if candidates.get("provenance_audit_pass") is not True:
+            blockers.append("provenance_audit_pass_false")
+        if int(candidates.get("constrained_llm_candidate_count") or 0) != R4_SEND_MAX:
+            blockers.append("constrained_llm_candidate_count!=20")
+        if int(candidates.get("deterministic_renderer_count") or 0) != 0:
+            blockers.append("deterministic_renderer_count!=0")
+        if not candidates.get("candidate_package_semantic_hash"):
+            blockers.append("missing_candidate_package_semantic_hash")
         sends = candidates.get("send_candidates") or []
         hashes_ok = all(bool(c.get("body_hash")) for c in sends) and len(sends) <= R4_SEND_MAX
         checks["candidate_body_hashes_valid"] = hashes_ok
+        checks["provenance_audit_pass"] = candidates.get("provenance_audit_pass") is True
+        checks["constrained_llm_candidate_count"] = int(
+            candidates.get("constrained_llm_candidate_count") or 0
+        )
         if not hashes_ok:
             blockers.append("candidate_body_hashes_invalid")
         if candidates.get("gmail_sends") not in (0, None):
