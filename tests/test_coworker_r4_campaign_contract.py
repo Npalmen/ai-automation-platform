@@ -205,7 +205,8 @@ def test_r4_readiness_and_dry_run_no_execute(llm_ready_env, tmp_path: Path):
 
         result = run_r4_live_campaign(
             mode="dry_run",
-            expected_runtime_sha=R3_QUALIFYING_SHA,
+            candidate_runtime_sha=R3_QUALIFYING_SHA,
+            expected_executor_sha=R3_QUALIFYING_SHA,
             status_dir=tmp_path,
         )
     assert result["gmail_sends"] == 0
@@ -216,11 +217,14 @@ def test_r4_readiness_and_dry_run_no_execute(llm_ready_env, tmp_path: Path):
     assert result["production_activation"] is False
     # Dry-run may PASS or BLOCKED depending on oracle/candidate status; never sends.
     assert result["overall_status"] in {"PASS", "BLOCKED"}
+    assert result.get("candidate_runtime_sha") == R3_QUALIFYING_SHA
+    assert result.get("executor_runtime_sha") == R3_QUALIFYING_SHA
     assert (tmp_path / f"digital-coworker-r4-manifest-{R3_QUALIFYING_SHA[:7]}.json").is_file()
 
     stopped = run_r4_live_campaign(
         mode="execute",
-        expected_runtime_sha=R3_QUALIFYING_SHA,
+        candidate_runtime_sha=R3_QUALIFYING_SHA,
+        expected_executor_sha=R3_QUALIFYING_SHA,
         status_dir=tmp_path,
     )
     assert stopped["overall_status"] == "STOPPED"

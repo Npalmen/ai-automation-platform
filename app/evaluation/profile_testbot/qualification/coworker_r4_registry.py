@@ -16,9 +16,28 @@ from app.evaluation.profile_testbot.scenarios.schema import ProfileScenario
 
 R4_LIVE_QUALITY_CAMPAIGN_TYPE = "coworker_r4_live_quality_campaign"
 R4_EXECUTION_MODE = "r4_reviewed_live_candidate"
-R4_AI_MODE = "live_llm"
+R4_AI_MODE = "live_llm"  # locked in candidate/manifest semantic hash @ b7fd95e
+R4_EXECUTE_AI_MODE = "reviewed_live_llm_body"  # live campaign registration / execute
 R4_PROFILE_ID = "niklas-demo-live-eval-v1"
 R4_TENANT_ID = "TENANT_LIVE_EVAL"
+R4_APPROVAL_TYPE = "R4_LIVE_CAMPAIGN_MANUAL_SEND"
+R4_SUBJECT_PREFIX = "KROWOLF-R4"
+
+# Locked qualifying candidate package bindings (do not regenerate).
+R4_LOCKED_CANDIDATE_RUNTIME_SHA = "b7fd95e075c16feee93a116a6062e402c1fee3df"
+R4_LOCKED_MANIFEST_SEMANTIC_HASH = (
+    "bdebc3ce422aee302fdafad748e3e9b93a3deda8effe5deb90b49853e09144f5"
+)
+R4_LOCKED_CANDIDATE_PACKAGE_SEMANTIC_HASH = (
+    "6e6c37aaa57df1464fbc367701c0cfbfaf500f697ffae5cec3a50d2dda116254"
+)
+R4_LOCKED_REVIEW_ARTIFACT_SHA256 = (
+    "7dced592907fb6fcbb89e632f1e37246cd120ace2a453e0aaa198397f5f0b57b"
+)
+R4_0088_REVIEWED_BODY_HASH = (
+    "7ef9def72b71f0981155eb157e22b2dc2b551fcb230bad832ccb731d93f2895e"
+)
+R4_0088_CONTRACT_ID = "r4_reviewed_hold_to_pending_v1"
 
 R4_SCENARIO_TARGET = 36
 R4_SEND_MAX = 20

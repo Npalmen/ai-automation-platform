@@ -253,6 +253,18 @@ class WorkflowOrchestrator:
             except Exception:
                 # Fail closed to ordinary hold skip on unexpected probe errors.
                 pass
+            try:
+                from app.evaluation.profile_testbot.qualification.coworker_r4_hold_materialization import (
+                    should_materialize_r4_0088_from_job,
+                )
+
+                if should_materialize_r4_0088_from_job(
+                    job=job,
+                    policy_payload=policy_payload,
+                ):
+                    return False
+            except Exception:
+                pass
             return True
 
         if recommended_next_step == "awaiting_approval":
