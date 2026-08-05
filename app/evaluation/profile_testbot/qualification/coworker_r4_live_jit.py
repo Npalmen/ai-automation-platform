@@ -18,6 +18,9 @@ from app.evaluation.profile_testbot.qualification.coworker_r4_hold_materializati
 from app.evaluation.profile_testbot.qualification.coworker_r4_human_review import (
     validate_r4_human_review_bindings,
 )
+from app.evaluation.profile_testbot.qualification.coworker_r4_live_probes import (
+    collect_r4_live_probes,
+)
 from app.evaluation.profile_testbot.qualification.coworker_r4_mutation_contract import (
     validate_r4_mutation_operation,
     R4_MUTATION_PROCESS_DELIVERY,
@@ -42,6 +45,10 @@ def _sha_env() -> str:
     return (os.environ.get("BUILD_GIT_SHA") or os.environ.get("GIT_COMMIT") or "").strip()
 
 
+def _any_probe_kwarg_set(**kwargs: Any) -> bool:
+    return any(v is not None for v in kwargs.values())
+
+
 def run_r4_full_live_jit(
     *,
     candidate_runtime_sha: str,
@@ -63,10 +70,17 @@ def run_r4_full_live_jit(
     mutation_contract_ready: bool | None = None,
     orphan_isolation_ready: bool | None = True,
     run_live_probes: bool = True,
+    auto_collect_live_probes: bool = True,
+    recipient_email: str = "ni@sol-f.se",
 ) -> dict[str, Any]:
-    """Full live JIT. When run_live_probes=True, requires probe results (or calls them)."""
+    """Full live JIT. When run_live_probes=True, collects read-only probes unless supplied."""
     blockers: list[str] = []
     review_sha = compute_file_sha256(human_review_path)
+    probe_bundle: dict[str, Any] | None = None
+    # Treat default True as unset so auto-collect can still run when no other probes given.
+    orphan_for_collect_check = (
+        None if orphan_isolation_ready is True else orphan_isolation_ready
+    )
 
     if candidate_runtime_sha != R4_LOCKED_CANDIDATE_RUNTIME_SHA:
         blockers.append("candidate_runtime_sha_not_locked_b7fd95e")
@@ -85,6 +99,38 @@ def run_r4_full_live_jit(
     if review_sha != R4_LOCKED_REVIEW_ARTIFACT_SHA256:
         blockers.append("review_artifact_sha256_mismatch")
 
+    if run_live_probes and auto_collect_live_probes and not _any_probe_kwarg_set(
+        tenant_intake_ready=tenant_intake_ready,
+        sender_gmail_ready=sender_gmail_ready,
+        recipient_gmail_ready=recipient_gmail_ready,
+        reply_provider_ready=reply_provider_ready,
+        delivery_observation_ready=delivery_observation_ready,
+        exact_message_ready=exact_message_ready,
+        registration_contract_ready=registration_contract_ready,
+        mutation_contract_ready=mutation_contract_ready,
+        orphan_isolation_ready=orphan_for_collect_check,
+        api_build_git_sha=api_build_git_sha,
+        worker_build_git_sha=worker_build_git_sha,
+    ):
+        probe_bundle = collect_r4_live_probes(
+            executor_runtime_sha=executor_runtime_sha,
+            manifest=manifest,
+            recipient_email=recipient_email,
+        )
+        api_build_git_sha = probe_bundle.get("api_build_git_sha")
+        worker_build_git_sha = probe_bundle.get("worker_build_git_sha")
+        runner_build_git_sha = probe_bundle.get("runner_build_git_sha") or executor_runtime_sha
+        tenant_intake_ready = probe_bundle.get("tenant_intake_ready")
+        sender_gmail_ready = probe_bundle.get("sender_gmail_ready")
+        recipient_gmail_ready = probe_bundle.get("recipient_gmail_ready")
+        reply_provider_ready = probe_bundle.get("reply_provider_ready")
+        delivery_observation_ready = probe_bundle.get("delivery_observation_ready")
+        exact_message_ready = probe_bundle.get("exact_message_ready")
+        registration_contract_ready = probe_bundle.get("registration_contract_ready")
+        mutation_contract_ready = probe_bundle.get("mutation_contract_ready")
+        orphan_isolation_ready = probe_bundle.get("orphan_isolation_ready")
+        blockers.extend(probe_bundle.get("probe_blockers") or [])
+
     api_sha = api_build_git_sha or _sha_env()
     worker_sha = worker_build_git_sha or api_sha
     runner_sha = runner_build_git_sha or executor_runtime_sha
@@ -94,9 +140,6 @@ def run_r4_full_live_jit(
         blockers.append("worker_sha_mismatch_executor")
     if runner_sha != executor_runtime_sha:
         blockers.append("runner_sha_mismatch_executor")
-    if candidate_runtime_sha == executor_runtime_sha:
-        # Allowed only if same SHA happens to be both; still report dual fields separately.
-        pass
 
     # Body + review bindings
     bindings = validate_r4_human_review_bindings(candidates, human_review)
@@ -159,7 +202,6 @@ def run_r4_full_live_jit(
         if registration_contract_ready is not True:
             blockers.append("registration_contract_ready!=true")
         if mutation_contract_ready is not True:
-            # Validate mutation allowlist structurally if probe not supplied.
             mut = validate_r4_mutation_operation(
                 operation=R4_MUTATION_PROCESS_DELIVERY,
                 tenant_id=manifest.get("tenant_id"),
@@ -170,6 +212,8 @@ def run_r4_full_live_jit(
             if not mut.allowed:
                 blockers.append("mutation_contract_ready!=true")
                 blockers.extend(mut.blockers)
+            else:
+                blockers.append("mutation_contract_ready!=true")
         if orphan_isolation_ready is not True:
             blockers.append("orphan_isolation_ready!=true")
 
@@ -204,6 +248,7 @@ def run_r4_full_live_jit(
     if int(candidates.get("send_candidate_count") or 0) != R4_SEND_MAX:
         blockers.append("send_budget!=20")
 
+    blockers = list(dict.fromkeys(blockers))
     passed = not blockers and structural.get("human_review_complete") is True
     return {
         "jit_type": "full_live_jit" if run_live_probes else "structural_only",
@@ -215,6 +260,8 @@ def run_r4_full_live_jit(
         "api_build_git_sha": api_sha,
         "worker_build_git_sha": worker_sha,
         "runner_build_git_sha": runner_sha,
+        "live_probes_collected": probe_bundle is not None,
+        "live_probe_bundle": probe_bundle,
         "manifest_semantic_hash": manifest.get("manifest_semantic_hash"),
         "candidate_package_semantic_hash": candidates.get("candidate_package_semantic_hash"),
         "human_review_sha256": review_sha,

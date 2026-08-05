@@ -417,7 +417,16 @@ def run_r4_live_campaign(
     result["structural_readiness"] = structural
 
     if mode == "mailbox_baseline":
-        baseline = build_r4_mailbox_baseline(campaign_id=campaign_id)
+        from app.evaluation.profile_testbot.qualification.coworker_r4_live_probes import (
+            probe_r4_mailbox_baseline,
+        )
+
+        baseline = build_r4_mailbox_baseline(
+            campaign_id=campaign_id,
+            probe_fn=lambda: probe_r4_mailbox_baseline(
+                campaign_id=campaign_id, recipient_email=recipient
+            ),
+        )
         result["mailbox_baseline"] = baseline
         result["overall_status"] = "PASS" if baseline.get("passed") else "BLOCKED"
         result["stop_reason"] = None if baseline.get("passed") else baseline.get("blockers")
@@ -434,6 +443,7 @@ def run_r4_live_campaign(
         return result
 
     if mode == "full_jit":
+        # Auto-collect read-only live probes unless explicit probe flags are supplied.
         jit = run_r4_full_live_jit(
             candidate_runtime_sha=candidate_runtime_sha,
             executor_runtime_sha=expected_executor_sha,
@@ -441,8 +451,12 @@ def run_r4_live_campaign(
             candidates=candidates,
             human_review=human_review,
             human_review_path=review_path,
-            api_build_git_sha=expected_executor_sha,
-            worker_build_git_sha=expected_executor_sha,
+            api_build_git_sha=None
+            if tenant_intake_ready is None
+            else expected_executor_sha,
+            worker_build_git_sha=None
+            if tenant_intake_ready is None
+            else expected_executor_sha,
             runner_build_git_sha=expected_executor_sha,
             tenant_intake_ready=tenant_intake_ready,
             sender_gmail_ready=sender_gmail_ready,
@@ -453,6 +467,8 @@ def run_r4_live_campaign(
             registration_contract_ready=registration_contract_ready,
             mutation_contract_ready=mutation_contract_ready,
             run_live_probes=True,
+            auto_collect_live_probes=True,
+            recipient_email=recipient,
         )
         result["full_live_jit"] = jit
         result["overall_status"] = "PASS" if jit.get("passed") else "BLOCKED"
@@ -567,8 +583,8 @@ def run_r4_live_campaign(
         candidates=candidates,
         human_review=human_review,
         human_review_path=review_path,
-        api_build_git_sha=expected_executor_sha,
-        worker_build_git_sha=expected_executor_sha,
+        api_build_git_sha=None if tenant_intake_ready is None else expected_executor_sha,
+        worker_build_git_sha=None if tenant_intake_ready is None else expected_executor_sha,
         runner_build_git_sha=expected_executor_sha,
         tenant_intake_ready=tenant_intake_ready,
         sender_gmail_ready=sender_gmail_ready,
@@ -579,6 +595,8 @@ def run_r4_live_campaign(
         registration_contract_ready=registration_contract_ready,
         mutation_contract_ready=mutation_contract_ready,
         run_live_probes=True,
+        auto_collect_live_probes=True,
+        recipient_email=recipient,
     )
     result["full_live_jit"] = jit
     if not jit.get("passed") or binding_blockers:
@@ -600,7 +618,16 @@ def run_r4_live_campaign(
         result["report_paths"] = {k: str(v) for k, v in paths.items()}
         return result
 
-    baseline = build_r4_mailbox_baseline(campaign_id=campaign_id)
+    from app.evaluation.profile_testbot.qualification.coworker_r4_live_probes import (
+        probe_r4_mailbox_baseline,
+    )
+
+    baseline = build_r4_mailbox_baseline(
+        campaign_id=campaign_id,
+        probe_fn=lambda: probe_r4_mailbox_baseline(
+            campaign_id=campaign_id, recipient_email=recipient
+        ),
+    )
     result["mailbox_baseline"] = baseline
     if not baseline.get("passed"):
         result["overall_status"] = "STOPPED"

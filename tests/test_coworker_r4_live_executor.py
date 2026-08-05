@@ -230,7 +230,28 @@ def test_structural_dry_run_not_full_jit(tmp_path, locked):
     assert result["gmail_sends"] == 0
 
 
-def test_full_jit_requires_live_probes(locked):
+def test_full_jit_requires_live_probes(locked, monkeypatch):
+    def fake_collect(**kwargs):
+        return {
+            "api_build_git_sha": EXECUTOR,
+            "worker_build_git_sha": EXECUTOR,
+            "runner_build_git_sha": EXECUTOR,
+            "tenant_intake_ready": False,
+            "sender_gmail_ready": False,
+            "recipient_gmail_ready": False,
+            "reply_provider_ready": False,
+            "delivery_observation_ready": False,
+            "exact_message_ready": False,
+            "registration_contract_ready": False,
+            "mutation_contract_ready": False,
+            "orphan_isolation_ready": False,
+            "probe_blockers": ["tenant_intake_ready!=true"],
+        }
+
+    monkeypatch.setattr(
+        "app.evaluation.profile_testbot.qualification.coworker_r4_live_jit.collect_r4_live_probes",
+        fake_collect,
+    )
     jit = run_r4_full_live_jit(
         candidate_runtime_sha=R4_LOCKED_CANDIDATE_RUNTIME_SHA,
         executor_runtime_sha=EXECUTOR,
@@ -238,13 +259,12 @@ def test_full_jit_requires_live_probes(locked):
         candidates=locked["candidates"],
         human_review=locked["review"],
         human_review_path=REV,
-        api_build_git_sha=EXECUTOR,
-        worker_build_git_sha=EXECUTOR,
-        runner_build_git_sha=EXECUTOR,
         run_live_probes=True,
+        auto_collect_live_probes=True,
     )
     assert jit["full_live_jit"] is True
-    assert jit["passed"] is False  # probes not supplied
+    assert jit["live_probes_collected"] is True
+    assert jit["passed"] is False
     assert any("tenant_intake" in b or "sender_gmail" in b for b in jit["blockers"])
 
 
@@ -269,9 +289,76 @@ def test_full_jit_pass_with_probe_flags(locked):
         mutation_contract_ready=True,
         orphan_isolation_ready=True,
         run_live_probes=True,
+        auto_collect_live_probes=False,
     )
     assert jit["passed"] is True
     assert jit["gmail_sends"] == 0
+    assert jit["live_probes_collected"] is False
+
+
+def test_full_jit_auto_collect_invoked(locked, monkeypatch):
+    calls = {"n": 0}
+
+    def fake_collect(**kwargs):
+        calls["n"] += 1
+        return {
+            "api_build_git_sha": EXECUTOR,
+            "worker_build_git_sha": EXECUTOR,
+            "runner_build_git_sha": EXECUTOR,
+            "tenant_intake_ready": True,
+            "sender_gmail_ready": True,
+            "recipient_gmail_ready": True,
+            "reply_provider_ready": True,
+            "delivery_observation_ready": True,
+            "exact_message_ready": True,
+            "registration_contract_ready": True,
+            "mutation_contract_ready": True,
+            "orphan_isolation_ready": True,
+            "probe_blockers": [],
+        }
+
+    monkeypatch.setattr(
+        "app.evaluation.profile_testbot.qualification.coworker_r4_live_jit.collect_r4_live_probes",
+        fake_collect,
+    )
+    jit = run_r4_full_live_jit(
+        candidate_runtime_sha=R4_LOCKED_CANDIDATE_RUNTIME_SHA,
+        executor_runtime_sha=EXECUTOR,
+        manifest=locked["manifest"],
+        candidates=locked["candidates"],
+        human_review=locked["review"],
+        human_review_path=REV,
+        run_live_probes=True,
+        auto_collect_live_probes=True,
+    )
+    assert calls["n"] == 1
+    assert jit["passed"] is True
+    assert jit["live_probes_collected"] is True
+
+
+def test_structural_dry_run_skips_live_probe_collection(tmp_path, locked, monkeypatch):
+    calls = {"n": 0}
+
+    def boom(**kwargs):
+        calls["n"] += 1
+        raise AssertionError("collect must not run in structural dry-run")
+
+    monkeypatch.setattr(
+        "app.evaluation.profile_testbot.qualification.coworker_r4_live_jit.collect_r4_live_probes",
+        boom,
+    )
+    result = run_r4_live_campaign(
+        mode="dry_run",
+        candidate_runtime_sha=R4_LOCKED_CANDIDATE_RUNTIME_SHA,
+        expected_executor_sha=EXECUTOR,
+        candidates_path=CAND,
+        human_review_path=REV,
+        manifest_path=MAN,
+        status_dir=tmp_path,
+    )
+    assert calls["n"] == 0
+    assert result["jit_type"] == "structural_dry_run"
+    assert result["full_live_jit"] is False
 
 
 def test_r4_0088_preserves_hold_and_never_execution_allowed():
