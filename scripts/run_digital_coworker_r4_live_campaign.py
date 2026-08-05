@@ -28,6 +28,11 @@ def main() -> int:
     parser.add_argument("--approval-file", default="")
     parser.add_argument("--human-review-file", default="")
     parser.add_argument(
+        "--candidates-json",
+        default="",
+        help="Reuse locked write-free candidate package (do not regenerate bodies)",
+    )
+    parser.add_argument(
         "--execute",
         action="store_true",
         help="Live execute (fail-closed until separate manual confirmation)",
@@ -41,6 +46,7 @@ def main() -> int:
         status_dir=Path(args.status_dir),
         approval_path=Path(args.approval_file) if args.approval_file else None,
         human_review_path=Path(args.human_review_file) if args.human_review_file else None,
+        candidates_path=Path(args.candidates_json) if args.candidates_json else None,
     )
     for path in (result.get("report_paths") or {}).values():
         print(f"wrote {path}")

@@ -36,6 +36,7 @@ def run_r4_live_campaign(
     status_dir: Path | None = None,
     approval_path: Path | None = None,
     human_review_path: Path | None = None,
+    candidates_path: Path | None = None,
 ) -> dict[str, Any]:
     status_dir = status_dir or Path("storage/status")
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -43,9 +44,13 @@ def run_r4_live_campaign(
     manifest = build_r4_campaign_manifest(
         runtime_sha=expected_runtime_sha, profile_id=profile_id, seed=seed
     )
-    candidates = generate_r4_candidates(
-        runtime_sha=expected_runtime_sha, profile_id=profile_id, seed=seed
-    )
+    if candidates_path is not None and Path(candidates_path).is_file():
+        # Post-review path: reuse locked write-free candidates; never regenerate bodies.
+        candidates = json.loads(Path(candidates_path).read_text(encoding="utf-8"))
+    else:
+        candidates = generate_r4_candidates(
+            runtime_sha=expected_runtime_sha, profile_id=profile_id, seed=seed
+        )
     human_review = None
     if human_review_path and human_review_path.is_file():
         human_review = json.loads(human_review_path.read_text(encoding="utf-8"))
@@ -67,8 +72,11 @@ def run_r4_live_campaign(
         "generated_at": generated_at,
         "runtime_sha": expected_runtime_sha,
         "manifest_semantic_hash": manifest.get("manifest_semantic_hash"),
+        "candidate_package_semantic_hash": candidates.get("candidate_package_semantic_hash"),
         "manifest_blockers": validate_r4_manifest(manifest),
         "candidates_overall_status": candidates.get("overall_status"),
+        "candidates_source": str(candidates_path) if candidates_path else "generated",
+        "human_review_source": str(human_review_path) if human_review_path else "built",
         "readiness": readiness,
         "gmail_sends": 0,
         "gmail_drafts": 0,
@@ -79,22 +87,34 @@ def run_r4_live_campaign(
         "r3_hold_override_generalized": False,
     }
 
+    review_complete = bool(readiness.get("human_review_complete"))
     if mode == "dry_run":
-        if readiness.get("r4_campaign_ready_for_dry_run") and candidates.get("overall_status") == "PASS":
+        if (
+            readiness.get("r4_campaign_ready_for_dry_run")
+            and candidates.get("overall_status") == "PASS"
+        ):
             result["overall_status"] = "PASS"
             result["stop_reason"] = None
-            result["manual_execution_confirmation"] = (
-                "MANUAL EXECUTION CONFIRMATION REQUIRED — R3 PASS formaliserad; "
-                "R4 campaign med 36 scenarier, minst 15 familjer, högst 20 granskade "
-                "send-kandidater och minst 16 no-send är SHA-, manifest-, profile-, "
-                "renderer-, validator- och body-hash-bunden; postdeploy preflight och "
-                "dry-run PASS utan Gmail-writes"
-            )
+            if review_complete:
+                result["manual_execution_confirmation"] = (
+                    "MANUAL EXECUTION CONFIRMATION REQUIRED — R4 human review PASS med "
+                    "20/20 hashbundna kandidater, 0 FAIL och 0 blocking notes; "
+                    "post-review preflight och dry-run PASS utan Gmail-writes"
+                )
+            else:
+                result["manual_execution_confirmation"] = (
+                    "MANUAL EXECUTION CONFIRMATION REQUIRED — R3 PASS formaliserad; "
+                    "R4 campaign med 36 scenarier, minst 15 familjer, högst 20 granskade "
+                    "send-kandidater och minst 16 no-send är SHA-, manifest-, profile-, "
+                    "renderer-, validator- och body-hash-bunden; postdeploy preflight och "
+                    "dry-run PASS utan Gmail-writes"
+                )
         else:
             result["overall_status"] = "BLOCKED"
             result["stop_reason"] = {
                 "readiness_blockers": readiness.get("blockers"),
                 "candidate_failures": candidates.get("blocking_failures"),
+                "execute_blockers": readiness.get("execute_blockers"),
             }
     else:
         # Fail-closed: this PR slice never performs live Gmail execute.
@@ -117,6 +137,7 @@ def run_r4_live_campaign(
         candidates=candidates,
         human_review=human_review,
         status_dir=status_dir,
+        rewrite_locked_packages=candidates_path is None,
     )
     result["report_paths"] = {k: str(v) for k, v in paths.items()}
     return result
@@ -129,6 +150,7 @@ def write_r4_execution_reports(
     candidates: dict[str, Any],
     human_review: dict[str, Any],
     status_dir: Path,
+    rewrite_locked_packages: bool = True,
 ) -> dict[str, Path]:
     status_dir.mkdir(parents=True, exist_ok=True)
     sha = str(result.get("runtime_sha") or "unknown")[:7]
@@ -141,11 +163,17 @@ def write_r4_execution_reports(
     )
     paths["manifest"] = manifest_path
 
-    cand_paths = write_r4_candidate_package(candidates, status_dir)
-    paths.update({f"candidates_{k}": v for k, v in cand_paths.items()})
-
-    review_paths = write_r4_human_review_package(human_review, status_dir)
-    paths.update({f"human_review_{k}": v for k, v in review_paths.items()})
+    if rewrite_locked_packages:
+        cand_paths = write_r4_candidate_package(candidates, status_dir)
+        paths.update({f"candidates_{k}": v for k, v in cand_paths.items()})
+        review_paths = write_r4_human_review_package(human_review, status_dir)
+        paths.update({f"human_review_{k}": v for k, v in review_paths.items()})
+    else:
+        # Preserve locked candidate/review body hashes; only emit dry-run reports.
+        paths["candidates_json"] = status_dir / f"digital-coworker-r4-candidates-{sha}.json"
+        paths["human_review_json"] = Path(
+            str(result.get("human_review_source") or "")
+        )
 
     report_json = status_dir / f"digital-coworker-r4-dry-run-{sha}.json"
     report_md = status_dir / f"digital-coworker-r4-dry-run-{sha}.md"
@@ -157,6 +185,7 @@ def write_r4_execution_reports(
         f"- overall_status: **{result.get('overall_status')}**",
         f"- runtime_sha: `{result.get('runtime_sha')}`",
         f"- manifest_semantic_hash: `{result.get('manifest_semantic_hash')}`",
+        f"- candidate_package_semantic_hash: `{result.get('candidate_package_semantic_hash')}`",
         f"- gmail_sends: **{result.get('gmail_sends')}**",
         f"- gmail_drafts: **{result.get('gmail_drafts')}**",
         f"- external_writes: **{result.get('external_writes')}**",
