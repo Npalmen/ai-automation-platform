@@ -464,12 +464,14 @@ def test_r4_execute_still_blocked_without_review(llm_ready_env, tmp_path):
     ):
         dry = run_r4_live_campaign(
             mode="dry_run",
-            expected_runtime_sha=RUNTIME,
+            candidate_runtime_sha=RUNTIME,
+            expected_executor_sha=RUNTIME,
             status_dir=tmp_path,
         )
         stopped = run_r4_live_campaign(
             mode="execute",
-            expected_runtime_sha=RUNTIME,
+            candidate_runtime_sha=RUNTIME,
+            expected_executor_sha=RUNTIME,
             status_dir=tmp_path,
         )
     assert dry["gmail_sends"] == 0

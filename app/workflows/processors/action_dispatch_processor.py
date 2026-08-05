@@ -201,6 +201,21 @@ def _apply_dispatch_authorization(
                     annotated = overridden
             except Exception:
                 pass
+            if annotated.get("_skip"):
+                try:
+                    from app.evaluation.profile_testbot.qualification.coworker_r4_hold_materialization import (
+                        apply_r4_0088_hold_materialization_from_job,
+                    )
+
+                    overridden_r4 = apply_r4_0088_hold_materialization_from_job(
+                        job=job,
+                        action=action,
+                        policy_payload=policy_payload,
+                    )
+                    if overridden_r4.get("_r4_0088_materialized") is True:
+                        annotated = overridden_r4
+                except Exception:
+                    pass
         if not annotated.get("_skip") and _dispatch_integration_gate_applies(job.tenant_id, db):
             spec = classify_action(annotated.get("type"))
             if spec is not None and spec.effect == ActionEffect.EXTERNAL_WRITE:
