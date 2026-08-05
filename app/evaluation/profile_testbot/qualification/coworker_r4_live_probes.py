@@ -36,7 +36,7 @@ def collect_r4_live_probes(
     recipient_email: str = "ni@sol-f.se",
 ) -> dict[str, Any]:
     """Run read-only live probes. Never sends mail or creates drafts."""
-    from app.db.session import SessionLocal
+    from app.repositories.postgres.database import SessionLocal
 
     blockers: list[str] = []
     config = get_live_eval_config()
