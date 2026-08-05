@@ -287,7 +287,7 @@ def run_r4_live_campaign(
     candidates_path: Path | None = None,
     manifest_path: Path | None = None,
     campaign_id: str | None = None,
-    recipient: str = "ni@sol-f.se",
+    recipient: str | None = None,
     live_executor: Callable[..., dict[str, Any]] | None = None,
     # Optional live probe results for full JIT
     tenant_intake_ready: bool | None = None,
@@ -302,6 +302,12 @@ def run_r4_live_campaign(
     status_dir = status_dir or Path("storage/status")
     generated_at = _utc_now()
     campaign_id = campaign_id or str(uuid.uuid4())
+    if not recipient:
+        from app.evaluation.live.config import get_live_eval_config
+
+        recipients = sorted(get_live_eval_config().recipient_emails)
+        recipient = recipients[0] if recipients else "niklas.palm@sol-f.se"
+    recipient = recipient.strip().lower()
 
     # Manifest: prefer locked file / rebuild bound to candidate SHA (never executor SHA as candidate).
     if manifest_path and Path(manifest_path).is_file():

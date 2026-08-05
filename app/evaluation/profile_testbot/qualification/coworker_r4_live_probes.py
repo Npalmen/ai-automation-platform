@@ -33,7 +33,7 @@ def collect_r4_live_probes(
     *,
     executor_runtime_sha: str,
     manifest: dict[str, Any],
-    recipient_email: str = "ni@sol-f.se",
+    recipient_email: str | None = None,
 ) -> dict[str, Any]:
     """Run read-only live probes. Never sends mail or creates drafts."""
     from app.repositories.postgres.database import SessionLocal
@@ -42,6 +42,8 @@ def collect_r4_live_probes(
     config = get_live_eval_config()
     senders = sorted(config.sender_emails)
     sender_email = senders[0] if senders else ""
+    recipients = sorted(config.recipient_emails)
+    resolved_recipient = (recipient_email or (recipients[0] if recipients else "")).strip().lower()
 
     base_url = (os.environ.get("LIVE_EVAL_APP_BASE_URL") or "http://127.0.0.1:8010").strip()
     admin_key = (os.environ.get("ADMIN_API_KEY") or "").strip()
@@ -61,16 +63,16 @@ def collect_r4_live_probes(
 
     sender_readiness = run_sender_readiness_read_only(
         expected_sender=sender_email,
-        expected_recipient=recipient_email,
+        expected_recipient=resolved_recipient,
         config=config,
     )
     recipient_readiness = run_recipient_gmail_readiness(
-        expected_recipient=recipient_email,
+        expected_recipient=resolved_recipient,
         config=config,
     )
     reply_provider = run_r3_live_reply_provider_readiness(
         tenant_id=LIVE_EVAL_TENANT_ID,
-        expected_recipient=recipient_email,
+        expected_recipient=resolved_recipient,
         expected_sender=sender_email,
     )
 
@@ -154,7 +156,7 @@ def collect_r4_live_probes(
 def probe_r4_mailbox_baseline(
     *,
     campaign_id: str,
-    recipient_email: str = "ni@sol-f.se",
+    recipient_email: str | None = None,
 ) -> dict[str, Any]:
     """Read-only mailbox scan for R4 baseline (no mutations)."""
     from app.evaluation.live.gmail_transport import (
@@ -165,6 +167,8 @@ def probe_r4_mailbox_baseline(
     config = get_live_eval_config()
     senders = sorted(config.sender_emails)
     sender_email = senders[0] if senders else None
+    recipients = sorted(config.recipient_emails)
+    recipient_email = (recipient_email or (recipients[0] if recipients else "")).strip().lower()
     r3_tokens: list[str] = []
     r4_tokens: list[str] = []
     r3_ids_redacted: list[str] = []
