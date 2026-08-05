@@ -859,3 +859,17 @@ Reference: `docs/plans/production-pilot-p1-observability-fix-plan.md`, `app/prod
 
 **Reference:** `docs/reply-quality/current-rendering-truth.md`, `app/workflows/reply_quality/`
 
+## DEC-051 — R3 PASS formalization and R4 live quality contract (2026-08-05)
+
+**Status:** Active — digital coworker reply quality chapter
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **R3 PASS is frozen-body canary only** | Qualifying SHA `5e9b1839d9a4ac5ac6aef1795d88a2eff5f06517`, campaign `54f2f10b-…`, 8/8 send + 7/7 no-send; attempts 1–7 excluded |
+| 2 | **R4 is a distinct campaign** | `coworker_r4_live_quality_campaign` / `r4_reviewed_live_candidate` / `live_llm` — never `r3_frozen_approved_body` |
+| 3 | **R3 0088 override is not generalized** | Complaint/risk in R4 follows ordinary policy unless a separate explicit R4 scenario contract is approved |
+| 4 | **R4 send path** | Constrained plan→render→validate→human review→SHA-bound execute approval; no post-bind re-render |
+| 5 | **Activation stays off** | Automatic Gmail false; production activation false; registry remains PENDING until R5 |
+
+**Reference:** `docs/reply-quality/r3-live-canary-result.md`, `app/evaluation/profile_testbot/qualification/coworker_r4_*.py`
+
