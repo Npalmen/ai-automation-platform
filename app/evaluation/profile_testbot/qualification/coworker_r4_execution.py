@@ -22,6 +22,9 @@ from app.evaluation.profile_testbot.qualification.coworker_r4_human_review impor
     validate_r4_human_review_bindings,
     write_r4_human_review_package,
 )
+from app.evaluation.profile_testbot.qualification.coworker_r4_live_backend import (
+    describe_r4_live_backend_wiring,
+)
 from app.evaluation.profile_testbot.qualification.coworker_r4_live_jit import (
     run_r4_full_live_jit,
 )
@@ -289,6 +292,7 @@ def run_r4_live_campaign(
     campaign_id: str | None = None,
     recipient: str | None = None,
     live_executor: Callable[..., dict[str, Any]] | None = None,
+    live_executor_factory: Callable[..., Callable[..., dict[str, Any]]] | None = None,
     # Optional live probe results for full JIT
     tenant_intake_ready: bool | None = None,
     sender_gmail_ready: bool | None = None,
@@ -396,6 +400,7 @@ def run_r4_live_campaign(
         "production_activation": False,
         "r3_hold_override_generalized": False,
         "ai_mode_registration": R4_EXECUTE_AI_MODE,
+        **describe_r4_live_backend_wiring(),
         "campaign_registration": build_r4_campaign_registration_payload(
             campaign_id=campaign_id,
             candidate_runtime_sha=candidate_runtime_sha,
@@ -558,6 +563,9 @@ def run_r4_live_campaign(
         return result
 
     approval = load_r4_approval_artifact(Path(approval_path))
+    from app.evaluation.live.config import get_live_eval_config
+
+    live_recipients = sorted(get_live_eval_config().recipient_emails)
     approval_validation = validate_r4_approval_artifact(
         approval,
         candidate_runtime_sha=candidate_runtime_sha,
@@ -569,14 +577,22 @@ def run_r4_live_campaign(
         human_review_sha256=compute_file_sha256(review_path),
         body_hashes=_body_hash_map(candidates),
         require_manual_approved=True,
+        expected_ai_mode=R4_EXECUTE_AI_MODE,
+        expected_recipient_allowlist=[recipient],
+        live_eval_recipient_allowlist=live_recipients,
+        expected_manifest_path=manifest_path,
+        expected_candidates_path=candidates_path,
+        expected_human_review_path=human_review_path,
     )
     result["approval_validation"] = approval_validation.to_dict()
+    result["approval_artifact_hash"] = approval.artifact_hash
     if not approval_validation.valid:
         result["overall_status"] = "STOPPED"
         result["stop_reason"] = {
             "approval_blockers": approval_validation.blockers,
         }
         result["failure_stage"] = "approval_validation"
+        result["backend_invoked"] = False
         paths = write_r4_execution_reports(
             result=result,
             manifest=manifest,
@@ -619,6 +635,7 @@ def run_r4_live_campaign(
             "binding_blockers": binding_blockers,
         }
         result["failure_stage"] = "full_live_jit"
+        result["backend_invoked"] = False
         paths = write_r4_execution_reports(
             result=result,
             manifest=manifest,
@@ -642,11 +659,41 @@ def run_r4_live_campaign(
         ),
     )
     result["mailbox_baseline"] = baseline
+    result["execute_gate_binding"] = {
+        "executor_runtime_sha": expected_executor_sha,
+        "campaign_id": campaign_id,
+        "approval_artifact_hash": approval.artifact_hash,
+        "manifest_semantic_hash": manifest.get("manifest_semantic_hash"),
+        "candidate_package_semantic_hash": candidates.get("candidate_package_semantic_hash"),
+        "human_review_sha256": compute_file_sha256(review_path),
+        "full_live_jit_passed": bool(jit.get("passed")),
+        "mailbox_baseline_passed": bool(baseline.get("passed")),
+    }
     if not baseline.get("passed"):
         result["overall_status"] = "STOPPED"
         result["stop_reason"] = baseline.get("blockers")
         result["failure_stage"] = "mailbox_baseline"
+        result["backend_invoked"] = False
         return result
+
+    # Wire live executor only after all gates PASS.
+    if live_executor is None and live_executor_factory is not None:
+        live_executor = live_executor_factory(
+            candidate_runtime_sha=candidate_runtime_sha,
+            executor_runtime_sha=expected_executor_sha,
+            campaign_id=campaign_id,
+            approval_artifact=approval,
+            manifest=manifest,
+            candidates=candidates,
+            human_review=human_review,
+            recipient=recipient,
+        )
+        result["live_executor_wired_after_gates"] = True
+    elif live_executor is not None:
+        result["live_executor_wired_after_gates"] = True
+    else:
+        result["live_executor_wired_after_gates"] = False
+    result["backend_invoked"] = live_executor is not None
 
     # Sequential campaign — fail closed. Without live_executor this stops before Gmail.
     outcomes: list[dict[str, Any]] = []
@@ -670,7 +717,7 @@ def run_r4_live_campaign(
             live_executor=live_executor,
         )
         outcomes.append(row)
-        if row.get("status") not in {"succeeded", "pass", "PASS"}:
+        if row.get("status") not in {"succeeded", "pass", "PASS", "passed"}:
             remaining = [
                 {
                     "scenario_id": sid,
@@ -717,7 +764,7 @@ def run_r4_live_campaign(
             live_executor=live_executor,
         )
         outcomes.append(row)
-        if row.get("status") not in {"succeeded", "pass", "PASS", "verified_no_send"}:
+        if row.get("status") not in {"succeeded", "pass", "PASS", "passed", "verified_no_send"}:
             remaining = [
                 {
                     "scenario_id": sid,

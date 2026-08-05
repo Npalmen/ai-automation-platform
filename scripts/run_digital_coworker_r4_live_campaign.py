@@ -13,6 +13,10 @@ sys.path.insert(0, str(ROOT))
 from app.evaluation.profile_testbot.qualification.coworker_r4_execution import (  # noqa: E402
     run_r4_live_campaign,
 )
+from app.evaluation.profile_testbot.qualification.coworker_r4_live_backend import (  # noqa: E402
+    build_r4_live_executor,
+    describe_r4_live_backend_wiring,
+)
 from app.evaluation.profile_testbot.qualification.coworker_r4_registry import (  # noqa: E402
     R4_LOCKED_CANDIDATE_RUNTIME_SHA,
     R4_PROFILE_ID,
@@ -58,6 +62,8 @@ def main() -> int:
         print("ERROR: --expected-executor-sha is required", file=sys.stderr)
         return 1
 
+    live_executor = None
+    live_executor_factory = None
     if args.execute:
         missing = []
         if not args.approval_file:
@@ -72,6 +78,8 @@ def main() -> int:
             print(f"ERROR: --execute requires {', '.join(missing)}", file=sys.stderr)
             return 1
         mode = "execute"
+        # Factory is invoked by the runner only after approval + full JIT + baseline PASS.
+        live_executor_factory = build_r4_live_executor
     elif args.full_jit:
         mode = "full_jit"
     elif args.mailbox_baseline:
@@ -79,6 +87,7 @@ def main() -> int:
     else:
         mode = "dry_run"
 
+    wiring = describe_r4_live_backend_wiring()
     result = run_r4_live_campaign(
         mode=mode,
         candidate_runtime_sha=args.candidate_runtime_sha.strip(),
@@ -90,12 +99,27 @@ def main() -> int:
         candidates_path=Path(args.candidates_json) if args.candidates_json else None,
         manifest_path=Path(args.manifest) if args.manifest else None,
         campaign_id=args.campaign_id.strip() or None,
+        live_executor=live_executor,
+        live_executor_factory=live_executor_factory,
     )
+    # Non-execute modes must never hold an active executor callback.
+    if mode != "execute":
+        result.setdefault("backend_wired", wiring["backend_wired"])
+        result.setdefault("execute_backend_type", wiring["execute_backend_type"])
+        result.setdefault("execute_callback_available", wiring["execute_callback_available"])
+        result["live_executor_injected"] = False
+    else:
+        result["live_executor_injected"] = bool(
+            result.get("live_executor_wired_after_gates")
+        )
     for path in (result.get("report_paths") or {}).values():
         print(f"wrote {path}")
     print(f"mode={result.get('mode')}")
     print(f"candidate_runtime_sha={result.get('candidate_runtime_sha')}")
     print(f"executor_runtime_sha={result.get('executor_runtime_sha')}")
+    print(f"backend_wired={result.get('backend_wired')}")
+    print(f"execute_backend_type={result.get('execute_backend_type')}")
+    print(f"execute_callback_available={result.get('execute_callback_available')}")
     print(f"overall_status={result.get('overall_status')}")
     if result.get("manual_execution_confirmation"):
         print(result["manual_execution_confirmation"])
