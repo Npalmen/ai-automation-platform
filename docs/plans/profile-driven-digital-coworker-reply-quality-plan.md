@@ -10,10 +10,11 @@ gates:
   R2_PRECHECK: FAIL
   R2_HUMAN_REVIEW: PENDING
   R3_LIVE_CANARY: PASS
+  R4_HUMAN_REVIEW: PASS
   R4_LIVE_CAMPAIGN: PENDING
   R5_CLOSURE: PENDING
 human_review_failure_sha: 8b167280e8190be0e79d6f127416a7819f84c4d7
-human_review_package_status: NON_QUALIFYING_DIAGNOSTIC_PACKAGE
+human_review_package_status: R4_SCORED_PASS_b7fd95e
 closure_branch: fix/digital-coworker-llm-reproducibility-and-precheck
 production_activation: false
 automatic_gmail_activation: false
