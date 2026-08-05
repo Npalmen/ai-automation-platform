@@ -312,6 +312,13 @@ def run_r4_live_campaign(
     # Manifest: prefer locked file / rebuild bound to candidate SHA (never executor SHA as candidate).
     if manifest_path and Path(manifest_path).is_file():
         manifest = _load_json(Path(manifest_path))
+        # Locked on-disk packages may omit semantic_payload; rehydrate when hash matches.
+        if not isinstance(manifest.get("semantic_payload"), dict):
+            rebuilt = build_r4_campaign_manifest(
+                runtime_sha=candidate_runtime_sha, profile_id=profile_id, seed=seed
+            )
+            if rebuilt.get("manifest_semantic_hash") == manifest.get("manifest_semantic_hash"):
+                manifest = {**manifest, "semantic_payload": rebuilt["semantic_payload"]}
     else:
         manifest = build_r4_campaign_manifest(
             runtime_sha=candidate_runtime_sha, profile_id=profile_id, seed=seed

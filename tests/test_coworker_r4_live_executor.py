@@ -216,6 +216,24 @@ def test_execute_never_regenerates_or_calls_llm(tmp_path, locked, monkeypatch):
     assert result["gmail_sends"] == 0
 
 
+def test_locked_manifest_rehydrates_semantic_payload(tmp_path, locked):
+    assert "semantic_payload" not in locked["manifest"] or not isinstance(
+        locked["manifest"].get("semantic_payload"), dict
+    )
+    result = run_r4_live_campaign(
+        mode="dry_run",
+        candidate_runtime_sha=R4_LOCKED_CANDIDATE_RUNTIME_SHA,
+        expected_executor_sha=EXECUTOR,
+        candidates_path=CAND,
+        human_review_path=REV,
+        manifest_path=MAN,
+        status_dir=tmp_path,
+    )
+    assert result["overall_status"] == "PASS"
+    assert result.get("manifest_blockers") == []
+    assert result["gmail_sends"] == 0
+
+
 def test_structural_dry_run_not_full_jit(tmp_path, locked):
     result = run_r4_live_campaign(
         mode="dry_run",
