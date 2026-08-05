@@ -225,3 +225,33 @@ class R3BindFrozenApprovalBodyResponse(BaseModel):
     bound: bool = True
     audit: R3FrozenBindAuditResponse
 
+
+class R4BindReviewedApprovalBodyRequest(BaseModel):
+    tenant_id: str
+    job_id: str
+    approval_id: str
+    scenario_id: str
+    reviewed_body: str
+    expected_body_hash: str
+    reviewed_snapshot: dict[str, Any] | None = None
+
+
+class R4ReviewedBindAuditResponse(BaseModel):
+    scenario_id: str
+    canonical_body_hash: str
+    body_source: str
+    bound_at: str
+    tenant_id: str
+    approval_id: str
+    job_id: str
+    r3_frozen_bind_reused: bool = False
+
+
+class R4BindReviewedApprovalBodyResponse(BaseModel):
+    approval_id: str
+    job_id: str
+    scenario_id: str
+    body_hash: str
+    bound: bool = True
+    audit: R4ReviewedBindAuditResponse
+

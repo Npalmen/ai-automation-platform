@@ -63,6 +63,9 @@ from app.evaluation.live.schemas import (
     R3BindFrozenApprovalBodyRequest,
     R3BindFrozenApprovalBodyResponse,
     R3FrozenBindAuditResponse,
+    R4BindReviewedApprovalBodyRequest,
+    R4BindReviewedApprovalBodyResponse,
+    R4ReviewedBindAuditResponse,
 )
 from app.evaluation.live.safety import (
     require_gmail_eval_enabled,
@@ -903,4 +906,55 @@ def bind_frozen_approval_body(
         body_hash=result.body_hash,
         bound=result.bound,
         audit=R3FrozenBindAuditResponse(**result.audit.to_dict()),
+    )
+
+
+@router.post("/r4/bind-reviewed-approval-body", response_model=R4BindReviewedApprovalBodyResponse)
+def bind_reviewed_approval_body(
+    body: R4BindReviewedApprovalBodyRequest,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin_api_key),
+):
+    import os
+
+    from app.evaluation.profile_testbot.qualification.coworker_r4_reviewed_bind import (
+        R4ReviewedBindError,
+        R4ReviewedBindRequest,
+        bind_reviewed_approval_body_record,
+    )
+
+    if os.environ.get("R4_REVIEWED_APPROVAL_BIND_ALLOWED", "").strip().lower() not in (
+        "yes",
+        "true",
+        "1",
+    ):
+        raise HTTPException(status_code=403, detail="R4 reviewed approval bind not allowed")
+    require_live_eval_enabled()
+    require_gmail_eval_enabled()
+    try:
+        require_tenant_allowed(body.tenant_id)
+    except LiveEvalSafetyError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        result = bind_reviewed_approval_body_record(
+            db,
+            R4ReviewedBindRequest(
+                tenant_id=body.tenant_id,
+                job_id=body.job_id,
+                approval_id=body.approval_id,
+                scenario_id=body.scenario_id,
+                reviewed_body=body.reviewed_body,
+                expected_body_hash=body.expected_body_hash,
+                reviewed_snapshot=body.reviewed_snapshot,
+            ),
+        )
+    except R4ReviewedBindError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    return R4BindReviewedApprovalBodyResponse(
+        approval_id=result.approval_id,
+        job_id=result.job_id,
+        scenario_id=result.scenario_id,
+        body_hash=result.body_hash,
+        bound=result.bound,
+        audit=R4ReviewedBindAuditResponse(**result.audit),
     )

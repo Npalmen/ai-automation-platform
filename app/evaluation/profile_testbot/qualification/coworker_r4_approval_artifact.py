@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,8 @@ _SECRET_MARKERS = (
     "Authorization",
     "Bearer ",
 )
+
+_APPROVED_AT_CLOCK_SKEW = timedelta(seconds=120)
 
 
 @dataclass
@@ -112,6 +115,30 @@ def build_r4_approval_artifact_example(
     }
 
 
+def _normalize_path(value: str | Path | None) -> str:
+    if value is None:
+        return ""
+    try:
+        return str(Path(value).resolve()).replace("\\", "/").lower()
+    except Exception:
+        return str(value).replace("\\", "/").lower()
+
+
+def _parse_approved_at(raw: Any) -> datetime | None:
+    if raw is None or raw == "":
+        return None
+    text = str(raw).strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 def validate_r4_approval_artifact(
     approval: R4ApprovalArtifact,
     *,
@@ -122,6 +149,13 @@ def validate_r4_approval_artifact(
     human_review_sha256: str,
     body_hashes: dict[str, str],
     require_manual_approved: bool = True,
+    expected_ai_mode: str = R4_EXECUTE_AI_MODE,
+    expected_recipient_allowlist: list[str] | None = None,
+    live_eval_recipient_allowlist: list[str] | None = None,
+    expected_manifest_path: str | Path | None = None,
+    expected_candidates_path: str | Path | None = None,
+    expected_human_review_path: str | Path | None = None,
+    now_utc: datetime | None = None,
 ) -> R4ApprovalValidation:
     blockers: list[str] = []
     p = approval.payload
@@ -131,6 +165,9 @@ def validate_r4_approval_artifact(
         blockers.append("manual_execution_approved_false")
     if p.get("unsigned_example") is True and require_manual_approved:
         blockers.append("unsigned_example_cannot_authorize_execute")
+    if require_manual_approved and "unsigned_example" in p and p.get("unsigned_example") is not False:
+        if p.get("unsigned_example") is not True:
+            blockers.append("unsigned_example_must_be_false_or_absent")
     if p.get("candidate_runtime_sha") != candidate_runtime_sha:
         blockers.append("candidate_runtime_sha_mismatch")
     if p.get("executor_runtime_sha") != executor_runtime_sha:
@@ -168,6 +205,47 @@ def validate_r4_approval_artifact(
         blockers.append("campaign_type_mismatch")
     if p.get("execution_mode") != R4_EXECUTION_MODE:
         blockers.append("execution_mode_mismatch")
+    if p.get("ai_mode") != expected_ai_mode:
+        blockers.append("ai_mode_mismatch")
+
+    allowlist = [str(x).strip().lower() for x in (p.get("recipient_allowlist") or [])]
+    expected_allow = [
+        str(x).strip().lower() for x in (expected_recipient_allowlist or allowlist)
+    ]
+    if expected_recipient_allowlist is not None and allowlist != expected_allow:
+        blockers.append("recipient_allowlist_mismatch")
+    if live_eval_recipient_allowlist is not None:
+        live_set = {str(x).strip().lower() for x in live_eval_recipient_allowlist}
+        if not allowlist:
+            blockers.append("recipient_allowlist_empty")
+        if any(r not in live_set for r in allowlist):
+            blockers.append("recipient_not_in_live_eval_allowlist")
+        if set(allowlist) - live_set:
+            blockers.append("extra_recipient_not_allowlisted")
+
+    if require_manual_approved:
+        approved_at = _parse_approved_at(p.get("approved_at"))
+        if approved_at is None:
+            blockers.append("approved_at_missing_or_invalid")
+        else:
+            now = now_utc or datetime.now(timezone.utc)
+            if approved_at > now + _APPROVED_AT_CLOCK_SKEW:
+                blockers.append("approved_at_in_future")
+
+    if expected_manifest_path is not None:
+        if _normalize_path(p.get("manifest_path")) != _normalize_path(expected_manifest_path):
+            blockers.append("manifest_path_mismatch")
+    if expected_candidates_path is not None:
+        if _normalize_path(p.get("candidate_package_path")) != _normalize_path(
+            expected_candidates_path
+        ):
+            blockers.append("candidate_package_path_mismatch")
+    if expected_human_review_path is not None:
+        if _normalize_path(p.get("human_review_path")) != _normalize_path(
+            expected_human_review_path
+        ):
+            blockers.append("human_review_path_mismatch")
+
     blob = json.dumps(p, ensure_ascii=False)
     if any(m in blob for m in _SECRET_MARKERS):
         blockers.append("secrets_exposed_in_approval_artifact")

@@ -420,7 +420,7 @@ def test_r3_override_not_used_for_r4_0088():
     assert not res.eligible
 
 
-def test_partial_campaign_marks_not_run(tmp_path, locked):
+def test_partial_campaign_marks_not_run(tmp_path, locked, monkeypatch):
     def failing_executor(**kwargs):
         return {
             "scenario_id": kwargs["scenario_id"],
@@ -433,21 +433,32 @@ def test_partial_campaign_marks_not_run(tmp_path, locked):
             "evaluation_run_id": kwargs.get("evaluation_run_id"),
         }
 
-    # Build a signed-looking approval that still fails unsigned_example / probes —
-    # instead inject live_executor after approval gate by calling stub path via
-    # missing approval → STOPPED. Use dry path for partial via execute with
-    # approval that passes validation is heavy; simulate via live_executor on
-    # execute after crafting valid approval without live probes → stops at JIT.
+    recipient = "niklas.palm@sol-f.se"
+    cfg = MagicMock()
+    cfg.sender_emails = {"qvarsken@gmail.com"}
+    cfg.recipient_emails = {recipient}
+    monkeypatch.setattr(
+        "app.evaluation.live.config.get_live_eval_config",
+        lambda: cfg,
+    )
+    monkeypatch.setattr(
+        "app.evaluation.profile_testbot.qualification.coworker_r4_execution.run_r4_full_live_jit",
+        lambda **kwargs: {"passed": True, "blockers": [], "full_live_jit": True},
+    )
+    monkeypatch.setattr(
+        "app.evaluation.profile_testbot.qualification.coworker_r4_execution.build_r4_mailbox_baseline",
+        lambda **kwargs: {"passed": True, "blockers": [], "mutations_performed": False},
+    )
     body_hashes = {
         c["scenario_id"]: c["body_hash"] for c in locked["candidates"]["send_candidates"]
     }
     example = build_r4_approval_artifact_example(
         executor_runtime_sha=EXECUTOR,
-        manifest_path=str(MAN),
-        candidate_package_path=str(CAND),
-        human_review_path=str(REV),
+        manifest_path=str(MAN.resolve()),
+        candidate_package_path=str(CAND.resolve()),
+        human_review_path=str(REV.resolve()),
         body_hashes=body_hashes,
-        recipient_allowlist=["ni@sol-f.se"],
+        recipient_allowlist=[recipient],
     )
     example["manual_execution_approved"] = True
     example.pop("unsigned_example", None)
@@ -464,6 +475,7 @@ def test_partial_campaign_marks_not_run(tmp_path, locked):
         manifest_path=MAN,
         approval_path=ap,
         status_dir=tmp_path,
+        recipient=recipient,
         live_executor=failing_executor,
         tenant_intake_ready=True,
         sender_gmail_ready=True,
