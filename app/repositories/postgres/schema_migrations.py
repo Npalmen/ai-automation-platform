@@ -480,6 +480,19 @@ _LIVE_EVAL_021_MIGRATION_STATEMENTS: list[str] = [
     "CREATE INDEX IF NOT EXISTS ix_live_eval_llm_operations_tenant ON live_eval_llm_operations (tenant_id, evaluation_run_id)",
 ]
 
+# Dual-path for migrations/026_live_eval_r4_registration_context.sql
+_LIVE_EVAL_026_MIGRATION_STATEMENTS: list[str] = [
+    "ALTER TABLE live_eval_runs ADD COLUMN IF NOT EXISTS campaign_type VARCHAR(128)",
+    "ALTER TABLE live_eval_runs ADD COLUMN IF NOT EXISTS execution_mode VARCHAR(64)",
+    "ALTER TABLE live_eval_runs ADD COLUMN IF NOT EXISTS manifest_hash VARCHAR(64)",
+    "ALTER TABLE live_eval_runs ADD COLUMN IF NOT EXISTS registration_context JSONB",
+    """
+    CREATE INDEX IF NOT EXISTS ix_live_eval_runs_campaign_type
+        ON live_eval_runs (campaign_type)
+        WHERE campaign_type IS NOT NULL
+    """,
+]
+
 _LIVE_EVAL_EVENTS_MIGRATION_STATEMENTS: list[str] = [
     """
     CREATE TABLE IF NOT EXISTS live_eval_external_events (
@@ -619,8 +632,12 @@ def ensure_runtime_schema(engine: Engine) -> None:
                 conn.execute(text(ddl))
                 log.debug("Live eval 021 migration OK")
 
+            for ddl in _LIVE_EVAL_026_MIGRATION_STATEMENTS:
+                conn.execute(text(ddl))
+                log.debug("Live eval 026 R4 registration context migration OK")
+
         log.info(
-            "Runtime schema safeguard complete (%d column(s), %d table/index statement(s), %d onboarding statement(s), %d slice2b statement(s), %d operator alerts statement(s), %d onboarding 2.0 statement(s), %d decision record statement(s), %d integration selection statement(s), %d live eval runs statement(s), %d live eval runs 019 statement(s), %d live eval events statement(s) checked)",
+            "Runtime schema safeguard complete (%d column(s), %d table/index statement(s), %d onboarding statement(s), %d slice2b statement(s), %d operator alerts statement(s), %d onboarding 2.0 statement(s), %d decision record statement(s), %d integration selection statement(s), %d live eval runs statement(s), %d live eval runs 019 statement(s), %d live eval events statement(s), %d live eval 026 R4 registration statement(s) checked)",
             len(_REQUIRED_COLUMNS),
             len(_REQUIRED_TABLES),
             len(_ONBOARDING_MIGRATION_STATEMENTS),
@@ -632,6 +649,7 @@ def ensure_runtime_schema(engine: Engine) -> None:
             len(_LIVE_EVAL_RUNS_MIGRATION_STATEMENTS),
             len(_LIVE_EVAL_RUNS_019_MIGRATION_STATEMENTS),
             len(_LIVE_EVAL_EVENTS_MIGRATION_STATEMENTS),
+            len(_LIVE_EVAL_026_MIGRATION_STATEMENTS),
         )
     except Exception as exc:
         log.error(
