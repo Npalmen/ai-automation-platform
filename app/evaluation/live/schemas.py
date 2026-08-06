@@ -7,6 +7,17 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from app.evaluation.profile_testbot.qualification.coworker_r4_registration_contract import (
+    R4RegistrationContext,
+)
+
+_AI_MODE_LITERAL = Literal[
+    "fixture_ai",
+    "live_llm",
+    "r3_frozen_approved_body",
+    "reviewed_live_llm_body",
+]
+
 
 class LiveEvalRunRegisterRequest(BaseModel):
     evaluation_run_id: str = Field(min_length=8, max_length=36)
@@ -14,7 +25,7 @@ class LiveEvalRunRegisterRequest(BaseModel):
     scenario_id: str
     attempt_id: int = Field(ge=1)
     transport_mode: Literal["live_gmail", "fixture_input"] = "live_gmail"
-    ai_mode: Literal["fixture_ai", "live_llm", "r3_frozen_approved_body"]
+    ai_mode: _AI_MODE_LITERAL
     campaign_type: str | None = None
     execution_mode: str | None = None
     campaign_id: str | None = None
@@ -24,6 +35,7 @@ class LiveEvalRunRegisterRequest(BaseModel):
     llm_provider: str | None = None
     llm_requested_model: str | None = None
     expires_at: datetime | None = None
+    registration_context: R4RegistrationContext | None = None
 
 
 class LiveEvalRunResponse(BaseModel):
@@ -44,6 +56,10 @@ class LiveEvalRunResponse(BaseModel):
     created_at: datetime
     expires_at: datetime
     config_hash: str
+    campaign_type: str | None = None
+    execution_mode: str | None = None
+    manifest_hash: str | None = None
+    registration_context: dict[str, Any] | None = None
 
 
 class LiveEvalRunStatusRequest(BaseModel):
@@ -78,6 +94,10 @@ class TrustedLiveEvalSnapshot(BaseModel):
     llm_max_calls: int | None = None
     config_hash: str
     trusted: bool = True
+    campaign_type: str | None = None
+    execution_mode: str | None = None
+    manifest_hash: str | None = None
+    registration_context: dict[str, Any] | None = None
 
 
 class LiveEvalReport(BaseModel):

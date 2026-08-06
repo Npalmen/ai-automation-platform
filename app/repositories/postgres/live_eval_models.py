@@ -37,6 +37,10 @@ class LiveEvalRunRow(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     config_hash = Column(String(64), nullable=False)
+    campaign_type = Column(String(128), nullable=True)
+    execution_mode = Column(String(64), nullable=True)
+    manifest_hash = Column(String(64), nullable=True)
+    registration_context = Column(JSON, nullable=True)
 
 
 class LiveEvalExternalEventRow(Base):

@@ -57,6 +57,9 @@ def register_live_eval_run(
         campaign_type=request.campaign_type,
         execution_mode=request.execution_mode,
         manifest_hash=request.manifest_hash,
+        campaign_id=request.campaign_id,
+        evaluation_run_id=request.evaluation_run_id,
+        registration_context=request.registration_context,
     )
     from app.evaluation.live.safety import validate_live_gmail_registration
 
@@ -76,6 +79,15 @@ def register_live_eval_run(
     llm_requested_model: str | None = None
     llm_max_calls: int | None = None
     config = get_live_eval_config()
+    registration_context_payload: dict | None = None
+    if request.registration_context is not None:
+        from app.evaluation.profile_testbot.qualification.coworker_r4_registration_contract import (
+            r4_registration_context_for_config_hash,
+        )
+
+        registration_context_payload = r4_registration_context_for_config_hash(
+            request.registration_context
+        )
     if request.transport_mode == "live_gmail":
         expected_sender = request.expected_sender.strip().lower()
         expected_recipient = request.expected_recipient.strip().lower()
@@ -108,6 +120,10 @@ def register_live_eval_run(
         "llm_requested_model": llm_requested_model,
         "llm_max_calls": llm_max_calls,
         "expires_at": expires_at.isoformat(),
+        "campaign_type": request.campaign_type,
+        "execution_mode": request.execution_mode,
+        "manifest_hash": request.manifest_hash,
+        "registration_context": registration_context_payload,
     }
     row = LiveEvalRunRow(
         evaluation_run_id=request.evaluation_run_id,
@@ -126,6 +142,10 @@ def register_live_eval_run(
         created_by=created_by,
         expires_at=expires_at,
         config_hash=_compute_config_hash(config_payload),
+        campaign_type=request.campaign_type,
+        execution_mode=request.execution_mode,
+        manifest_hash=request.manifest_hash,
+        registration_context=registration_context_payload,
     )
     try:
         LiveEvalRunRepository.register_run(db, row)
@@ -170,6 +190,10 @@ def _row_to_response(row: LiveEvalRunRow) -> LiveEvalRunResponse:
         "created_at": row.created_at,
         "expires_at": row.expires_at,
         "config_hash": row.config_hash,
+        "campaign_type": getattr(row, "campaign_type", None),
+        "execution_mode": getattr(row, "execution_mode", None),
+        "manifest_hash": getattr(row, "manifest_hash", None),
+        "registration_context": getattr(row, "registration_context", None),
     }
     return LiveEvalRunResponse.model_validate(payload)
 
@@ -343,6 +367,10 @@ def trusted_snapshot_from_row(row: LiveEvalRunRow) -> TrustedLiveEvalSnapshot:
         llm_max_calls=row.llm_max_calls,
         config_hash=row.config_hash,
         trusted=True,
+        campaign_type=getattr(row, "campaign_type", None),
+        execution_mode=getattr(row, "execution_mode", None),
+        manifest_hash=getattr(row, "manifest_hash", None),
+        registration_context=getattr(row, "registration_context", None),
     )
 
 

@@ -24,7 +24,17 @@ ALLOWED_RUN_TRANSITIONS: dict[str, frozenset[str]] = {
 }
 
 ALLOWED_TRANSPORT_MODES = frozenset({"live_gmail", "fixture_input"})
-ALLOWED_AI_MODES = frozenset({"fixture_ai", "live_llm", "r3_frozen_approved_body"})
+
+# Keep string aligned with coworker_r4_registry.R4_EXECUTE_AI_MODE / REVIEWED_LIVE_LLM_BODY.
+REVIEWED_LIVE_LLM_BODY = "reviewed_live_llm_body"
+ALLOWED_AI_MODES = frozenset(
+    {
+        "fixture_ai",
+        "live_llm",
+        "r3_frozen_approved_body",
+        REVIEWED_LIVE_LLM_BODY,
+    }
+)
 
 ALLOWED_2F3_SCENARIOS = frozenset({"S01_lead_laddbox_quality"})
 

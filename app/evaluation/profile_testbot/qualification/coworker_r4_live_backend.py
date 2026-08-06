@@ -562,7 +562,22 @@ def _send_with_existing_run_id(
         "manifest_hash": backend.registration_manifest_hash,
         "expected_sender": backend.sender_email,
         "expected_recipient": backend.recipient_email,
-        "r4_reviewed_body_snapshot": snapshot.to_dict(),
+        "registration_context": {
+            "candidate_runtime_sha": snapshot.candidate_runtime_sha,
+            "executor_runtime_sha": snapshot.executor_runtime_sha,
+            "candidate_package_semantic_hash": snapshot.candidate_package_semantic_hash,
+            "human_review_sha256": snapshot.human_review_artifact_hash,
+            "planned_gmail_send": True,
+            "plan_hash": snapshot.plan_hash,
+            "reviewed_body_hash": snapshot.reviewed_body_hash,
+            "review_status": snapshot.review_status,
+            "renderer_type": snapshot.renderer_type,
+            "model_id": snapshot.model_id,
+            "prompt_version": snapshot.prompt_version,
+            "automatic_gmail": False,
+            "production_activation": False,
+            "probe": False,
+        },
     }
     backend.observer.register_run(register_payload)
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -49,6 +50,9 @@ def validate_registration_request(
     campaign_type: str | None = None,
     execution_mode: str | None = None,
     manifest_hash: str | None = None,
+    campaign_id: str | None = None,
+    evaluation_run_id: str | None = None,
+    registration_context: Any = None,
     config: LiveEvalConfig | None = None,
 ) -> LiveEvalConfig:
     config = require_tenant_allowed(tenant_id, config)
@@ -66,6 +70,32 @@ def validate_registration_request(
         R3RegistrationContractRequest,
         require_r3_registration_contract,
     )
+    from app.evaluation.profile_testbot.qualification.coworker_r4_registration_contract import (
+        R4RegistrationContractRequest,
+        REVIEWED_LIVE_LLM_BODY,
+        require_r4_registration_contract,
+    )
+
+    if transport_mode == "live_gmail" and ai_mode == REVIEWED_LIVE_LLM_BODY:
+        require_r4_registration_contract(
+            R4RegistrationContractRequest(
+                tenant_id=tenant_id,
+                scenario_id=scenario_id,
+                transport_mode=transport_mode,
+                ai_mode=ai_mode,
+                campaign_type=campaign_type,
+                execution_mode=execution_mode,
+                expected_sender=expected_sender,
+                expected_recipient=expected_recipient,
+                manifest_hash=manifest_hash,
+                campaign_id=campaign_id,
+                evaluation_run_id=evaluation_run_id,
+                registration_context=registration_context,
+                sender_allowlist=config.sender_emails,
+                recipient_allowlist=config.recipient_emails,
+            )
+        )
+        return config
 
     if transport_mode == "live_gmail" and ai_mode == "r3_frozen_approved_body":
         require_r3_registration_contract(
@@ -335,6 +365,27 @@ def validate_live_gmail_registration(
     from app.evaluation.profile_testbot.qualification.coworker_r3_registration_contract import (
         is_r3_frozen_live_canary_scenario,
     )
+    from app.evaluation.profile_testbot.qualification.coworker_r4_registration_contract import (
+        REVIEWED_LIVE_LLM_BODY,
+        is_r4_registry_scenario,
+    )
+    from app.evaluation.profile_testbot.qualification.coworker_r4_registry import (
+        R4_LIVE_QUALITY_CAMPAIGN_TYPE as _R4_CT,
+    )
+
+    # R4 branch must run before overlapping R3 scenario force-path.
+    if ai_mode == REVIEWED_LIVE_LLM_BODY or campaign_type == _R4_CT:
+        if ai_mode != REVIEWED_LIVE_LLM_BODY:
+            raise LiveEvalSafetyError(
+                "R4 reviewed-live requires ai_mode reviewed_live_llm_body"
+            )
+        if campaign_type and campaign_type != _R4_CT:
+            raise LiveEvalSafetyError(
+                "R4 reviewed-live requires campaign_type coworker_r4_live_quality_campaign"
+            )
+        if not is_r4_registry_scenario(scenario_id):
+            raise LiveEvalSafetyError(f"scenario_id {scenario_id!r} not in R4 registry")
+        return
 
     if is_r3_frozen_live_canary_scenario(scenario_id):
         if ai_mode != "r3_frozen_approved_body":
@@ -418,11 +469,30 @@ def validate_live_gmail_run_for_mutation(
     if row.tenant_id != tenant_id:
         raise LiveEvalSafetyError("run tenant mismatch")
 
-    from app.evaluation.live.delivery_mailbox_reader import is_r3_frozen_live_eval_run
+    from app.evaluation.live.delivery_mailbox_reader import (
+        is_r3_frozen_live_eval_run,
+        is_r4_reviewed_live_eval_run,
+    )
     from app.evaluation.profile_testbot.qualification.coworker_r3_mutation_contract import (
         R3_MUTATION_PROCESS_DELIVERY,
         validate_r3_frozen_live_run_contract,
     )
+    from app.evaluation.profile_testbot.qualification.coworker_r4_mutation_contract import (
+        R4_MUTATION_PROCESS_DELIVERY,
+        validate_r4_mutation_operation_for_row,
+    )
+
+    if is_r4_reviewed_live_eval_run(row):
+        operation = mutation_operation or R4_MUTATION_PROCESS_DELIVERY
+        result = validate_r4_mutation_operation_for_row(
+            row,
+            tenant_id=tenant_id,
+            operation=operation,
+            recipient_message_id=recipient_message_id,
+        )
+        if not result.allowed:
+            raise LiveEvalSafetyError("; ".join(result.blockers))
+        return
 
     if is_r3_frozen_live_eval_run(row):
         operation = mutation_operation or R3_MUTATION_PROCESS_DELIVERY
