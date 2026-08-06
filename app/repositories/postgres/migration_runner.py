@@ -27,6 +27,7 @@ ORDERED_MIGRATION_FILES: tuple[str, ...] = (
     "023_end_customer_idempotency.sql",
     "024_end_customer_shadow_ledger.sql",
     "025_production_pilot_message_reviews.sql",
+    "026_live_eval_r4_registration_context.sql",
 )
 
 MIGRATIONS_THROUGH_014: tuple[str, ...] = ORDERED_MIGRATION_FILES[:6]
