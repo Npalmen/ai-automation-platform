@@ -33,7 +33,8 @@ ORDERED_MIGRATION_FILES: tuple[str, ...] = (
 MIGRATIONS_THROUGH_014: tuple[str, ...] = ORDERED_MIGRATION_FILES[:6]
 MIGRATIONS_THROUGH_015: tuple[str, ...] = ORDERED_MIGRATION_FILES[:7]
 MIGRATIONS_THROUGH_019: tuple[str, ...] = ORDERED_MIGRATION_FILES[:10]
-LATEST_MIGRATION_VERSION = "025"
+MIGRATIONS_THROUGH_025: tuple[str, ...] = ORDERED_MIGRATION_FILES[:-1]
+LATEST_MIGRATION_VERSION = "026"
 
 # Tables created exclusively by migrations/009-015 SQL files (not create_tables.py baseline).
 MIGRATION_OWNED_TABLES: frozenset[str] = frozenset(
@@ -85,11 +86,19 @@ _CI_REQUIRED_TABLES: tuple[str, ...] = (
 _CI_REQUIRED_INDEXES: tuple[tuple[str, str], ...] = (
     ("live_eval_runs", "ix_live_eval_runs_tenant_status"),
     ("live_eval_runs", "ix_live_eval_runs_expires_at"),
+    ("live_eval_runs", "ix_live_eval_runs_campaign_type"),
     ("live_eval_external_events", "ix_live_eval_external_events_run"),
     ("live_eval_external_events", "uq_live_eval_external_events_operation_succeeded"),
     ("live_eval_llm_operations", "uq_live_eval_llm_operations_operation_key"),
     ("live_eval_llm_operations", "uq_live_eval_llm_operations_run_prompt"),
     ("live_eval_llm_operations", "uq_live_eval_llm_operations_run_ordinal"),
+)
+
+_CI_REQUIRED_026_COLUMNS: tuple[str, ...] = (
+    "campaign_type",
+    "execution_mode",
+    "manifest_hash",
+    "registration_context",
 )
 
 _CI_REQUIRED_CONSTRAINTS: tuple[tuple[str, str], ...] = (
@@ -219,6 +228,15 @@ def read_migration_state(engine: Engine) -> dict[str, object]:
         raise RuntimeError(
             "Migration state incomplete — end_customers.version missing (022)"
         )
+    for column_name in _CI_REQUIRED_026_COLUMNS:
+        if not column_exists(engine, "live_eval_runs", column_name):
+            raise RuntimeError(
+                f"Migration state incomplete — live_eval_runs.{column_name} missing (026)"
+            )
+    if "ix_live_eval_runs_campaign_type" not in _index_names(engine, "live_eval_runs"):
+        raise RuntimeError(
+            "Migration state incomplete — ix_live_eval_runs_campaign_type missing (026)"
+        )
     return {
         "latest_version": LATEST_MIGRATION_VERSION,
         "latest_file": ORDERED_MIGRATION_FILES[-1],
@@ -251,12 +269,19 @@ def verify_ci_postgres_schema_provisioned(engine: Engine) -> dict[str, object]:
             "PostgreSQL schema is not provisioned for integration_db tests. "
             "Missing table live_eval_llm_operations (migration 021)."
         )
+    for column_name in _CI_REQUIRED_026_COLUMNS:
+        if not column_exists(engine, "live_eval_runs", column_name):
+            raise RuntimeError(
+                "PostgreSQL schema is not provisioned for integration_db tests. "
+                f"Missing column live_eval_runs.{column_name} (migration 026)."
+            )
 
     for table_name, index_name in _CI_REQUIRED_INDEXES:
         if index_name not in _index_names(engine, table_name):
+            migration_hint = " (migration 026)." if index_name == "ix_live_eval_runs_campaign_type" else "."
             raise RuntimeError(
                 f"PostgreSQL schema is not provisioned for integration_db tests. "
-                f"Missing index {index_name} on {table_name}."
+                f"Missing index {index_name} on {table_name}{migration_hint}"
             )
 
     for table_name, constraint_name in _CI_REQUIRED_CONSTRAINTS:
