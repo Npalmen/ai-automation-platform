@@ -110,8 +110,8 @@ def process_gmail_message_by_id(
             return {
                 "status": "failed",
                 "message_id": message_id,
-                "reason": "R3 intake requires live_eval_recipient_env",
-                "safety_reason": "R3 intake requires live_eval_recipient_env",
+                "reason": "reviewed-live intake requires live_eval_recipient_env",
+                "safety_reason": "reviewed-live intake requires live_eval_recipient_env",
             }
         if not mailbox_resolution.ready or mailbox_resolution.reader is None:
             blockers = "; ".join(mailbox_resolution.blockers or ["mailbox reader not ready"])

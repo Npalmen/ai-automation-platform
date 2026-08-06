@@ -25,6 +25,8 @@ CREDENTIAL_SOURCE_LIVE_EVAL_RECIPIENT_ENV = "live_eval_recipient_env"
 CREDENTIAL_SOURCE_TENANT_GOOGLE_MAIL = "tenant_google_mail_integration"
 # Must match coworker_r3_registration_contract.R3_FROZEN_EXECUTION_MODE (avoid circular import).
 _R3_FROZEN_EXECUTION_MODE = "r3_frozen_approved_body"
+# Must match coworker_r4_registry.R4_EXECUTE_AI_MODE / live.constants.REVIEWED_LIVE_LLM_BODY.
+_R4_REVIEWED_LIVE_AI_MODE = "reviewed_live_llm_body"
 
 
 class DeliveryMailboxReader(Protocol):
@@ -128,6 +130,21 @@ def is_r3_frozen_live_eval_run(row: LiveEvalRunRow) -> bool:
     )
 
 
+def is_r4_reviewed_live_eval_run(row: LiveEvalRunRow) -> bool:
+    return (
+        row.tenant_id == LIVE_EVAL_TENANT_ID
+        and row.transport_mode == "live_gmail"
+        and row.ai_mode == _R4_REVIEWED_LIVE_AI_MODE
+        and getattr(row, "campaign_type", None) == "coworker_r4_live_quality_campaign"
+        and getattr(row, "execution_mode", None) == "r4_reviewed_live_candidate"
+    )
+
+
+def is_reviewed_live_eval_run(row: LiveEvalRunRow) -> bool:
+    """R3 frozen reviewed run or R4 reviewed-live run."""
+    return is_r3_frozen_live_eval_run(row) or is_r4_reviewed_live_eval_run(row)
+
+
 def resolve_r3_recipient_delivery_reader(
     *,
     config: LiveEvalConfig | None = None,
@@ -178,14 +195,17 @@ def resolve_delivery_mailbox_reader(
 ) -> DeliveryMailboxReaderResolution:
     """Resolve the mailbox reader used for delivery observation on a run."""
     config = config or get_live_eval_config()
-    if is_r3_frozen_live_eval_run(row):
+    if is_reviewed_live_eval_run(row):
         resolution = resolve_r3_recipient_delivery_reader(
             config=config,
             credentials=credentials,
             expected_recipient=row.expected_recipient,
         )
         if resolution.credential_source != CREDENTIAL_SOURCE_LIVE_EVAL_RECIPIENT_ENV:
-            resolution.blockers.append("R3 run requires live_eval_recipient_env credential source")
+            label = "R4" if is_r4_reviewed_live_eval_run(row) else "R3"
+            resolution.blockers.append(
+                f"{label} run requires live_eval_recipient_env credential source"
+            )
             resolution.source_allowed = False
         return resolution
 

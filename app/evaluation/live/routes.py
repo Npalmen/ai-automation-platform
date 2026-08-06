@@ -518,7 +518,7 @@ def process_live_eval_delivery(
         )
 
     from app.evaluation.live.delivery_mailbox_reader import (
-        is_r3_frozen_live_eval_run,
+        is_reviewed_live_eval_run,
         resolve_delivery_mailbox_reader,
         resolve_intake_label_id_from_reader,
     )
@@ -547,13 +547,13 @@ def process_live_eval_delivery(
         ) from exc
 
     config = get_live_eval_config()
-    r3_run = is_r3_frozen_live_eval_run(row)
+    reviewed_run = is_reviewed_live_eval_run(row)
     mailbox_resolution = None
-    if r3_run:
+    if reviewed_run:
         mailbox_resolution = resolve_delivery_mailbox_reader(db=db, row=row, config=config)
         if not mailbox_resolution.ready or mailbox_resolution.reader is None:
             raise _safety_http_exception(
-                "; ".join(mailbox_resolution.blockers or ["R3 mailbox reader not ready"]),
+                "; ".join(mailbox_resolution.blockers or ["reviewed-live mailbox reader not ready"]),
                 evaluation_run_id=evaluation_run_id,
                 scenario_id=row.scenario_id,
                 attempt_id=row.attempt_id,
@@ -605,7 +605,7 @@ def process_live_eval_delivery(
         live_eval_run_id=evaluation_run_id,
         skip_slack_notify=True,
         mailbox_resolution=mailbox_resolution,
-        skip_gmail_post_pipeline=r3_run,
+        skip_gmail_post_pipeline=reviewed_run,
     )
     record_pipeline_execution_build_sha()
     if intake_result.get("status") == "failed":
@@ -821,6 +821,40 @@ def tenant_intake_readiness(
     payload = report.to_dict()
     payload["tenant_id"] = tenant_id
     return payload
+
+
+@router.get("/r4-registration-readiness")
+def r4_registration_readiness(
+    _admin=Depends(require_admin_api_key),
+):
+    """Write-free R4 registration readiness (no DB run, no Gmail)."""
+    require_live_eval_enabled()
+    from app.evaluation.live.pipeline_runtime import resolve_api_build_git_sha
+    from app.evaluation.profile_testbot.qualification.coworker_r4_registration_readiness import (
+        evaluate_r4_registration_readiness,
+    )
+
+    return evaluate_r4_registration_readiness(
+        executor_runtime_sha=resolve_api_build_git_sha() or "unknown",
+    )
+
+
+@router.post("/r4-registration-probe")
+def r4_registration_probe(
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin_api_key),
+):
+    """DB-only registration round-trip probe; aborts immediately; zero Gmail writes."""
+    require_live_eval_enabled()
+    from app.evaluation.live.pipeline_runtime import resolve_api_build_git_sha
+    from app.evaluation.profile_testbot.qualification.coworker_r4_registration_readiness import (
+        run_r4_registration_db_probe,
+    )
+
+    return run_r4_registration_db_probe(
+        db,
+        executor_runtime_sha=resolve_api_build_git_sha() or "unknown",
+    )
 
 
 @router.post("/runs/{evaluation_run_id}/status", response_model=LiveEvalRunResponse)
