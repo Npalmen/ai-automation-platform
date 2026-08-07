@@ -20,7 +20,7 @@
     "tests/evaluation/profile_testbot/test_readiness.py::test_sender_recipient_overlap_with_p1_fails": "SAME_FAILURE_ON_BASE",
     "tests/test_digital_coworker_natural_language.py::TestGoldenReplies::test_ptb_dcq_0002_fully_english": "SAME_FAILURE_ON_BASE",
     "tests/test_integration_selection_migration_016.py::test_postgres_migration_016_table_when_database_available": "SAME_FAILURE_ON_BASE",
-    "tests/test_schema_migrations.py::TestEnsureRuntimeSchemaHappyPath::test_executes_alter_for_each_required_column": "SAME_FAILURE_ON_BASE"
+    "tests/test_schema_migrations.py::TestEnsureRuntimeSchemaHappyPath::test_executes_alter_for_each_required_column": "SAME_FAILURE_ON_BASE_FIXED_IN_PR_MIGRATION_026_COUNT"
   },
   "pr_regressions": [],
   "classification": "all_7_baseline_pre_existing_local_env"
