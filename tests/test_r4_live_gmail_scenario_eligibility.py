@@ -8,7 +8,6 @@ import pytest
 
 from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.live.safety import (
-    require_scenario_allowed_for_live_gmail,
     validate_live_gmail_registration,
     validate_registration_request,
 )
@@ -139,8 +138,13 @@ def test_d3_negative_mutations(r4_env):
         validate_live_gmail_registration(**{**base, "tenant_id": "T_OTHER"})
     with pytest.raises(LiveEvalSafetyError):
         validate_live_gmail_registration(**{**base, "execution_mode": "wrong_mode"})
-    with pytest.raises(LiveEvalSafetyError, match="2F.2 or campaign"):
-        require_scenario_allowed_for_live_gmail("PTB-DCQ-0002")
+    with pytest.raises(LiveEvalSafetyError, match="complete registration context"):
+        validate_live_gmail_registration(
+            transport_mode="live_gmail",
+            scenario_id="PTB-DCQ-0002",
+            ai_mode=REVIEWED_LIVE_LLM_BODY,
+            campaign_type=R4_LIVE_QUALITY_CAMPAIGN_TYPE,
+        )
     with pytest.raises(LiveEvalSafetyError):
         validate_registration_request(
             tenant_id="T_OTHER",
@@ -156,6 +160,8 @@ def test_d3_negative_mutations(r4_env):
 
 
 def test_d4_legacy_2f2_and_r3_unchanged(r4_env, monkeypatch):
+    from app.evaluation.live.safety import require_scenario_allowed_for_live_gmail
+
     monkeypatch.setenv("FULL_SYSTEM_TESTBOT_CAMPAIGN_ALLOWED", "yes")
     require_scenario_allowed_for_live_gmail("S01_lead_laddbox_quality")
     from app.evaluation.profile_testbot.qualification.coworker_r3_registration_contract import (
@@ -176,8 +182,13 @@ def test_d5_ptb_sem_0024_eligibility_without_legacy_gate(r4_env):
     assert PTB_SEM_0024 in R4_NO_SEND_SCENARIO_IDS
     assert PTB_SEM_0024 in R4_LOCAL_QUARANTINE_SCENARIO_IDS
     validate_live_gmail_registration(**_r4_gmail_kwargs(PTB_SEM_0024))
-    with pytest.raises(LiveEvalSafetyError):
-        require_scenario_allowed_for_live_gmail(PTB_SEM_0024)
+    with pytest.raises(LiveEvalSafetyError, match="complete registration context"):
+        validate_live_gmail_registration(
+            transport_mode="live_gmail",
+            scenario_id=PTB_SEM_0024,
+            ai_mode=REVIEWED_LIVE_LLM_BODY,
+            campaign_type=R4_LIVE_QUALITY_CAMPAIGN_TYPE,
+        )
 
 
 def test_d6_pr174_exact_payload_invariants(r4_env):
