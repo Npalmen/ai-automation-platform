@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from app.evaluation.profile_testbot.qualification.coworker_r4_approval_artifact import (
     compute_file_sha256,
@@ -24,6 +25,10 @@ from app.evaluation.profile_testbot.qualification.coworker_r4_live_probes import
 from app.evaluation.profile_testbot.qualification.coworker_r4_mutation_contract import (
     validate_r4_mutation_operation,
     R4_MUTATION_PROCESS_DELIVERY,
+)
+from app.evaluation.profile_testbot.qualification.coworker_r4_registration_payload import (
+    evaluate_exact_r4_registration_payload_matrix,
+    r4_registration_campaign_bindings,
 )
 from app.evaluation.profile_testbot.qualification.coworker_r4_readiness import (
     evaluate_coworker_r4_readiness,
@@ -99,6 +104,31 @@ def run_r4_full_live_jit(
     if review_sha != R4_LOCKED_REVIEW_ARTIFACT_SHA256:
         blockers.append("review_artifact_sha256_mismatch")
 
+    from app.evaluation.live.config import get_live_eval_config
+
+    live_cfg = get_live_eval_config()
+    probe_senders = sorted(live_cfg.sender_emails)
+    probe_sender = probe_senders[0] if probe_senders else ""
+    exact_matrix = evaluate_exact_r4_registration_payload_matrix(
+        bindings=r4_registration_campaign_bindings(
+            campaign_id=f"r4-jit-exact-payload-{uuid4()}",
+            candidate_runtime_sha=candidate_runtime_sha,
+            executor_runtime_sha=executor_runtime_sha,
+            expected_sender=probe_sender,
+            expected_recipient=recipient_email.strip().lower(),
+            manifest_semantic_hash=str(manifest.get("manifest_semantic_hash") or ""),
+            candidate_package_semantic_hash=str(
+                candidates.get("candidate_package_semantic_hash") or ""
+            ),
+        ),
+        candidates=candidates,
+        human_review=human_review,
+        config=live_cfg,
+    )
+    if not exact_matrix.get("passed"):
+        blockers.append("exact_registration_payload_not_ready")
+        blockers.extend(exact_matrix.get("blockers") or [])
+
     if run_live_probes and auto_collect_live_probes and not _any_probe_kwarg_set(
         tenant_intake_ready=tenant_intake_ready,
         sender_gmail_ready=sender_gmail_ready,
@@ -115,6 +145,9 @@ def run_r4_full_live_jit(
         probe_bundle = collect_r4_live_probes(
             executor_runtime_sha=executor_runtime_sha,
             manifest=manifest,
+            candidates=candidates,
+            human_review=human_review,
+            campaign_id=f"r4-full-jit-{uuid4()}",
             recipient_email=recipient_email,
         )
         api_build_git_sha = probe_bundle.get("api_build_git_sha")
@@ -269,6 +302,14 @@ def run_r4_full_live_jit(
         "constrained_llm_provenance": f"{prov_ok}/20",
         "no_send_ready": f"{no_send}/16",
         "human_review_complete": bindings.get("human_review_complete"),
+        "exact_registration_payload_ready": exact_matrix.get("exact_registration_payload_ready"),
+        "exact_send_registration_payload_ready": exact_matrix.get(
+            "exact_send_registration_payload_ready"
+        ),
+        "exact_no_send_registration_payload_ready": exact_matrix.get(
+            "exact_no_send_registration_payload_ready"
+        ),
+        "exact_registration_payload_matrix": exact_matrix,
         "structural_readiness": structural,
         "gmail_sends": 0,
         "gmail_drafts": 0,

@@ -1,0 +1,74 @@
+{
+  "generated_at": "2026-08-07T17:30:00Z",
+  "report_type": "r4_attempt5_registration_forensic",
+  "executor_runtime_sha": "08e19967666b204b7280dde0378c1988e2cca174",
+  "candidate_runtime_sha": "b7fd95e075c16feee93a116a6062e402c1fee3df",
+  "attempt_number": 5,
+  "campaign_id": "af0c2de2-eebe-486e-bb67-3414ac59d1b9",
+  "overall_status": "stopped_fail_closed",
+  "defects": [
+    {
+      "id": "defect_1",
+      "title": "Scenario registration divergence (0000 PASS, 0002 400)",
+      "evidence": {
+        "passed_scenario": "PTB-DCQ-0000",
+        "failed_scenario": "PTB-DCQ-0002",
+        "failure_stage": "inbound_trigger_send",
+        "api_status": 400,
+        "api_detail": "expected_sender not in sender allowlist; registration_context missing"
+      },
+      "root_cause": "Execute path built hand-rolled register payloads per scenario without a single authoritative builder; scenario 0002 registration diverged before Gmail trigger."
+    },
+    {
+      "id": "defect_2",
+      "title": "Readiness used sample registration contexts",
+      "evidence": {
+        "readiness_function": "evaluate_r4_registration_readiness",
+        "sample_contexts": true,
+        "exact_execute_payload_validation": false
+      },
+      "root_cause": "JIT/readiness validated placeholder registration_context samples, not exact execute payloads bound to locked candidate/review hashes."
+    },
+    {
+      "id": "defect_3",
+      "title": "No-send path used fake snapshot with planned_gmail_send=true",
+      "evidence": {
+        "path": "_execute_no_send via _send_with_existing_run_id",
+        "planned_gmail_send_bug": true
+      },
+      "root_cause": "No-send registration reused send helper with fabricated snapshot and planned_gmail_send=true, violating registry contract."
+    }
+  ],
+  "attempt5_outcome": {
+    "scenarios_passed": 1,
+    "scenarios_failed": 1,
+    "scenarios_not_run": 34,
+    "thread_evidence_fix_verified_on_ptb_dcq_0000": true,
+    "failure_classification": "RUN_REGISTRATION_400"
+  },
+  "remediation": {
+    "authoritative_builder": "coworker_r4_registration_payload.py",
+    "exact_payload_matrix": "evaluate_exact_r4_registration_payload_matrix",
+    "no_send_fix": "_register_r4_live_run(planned_gmail_send=false) + inbound trigger helper",
+    "gates_preserved": {
+      "R3_LIVE_CANARY": "PASS",
+      "R4_HUMAN_REVIEW": "PASS",
+      "R4_LIVE_CAMPAIGN": "PENDING",
+      "R5_CLOSURE": "PENDING"
+    }
+  },
+  "quarantine": {
+    "attempt5_orphan_group": "orphaned_r4_attempt_5",
+    "resume_forbidden": true,
+    "retry_forbidden": true,
+    "prior_attempts_quarantined": [
+      "fb36fd42-ce05-492e-8227-f1aad537868b",
+      "4d836572-9c27-4eac-9892-a3693801d334",
+      "32c6ed26-d030-441a-af52-5b186fae1107",
+      "99fa0b7f-1a6b-45aa-bec9-07f54f845de3",
+      "af0c2de2-eebe-486e-bb67-3414ac59d1b9"
+    ]
+  },
+  "execute_not_run_in_remediation": true,
+  "gmail_writes_in_remediation": 0
+}

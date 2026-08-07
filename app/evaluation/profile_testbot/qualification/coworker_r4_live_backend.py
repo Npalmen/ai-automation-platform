@@ -27,6 +27,13 @@ from app.evaluation.profile_testbot.qualification.coworker_r4_registry import (
     R4_SEND_SCENARIO_IDS,
     resolve_r4_scenarios,
 )
+from app.evaluation.profile_testbot.qualification.coworker_r4_registration_payload import (
+    R4RegistrationCampaignBindings,
+    build_r4_live_eval_register_request,
+    r4_registration_campaign_bindings,
+    send_registration_fields_from_snapshot,
+    validate_exact_r4_registration_payload,
+)
 from app.evaluation.profile_testbot.qualification.coworker_r4_reviewed_snapshot import (
     R4ReviewedBodySnapshot,
 )
@@ -200,11 +207,23 @@ def build_r4_live_executor(
     review_by_id = {r.get("scenario_id"): r for r in (human_review.get("reviews") or [])}
     claimed_ops: set[str] = set()
     send_budget_remaining = 20
+    campaign_bindings = r4_registration_campaign_bindings(
+        campaign_id=campaign_id,
+        candidate_runtime_sha=candidate_runtime_sha,
+        executor_runtime_sha=executor_runtime_sha,
+        expected_sender=backend.sender_email,
+        expected_recipient=resolved_recipient,
+        manifest_semantic_hash=str(manifest.get("manifest_semantic_hash") or ""),
+        candidate_package_semantic_hash=str(
+            candidates.get("candidate_package_semantic_hash") or ""
+        ),
+    )
     state = {
         "approval_artifact_hash": approval_artifact.artifact_hash,
         "candidate_runtime_sha": candidate_runtime_sha,
         "executor_runtime_sha": executor_runtime_sha,
         "campaign_id": campaign_id,
+        "campaign_bindings": campaign_bindings,
     }
 
     def _executor(**kwargs: Any) -> dict[str, Any]:
@@ -217,6 +236,7 @@ def build_r4_live_executor(
                 scenario=scenario_by_id[scenario_id],
                 evaluation_run_id=str(kwargs.get("evaluation_run_id") or uuid.uuid4()),
                 campaign_id=campaign_id,
+                campaign_bindings=campaign_bindings,
             )
         snapshot: R4ReviewedBodySnapshot = kwargs["snapshot"]
         candidate = kwargs.get("candidate") or cand_by_id[scenario_id]
@@ -339,6 +359,7 @@ def _execute_send(
             idempotency_key=idempotency_key,
             evaluation_run_id=evaluation_run_id,
             snapshot=snapshot,
+            campaign_bindings=state["campaign_bindings"],
         )
     except Exception as exc:
         return {
@@ -522,66 +543,18 @@ def _execute_send(
     return base
 
 
-def _send_with_existing_run_id(
+def _send_inbound_trigger_for_scenario(
     backend: LiveSemiAutoBackend,
     *,
     campaign_id: str,
     scenario: ProfileScenario,
-    idempotency_key: str,
     evaluation_run_id: str,
-    snapshot: R4ReviewedBodySnapshot,
+    ctx: Any,
 ) -> Any:
     from app.evaluation.live.gmail_transport import send_scenario_email
-    from app.evaluation.live.errors import LiveEvalSafetyError
-    from app.evaluation.profile_testbot.campaign.mailbox_readiness import mailbox_hash
-    from app.evaluation.profile_testbot.campaign.semi_auto_contract import TestSendResult
     from app.evaluation.profile_testbot.campaign.send_payload import (
         build_profile_testbot_message_body,
     )
-
-    if backend.tenant_id != LIVE_EVAL_TENANT_ID:
-        raise LiveEvalSafetyError(f"cross-tenant send blocked: {backend.tenant_id}")
-    if idempotency_key in backend.sent_keys:
-        raise LiveEvalSafetyError(f"duplicate test send for idempotency_key={idempotency_key}")
-    recipient = backend.recipient_email.strip().lower()
-    if not recipient:
-        raise LiveEvalSafetyError("recipient mailbox missing")
-
-    ctx = backend.runs[scenario.scenario_id]
-    ctx.evaluation_run_id = evaluation_run_id
-    backend.sent_keys.add(idempotency_key)
-
-    register_payload: dict[str, Any] = {
-        "evaluation_run_id": evaluation_run_id,
-        "tenant_id": backend.tenant_id,
-        "scenario_id": scenario.scenario_id,
-        "attempt_id": ctx.attempt_id,
-        "transport_mode": "live_gmail",
-        "ai_mode": backend.registration_ai_mode,
-        "campaign_type": backend.registration_campaign_type,
-        "execution_mode": backend.registration_execution_mode,
-        "campaign_id": campaign_id,
-        "manifest_hash": backend.registration_manifest_hash,
-        "expected_sender": backend.sender_email,
-        "expected_recipient": backend.recipient_email,
-        "registration_context": {
-            "candidate_runtime_sha": snapshot.candidate_runtime_sha,
-            "executor_runtime_sha": snapshot.executor_runtime_sha,
-            "candidate_package_semantic_hash": snapshot.candidate_package_semantic_hash,
-            "human_review_sha256": snapshot.human_review_artifact_hash,
-            "planned_gmail_send": True,
-            "plan_hash": snapshot.plan_hash,
-            "reviewed_body_hash": snapshot.reviewed_body_hash,
-            "review_status": snapshot.review_status,
-            "renderer_type": snapshot.renderer_type,
-            "model_id": snapshot.model_id,
-            "prompt_version": snapshot.prompt_version,
-            "automatic_gmail": False,
-            "production_activation": False,
-            "probe": False,
-        },
-    }
-    backend.observer.register_run(register_payload)
 
     body = build_profile_testbot_message_body(
         scenario=scenario,
@@ -601,6 +574,81 @@ def _send_with_existing_run_id(
     ctx.send_outcome = outcome
     ctx.inbound_provider_message_id = outcome.sender_gmail_message_id
     ctx.inbound_rfc_message_id = outcome.rfc_message_id
+    return outcome
+
+
+def _register_r4_live_run(
+    backend: LiveSemiAutoBackend,
+    *,
+    campaign_bindings: R4RegistrationCampaignBindings,
+    scenario: ProfileScenario,
+    evaluation_run_id: str,
+    attempt_id: int,
+    planned_gmail_send: bool,
+    snapshot: R4ReviewedBodySnapshot | None = None,
+) -> None:
+    send_fields = (
+        send_registration_fields_from_snapshot(snapshot) if planned_gmail_send and snapshot else None
+    )
+    request = build_r4_live_eval_register_request(
+        campaign_bindings,
+        scenario_id=scenario.scenario_id,
+        evaluation_run_id=evaluation_run_id,
+        attempt_id=attempt_id,
+        planned_gmail_send=planned_gmail_send,
+        send_fields=send_fields,
+    )
+    validation = validate_exact_r4_registration_payload(request, config=backend.config)
+    if not validation["passed"]:
+        raise LiveEvalSafetyError(
+            "; ".join(validation.get("registration_blockers") or ["registration_payload_invalid"])
+        )
+    backend.observer.register_run(request.model_dump(mode="json"))
+
+
+def _send_with_existing_run_id(
+    backend: LiveSemiAutoBackend,
+    *,
+    campaign_id: str,
+    scenario: ProfileScenario,
+    idempotency_key: str,
+    evaluation_run_id: str,
+    snapshot: R4ReviewedBodySnapshot,
+    campaign_bindings: R4RegistrationCampaignBindings,
+) -> Any:
+    from app.evaluation.live.errors import LiveEvalSafetyError
+    from app.evaluation.profile_testbot.campaign.mailbox_readiness import mailbox_hash
+    from app.evaluation.profile_testbot.campaign.semi_auto_contract import TestSendResult
+
+    if backend.tenant_id != LIVE_EVAL_TENANT_ID:
+        raise LiveEvalSafetyError(f"cross-tenant send blocked: {backend.tenant_id}")
+    if idempotency_key in backend.sent_keys:
+        raise LiveEvalSafetyError(f"duplicate test send for idempotency_key={idempotency_key}")
+    recipient = backend.recipient_email.strip().lower()
+    if not recipient:
+        raise LiveEvalSafetyError("recipient mailbox missing")
+
+    ctx = backend.runs[scenario.scenario_id]
+    ctx.evaluation_run_id = evaluation_run_id
+    backend.sent_keys.add(idempotency_key)
+
+    _register_r4_live_run(
+        backend,
+        campaign_bindings=campaign_bindings,
+        scenario=scenario,
+        evaluation_run_id=evaluation_run_id,
+        attempt_id=ctx.attempt_id,
+        planned_gmail_send=True,
+        snapshot=snapshot,
+    )
+
+    outcome = _send_inbound_trigger_for_scenario(
+        backend,
+        campaign_id=campaign_id,
+        scenario=scenario,
+        evaluation_run_id=evaluation_run_id,
+        ctx=ctx,
+    )
     return TestSendResult(
         accepted=True,
         provider_message_id=outcome.sender_gmail_message_id,
@@ -617,6 +665,7 @@ def _execute_no_send(
     scenario: ProfileScenario,
     evaluation_run_id: str,
     campaign_id: str,
+    campaign_bindings: R4RegistrationCampaignBindings,
 ) -> dict[str, Any]:
     expected = str(scenario.expected_send_behavior or "no_reply")
     # No-send scenarios still may process inbound for reject/hold policy, but never reply/draft.
@@ -660,32 +709,24 @@ def _execute_no_send(
         backend.runs[scenario.scenario_id] = _ScenarioRunContext(
             evaluation_run_id=evaluation_run_id
         )
-        _send_with_existing_run_id(
+        ctx = backend.runs[scenario.scenario_id]
+        if idempotency_key in backend.sent_keys:
+            raise LiveEvalSafetyError(f"duplicate test send for idempotency_key={idempotency_key}")
+        backend.sent_keys.add(idempotency_key)
+        _register_r4_live_run(
+            backend,
+            campaign_bindings=campaign_bindings,
+            scenario=scenario,
+            evaluation_run_id=evaluation_run_id,
+            attempt_id=ctx.attempt_id,
+            planned_gmail_send=False,
+        )
+        _send_inbound_trigger_for_scenario(
             backend,
             campaign_id=campaign_id,
             scenario=scenario,
-            idempotency_key=idempotency_key,
             evaluation_run_id=evaluation_run_id,
-            snapshot=R4ReviewedBodySnapshot(
-                campaign_type=R4_LIVE_QUALITY_CAMPAIGN_TYPE,
-                execution_mode=R4_EXECUTION_MODE,
-                scenario_id=scenario.scenario_id,
-                candidate_runtime_sha="",
-                executor_runtime_sha="",
-                manifest_semantic_hash="",
-                candidate_package_semantic_hash="",
-                human_review_artifact_hash="",
-                plan_hash="",
-                reviewed_body="",
-                reviewed_body_hash="",
-                review_status="N/A",
-                renderer_type="none",
-                model_id=None,
-                prompt_version=None,
-                recipient=backend.recipient_email,
-                campaign_id=campaign_id,
-                evaluation_run_id=evaluation_run_id,
-            ),
+            ctx=ctx,
         )
         intake = backend.observe_intake(
             scenario_id=scenario.scenario_id, campaign_id=campaign_id
