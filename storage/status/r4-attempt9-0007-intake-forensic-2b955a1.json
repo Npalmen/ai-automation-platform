@@ -1,0 +1,59 @@
+{
+  "generated_at": "2026-08-07T20:15:00Z",
+  "attempt_number": 9,
+  "campaign_id": "8e0fa53a-868f-454f-b40f-2a41f94b2efe",
+  "failed_scenario": "PTB-DCQ-0007",
+  "failure_stage": "intake_observation",
+  "failure_reason": "intake_skipped: partnership_disabled",
+  "evaluation_run_id": "1e768ca6-18c6-420a-b2b2-51b3e45b58dc",
+  "executor_runtime_sha": "2b955a1b9db6d38460dae881e4211cbe014fe775",
+  "candidate_runtime_sha": "b7fd95e075c16feee93a116a6062e402c1fee3df",
+  "root_cause": "live_eval_transport_false_positive",
+  "first_breakpoint": "gmail_intake.classify_email_type on raw subject+body before enabled_job_types gate",
+  "classification_branch": "partnership keyword 'b2b' matched as substring inside evaluation_run_id UUID segment b2b2",
+  "scenario_semantic_contract": {
+    "family": "solar_installation_new",
+    "subject": "Solceller fortsättning",
+    "message": "Hej igen, följer upp vår förfrågan om solceller.",
+    "service_type": "solar_installation",
+    "business_intent": "lead",
+    "thread_state": "continuation",
+    "expected_send_behavior": "send_after_approval"
+  },
+  "comparison_attempt9_successful_send": {
+    "PTB-DCQ-0000": {
+      "evaluation_run_id": "ec87b983-4ebc-4905-8e28-cf85b5ae8ed1",
+      "contains_b2b_substring": false,
+      "raw_classify": "lead",
+      "intake_proceeds_after_fix": true
+    },
+    "PTB-DCQ-0002": {
+      "evaluation_run_id": "949d4753-341d-4342-96d6-eceb4261bc79",
+      "contains_b2b_substring": false,
+      "raw_classify": "lead",
+      "intake_proceeds_after_fix": true
+    },
+    "PTB-DCQ-0005": {
+      "evaluation_run_id": "765c567a-e509-4140-a48b-85c2424e96a2",
+      "contains_b2b_substring": false,
+      "raw_classify": "lead",
+      "intake_proceeds_after_fix": true
+    },
+    "PTB-DCQ-0007": {
+      "evaluation_run_id": "1e768ca6-18c6-420a-b2b2-51b3e45b58dc",
+      "contains_b2b_substring": true,
+      "raw_classify": "partnership",
+      "intake_proceeds_before_fix": false,
+      "intake_proceeds_after_fix": true
+    }
+  },
+  "evidence": {
+    "partnership_keyword_matched": "b2b",
+    "matched_in": "KROWOLF-EVAL subject token evaluation_run_id UUID",
+    "semantic_content_classifies_as": "lead",
+    "tenant_enabled_job_types": ["lead", "customer_inquiry", "invoice"],
+    "stale_thread_correlation": false
+  },
+  "fix_scope": "strip live-eval transport metadata before production intake classification in gmail_intake",
+  "partnership_disabled_not_legitimate_for_0007": true
+}
