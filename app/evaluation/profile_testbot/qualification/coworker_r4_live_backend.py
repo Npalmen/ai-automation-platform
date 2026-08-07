@@ -712,6 +712,7 @@ def _execute_no_send(
             return result
 
     idempotency_key = f"{campaign_id}:{scenario.scenario_id}:r4-nosend"
+    gmail_sends_before = backend.gmail_sends
     try:
         from app.evaluation.profile_testbot.campaign.semi_auto_live_backend import (
             _ScenarioRunContext,
@@ -749,6 +750,7 @@ def _execute_no_send(
                 apply_r4_expected_intake_suppression_result,
                 parse_intake_skip_reason_from_error,
                 resolve_r4_no_send_intake_suppression,
+                scenario_local_gmail_sends,
             )
 
             skip_reason = parse_intake_skip_reason_from_error(exc)
@@ -760,7 +762,10 @@ def _execute_no_send(
                     inbound_delivery_observed=True,
                     job_id=getattr(ctx, "job_id", None),
                     approval_count=0,
-                    gmail_sends=backend.gmail_sends,
+                    gmail_sends=scenario_local_gmail_sends(
+                        campaign_gmail_sends_before=gmail_sends_before,
+                        campaign_gmail_sends_after=backend.gmail_sends,
+                    ),
                     gmail_drafts=0,
                     external_executions=0,
                     provider_accepted=False,

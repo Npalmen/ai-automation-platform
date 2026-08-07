@@ -1,0 +1,29 @@
+{
+  "generated_at": "2026-08-07T21:30:00Z",
+  "attempt_number": 10,
+  "campaign_id": "87bb6153-8358-4758-8f64-bac153763170",
+  "executor_runtime_sha": "6465938ac459459a09e6d64c6e6bd70ac7efdabe",
+  "candidate_runtime_sha": "b7fd95e075c16feee93a116a6062e402c1fee3df",
+  "failed_scenario": "PTB-SEM-0023",
+  "failure_stage": "no_send_verification",
+  "surface_failure_reason": "intake_skipped: newsletter_disabled",
+  "root_cause": "campaign_cumulative_gmail_send_counter_used_as_scenario_local_counter",
+  "first_breakpoint": "coworker_r4_live_backend._execute_no_send passed backend.gmail_sends (campaign total) to resolve_r4_no_send_intake_suppression instead of scenario-local delta",
+  "data_flow": [
+    "20/20 R4 send scenarios each increment LiveSemiAutoBackend.gmail_sends via verify_reply",
+    "After send phase backend.gmail_sends == 20 (correct campaign total)",
+    "PTB-SEM-0023 enters _execute_no_send; intake correctly suppresses with newsletter_disabled",
+    "Suppression verifier received gmail_sends=20 (campaign cumulative)",
+    "resolve_r4_no_send_intake_suppression interpreted 20 > 0 as gmail_send_observed",
+    "Expected suppression PASS rejected despite zero scenario-local Gmail side effects"
+  ],
+  "ptb_sem_0023_scenario_local_gmail_sends": 0,
+  "campaign_gmail_sends_before_0023": 20,
+  "campaign_gmail_sends_after_0023": 20,
+  "send_path_evidence": {
+    "send_passed": "20/20",
+    "ptb_dcq_0007_passed": true,
+    "ptb_dcq_0088_lifecycle_passed": true
+  },
+  "fix_scope": "scenario_local_gmail_sends delta at _execute_no_send entry; resolver safety unchanged"
+}
