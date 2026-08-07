@@ -87,6 +87,24 @@ def _operation_records(
     ]
 
 
+def _reply_provider_message_id_from_observation(
+    observation: dict[str, Any],
+    *,
+    action_operation_id: str | None = None,
+) -> str | None:
+    outcome = extract_provider_execution_outcome(observation)
+    if outcome is not None:
+        return outcome.provider_message_id
+    for row in _operation_records(observation, action_operation_id=action_operation_id):
+        if str(row.get("record_type") or "") != "execution_outcome":
+            continue
+        metadata = row.get("metadata") or {}
+        provider_id = str(metadata.get("provider_message_id") or "").strip()
+        if provider_id:
+            return provider_id
+    return None
+
+
 def classify_reply_execution_status(
     observation: dict[str, Any],
     *,
@@ -102,7 +120,10 @@ def classify_reply_execution_status(
             continue
         status = str(row.get("execution_status") or "").strip().lower()
         if status in TERMINAL_SUCCESS_STATUSES:
-            return "succeeded"
+            metadata = row.get("metadata") or {}
+            if str(metadata.get("provider_message_id") or "").strip():
+                return "succeeded"
+            return "outcome_unknown"
         if status in TERMINAL_FAILURE_STATUSES:
             return "skipped" if status == "skipped" else "failed"
         if status in OUTCOME_UNKNOWN_STATUSES:
@@ -119,7 +140,9 @@ def classify_reply_execution_status(
             if terminal:
                 latest = terminal[-1]
                 if latest.status in {"executed", "succeeded"}:
-                    return "succeeded"
+                    if (latest.external_id or "").strip():
+                        return "succeeded"
+                    return "pending"
                 if latest.status == "skipped":
                     return "skipped"
                 return "failed"
@@ -174,6 +197,10 @@ def build_reply_execution_evidence(
     if status == "succeeded" and not provider_outcome:
         provider_outcome = "executed"
 
+    if status == "succeeded" and not reply_provider_message_id:
+        status = "outcome_unknown"
+        provider_outcome = provider_outcome or "reconciliation_required"
+
     evidence = ReplyExecutionEvidence(
         inbound_provider_message_id=inbound_provider_message_id,
         inbound_rfc_message_id=inbound_rfc_message_id,
@@ -185,6 +212,8 @@ def build_reply_execution_evidence(
     )
     if status == "succeeded":
         assert_reply_evidence_invariants(evidence)
+    elif status == "outcome_unknown":
+        pass
     elif inbound_provider_message_id and reply_provider_message_id:
         if inbound_provider_message_id == reply_provider_message_id:
             raise LiveEvalSafetyError(

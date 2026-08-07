@@ -501,6 +501,99 @@ class TestReplyExecutionEvidence:
         assert evidence.reply_provider_message_id == "reply-1"
         assert provider_accepted(evidence)
 
+    def test_classify_executed_without_external_id_stays_pending(self):
+        observation: dict = {"job": {"decision_records": [], "result": {}}}
+        status = classify_reply_execution_status(
+            observation,
+            job_actions=[
+                JobActionExecutionSnapshot(
+                    action_type="send_customer_auto_reply",
+                    status="executed",
+                    external_id=None,
+                )
+            ],
+        )
+        assert status == "pending"
+
+    def test_classify_execution_outcome_succeeded_without_provider_id_is_outcome_unknown(self):
+        observation = {
+            "job": {
+                "decision_records": [
+                    {
+                        "record_type": "execution_outcome",
+                        "execution_status": "succeeded",
+                        "metadata": {
+                            "adapter_provider": "internal_stub",
+                            "adapter_status": "executed",
+                        },
+                    }
+                ],
+                "result": {},
+            },
+            "events": [],
+        }
+        assert classify_reply_execution_status(observation) == "outcome_unknown"
+        evidence = build_reply_execution_evidence(
+            observation=observation,
+            action_operation_id="op-1",
+            inbound_provider_message_id="inbound-1",
+            inbound_rfc_message_id="<inbound@test>",
+        )
+        assert evidence.reply_execution_status == "outcome_unknown"
+        assert evidence.reply_provider_message_id is None
+
+    def test_classify_succeeded_requires_external_id_on_job_action(self):
+        observation: dict = {"job": {"decision_records": [], "result": {}}}
+        status = classify_reply_execution_status(
+            observation,
+            job_actions=[
+                JobActionExecutionSnapshot(
+                    action_type="send_customer_auto_reply",
+                    status="executed",
+                    external_id="gmail-msg-99",
+                )
+            ],
+        )
+        assert status == "succeeded"
+
+    def test_late_provider_id_within_poll_succeeds(self):
+        calls = {"n": 0}
+
+        def fetch_observation() -> dict:
+            calls["n"] += 1
+            if calls["n"] < 2:
+                return {"job": {"decision_records": [], "result": {}}}
+            return {
+                "job": {
+                    "decision_records": [
+                        {
+                            "record_type": "execution_outcome",
+                            "execution_status": "succeeded",
+                            "metadata": {
+                                "provider_message_id": "reply-late",
+                                "adapter_provider": "google_mail",
+                                "adapter_status": "executed",
+                                "adapter_recipient": "sender@test",
+                            },
+                        }
+                    ],
+                    "result": {},
+                },
+                "events": [],
+            }
+
+        evidence = poll_post_approval_reply_execution(
+            fetch_observation,
+            None,
+            action_operation_id="op-1",
+            inbound_provider_message_id="inbound-1",
+            inbound_rfc_message_id="<in@test>",
+            timeout_seconds=5.0,
+            poll_interval_seconds=0.01,
+        )
+        assert evidence.reply_execution_status == "succeeded"
+        assert evidence.reply_provider_message_id == "reply-late"
+
 
 class TestPostApprovalStateMachine:
     def test_happy_path_created_to_verified(self):
