@@ -33,6 +33,9 @@ from app.evaluation.profile_testbot.qualification.coworker_r4_registration_contr
     REVIEWED_LIVE_LLM_BODY as R4_AI_MODE,
     validate_r4_registration_contract,
 )
+from app.evaluation.profile_testbot.qualification.coworker_r4_live_intake_compatibility import (
+    evaluate_r4_live_intake_compatibility_matrix,
+)
 from app.evaluation.profile_testbot.qualification.coworker_r4_live_gmail_eligibility import (
     evaluate_r4_live_gmail_scenario_eligibility_matrix,
 )
@@ -246,12 +249,18 @@ def evaluate_r4_registration_readiness(
     if not eligibility_ready:
         blockers.extend([f"eligibility:{b}" for b in (eligibility_matrix.get("blockers") or [])[:8]])
 
+    intake_matrix = evaluate_r4_live_intake_compatibility_matrix()
+    intake_ready = bool(intake_matrix.get("passed"))
+    if not intake_ready:
+        blockers.extend([f"intake:{b}" for b in (intake_matrix.get("blockers") or [])[:8]])
+
     sample_passed = (
         send_ready == 20
         and no_send_ready == 16
         and mutation_ready == 36
         and ai_mode_schema_supported
         and eligibility_ready
+        and intake_ready
         and not blockers
     )
 
@@ -312,6 +321,9 @@ def evaluate_r4_registration_readiness(
             "r4_local_quarantine_scenario_eligibility"
         ),
         "live_gmail_scenario_eligibility_matrix": eligibility_matrix,
+        "r4_live_intake_compatibility": intake_matrix.get("r4_live_intake_compatibility"),
+        "live_intake_compatibility_matrix": intake_matrix,
+        "intake_compatibility_ready": intake_ready,
         "exact_send_registration_payload_ready": (
             exact_matrix.get("exact_send_registration_payload_ready") if exact_matrix else "skipped"
         ),

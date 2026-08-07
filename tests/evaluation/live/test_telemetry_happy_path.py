@@ -172,8 +172,8 @@ def test_intake_success_records_started_and_succeeded_telemetry(db, live_eval_en
         "app.evaluation.live.gmail_intake.get_tenant_config",
         return_value={"enabled_job_types": ["lead"]},
     ), patch(
-        "app.evaluation.live.gmail_intake.classify_email_type",
-        return_value="lead",
+        "app.evaluation.live.gmail_intake.evaluate_gmail_intake_classification_gate",
+        return_value={"proceeds": True, "inferred_type": "lead", "skip_reason": None},
     ), patch(
         "app.evaluation.live.gmail_intake.resolve_trusted_live_eval_from_message",
         return_value=_snapshot_for(run_id),
@@ -239,8 +239,8 @@ def test_intake_failure_records_failed_telemetry_without_masking_error(db, live_
         "app.evaluation.live.gmail_intake.get_tenant_config",
         return_value={"enabled_job_types": ["lead"]},
     ), patch(
-        "app.evaluation.live.gmail_intake.classify_email_type",
-        return_value="lead",
+        "app.evaluation.live.gmail_intake.evaluate_gmail_intake_classification_gate",
+        return_value={"proceeds": True, "inferred_type": "lead", "skip_reason": None},
     ), patch(
         "app.evaluation.live.gmail_intake.resolve_trusted_live_eval_from_message",
         return_value=_snapshot_for(run_id),

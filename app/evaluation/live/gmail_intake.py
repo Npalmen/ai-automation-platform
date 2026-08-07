@@ -30,7 +30,7 @@ from app.workflows.action_executor import execute_action as dispatch_action
 from app.workflows.intake_enforcement import evaluate_intake_gate
 from app.workflows.manual_review_handoff import post_pipeline_gmail_message_outcome
 from app.workflows.pipeline_runner import run_pipeline
-from app.workflows.processors.classification_processor import classify_email_type
+from app.evaluation.live.intake_classification_input import evaluate_gmail_intake_classification_gate
 from app.core.config import get_tenant_config
 
 _INFERRED_TYPE_TO_JOB_TYPE = {
@@ -239,12 +239,17 @@ def process_gmail_message_by_id(
     tenant_config = get_tenant_config(tenant_id, db=db)
     enabled_job_types = set(tenant_config.get("enabled_job_types") or [])
 
-    inferred_type = classify_email_type(subject, body_text)
-    if inferred_type not in enabled_job_types:
+    intake_gate_result = evaluate_gmail_intake_classification_gate(
+        subject,
+        body_text,
+        enabled_job_types=frozenset(enabled_job_types),
+    )
+    inferred_type = str(intake_gate_result["inferred_type"])
+    if not intake_gate_result["proceeds"]:
         return {
             "status": "skipped",
             "message_id": message_id,
-            "reason": f"{inferred_type}_disabled",
+            "reason": intake_gate_result["skip_reason"],
         }
 
     job_type = _INFERRED_TYPE_TO_JOB_TYPE[inferred_type]

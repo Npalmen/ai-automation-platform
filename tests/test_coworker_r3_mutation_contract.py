@@ -307,8 +307,12 @@ def test_process_gmail_message_by_id_uses_injected_reader(db, monkeypatch):
         MagicMock(side_effect=AssertionError("tenant GOOGLE_MAIL must not be used")),
     )
     monkeypatch.setattr(
-        "app.evaluation.live.gmail_intake.classify_email_type",
-        lambda subject, body: "customer_inquiry",
+        "app.evaluation.live.gmail_intake.evaluate_gmail_intake_classification_gate",
+        lambda subject, body, **kwargs: {
+            "proceeds": True,
+            "inferred_type": "customer_inquiry",
+            "skip_reason": None,
+        },
     )
     result = process_gmail_message_by_id(
         db,
@@ -350,8 +354,12 @@ def test_process_gmail_message_by_id_normal_tenant_path_unchanged(db, monkeypatc
         lambda *args, **kwargs: (R3_RECIPIENT, None),
     )
     monkeypatch.setattr(
-        "app.evaluation.live.gmail_intake.classify_email_type",
-        lambda subject, body: "customer_inquiry",
+        "app.evaluation.live.gmail_intake.evaluate_gmail_intake_classification_gate",
+        lambda subject, body, **kwargs: {
+            "proceeds": True,
+            "inferred_type": "customer_inquiry",
+            "skip_reason": None,
+        },
     )
     result = process_gmail_message_by_id(
         db,
