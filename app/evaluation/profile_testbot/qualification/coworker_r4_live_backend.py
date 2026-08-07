@@ -739,9 +739,39 @@ def _execute_no_send(
             evaluation_run_id=evaluation_run_id,
             ctx=ctx,
         )
-        intake = backend.observe_intake(
-            scenario_id=scenario.scenario_id, campaign_id=campaign_id
-        )
+        result["inbound_trigger_sent"] = True
+        try:
+            intake = backend.observe_intake(
+                scenario_id=scenario.scenario_id, campaign_id=campaign_id
+            )
+        except LiveEvalSafetyError as exc:
+            from app.evaluation.profile_testbot.qualification.coworker_r4_no_send_intake_suppression import (
+                apply_r4_expected_intake_suppression_result,
+                parse_intake_skip_reason_from_error,
+                resolve_r4_no_send_intake_suppression,
+            )
+
+            skip_reason = parse_intake_skip_reason_from_error(exc)
+            if skip_reason is not None:
+                resolution = resolve_r4_no_send_intake_suppression(
+                    scenario_id=scenario.scenario_id,
+                    expected_send_behavior=expected,
+                    intake_skip_reason=skip_reason,
+                    inbound_delivery_observed=True,
+                    job_id=getattr(ctx, "job_id", None),
+                    approval_count=0,
+                    gmail_sends=backend.gmail_sends,
+                    gmail_drafts=0,
+                    external_executions=0,
+                    provider_accepted=False,
+                )
+                if resolution.eligible:
+                    return apply_r4_expected_intake_suppression_result(
+                        result,
+                        resolution=resolution,
+                        intake_skip_reason=skip_reason,
+                    )
+            raise
         processing = backend.observe_processing(scenario_id=scenario.scenario_id)
         verification = backend.verify_reply(scenario=scenario, approved=False)
         result["job_id"] = intake.job_id
