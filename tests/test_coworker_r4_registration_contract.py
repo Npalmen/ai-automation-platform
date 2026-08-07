@@ -313,12 +313,22 @@ def test_validate_registration_request_r4_branch(r4_env):
 
 
 def test_validate_live_gmail_registration_r4_before_r3_overlap(r4_env):
-    # Overlapping scenario ID must accept R4 ai_mode.
+    # Overlapping scenario ID must accept R4 ai_mode with full reviewed-live context.
     validate_live_gmail_registration(
         transport_mode="live_gmail",
         scenario_id="PTB-DCQ-0000",
         ai_mode=REVIEWED_LIVE_LLM_BODY,
         campaign_type=R4_LIVE_QUALITY_CAMPAIGN_TYPE,
+        execution_mode=R4_EXECUTION_MODE,
+        tenant_id=R4_TENANT_ID,
+    )
+    validate_live_gmail_registration(
+        transport_mode="live_gmail",
+        scenario_id="PTB-DCQ-0002",
+        ai_mode=REVIEWED_LIVE_LLM_BODY,
+        campaign_type=R4_LIVE_QUALITY_CAMPAIGN_TYPE,
+        execution_mode=R4_EXECUTION_MODE,
+        tenant_id=R4_TENANT_ID,
     )
 
 

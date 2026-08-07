@@ -9,6 +9,17 @@ from app.evaluation.live.errors import LiveEvalSafetyError
 
 ORPHAN_GROUP_ID = "orphaned_r4_attempt_1"
 ATTEMPT1_CAMPAIGN_ID = "fb36fd42-ce05-492e-8227-f1aad537868b"
+ATTEMPT6_CAMPAIGN_ID = "298aeee7-dc72-4614-86eb-8f20566bee2f"
+R4_QUARANTINED_CAMPAIGN_IDS: frozenset[str] = frozenset(
+    {
+        ATTEMPT1_CAMPAIGN_ID,
+        "4d836572-9c27-4eac-9892-a3693801d334",
+        "32c6ed26-d030-441a-af52-5b186fae1107",
+        "99fa0b7f-1a6b-45aa-bec9-07f54f845de3",
+        "af0c2de2-eebe-486e-bb67-3414ac59d1b9",
+        ATTEMPT6_CAMPAIGN_ID,
+    }
+)
 ATTEMPT1_FAILED_SCENARIO = "PTB-DCQ-0000"
 ATTEMPT1_CLASSIFICATION = "registration_rejected_before_external_write"
 
@@ -74,11 +85,12 @@ def is_r4_attempt1_evaluation_run_id(evaluation_run_id: str | None) -> bool:
 
 
 def assert_r4_campaign_not_quarantined(campaign_id: str | None) -> None:
-    if is_r4_attempt1_campaign_id(campaign_id):
-        raise LiveEvalSafetyError(
-            f"campaign_id {ATTEMPT1_CAMPAIGN_ID} is permanently quarantined "
-            f"({ORPHAN_GROUP_ID}); resume/reuse forbidden"
-        )
+    normalized = (campaign_id or "").strip().lower()
+    for quarantined in R4_QUARANTINED_CAMPAIGN_IDS:
+        if normalized == quarantined.lower():
+            raise LiveEvalSafetyError(
+                f"campaign_id {quarantined} is permanently quarantined; resume/reuse forbidden"
+            )
 
 
 def assert_r4_evaluation_run_not_quarantined(evaluation_run_id: str | None) -> None:

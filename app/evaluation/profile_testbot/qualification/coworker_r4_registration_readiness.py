@@ -33,6 +33,9 @@ from app.evaluation.profile_testbot.qualification.coworker_r4_registration_contr
     REVIEWED_LIVE_LLM_BODY as R4_AI_MODE,
     validate_r4_registration_contract,
 )
+from app.evaluation.profile_testbot.qualification.coworker_r4_live_gmail_eligibility import (
+    evaluate_r4_live_gmail_scenario_eligibility_matrix,
+)
 from app.evaluation.profile_testbot.qualification.coworker_r4_registration_payload import (
     build_r4_live_eval_register_request,
     evaluate_exact_r4_registration_payload_matrix,
@@ -238,11 +241,17 @@ def evaluate_r4_registration_readiness(
 
     blockers = list(dict.fromkeys(blockers))
     orphan = attempt1_orphan_record().to_dict()
+    eligibility_matrix = evaluate_r4_live_gmail_scenario_eligibility_matrix()
+    eligibility_ready = bool(eligibility_matrix.get("passed"))
+    if not eligibility_ready:
+        blockers.extend([f"eligibility:{b}" for b in (eligibility_matrix.get("blockers") or [])[:8]])
+
     sample_passed = (
         send_ready == 20
         and no_send_ready == 16
         and mutation_ready == 36
         and ai_mode_schema_supported
+        and eligibility_ready
         and not blockers
     )
 
@@ -289,6 +298,20 @@ def evaluate_r4_registration_readiness(
         "registration_contract_valid": send_ready == 20 and no_send_ready == 16 and not blockers,
         "send_registration_ready": f"{send_ready}/20",
         "no_send_registration_ready": f"{no_send_ready}/16",
+        "r4_live_gmail_scenario_eligibility": eligibility_matrix.get(
+            "r4_live_gmail_scenario_eligibility"
+        ),
+        "r4_send_scenario_eligibility": eligibility_matrix.get("r4_send_scenario_eligibility"),
+        "r4_no_send_scenario_eligibility": eligibility_matrix.get(
+            "r4_no_send_scenario_eligibility"
+        ),
+        "r4_live_trigger_scenario_eligibility": eligibility_matrix.get(
+            "r4_live_trigger_scenario_eligibility"
+        ),
+        "r4_local_quarantine_scenario_eligibility": eligibility_matrix.get(
+            "r4_local_quarantine_scenario_eligibility"
+        ),
+        "live_gmail_scenario_eligibility_matrix": eligibility_matrix,
         "exact_send_registration_payload_ready": (
             exact_matrix.get("exact_send_registration_payload_ready") if exact_matrix else "skipped"
         ),

@@ -68,6 +68,8 @@ def register_live_eval_run(
         scenario_id=request.scenario_id,
         ai_mode=request.ai_mode,
         campaign_type=request.campaign_type,
+        execution_mode=request.execution_mode,
+        tenant_id=request.tenant_id,
     )
     fixture_bundle_id = resolve_fixture_bundle_id(
         scenario_id=request.scenario_id,

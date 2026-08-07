@@ -26,6 +26,9 @@ from app.evaluation.profile_testbot.qualification.coworker_r4_mutation_contract 
     validate_r4_mutation_operation,
     R4_MUTATION_PROCESS_DELIVERY,
 )
+from app.evaluation.profile_testbot.qualification.coworker_r4_live_gmail_eligibility import (
+    evaluate_r4_live_gmail_scenario_eligibility_matrix,
+)
 from app.evaluation.profile_testbot.qualification.coworker_r4_registration_payload import (
     evaluate_exact_r4_registration_payload_matrix,
     r4_registration_campaign_bindings,
@@ -128,6 +131,11 @@ def run_r4_full_live_jit(
     if not exact_matrix.get("passed"):
         blockers.append("exact_registration_payload_not_ready")
         blockers.extend(exact_matrix.get("blockers") or [])
+
+    eligibility_matrix = evaluate_r4_live_gmail_scenario_eligibility_matrix()
+    if not eligibility_matrix.get("passed"):
+        blockers.append("r4_live_gmail_scenario_eligibility_not_ready")
+        blockers.extend(eligibility_matrix.get("blockers") or [])
 
     if run_live_probes and auto_collect_live_probes and not _any_probe_kwarg_set(
         tenant_intake_ready=tenant_intake_ready,
@@ -310,6 +318,16 @@ def run_r4_full_live_jit(
             "exact_no_send_registration_payload_ready"
         ),
         "exact_registration_payload_matrix": exact_matrix,
+        "r4_live_gmail_scenario_eligibility": eligibility_matrix.get(
+            "r4_live_gmail_scenario_eligibility"
+        ),
+        "r4_live_trigger_scenario_eligibility": eligibility_matrix.get(
+            "r4_live_trigger_scenario_eligibility"
+        ),
+        "r4_local_quarantine_scenario_eligibility": eligibility_matrix.get(
+            "r4_local_quarantine_scenario_eligibility"
+        ),
+        "live_gmail_scenario_eligibility_matrix": eligibility_matrix,
         "structural_readiness": structural,
         "gmail_sends": 0,
         "gmail_drafts": 0,
