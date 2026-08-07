@@ -154,18 +154,18 @@ def should_materialize_r4_0088_action_dispatch_despite_hold(
     )
 
 
-def should_materialize_r4_0088_from_job(
-    *,
-    job: Any,
-    policy_payload: dict[str, Any] | None = None,
-) -> bool:
-    """Orchestrator hook: allow ACTION_DISPATCH for R4 0088 hold→pending only."""
-    policy_payload = policy_payload or {}
-    if policy_payload.get("decision") != "hold_for_review":
-        return False
+def _r4_0088_resolution_kwargs_from_job(job: Any) -> dict[str, Any] | None:
+    """Resolve R4 0088 contract inputs from job live_eval snapshot or registration_context."""
     input_data = getattr(job, "input_data", None) or {}
     live = input_data.get("live_eval") or {}
+    if not isinstance(live, dict):
+        return None
     snap = live.get("r4_reviewed_body_snapshot") or {}
+    reg = live.get("registration_context") or {}
+    if not isinstance(snap, dict):
+        snap = {}
+    if not isinstance(reg, dict):
+        reg = {}
     scenario_id = str(
         snap.get("scenario_id")
         or live.get("scenario_id")
@@ -173,17 +173,90 @@ def should_materialize_r4_0088_from_job(
         or ""
     )
     if scenario_id != R4_0088_SCENARIO_ID:
-        return False
-    resolution = resolve_r4_0088_hold_materialization(
-        scenario_id=scenario_id,
+        return None
+    reviewed_body_hash = str(
+        snap.get("reviewed_body_hash") or reg.get("reviewed_body_hash") or ""
+    )
+    candidate_package_semantic_hash = str(
+        snap.get("candidate_package_semantic_hash")
+        or reg.get("candidate_package_semantic_hash")
+        or ""
+    )
+    human_review_artifact_hash = str(
+        snap.get("human_review_artifact_hash")
+        or reg.get("human_review_sha256")
+        or ""
+    )
+    return {
+        "scenario_id": scenario_id,
+        "reviewed_body_hash": reviewed_body_hash,
+        "candidate_package_semantic_hash": candidate_package_semantic_hash,
+        "human_review_artifact_hash": human_review_artifact_hash,
+        "campaign_type": str(
+            snap.get("campaign_type") or live.get("campaign_type") or ""
+        ),
+        "execution_mode": str(
+            snap.get("execution_mode") or live.get("execution_mode") or ""
+        ),
+        "ai_mode": str(live.get("ai_mode") or snap.get("ai_mode") or ""),
+        "tenant_id": str(getattr(job, "tenant_id", "") or ""),
+    }
+
+
+def resolve_r4_0088_hold_materialization_from_job(
+    *,
+    job: Any,
+    policy_payload: dict[str, Any] | None = None,
+    risk_tags: list[str] | tuple[str, ...] | None = None,
+    policy_reasons: list[str] | tuple[str, ...] | None = None,
+) -> R4HoldMaterializationResolution:
+    policy_payload = policy_payload or {}
+    kwargs = _r4_0088_resolution_kwargs_from_job(job)
+    if kwargs is None:
+        return R4HoldMaterializationResolution(
+            eligible=False,
+            authorization=None,
+            blockers=["scenario_not_r4_0088"],
+            base_policy_authorization=policy_payload.get("decision"),
+        )
+    if policy_payload.get("decision") != "hold_for_review":
+        return R4HoldMaterializationResolution(
+            eligible=False,
+            authorization=None,
+            blockers=[f"base_policy_not_hold:{policy_payload.get('decision')}"],
+            base_policy_authorization=policy_payload.get("decision"),
+        )
+    if risk_tags is None:
+        risk_tags = policy_payload.get("risk_categories") or []
+    if policy_reasons is None:
+        policy_reasons = policy_payload.get("reasons") or policy_payload.get("reason_codes") or []
+    return resolve_r4_0088_hold_materialization(
+        scenario_id=kwargs["scenario_id"],
         base_authorization="hold_for_review",
-        reviewed_body_hash=str(snap.get("reviewed_body_hash") or ""),
-        candidate_package_semantic_hash=str(snap.get("candidate_package_semantic_hash") or ""),
-        human_review_artifact_hash=str(snap.get("human_review_artifact_hash") or ""),
-        campaign_type=str(snap.get("campaign_type") or live.get("campaign_type") or ""),
-        execution_mode=str(snap.get("execution_mode") or live.get("execution_mode") or ""),
-        ai_mode=str(live.get("ai_mode") or snap.get("ai_mode") or ""),
-        tenant_id=str(getattr(job, "tenant_id", "") or ""),
+        reviewed_body_hash=kwargs["reviewed_body_hash"],
+        candidate_package_semantic_hash=kwargs["candidate_package_semantic_hash"],
+        human_review_artifact_hash=kwargs["human_review_artifact_hash"],
+        campaign_type=kwargs["campaign_type"],
+        execution_mode=kwargs["execution_mode"],
+        ai_mode=kwargs["ai_mode"],
+        tenant_id=kwargs["tenant_id"],
+        risk_tags=risk_tags,
+        policy_reasons=policy_reasons,
+    )
+
+
+def should_materialize_r4_0088_from_job(
+    *,
+    job: Any,
+    policy_payload: dict[str, Any] | None = None,
+) -> bool:
+    """Orchestrator hook: allow ACTION_DISPATCH for R4 0088 hold→pending only."""
+    resolution = resolve_r4_0088_hold_materialization_from_job(
+        job=job,
+        policy_payload=policy_payload,
+    )
+    scenario_id = str(
+        (_r4_0088_resolution_kwargs_from_job(job) or {}).get("scenario_id") or ""
     )
     return should_materialize_r4_0088_action_dispatch_despite_hold(
         scenario_id=scenario_id,
@@ -217,26 +290,9 @@ def apply_r4_0088_hold_materialization_from_job(
     action: dict[str, Any],
     policy_payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    policy_payload = policy_payload or {}
-    input_data = getattr(job, "input_data", None) or {}
-    live = input_data.get("live_eval") or {}
-    snap = live.get("r4_reviewed_body_snapshot") or {}
-    scenario_id = str(
-        snap.get("scenario_id")
-        or live.get("scenario_id")
-        or input_data.get("scenario_id")
-        or ""
-    )
-    resolution = resolve_r4_0088_hold_materialization(
-        scenario_id=scenario_id,
-        base_authorization="hold_for_review",
-        reviewed_body_hash=str(snap.get("reviewed_body_hash") or ""),
-        candidate_package_semantic_hash=str(snap.get("candidate_package_semantic_hash") or ""),
-        human_review_artifact_hash=str(snap.get("human_review_artifact_hash") or ""),
-        campaign_type=str(snap.get("campaign_type") or live.get("campaign_type") or ""),
-        execution_mode=str(snap.get("execution_mode") or live.get("execution_mode") or ""),
-        ai_mode=str(live.get("ai_mode") or ""),
-        tenant_id=str(getattr(job, "tenant_id", "") or ""),
+    resolution = resolve_r4_0088_hold_materialization_from_job(
+        job=job,
+        policy_payload=policy_payload,
     )
     if not resolution.eligible:
         return action
