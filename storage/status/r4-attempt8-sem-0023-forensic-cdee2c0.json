@@ -1,0 +1,51 @@
+{
+  "generated_at": "2026-08-07T21:15:00Z",
+  "attempt_number": 8,
+  "executor_runtime_sha": "cdee2c07b94958208ce88a44565eaf10e97d06e5",
+  "failed_scenario": "PTB-SEM-0023",
+  "failure_stage": "no_send_verification",
+  "failure_reason": "intake_skipped: newsletter_disabled",
+  "first_breakpoint": "coworker_r4_live_backend._execute_no_send.observe_intake",
+  "trace": [
+    {
+      "step": 1,
+      "component": "locked R4 scenario PTB-SEM-0023",
+      "observed": "family=spam expected_send_behavior=no_reply planned_no_send=true",
+      "status": "pass"
+    },
+    {
+      "step": 2,
+      "component": "inbound Gmail trigger",
+      "observed": "inbound_trigger_sent=true for no-send path",
+      "status": "pass"
+    },
+    {
+      "step": 3,
+      "component": "live Gmail intake process_delivery",
+      "observed": "intake_skip_reason=newsletter_disabled (authoritative product suppression for newsletter-class visibility-only mail)",
+      "status": "pass_intentional_suppression"
+    },
+    {
+      "step": 4,
+      "component": "R4 _execute_no_send verifier",
+      "observed": "treated intake_skipped as hard failure without R4 intake-suppression contract",
+      "expected": "PASS expected intake suppression for PTB-SEM-0023 only",
+      "status": "fail",
+      "root_cause": true
+    }
+  ],
+  "semantic_contract": {
+    "scenario_id": "PTB-SEM-0023",
+    "expected_send_behavior": "no_reply",
+    "expected_intake_suppression_reason": "newsletter_disabled",
+    "job_required": false,
+    "approval_required": false,
+    "gmail_reply_required": false
+  },
+  "attempt_8_send_evidence_frozen": {
+    "send_passed": "20/20",
+    "gmail_replies": 20,
+    "ptb_dcq_0088_lifecycle": "PASS"
+  },
+  "note": "newsletter_disabled is intentional production intake policy, not infrastructure defect"
+}
