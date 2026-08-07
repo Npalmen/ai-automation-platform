@@ -351,10 +351,10 @@ def execute_external_write_with_trace(
     r3_context = False
     try:
         from app.evaluation.profile_testbot.qualification.coworker_r3_reply_provider import (
-            is_r3_frozen_customer_reply_context,
+            is_reviewed_live_customer_reply_context,
         )
 
-        r3_context = is_r3_frozen_customer_reply_context(action=action, job=job, db=db)
+        r3_context = is_reviewed_live_customer_reply_context(action=action, job=job, db=db)
     except Exception:
         r3_context = False
 

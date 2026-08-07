@@ -11,6 +11,8 @@ from app.evaluation.live.context import snapshot_from_job_input
 from app.evaluation.live.delivery_mailbox_reader import (
     CREDENTIAL_SOURCE_LIVE_EVAL_RECIPIENT_ENV,
     is_r3_frozen_live_eval_run,
+    is_r4_reviewed_live_eval_run,
+    is_reviewed_live_eval_run,
 )
 from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.live.gmail_transport import (
@@ -141,6 +143,48 @@ def is_r3_frozen_customer_reply_context(
     return is_r3_frozen_live_eval_run(row)
 
 
+def is_reviewed_live_customer_reply_context(
+    *,
+    action: dict[str, Any] | None,
+    job: Any | None,
+    db: Session | None = None,
+) -> bool:
+    """True when customer reply must use recipient-env Gmail (R3 frozen or R4 reviewed-live)."""
+    if is_r3_frozen_customer_reply_context(action=action, job=job, db=db):
+        return True
+    if not isinstance(action, dict):
+        return False
+    if str(action.get("type") or "") != "send_customer_auto_reply":
+        return False
+    tenant_id = str(action.get("tenant_id") or getattr(job, "tenant_id", "") or "").strip()
+    if tenant_id != LIVE_EVAL_TENANT_ID:
+        return False
+    if job is None:
+        return False
+    snap = snapshot_from_job_input(getattr(job, "input_data", None) or {})
+    if snap is None:
+        return False
+    if snap.tenant_id != LIVE_EVAL_TENANT_ID:
+        return False
+    from app.evaluation.profile_testbot.qualification.coworker_r4_registry import (
+        R4_EXECUTE_AI_MODE,
+        R4_SEND_SCENARIO_IDS,
+    )
+
+    if snap.ai_mode != R4_EXECUTE_AI_MODE:
+        return False
+    if snap.scenario_id not in R4_SEND_SCENARIO_IDS:
+        return False
+    if db is None:
+        return True
+    row = LiveEvalRunRepository.get_run(
+        db, snap.evaluation_run_id, tenant_id=LIVE_EVAL_TENANT_ID
+    )
+    if row is None:
+        return True
+    return is_r4_reviewed_live_eval_run(row)
+
+
 def resolve_r3_live_reply_provider(
     *,
     db: Session | None,
@@ -157,15 +201,23 @@ def resolve_r3_live_reply_provider(
     )
     blockers: list[str] = []
 
-    if not is_r3_frozen_customer_reply_context(action=action, job=job, db=db):
-        blockers.append("not a trusted R3 frozen customer-reply context")
+    if not is_reviewed_live_customer_reply_context(action=action, job=job, db=db):
+        blockers.append("not a trusted reviewed-live customer-reply context")
         result.blockers = blockers
         return result
 
     snap = snapshot_from_job_input(getattr(job, "input_data", None) or {})
     assert snap is not None
 
-    if snap.scenario_id not in R3_ALL_SCENARIO_IDS:
+    is_r4 = snap.ai_mode != R3_FROZEN_AI_MODE
+    if is_r4:
+        from app.evaluation.profile_testbot.qualification.coworker_r4_registry import (
+            R4_SEND_SCENARIO_IDS,
+        )
+
+        if snap.scenario_id not in R4_SEND_SCENARIO_IDS:
+            blockers.append(f"scenario {snap.scenario_id!r} not in R4 send registry")
+    elif snap.scenario_id not in R3_ALL_SCENARIO_IDS:
         blockers.append(f"scenario {snap.scenario_id!r} not in R3 registry")
 
     auth = str(action.get("_authorization") or "").strip()
@@ -186,11 +238,17 @@ def resolve_r3_live_reply_provider(
         )
         if row is None:
             blockers.append("live eval run row missing")
-        elif not is_r3_frozen_live_eval_run(row):
+        elif not is_reviewed_live_eval_run(row):
+            blockers.append("run is not reviewed-live gmail eval")
+        elif is_r4 and not is_r4_reviewed_live_eval_run(row):
+            blockers.append("run is not R4 reviewed-live eval")
+        elif not is_r4 and not is_r3_frozen_live_eval_run(row):
             blockers.append("run is not R3 frozen live_gmail")
         else:
-            # campaign_type is enforced at registration; ai_mode is the persisted signal
-            if row.ai_mode != R3_FROZEN_AI_MODE:
+            if is_r4:
+                if row.ai_mode != snap.ai_mode:
+                    blockers.append("ai_mode/execution_mode mismatch")
+            elif row.ai_mode != R3_FROZEN_AI_MODE:
                 blockers.append("ai_mode/execution_mode mismatch")
 
     # Frozen body + approval binding (when we can see approval id)
@@ -206,19 +264,32 @@ def resolve_r3_live_reply_provider(
         else:
             result.approval_binding_valid = True
             delivery = dict(record.delivery_payload or {})
-            frozen = delivery.get("r3_frozen_bind")
-            if not isinstance(frozen, dict) or not frozen.get("canonical_body_hash"):
-                blockers.append("frozen body bind missing on approval")
-            else:
-                result.frozen_body_binding_valid = True
-                body = str(action.get("body") or delivery.get("body") or "")
-                if body.strip():
-                    from app.evaluation.profile_testbot.qualification.coworker_r3_frozen_bodies import (
-                        r3_send_body_hash,
-                    )
+            if is_r4:
+                reviewed = delivery.get("r4_reviewed_bind")
+                if not isinstance(reviewed, dict) or not reviewed.get("canonical_body_hash"):
+                    blockers.append("reviewed body bind missing on approval")
+                else:
+                    result.frozen_body_binding_valid = True
+                    body = str(action.get("body") or delivery.get("body") or "")
+                    if body.strip():
+                        from app.workflows.reply_quality.provenance import hash_body
 
-                    if r3_send_body_hash(body) != str(frozen.get("canonical_body_hash")):
-                        blockers.append("frozen body hash mismatch before send")
+                        if hash_body(body) != str(reviewed.get("canonical_body_hash")):
+                            blockers.append("reviewed body hash mismatch before send")
+            else:
+                frozen = delivery.get("r3_frozen_bind")
+                if not isinstance(frozen, dict) or not frozen.get("canonical_body_hash"):
+                    blockers.append("frozen body bind missing on approval")
+                else:
+                    result.frozen_body_binding_valid = True
+                    body = str(action.get("body") or delivery.get("body") or "")
+                    if body.strip():
+                        from app.evaluation.profile_testbot.qualification.coworker_r3_frozen_bodies import (
+                            r3_send_body_hash,
+                        )
+
+                        if r3_send_body_hash(body) != str(frozen.get("canonical_body_hash")):
+                            blockers.append("frozen body hash mismatch before send")
     elif probe_only:
         result.frozen_body_binding_valid = True
         result.approval_binding_valid = True

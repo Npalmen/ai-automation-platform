@@ -24,10 +24,19 @@ from app.workflows.decision_record_service import (
     record_action_authorization,
     record_execution_intent,
 )
-from app.workflows.decision_trace_errors import OperationConflict, ReconciliationRequired
+from app.workflows.decision_trace_errors import ExternalWriteBlocked, OperationConflict, ReconciliationRequired
 from app.workflows.decision_trace_readiness import verify_decision_trace_readiness
 from app.workflows.decision_record import DecisionRecordType, ExecutionStatus
-from app.workflows.external_write_trace import execute_external_write_with_trace
+from app.evaluation.profile_testbot.campaign.post_approval_execution import (
+    assert_reply_evidence_invariants,
+    build_reply_execution_evidence,
+    classify_reply_execution_status,
+)
+from app.workflows.action_executor import _build_stub_result
+from app.workflows.external_write_trace import (
+    execute_external_write_with_trace,
+    is_real_provider_execution_result,
+)
 from app.workflows.pipeline_run_context import (
     DecisionTraceSession,
     PipelineRunSource,
@@ -283,3 +292,192 @@ class TestIdempotency:
         )
         rows = DecisionRecordRepository.list_for_job(trace_db, tenant_id=job.tenant_id, job_id=job.job_id)
         assert len(rows) == 1
+
+
+def _gmail_r4_adapter_result() -> dict:
+    return {
+        "type": "send_customer_auto_reply",
+        "status": "executed",
+        "provider": "google_mail",
+        "external_id": "gmail-r4-msg-1",
+        "integration_result": {
+            "provider": "google_mail",
+            "status": "success",
+            "external_id": "gmail-r4-msg-1",
+            "payload": {
+                "google_message_id": "gmail-r4-msg-1",
+                "thread_id": "thread-r4-1",
+                "rfc_message_id": "<rfc-r4@test>",
+            },
+        },
+    }
+
+
+def _observation_from_records(records) -> dict:
+    return {
+        "job": {
+            "decision_records": [
+                {
+                    "record_type": row.record_type,
+                    "execution_status": row.execution_status,
+                    "action_operation_id": row.action_operation_id,
+                    "metadata": dict(row.metadata_json or {}),
+                }
+                for row in records
+            ],
+            "result": {},
+        },
+        "events": [],
+    }
+
+
+class TestReviewedLiveExternalWritePersistence:
+    def test_gmail_success_persists_provider_message_id_before_terminal_success(self, trace_db):
+        job = _job(tenant_id="TENANT_LIVE_EVAL")
+        trace = _trace(job, trace_db)
+        action = {
+            "type": "send_customer_auto_reply",
+            "to": "sender@eval.test",
+            "tenant_id": job.tenant_id,
+            "_authorization": "execution_allowed",
+        }
+        op_id = record_action_authorization(
+            trace_db, trace, job, action, authorization="execution_allowed"
+        )
+        action["_action_operation_id"] = op_id
+
+        with patch.dict("os.environ", {"DECISION_RECORD_ENFORCE_WRITES": "true"}):
+            get_settings.cache_clear()
+            result = execute_external_write_with_trace(
+                db=trace_db,
+                trace=trace,
+                job=job,
+                action=action,
+                adapter_fn=lambda: _gmail_r4_adapter_result(),
+            )
+            get_settings.cache_clear()
+
+        assert result["external_id"] == "gmail-r4-msg-1"
+        assert is_real_provider_execution_result(result)
+
+        records = DecisionRecordRepository.list_for_operation(
+            trace_db,
+            tenant_id=job.tenant_id,
+            action_operation_id=op_id,
+        )
+        intents = [r for r in records if r.record_type == "execution_intent"]
+        outcomes = [r for r in records if r.record_type == "execution_outcome"]
+        assert intents
+        assert intents[-1].execution_status == ExecutionStatus.PENDING.value
+        assert outcomes
+        assert outcomes[-1].execution_status == ExecutionStatus.SUCCEEDED.value
+        assert outcomes[-1].metadata_json["provider_message_id"] == "gmail-r4-msg-1"
+
+        observation = _observation_from_records(records)
+        assert classify_reply_execution_status(observation, action_operation_id=op_id) == "succeeded"
+        evidence = build_reply_execution_evidence(
+            observation=observation,
+            action_operation_id=op_id,
+            inbound_provider_message_id="inbound-r4-1",
+            inbound_rfc_message_id="<inbound-r4@test>",
+        )
+        assert evidence.reply_provider_message_id == "gmail-r4-msg-1"
+        assert_reply_evidence_invariants(evidence)
+
+    def test_missing_provider_message_id_never_succeeded(self, trace_db):
+        job = _job(tenant_id="TENANT_LIVE_EVAL")
+        trace = _trace(job, trace_db)
+        action = {
+            "type": "send_customer_auto_reply",
+            "to": "sender@eval.test",
+            "tenant_id": job.tenant_id,
+            "_authorization": "execution_allowed",
+        }
+        op_id = record_action_authorization(
+            trace_db, trace, job, action, authorization="execution_allowed"
+        )
+        action["_action_operation_id"] = op_id
+        ambiguous = {
+            "type": "send_customer_auto_reply",
+            "status": "executed",
+            "provider": "google_mail",
+            "integration_result": {
+                "provider": "google_mail",
+                "status": "success",
+                "payload": {"thread_id": "thread-r4-1"},
+            },
+        }
+
+        with patch.dict("os.environ", {"DECISION_RECORD_ENFORCE_WRITES": "true"}):
+            get_settings.cache_clear()
+            with pytest.raises(ReconciliationRequired):
+                execute_external_write_with_trace(
+                    db=trace_db,
+                    trace=trace,
+                    job=job,
+                    action=action,
+                    adapter_fn=lambda: ambiguous,
+                )
+            get_settings.cache_clear()
+
+        records = DecisionRecordRepository.list_for_operation(
+            trace_db,
+            tenant_id=job.tenant_id,
+            action_operation_id=op_id,
+        )
+        outcomes = [r for r in records if r.record_type == "execution_outcome"]
+        assert outcomes
+        assert outcomes[-1].execution_status in {
+            ExecutionStatus.OUTCOME_UNKNOWN.value,
+            ExecutionStatus.RECONCILIATION_REQUIRED.value,
+        }
+        assert outcomes[-1].metadata_json.get("reconciliation_required") is True
+
+    def test_reviewed_live_internal_stub_never_succeeded(self, trace_db):
+        job = _job(tenant_id="TENANT_LIVE_EVAL")
+        trace = _trace(job, trace_db)
+        action = {
+            "type": "send_customer_auto_reply",
+            "to": "sender@eval.test",
+            "tenant_id": job.tenant_id,
+            "_authorization": "execution_allowed",
+        }
+        op_id = record_action_authorization(
+            trace_db, trace, job, action, authorization="execution_allowed"
+        )
+        action["_action_operation_id"] = op_id
+        stub = _build_stub_result(
+            "send_customer_auto_reply",
+            "sender@eval.test",
+            {"to": "sender@eval.test", "subject": "Re: test", "body": "body"},
+            "email",
+            "stub",
+        )
+
+        with (
+            patch(
+                "app.evaluation.profile_testbot.qualification.coworker_r3_reply_provider.is_reviewed_live_customer_reply_context",
+                return_value=True,
+            ),
+            patch.dict("os.environ", {"DECISION_RECORD_ENFORCE_WRITES": "true"}),
+        ):
+            get_settings.cache_clear()
+            with pytest.raises(ExternalWriteBlocked):
+                execute_external_write_with_trace(
+                    db=trace_db,
+                    trace=trace,
+                    job=job,
+                    action=action,
+                    adapter_fn=lambda: stub,
+                )
+            get_settings.cache_clear()
+
+        records = DecisionRecordRepository.list_for_operation(
+            trace_db,
+            tenant_id=job.tenant_id,
+            action_operation_id=op_id,
+        )
+        outcomes = [r for r in records if r.record_type == "execution_outcome"]
+        assert outcomes
+        assert outcomes[-1].execution_status == ExecutionStatus.FAILED.value
+        assert outcomes[-1].metadata_json.get("reconciliation_required") is True

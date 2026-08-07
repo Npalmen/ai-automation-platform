@@ -34,6 +34,7 @@ class TestEnsureRuntimeSchemaHappyPath:
             _LIVE_EVAL_EVENTS_MIGRATION_STATEMENTS,
             _LIVE_EVAL_020_MIGRATION_STATEMENTS,
             _LIVE_EVAL_021_MIGRATION_STATEMENTS,
+            _LIVE_EVAL_026_MIGRATION_STATEMENTS,
             _LIVE_EVAL_RUNS_019_MIGRATION_STATEMENTS,
             _LIVE_EVAL_RUNS_MIGRATION_STATEMENTS,
             _ONBOARDING_2_MIGRATION_STATEMENTS,
@@ -60,6 +61,7 @@ class TestEnsureRuntimeSchemaHappyPath:
             + len(_LIVE_EVAL_RUNS_019_MIGRATION_STATEMENTS)
             + len(_LIVE_EVAL_020_MIGRATION_STATEMENTS)
             + len(_LIVE_EVAL_021_MIGRATION_STATEMENTS)
+            + len(_LIVE_EVAL_026_MIGRATION_STATEMENTS)
             + len(_LIVE_EVAL_EVENTS_MIGRATION_STATEMENTS)
         )
         assert conn.execute.call_count == expected

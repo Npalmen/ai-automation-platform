@@ -97,12 +97,12 @@ def _build_email_result(
     from app.evaluation.live.errors import LiveEvalSafetyError
     from app.evaluation.profile_testbot.qualification.coworker_r3_reply_provider import (
         build_r3_email_result_from_resolution,
-        is_r3_frozen_customer_reply_context,
+        is_reviewed_live_customer_reply_context,
         resolve_r3_live_reply_provider,
     )
 
-    # Trusted R3 frozen live-canary: recipient-env Gmail only — never stub / tenant GOOGLE_MAIL.
-    if is_r3_frozen_customer_reply_context(action=action, job=job, db=db):
+    # Trusted reviewed-live eval (R3 frozen / R4 reviewed): recipient-env Gmail only.
+    if is_reviewed_live_customer_reply_context(action=action, job=job, db=db):
         resolution = resolve_r3_live_reply_provider(
             db=db,
             job=job,

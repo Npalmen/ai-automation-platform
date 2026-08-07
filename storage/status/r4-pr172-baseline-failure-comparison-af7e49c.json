@@ -1,0 +1,27 @@
+{
+  "generated_at": "2026-08-07T11:16:00Z",
+  "pr": 172,
+  "branch": "fix/r4-provider-message-id-lifecycle",
+  "base_sha": "af7e49cecba372a5096713765fcde8baf70ec167",
+  "comparison_method": "run_same_7_test_ids_on_base_checkout_then_pr_head",
+  "failing_test_ids": [
+    "tests/evaluation/live/test_cli_and_seed.py::test_seed_script_apply_requires_seed_flag",
+    "tests/evaluation/live/test_oauth_seed.py::test_oauth_seed_apply_blocked_without_seed_allowed",
+    "tests/evaluation/profile_testbot/test_readiness.py::test_p1_mailbox_blocked_is_safety_assertion",
+    "tests/evaluation/profile_testbot/test_readiness.py::test_sender_recipient_overlap_with_p1_fails",
+    "tests/test_digital_coworker_natural_language.py::TestGoldenReplies::test_ptb_dcq_0002_fully_english",
+    "tests/test_integration_selection_migration_016.py::test_postgres_migration_016_table_when_database_available",
+    "tests/test_schema_migrations.py::TestEnsureRuntimeSchemaHappyPath::test_executes_alter_for_each_required_column"
+  ],
+  "results": {
+    "tests/evaluation/live/test_cli_and_seed.py::test_seed_script_apply_requires_seed_flag": "SAME_FAILURE_ON_BASE",
+    "tests/evaluation/live/test_oauth_seed.py::test_oauth_seed_apply_blocked_without_seed_allowed": "SAME_FAILURE_ON_BASE",
+    "tests/evaluation/profile_testbot/test_readiness.py::test_p1_mailbox_blocked_is_safety_assertion": "SAME_FAILURE_ON_BASE",
+    "tests/evaluation/profile_testbot/test_readiness.py::test_sender_recipient_overlap_with_p1_fails": "SAME_FAILURE_ON_BASE",
+    "tests/test_digital_coworker_natural_language.py::TestGoldenReplies::test_ptb_dcq_0002_fully_english": "SAME_FAILURE_ON_BASE",
+    "tests/test_integration_selection_migration_016.py::test_postgres_migration_016_table_when_database_available": "SAME_FAILURE_ON_BASE",
+    "tests/test_schema_migrations.py::TestEnsureRuntimeSchemaHappyPath::test_executes_alter_for_each_required_column": "SAME_FAILURE_ON_BASE_FIXED_IN_PR_MIGRATION_026_COUNT"
+  },
+  "pr_regressions": [],
+  "classification": "all_7_baseline_pre_existing_local_env"
+}
