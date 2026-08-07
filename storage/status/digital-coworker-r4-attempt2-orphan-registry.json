@@ -1,0 +1,22 @@
+{
+  "generated_at": "2026-08-06T19:40:00Z",
+  "campaign_id": "4d836572-9c27-4eac-9892-a3693801d334",
+  "orphan_group_id": "orphaned_r4_attempt_2",
+  "classification": "full_live_jit_recipient_oauth_refresh_failed",
+  "failure_before_first_external_write": true,
+  "scenarios_executed": 0,
+  "scenarios_not_run": 36,
+  "gmail_triggers": 0,
+  "gmail_replies": 0,
+  "gmail_drafts": 0,
+  "external_writes": 0,
+  "resume_forbidden": true,
+  "reuse_blocked": true,
+  "never_resume": true,
+  "never_retry": true,
+  "exclude_from_r4_pass": true,
+  "executor_runtime_sha": "af7e49cecba372a5096713765fcde8baf70ec167",
+  "candidate_runtime_sha": "b7fd95e075c16feee93a116a6062e402c1fee3df",
+  "attempt1_also_excluded": true,
+  "attempt1_campaign_id": "fb36fd42-ce05-492e-8227-f1aad537868b"
+}

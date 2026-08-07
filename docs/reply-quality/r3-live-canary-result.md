@@ -7,9 +7,9 @@ Redacted formal record of the qualifying R3 frozen live canary. Local operator a
 | Gate | Status |
 |------|--------|
 | `R3_LIVE_CANARY` | **PASS** |
-| `R4_LIVE_CAMPAIGN` | PENDING |
-| `R5_CLOSURE` | PENDING |
-| `PROFILE_DRIVEN_DIGITAL_COWORKER_REPLY_QUALITY_QUALIFIED` | PENDING |
+| `R4_LIVE_CAMPAIGN` | **PASS** |
+| `R5_CLOSURE` | **PASS** |
+| `PROFILE_DRIVEN_DIGITAL_COWORKER_REPLY_QUALITY_QUALIFIED` | **VALID** |
 
 ## Qualifying run
 

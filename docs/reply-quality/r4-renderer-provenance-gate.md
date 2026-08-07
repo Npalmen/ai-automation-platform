@@ -61,8 +61,8 @@ diagnostic package with `human_review_authorized=false` and zero review rows.
 
 This gate does not authorize:
 
-- R4 `--execute`
-- Gmail triggers / drafts / replies
+- R4 `--execute` (requires separate manual approval per campaign)
 - automatic Gmail
 - production activation
-- R5 closure or qualification registry PASS
+
+R5 closure and `PROFILE_DRIVEN_DIGITAL_COWORKER_REPLY_QUALITY_QUALIFIED=VALID` are documented separately in `docs/plans/profile-driven-digital-coworker-reply-quality-r5-closure.md`.

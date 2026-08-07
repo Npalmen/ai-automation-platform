@@ -1,0 +1,69 @@
+{
+  "passed": true,
+  "blockers": [],
+  "provenance": {
+    "qualifying_executor_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d",
+    "qualifying_release_gate_run": "31220948265",
+    "r4_pass_campaign_id": "b4dcd6a8-9bda-4ce4-8b63-4e7a54176605",
+    "candidate_runtime_sha": "b7fd95e075c16feee93a116a6062e402c1fee3df",
+    "manifest_semantic_hash": "bdebc3ce422aee302fdafad748e3e9b93a3deda8effe5deb90b49853e09144f5",
+    "candidate_package_semantic_hash": "6e6c37aaa57df1464fbc367701c0cfbfaf500f697ffae5cec3a50d2dda116254",
+    "r2": {
+      "artifact_sha256": "7dced592907fb6fcbb89e632f1e37246cd120ace2a453e0aaa198397f5f0b57b",
+      "status_counts": {
+        "PASS": 10,
+        "PASS_WITH_NOTE": 10,
+        "FAIL": 0,
+        "PENDING": 0
+      }
+    },
+    "r3": {
+      "qualifying_sha": "5e9b1839d9a4ac5ac6aef1795d88a2eff5f06517",
+      "qualifying_campaign_id": "54f2f10b-4f09-4ae4-9950-39bd2efb1214",
+      "doc": "docs/reply-quality/r3-live-canary-result.md"
+    },
+    "r1": {
+      "mode": "frozen_gate_pass_not_rerun"
+    }
+  },
+  "gates": {
+    "R1_HERMETIC": "PASS",
+    "R2_HUMAN_REVIEW": "PASS",
+    "R3_LIVE_CANARY": "PASS",
+    "R4_LIVE_CAMPAIGN": "PASS",
+    "R5_CLOSURE": "PASS",
+    "automatic_gmail": "false",
+    "production_activation": "false"
+  },
+  "evidence_artifacts": {
+    "r4_pass_record": "storage/status/digital-coworker-r4-attempt12-pass-record-4ad74d4.json",
+    "r4_execution": "storage/status/digital-coworker-r4-live-execution-4ad74d4.json",
+    "r4_reconciliation": "storage/status/digital-coworker-r4-reconciliation-4ad74d4.json",
+    "r2_human_review": "storage/status/digital-coworker-r4-human-review-scored-b7fd95e.json",
+    "r3_result_doc": "docs/reply-quality/r3-live-canary-result.md",
+    "r1_contract": "coworker_reply_hermetic_v1"
+  },
+  "quarantined_campaign_ids": [
+    "298aeee7-dc72-4614-86eb-8f20566bee2f",
+    "32c6ed26-d030-441a-af52-5b186fae1107",
+    "452e65bd-8d9c-4bb0-a630-31c1f6d87b19",
+    "462aad8c-8266-4ee7-bc83-3831368a136b",
+    "4d836572-9c27-4eac-9892-a3693801d334",
+    "87bb6153-8358-4758-8f64-bac153763170",
+    "8e0fa53a-868f-454f-b40f-2a41f94b2efe",
+    "92305703-a8ca-4e91-8b16-c13ebebb6655",
+    "99fa0b7f-1a6b-45aa-bec9-07f54f845de3",
+    "af0c2de2-eebe-486e-bb67-3414ac59d1b9",
+    "fb36fd42-ce05-492e-8227-f1aad537868b"
+  ],
+  "registry_target": {
+    "id": "PROFILE_DRIVEN_DIGITAL_COWORKER_REPLY_QUALITY_QUALIFIED",
+    "status": "VALID",
+    "source_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d",
+    "source_workflow_run": "31220948265"
+  },
+  "external_writes": 0,
+  "gmail_triggers": 0,
+  "gmail_replies": 0,
+  "llm_calls": 0
+}

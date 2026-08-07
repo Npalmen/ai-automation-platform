@@ -6,6 +6,7 @@ import pytest
 
 from app.evaluation.profile_testbot.constants import (
     QUALIFICATION_AUTOMATIC,
+    QUALIFICATION_COWORKER_REPLY,
     QUALIFICATION_PASS,
     QUALIFICATION_SEMI_AUTO,
     QUALIFICATION_SEMI_AUTO_QUALITY,
@@ -78,6 +79,18 @@ class TestQualificationRegistry:
 
     def test_semi_auto_gmail_still_valid(self):
         assert qualification_index()[QUALIFICATION_SEMI_AUTO]["status"] == "VALID"
+
+    def test_coworker_reply_qualification_valid(self):
+        from app.evaluation.profile_testbot.qualification.coworker_reply_quality_closure import (
+            R5_QUALIFYING_EXECUTOR_SHA,
+            R5_QUALIFYING_RELEASE_GATE_RUN,
+        )
+
+        entry = qualification_index()[QUALIFICATION_COWORKER_REPLY]
+        assert entry["status"] == "VALID"
+        assert entry["source_sha"] == R5_QUALIFYING_EXECUTOR_SHA
+        assert entry["source_workflow_run"] == R5_QUALIFYING_RELEASE_GATE_RUN
+        assert entry["default_production_activation"] is False
 
 
 class TestHermeticQualityQualification:

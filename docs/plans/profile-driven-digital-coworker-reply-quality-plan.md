@@ -4,15 +4,15 @@ slug: profile-driven-digital-coworker-reply-quality
 status: approved
 created: 2026-08-02
 qualification_target: PROFILE_DRIVEN_DIGITAL_COWORKER_REPLY_QUALITY_QUALIFIED
-qualification_registry_status: PENDING
+qualification_registry_status: VALID
 gates:
   R1_HERMETIC: PASS
-  R2_PRECHECK: FAIL
-  R2_HUMAN_REVIEW: PENDING
+  R2_PRECHECK: PASS
+  R2_HUMAN_REVIEW: PASS
   R3_LIVE_CANARY: PASS
   R4_HUMAN_REVIEW: PASS
-  R4_LIVE_CAMPAIGN: PENDING
-  R5_CLOSURE: PENDING
+  R4_LIVE_CAMPAIGN: PASS
+  R5_CLOSURE: PASS
 human_review_failure_sha: 8b167280e8190be0e79d6f127416a7819f84c4d7
 human_review_package_status: R4_SCORED_PASS_b7fd95e
 closure_branch: fix/digital-coworker-llm-reproducibility-and-precheck
@@ -27,8 +27,8 @@ todos:
   F: completed
   G: completed
   H: completed
-  I: in_progress
-  J: pending
+  I: completed
+  J: completed
 ---
 
 # Profile-driven Digital Coworker Reply Quality
