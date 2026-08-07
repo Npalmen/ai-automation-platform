@@ -1,0 +1,71 @@
+{
+  "generated_at": "2026-08-07T20:30:00Z",
+  "attempt_number": 7,
+  "executor_runtime_sha": "37ca9654358d878d010431bfac207c0f6f7cd3a2",
+  "failed_scenario": "PTB-DCQ-0088",
+  "failure_stage": "reviewed_body_bind",
+  "failure_reason": "reviewed body bind blocked: no pending approval",
+  "failure_classification": "R4_0088_HOLD_TO_PENDING_NOT_MATERIALIZED",
+  "first_breakpoint": "orchestrator_should_skip_step",
+  "trace": [
+    {
+      "step": 1,
+      "component": "policy_processor",
+      "observed": "decision=hold_for_review",
+      "expected": "hold_for_review",
+      "status": "pass"
+    },
+    {
+      "step": 2,
+      "component": "orchestrator._should_skip_step",
+      "observed": "should_materialize_r4_0088_from_job returned false because job.input_data.live_eval.r4_reviewed_body_snapshot was absent; reviewed_body_hash/candidate_package_semantic_hash/human_review_artifact_hash resolved empty",
+      "expected": "return false (do not skip ACTION_DISPATCH) for exact R4 0088 registration_context",
+      "status": "fail",
+      "root_cause": true
+    },
+    {
+      "step": 3,
+      "component": "ACTION_DISPATCH",
+      "observed": "skipped by orchestrator hold gate",
+      "expected": "run action dispatch for R4 0088 hold materialization",
+      "status": "fail"
+    },
+    {
+      "step": 4,
+      "component": "apply_action_authorization + apply_r4_0088_hold_materialization_from_job",
+      "observed": "never reached",
+      "expected": "_needs_approval=true, _authorization=approval_required, _skip=false, _r4_0088_materialized=true",
+      "status": "not_reached"
+    },
+    {
+      "step": 5,
+      "component": "_create_action_approval_record",
+      "observed": "no pending approval row persisted",
+      "expected": "exactly one pending customer-reply approval with next_on_approve in (action_execute, email_send)",
+      "status": "fail"
+    },
+    {
+      "step": 6,
+      "component": "bind_reviewed_send_body list_job_approvals",
+      "observed": "approval_state=hold, pending approval count=0",
+      "expected": "pending approval visible for bind lookup",
+      "status": "fail"
+    }
+  ],
+  "authoritative_registration_present": true,
+  "registration_context_fields_used_for_fix": [
+    "reviewed_body_hash",
+    "candidate_package_semantic_hash",
+    "human_review_sha256"
+  ],
+  "live_eval_fields_used_for_fix": [
+    "scenario_id",
+    "campaign_type",
+    "execution_mode",
+    "ai_mode",
+    "registration_context"
+  ],
+  "r3_override_applied": false,
+  "r4_contract_logged_at_bind": true,
+  "note": "r4_0088_provenance in live executor is aspirational logging at bind time; it does not prove pipeline materialization occurred"
+}
