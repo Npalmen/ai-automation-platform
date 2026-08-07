@@ -68,6 +68,17 @@ def locked():
     }
 
 
+@pytest.fixture
+def r4_jit_allowlist(monkeypatch):
+    cfg = MagicMock()
+    cfg.sender_emails = {"qvarsken@gmail.com"}
+    cfg.recipient_emails = {RECIPIENT}
+    monkeypatch.setattr(
+        "app.evaluation.live.config.get_live_eval_config",
+        lambda: cfg,
+    )
+
+
 def test_execute_missing_approval_blocks_before_gmail(tmp_path, locked):
     result = run_r4_live_campaign(
         mode="execute",
@@ -287,7 +298,7 @@ def test_full_jit_requires_live_probes(locked, monkeypatch):
     assert any("tenant_intake" in b or "sender_gmail" in b for b in jit["blockers"])
 
 
-def test_full_jit_pass_with_probe_flags(locked):
+def test_full_jit_pass_with_probe_flags(locked, r4_jit_allowlist):
     jit = run_r4_full_live_jit(
         candidate_runtime_sha=R4_LOCKED_CANDIDATE_RUNTIME_SHA,
         executor_runtime_sha=EXECUTOR,
@@ -316,7 +327,7 @@ def test_full_jit_pass_with_probe_flags(locked):
     assert jit["live_probes_collected"] is False
 
 
-def test_full_jit_auto_collect_invoked(locked, monkeypatch):
+def test_full_jit_auto_collect_invoked(locked, r4_jit_allowlist, monkeypatch):
     calls = {"n": 0}
 
     def fake_collect(**kwargs):
