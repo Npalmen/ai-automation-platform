@@ -50,6 +50,7 @@ CAND = Path("storage/status/digital-coworker-r4-candidates-b7fd95e.json")
 REV = Path("storage/status/digital-coworker-r4-human-review-scored-b7fd95e.json")
 MAN = Path("storage/status/digital-coworker-r4-manifest-b7fd95e.json")
 EXECUTOR = "9c743968361cfa986017704167bf35342748bbca"
+RECIPIENT = "niklas.palm@sol-f.se"
 
 
 pytestmark = pytest.mark.skipif(
@@ -308,6 +309,7 @@ def test_full_jit_pass_with_probe_flags(locked):
         orphan_isolation_ready=True,
         run_live_probes=True,
         auto_collect_live_probes=False,
+        recipient_email=RECIPIENT,
     )
     assert jit["passed"] is True
     assert jit["gmail_sends"] == 0
@@ -348,6 +350,7 @@ def test_full_jit_auto_collect_invoked(locked, monkeypatch):
         human_review_path=REV,
         run_live_probes=True,
         auto_collect_live_probes=True,
+        recipient_email=RECIPIENT,
     )
     assert calls["n"] == 1
     assert jit["passed"] is True
