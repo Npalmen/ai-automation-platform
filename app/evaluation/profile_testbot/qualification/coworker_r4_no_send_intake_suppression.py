@@ -48,6 +48,15 @@ def parse_intake_skip_reason_from_error(exc: BaseException) -> str | None:
     return reason or None
 
 
+def scenario_local_gmail_sends(
+    *,
+    campaign_gmail_sends_before: int,
+    campaign_gmail_sends_after: int,
+) -> int:
+    """Scenario-local Gmail send delta from campaign cumulative counters."""
+    return campaign_gmail_sends_after - campaign_gmail_sends_before
+
+
 def resolve_r4_no_send_intake_suppression(
     *,
     scenario_id: str,
