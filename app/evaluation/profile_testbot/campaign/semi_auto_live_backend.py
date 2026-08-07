@@ -18,6 +18,10 @@ from app.evaluation.live.config import LiveEvalConfig, get_live_eval_config
 from app.evaluation.live.errors import LiveEvalIntakeSkippedError, LiveEvalPipelinePollError, LiveEvalSafetyError
 from app.evaluation.live.gmail_transport import (
     SendOutcome,
+    _TRANSPORT_ERRORS,
+    build_recipient_client,
+    compute_reply_thread_match,
+    fetch_provider_sent_reply_object,
     observe_expected_sender_reply,
     send_scenario_email,
 )
@@ -533,6 +537,39 @@ class LiveSemiAutoBackend:
                 reply_execution_status=evidence.reply_execution_status,
                 reply_provider_outcome=evidence.reply_provider_outcome,
             )
+        provider_object = fetch_provider_sent_reply_object(
+            provider_message_id=reply_provider_id or "",
+            expected_sender=self.sender_email,
+            expected_recipient=self.recipient_email,
+            inbound_rfc_message_id=inbound_rfc,
+        )
+        inbound_thread_id: str | None = None
+        if inbound_id:
+            try:
+                inbound_detail = build_recipient_client().get_message(inbound_id)
+                inbound_thread_id = str(inbound_detail.get("thread_id") or "") or None
+            except _TRANSPORT_ERRORS:
+                inbound_thread_id = None
+        thread_match, thread_match_basis = compute_reply_thread_match(
+            provider_sent=provider_object,
+            inbound_rfc_message_id=inbound_rfc,
+            inbound_gmail_thread_id=inbound_thread_id,
+            delivered=observed,
+        )
+        reply_rfc = (
+            evidence.reply_rfc_message_id
+            or (provider_object.rfc_message_id if provider_object else None)
+            or observed.rfc_message_id
+        )
+        reply_thread_id = (
+            (provider_object.thread_id if provider_object else None) or observed.thread_id
+        )
+        reply_in_reply_to = (
+            provider_object.in_reply_to if provider_object else observed.in_reply_to
+        )
+        reply_references = (
+            provider_object.references if provider_object else observed.references
+        )
         reply_hash = hashlib.sha256(observed.message_id.encode("utf-8")).hexdigest()
         return ReplyVerification(
             execution_intents=1,
@@ -544,7 +581,12 @@ class LiveSemiAutoBackend:
             inbound_provider_message_id=inbound_id,
             inbound_rfc_message_id=inbound_rfc,
             reply_provider_message_id=reply_provider_id,
-            reply_rfc_message_id=evidence.reply_rfc_message_id,
+            reply_rfc_message_id=reply_rfc,
+            reply_thread_id=reply_thread_id,
+            reply_in_reply_to=reply_in_reply_to,
+            reply_references=reply_references,
+            thread_match=thread_match,
+            thread_match_basis=thread_match_basis,
             reply_action_operation_id=evidence.reply_action_operation_id,
             reply_execution_status=evidence.reply_execution_status,
             reply_provider_outcome=evidence.reply_provider_outcome,

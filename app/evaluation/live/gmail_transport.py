@@ -75,6 +75,10 @@ class ExpectedReplyEvidence:
     from_masked: str
     internal_date_ms: int | None
     placement: str = "recipient_verified_in_inbox"
+    thread_id: str | None = None
+    rfc_message_id: str | None = None
+    in_reply_to: str | None = None
+    references: str | None = None
 
 
 @dataclass(frozen=True)
@@ -824,7 +828,45 @@ def _reply_evidence_from_message(
         from_masked=masked_from,
         internal_date_ms=_internal_date_ms(detail),
         placement=placement,
+        thread_id=str(detail.get("thread_id") or "") or None,
+        rfc_message_id=_normalize_rfc_message_id(
+            str(detail.get("internet_message_id") or "") or None
+        ),
+        in_reply_to=_normalize_rfc_message_id(str(detail.get("in_reply_to") or "") or None),
+        references=str(detail.get("references") or "")[:240] or None,
     )
+
+
+def compute_reply_thread_match(
+    *,
+    provider_sent: ProviderSentObjectEvidence | None,
+    inbound_rfc_message_id: str | None,
+    inbound_gmail_thread_id: str | None = None,
+    delivered: ExpectedReplyEvidence | None = None,
+) -> tuple[bool, str | None]:
+    """Fail-closed thread linkage from provider Sent object + inbound anchor."""
+    if provider_sent is None or not provider_sent.rfc_message_id:
+        return False, None
+    delivered_rfc = delivered.rfc_message_id if delivered else None
+    if delivered_rfc and delivered_rfc != provider_sent.rfc_message_id:
+        return False, None
+    inbound_norm = _normalize_rfc_message_id(inbound_rfc_message_id)
+    bases: list[str] = []
+    if inbound_norm and provider_sent.in_reply_to and provider_sent.in_reply_to == inbound_norm:
+        bases.append("rfc_in_reply_to")
+    refs = provider_sent.references or ""
+    if inbound_norm and inbound_norm.strip("<>") in refs:
+        bases.append("rfc_references")
+    if (
+        inbound_gmail_thread_id
+        and provider_sent.thread_id
+        and inbound_gmail_thread_id == provider_sent.thread_id
+    ):
+        bases.append("gmail_same_mailbox_thread")
+    if not bases:
+        return False, None
+    basis = bases[0] if len(bases) == 1 else "combination"
+    return True, basis
 
 
 def _classify_recipient_placement(labels: list[str] | tuple[str, ...]) -> str:

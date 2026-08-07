@@ -474,8 +474,11 @@ def _execute_send(
 
     reply_id = getattr(verification, "reply_provider_message_id", None)
     base["reply_provider_message_id_redacted"] = _redact_id(reply_id)
-    base["reply_thread_id_redacted"] = _redact_id(
+    base["reply_rfc_message_id_redacted"] = _redact_id(
         getattr(verification, "reply_rfc_message_id", None)
+    )
+    base["reply_thread_id_redacted"] = _redact_id(
+        getattr(verification, "reply_thread_id", None)
     )
     base["adapter_provider"] = "google_mail" if verification.provider_accepted else None
     base["provider_status"] = getattr(verification, "reply_execution_status", None) or (
@@ -485,9 +488,8 @@ def _execute_send(
         verification.provider_accepted and verification.recipient_verified
     )
     base["recipient_match"] = bool(verification.recipient_verified)
-    base["thread_match"] = bool(
-        verification.provider_accepted and getattr(verification, "reply_rfc_message_id", None)
-    )
+    base["thread_match"] = bool(getattr(verification, "thread_match", False))
+    base["thread_match_basis"] = getattr(verification, "thread_match_basis", None)
     expected_hash = str(candidate.get("body_hash") or "")
     base["body_hash_match"] = expected_hash == snapshot.reviewed_body_hash == hash_body(
         snapshot.reviewed_body
