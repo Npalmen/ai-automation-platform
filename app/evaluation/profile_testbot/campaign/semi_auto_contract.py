@@ -78,6 +78,11 @@ class ReplyVerification:
     inbound_rfc_message_id: str | None = None
     reply_provider_message_id: str | None = None
     reply_rfc_message_id: str | None = None
+    reply_thread_id: str | None = None
+    reply_in_reply_to: str | None = None
+    reply_references: str | None = None
+    thread_match: bool = False
+    thread_match_basis: str | None = None
     reply_action_operation_id: str | None = None
     reply_execution_status: str | None = None
     reply_provider_outcome: str | None = None

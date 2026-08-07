@@ -1,0 +1,93 @@
+{
+  "generated_at": "2026-08-07T13:08:36Z",
+  "attempt_number": 4,
+  "campaign_id": "99fa0b7f-1a6b-45aa-bec9-07f54f845de3",
+  "evaluation_run_id": "f5089b6b-09bc-43f9-8877-f9a8d106ed11",
+  "scenario_id": "PTB-DCQ-0000",
+  "executor_runtime_sha": "271a977abb178d92004f9f636a56c081cc69d2fa",
+  "classification": "THREAD_EVIDENCE_PROPAGATION_BUG",
+  "primary_root_cause": "THREAD_EVIDENCE_PROPAGATION_BUG",
+  "proceed_to_fix": true,
+  "provider_message_id_redacted": "19fd\u202645d7",
+  "trigger_message_id_redacted": "19fd\u2026fb60",
+  "provider_sent_object": {
+    "gmail_message_id": "19fdc3af1bb645d7",
+    "gmail_message_id_redacted": "19fd\u202645d7",
+    "gmail_thread_id": "19fdc3abf1b7fb60",
+    "gmail_thread_id_redacted": "19fd\u2026fb60",
+    "rfc_message_id": "caeka9ppcfgbzxhqcmyuxy+i6mfphhivj1oxszot4r4krq2dwqa@mail.gmail.com",
+    "rfc_message_id_redacted": "caeka9pp\u2026il.com",
+    "in_reply_to": "cafbf1syle3h+ze6rfwpckrjg2c=h1d_jrhorhmeowkxnyattlw@mail.gmail.com",
+    "in_reply_to_redacted": "cafbf1sy\u2026il.com",
+    "references_redacted": "<cafbf1syle3h+ze6rfwpckrjg2c=h1d_jrhorhmeowkxnyattlw@mail.gmail.com>",
+    "labels": [
+      "SENT"
+    ],
+    "has_sent_label": true,
+    "from_redacted": "nik\u2026",
+    "to_recipients_redacted": [
+      "qvar\u2026.com"
+    ],
+    "subject_token": "Re: KROWOLF-EVAL/f5089b6b-09bc-43f9-8877-f9a8d106ed11/PTB-DCQ-0000/1 | Offert solceller Uppsala"
+  },
+  "inbound_app_mailbox_object": {
+    "gmail_message_id": "19fdc3abf1b7fb60",
+    "gmail_message_id_redacted": "19fd\u2026fb60",
+    "gmail_thread_id": "19fdc3abf1b7fb60",
+    "gmail_thread_id_redacted": "19fd\u2026fb60",
+    "rfc_message_id": "cafbf1syle3h+ze6rfwpckrjg2c=h1d_jrhorhmeowkxnyattlw@mail.gmail.com",
+    "rfc_message_id_redacted": "cafbf1sy\u2026il.com",
+    "in_reply_to": null,
+    "in_reply_to_redacted": null,
+    "references_redacted": null,
+    "labels": [
+      "Label_6416277481636141051",
+      "UNREAD",
+      "CATEGORY_PERSONAL",
+      "INBOX"
+    ],
+    "has_sent_label": false,
+    "from_redacted": "qva\u2026",
+    "to_recipients_redacted": [
+      "nikl\u2026f.se",
+      "nikl\u2026f.se"
+    ],
+    "subject_token": "KROWOLF-EVAL/f5089b6b-09bc-43f9-8877-f9a8d106ed11/PTB-DCQ-0000/1 | Offert solceller Uppsala"
+  },
+  "delivered_sender_mailbox_reply": {
+    "gmail_message_id": "19fdc3afb2adc011",
+    "gmail_message_id_redacted": "19fd\u2026c011",
+    "gmail_thread_id": "19fdc3afb2adc011",
+    "gmail_thread_id_redacted": "19fd\u2026c011",
+    "rfc_message_id": "caeka9ppcfgbzxhqcmyuxy+i6mfphhivj1oxszot4r4krq2dwqa@mail.gmail.com",
+    "rfc_message_id_redacted": "caeka9pp\u2026il.com",
+    "in_reply_to": "cafbf1syle3h+ze6rfwpckrjg2c=h1d_jrhorhmeowkxnyattlw@mail.gmail.com",
+    "in_reply_to_redacted": "cafbf1sy\u2026il.com",
+    "references_redacted": "<cafbf1syle3h+ze6rfwpckrjg2c=h1d_jrhorhmeowkxnyattlw@mail.gmail.com>",
+    "labels": [
+      "UNREAD",
+      "IMPORTANT",
+      "CATEGORY_PERSONAL",
+      "INBOX"
+    ],
+    "has_sent_label": false,
+    "from_redacted": "nik\u2026",
+    "to_recipients_redacted": [
+      "qvar\u2026.com",
+      "qvar\u2026.com"
+    ],
+    "subject_token": "Re: KROWOLF-EVAL/f5089b6b-09bc-43f9-8877-f9a8d106ed11/PTB-DCQ-0000/1 | Offert solceller Uppsala"
+  },
+  "checks": {
+    "A_provider_rfc_present": true,
+    "B_delivered_rfc_equals_provider_rfc": true,
+    "C_in_reply_to_matches_inbound": true,
+    "C_references_contains_inbound": true,
+    "C_same_mailbox_gmail_thread": true,
+    "thread_linkage_pass": true,
+    "execution_reply_rfc_exposed_to_verifier": null,
+    "verifier_used_rfc_as_thread_id_bug": true
+  },
+  "gmail_writes_performed": false,
+  "secrets_exposed": false
+}

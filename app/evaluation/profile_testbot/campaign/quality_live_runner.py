@@ -364,6 +364,10 @@ def _apply_reply_evidence(scenario_state: ScenarioExecutionState, reply: ReplyVe
         "inbound_rfc_message_id",
         "reply_provider_message_id",
         "reply_rfc_message_id",
+        "reply_thread_id",
+        "reply_in_reply_to",
+        "reply_references",
+        "thread_match_basis",
         "reply_action_operation_id",
         "reply_execution_status",
         "reply_provider_outcome",
@@ -371,6 +375,7 @@ def _apply_reply_evidence(scenario_state: ScenarioExecutionState, reply: ReplyVe
         value = getattr(reply, key, None)
         if value:
             scenario_state.evidence[key] = value
+    scenario_state.evidence["thread_match"] = bool(getattr(reply, "thread_match", False))
     if reply.reply_hash:
         scenario_state.evidence["reply_hash"] = reply.reply_hash
 
