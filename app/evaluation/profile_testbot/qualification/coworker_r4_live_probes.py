@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from typing import Any
+from uuid import uuid4
 
 from app.evaluation.live.config import get_live_eval_config
 from app.evaluation.live.gmail_transport import run_sender_readiness_read_only
@@ -20,10 +21,15 @@ from app.evaluation.profile_testbot.qualification.coworker_r4_mutation_contract 
     R4_MUTATION_PROCESS_DELIVERY,
     validate_r4_mutation_operation,
 )
+from app.evaluation.profile_testbot.qualification.coworker_r4_registration_payload import (
+    evaluate_exact_r4_registration_payload_matrix,
+    r4_registration_campaign_bindings,
+)
 from app.evaluation.profile_testbot.qualification.coworker_r4_registry import (
     R4_EXECUTE_AI_MODE,
     R4_EXECUTION_MODE,
     R4_LIVE_QUALITY_CAMPAIGN_TYPE,
+    R4_LOCKED_CANDIDATE_RUNTIME_SHA,
     R4_SUBJECT_PREFIX,
     R4_TENANT_ID,
 )
@@ -33,6 +39,9 @@ def collect_r4_live_probes(
     *,
     executor_runtime_sha: str,
     manifest: dict[str, Any],
+    candidates: dict[str, Any] | None = None,
+    human_review: dict[str, Any] | None = None,
+    campaign_id: str | None = None,
     recipient_email: str | None = None,
 ) -> dict[str, Any]:
     """Run read-only live probes. Never sends mail or creates drafts."""
@@ -99,6 +108,27 @@ def collect_r4_live_probes(
         and manifest.get("execution_mode") == R4_EXECUTION_MODE
         and manifest.get("tenant_id") == R4_TENANT_ID
     )
+    exact_registration_ok = registration_ok
+    exact_registration_matrix: dict[str, Any] | None = None
+    if candidates and human_review:
+        bindings = r4_registration_campaign_bindings(
+            campaign_id=campaign_id or f"r4-live-probe-{uuid4()}",
+            candidate_runtime_sha=R4_LOCKED_CANDIDATE_RUNTIME_SHA,
+            executor_runtime_sha=executor_runtime_sha,
+            expected_sender=sender_email.strip().lower(),
+            expected_recipient=resolved_recipient,
+            manifest_semantic_hash=str(manifest.get("manifest_semantic_hash") or ""),
+            candidate_package_semantic_hash=str(
+                candidates.get("candidate_package_semantic_hash") or ""
+            ),
+        )
+        exact_registration_matrix = evaluate_exact_r4_registration_payload_matrix(
+            bindings=bindings,
+            candidates=candidates,
+            human_review=human_review,
+            config=config,
+        )
+        exact_registration_ok = bool(exact_registration_matrix.get("passed"))
 
     delivery_ok = bool(recipient_readiness.delivery_observation_path_ready)
     exact_ok = bool(recipient_readiness.delivery_observation_path_ready)
@@ -120,6 +150,9 @@ def collect_r4_live_probes(
         blockers.extend(mut.blockers)
     if not registration_ok:
         blockers.append("registration_contract_not_ready")
+    if candidates and human_review and not exact_registration_ok:
+        blockers.append("exact_registration_payload_not_ready")
+        blockers.extend(exact_registration_matrix.get("blockers") or [])
 
     return {
         "api_build_git_sha": api_sha,
@@ -132,7 +165,9 @@ def collect_r4_live_probes(
         "reply_provider_ready": reply_ok,
         "delivery_observation_ready": delivery_ok,
         "exact_message_ready": exact_ok,
-        "registration_contract_ready": registration_ok,
+        "registration_contract_ready": registration_ok and exact_registration_ok,
+        "exact_registration_payload_ready": exact_registration_ok,
+        "exact_registration_payload_matrix": exact_registration_matrix,
         "mutation_contract_ready": bool(mut.allowed),
         "orphan_isolation_ready": True,
         "sender_profile_email": sender_readiness.profile_email,

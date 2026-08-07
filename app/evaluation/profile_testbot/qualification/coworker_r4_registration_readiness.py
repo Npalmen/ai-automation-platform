@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import os
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -31,6 +33,12 @@ from app.evaluation.profile_testbot.qualification.coworker_r4_registration_contr
     REVIEWED_LIVE_LLM_BODY as R4_AI_MODE,
     validate_r4_registration_contract,
 )
+from app.evaluation.profile_testbot.qualification.coworker_r4_registration_payload import (
+    build_r4_live_eval_register_request,
+    evaluate_exact_r4_registration_payload_matrix,
+    r4_registration_campaign_bindings,
+    send_registration_fields_from_candidate,
+)
 from app.evaluation.profile_testbot.qualification.coworker_r4_registry import (
     R4_EXECUTION_MODE,
     R4_LIVE_QUALITY_CAMPAIGN_TYPE,
@@ -46,6 +54,19 @@ from app.repositories.postgres.live_eval_models import LiveEvalRunRow
 from app.repositories.postgres.live_eval_repository import LiveEvalRunRepository
 
 R4_REGISTRATION_PROBE_SCENARIO_ID = "PTB-DCQ-0000"
+R4_LOCKED_CANDIDATES_PATH = Path("storage/status/digital-coworker-r4-candidates-b7fd95e.json")
+R4_LOCKED_HUMAN_REVIEW_PATH = Path(
+    "storage/status/digital-coworker-r4-human-review-scored-b7fd95e.json"
+)
+
+
+def _load_locked_r4_artifacts() -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    if not R4_LOCKED_CANDIDATES_PATH.is_file() or not R4_LOCKED_HUMAN_REVIEW_PATH.is_file():
+        return None, None
+    return (
+        json.loads(R4_LOCKED_CANDIDATES_PATH.read_text(encoding="utf-8")),
+        json.loads(R4_LOCKED_HUMAN_REVIEW_PATH.read_text(encoding="utf-8")),
+    )
 
 
 def _sample_send_context(*, executor_runtime_sha: str) -> R4RegistrationContext:
@@ -85,6 +106,9 @@ def evaluate_r4_registration_readiness(
     executor_runtime_sha: str,
     sender_email: str | None = None,
     recipient_email: str | None = None,
+    candidates: dict[str, Any] | None = None,
+    human_review: dict[str, Any] | None = None,
+    campaign_id: str | None = None,
 ) -> dict[str, Any]:
     """Write-free readiness across all 36 R4 scenarios."""
     config = get_live_eval_config()
@@ -214,12 +238,70 @@ def evaluate_r4_registration_readiness(
 
     blockers = list(dict.fromkeys(blockers))
     orphan = attempt1_orphan_record().to_dict()
+    sample_passed = (
+        send_ready == 20
+        and no_send_ready == 16
+        and mutation_ready == 36
+        and ai_mode_schema_supported
+        and not blockers
+    )
+
+    locked_candidates = candidates
+    locked_review = human_review
+    if locked_candidates is None or locked_review is None:
+        loaded_candidates, loaded_review = _load_locked_r4_artifacts()
+        locked_candidates = locked_candidates or loaded_candidates
+        locked_review = locked_review or loaded_review
+
+    exact_matrix: dict[str, Any] | None = None
+    exact_payload_ready = False
+    exact_blockers: list[str] = []
+    if locked_candidates and locked_review:
+        bindings = r4_registration_campaign_bindings(
+            campaign_id=campaign_id or f"r4-exact-payload-readiness-{uuid4()}",
+            candidate_runtime_sha=R4_LOCKED_CANDIDATE_RUNTIME_SHA,
+            executor_runtime_sha=executor_runtime_sha,
+            expected_sender=sender,
+            expected_recipient=recipient,
+            manifest_semantic_hash=str(
+                locked_candidates.get("manifest_semantic_hash") or R4_LOCKED_MANIFEST_SEMANTIC_HASH
+            ),
+            candidate_package_semantic_hash=str(
+                locked_candidates.get("candidate_package_semantic_hash")
+                or R4_LOCKED_CANDIDATE_PACKAGE_SEMANTIC_HASH
+            ),
+            human_review_sha256=R4_LOCKED_REVIEW_ARTIFACT_SHA256,
+        )
+        exact_matrix = evaluate_exact_r4_registration_payload_matrix(
+            bindings=bindings,
+            candidates=locked_candidates,
+            human_review=locked_review,
+            config=config,
+        )
+        exact_payload_ready = bool(exact_matrix.get("passed"))
+        if not exact_payload_ready:
+            exact_blockers = [f"exact:{b}" for b in (exact_matrix.get("blockers") or [])[:8]]
+
+    passed = sample_passed and (exact_matrix is None or exact_payload_ready)
     return {
         "ai_mode_schema_supported": ai_mode_schema_supported,
         "allowed_ai_modes_contains_r4": REVIEWED_LIVE_LLM_BODY in ALLOWED_AI_MODES,
         "registration_contract_valid": send_ready == 20 and no_send_ready == 16 and not blockers,
         "send_registration_ready": f"{send_ready}/20",
         "no_send_registration_ready": f"{no_send_ready}/16",
+        "exact_send_registration_payload_ready": (
+            exact_matrix.get("exact_send_registration_payload_ready") if exact_matrix else "skipped"
+        ),
+        "exact_no_send_registration_payload_ready": (
+            exact_matrix.get("exact_no_send_registration_payload_ready")
+            if exact_matrix
+            else "skipped"
+        ),
+        "exact_registration_payload_ready": (
+            exact_matrix.get("exact_registration_payload_ready") if exact_matrix else "skipped"
+        ),
+        "exact_payload_matrix": exact_matrix,
+        "exact_payload_ready": exact_payload_ready if exact_matrix else None,
         "persistent_context_schema_ready": True,
         "trusted_snapshot_roundtrip_ready": True,
         "registration_config_hash_binding_ready": True,
@@ -233,12 +315,8 @@ def evaluate_r4_registration_readiness(
         "attempt1_orphan": orphan,
         "automatic_gmail": False,
         "production_activation": False,
-        "blockers": blockers,
-        "passed": send_ready == 20
-        and no_send_ready == 16
-        and mutation_ready == 36
-        and ai_mode_schema_supported
-        and not blockers,
+        "blockers": list(dict.fromkeys(blockers + exact_blockers)),
+        "passed": passed,
     }
 
 
@@ -253,28 +331,30 @@ def run_r4_registration_db_probe(
     sender = sorted(config.sender_emails)[0]
     recipient = sorted(config.recipient_emails)[0]
     evaluation_run_id = str(uuid4())
-    ctx = _sample_send_context(executor_runtime_sha=executor_runtime_sha)
-    ctx = ctx.model_copy(
-        update={
-            "plan_hash": "probe-plan-hash",
-            "reviewed_body_hash": "p" * 64,
-            "probe": True,
-        }
-    )
-    request = LiveEvalRunRegisterRequest(
-        evaluation_run_id=evaluation_run_id,
-        tenant_id=R4_TENANT_ID,
-        scenario_id=R4_REGISTRATION_PROBE_SCENARIO_ID,
-        attempt_id=1,
-        transport_mode="live_gmail",
-        ai_mode=R4_AI_MODE,
-        campaign_type=R4_LIVE_QUALITY_CAMPAIGN_TYPE,
-        execution_mode=R4_EXECUTION_MODE,
+    bindings = r4_registration_campaign_bindings(
         campaign_id=f"r4-registration-probe-{uuid4()}",
-        manifest_hash=R4_LOCKED_MANIFEST_SEMANTIC_HASH,
+        candidate_runtime_sha=R4_LOCKED_CANDIDATE_RUNTIME_SHA,
+        executor_runtime_sha=executor_runtime_sha,
         expected_sender=sender,
         expected_recipient=recipient,
-        registration_context=ctx,
+    )
+    request = build_r4_live_eval_register_request(
+        bindings,
+        scenario_id=R4_REGISTRATION_PROBE_SCENARIO_ID,
+        evaluation_run_id=evaluation_run_id,
+        attempt_id=1,
+        planned_gmail_send=True,
+        send_fields=send_registration_fields_from_candidate(
+            {
+                "plan_hash": "probe-plan-hash",
+                "body_hash": "p" * 64,
+                "renderer_type": "constrained_llm_v1",
+                "model_id": "gpt-4o-mini-2024-07-18",
+                "prompt_version": "coworker_constrained_llm_v5",
+            },
+            {"review_status": "PASS"},
+        ),
+        probe=True,
     )
     response = register_live_eval_run(db, request, created_by=created_by)
     row = LiveEvalRunRepository.get_run(
