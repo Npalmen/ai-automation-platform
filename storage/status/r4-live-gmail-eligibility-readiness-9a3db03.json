@@ -1,0 +1,20 @@
+{
+  "executor_runtime_sha": "9a3db037eb6e1c8afe1da4d04e57a095b47d3326",
+  "candidate_runtime_sha": "b7fd95e075c16feee93a116a6062e402c1fee3df",
+  "r4_registry_cardinality": 36,
+  "live_gmail_scenario_eligibility": "36/36",
+  "send_eligibility": "20/20",
+  "no_send_eligibility": "16/16",
+  "live_trigger_intended_eligibility": "35/35",
+  "ptb_sem_0024_local_quarantine": "1/1",
+  "exact_registration": "36/36",
+  "ptb_dcq_0000_to_0002_production_safety_regression": "PASS",
+  "gmail_triggers": 0,
+  "gmail_replies": 0,
+  "gmail_drafts": 0,
+  "external_writes": 0,
+  "llm_calls": 0,
+  "candidate_regeneration": 0,
+  "secrets_exposed": false,
+  "passed": true
+}

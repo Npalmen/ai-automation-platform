@@ -21,6 +21,9 @@ from app.evaluation.profile_testbot.qualification.coworker_r4_mutation_contract 
     R4_MUTATION_PROCESS_DELIVERY,
     validate_r4_mutation_operation,
 )
+from app.evaluation.profile_testbot.qualification.coworker_r4_live_gmail_eligibility import (
+    evaluate_r4_live_gmail_scenario_eligibility_matrix,
+)
 from app.evaluation.profile_testbot.qualification.coworker_r4_registration_payload import (
     evaluate_exact_r4_registration_payload_matrix,
     r4_registration_campaign_bindings,
@@ -110,6 +113,8 @@ def collect_r4_live_probes(
     )
     exact_registration_ok = registration_ok
     exact_registration_matrix: dict[str, Any] | None = None
+    eligibility_matrix = evaluate_r4_live_gmail_scenario_eligibility_matrix()
+    eligibility_ok = bool(eligibility_matrix.get("passed"))
     if candidates and human_review:
         bindings = r4_registration_campaign_bindings(
             campaign_id=campaign_id or f"r4-live-probe-{uuid4()}",
@@ -150,6 +155,9 @@ def collect_r4_live_probes(
         blockers.extend(mut.blockers)
     if not registration_ok:
         blockers.append("registration_contract_not_ready")
+    if not eligibility_ok:
+        blockers.append("r4_live_gmail_scenario_eligibility_not_ready")
+        blockers.extend(eligibility_matrix.get("blockers") or [])
     if candidates and human_review and not exact_registration_ok:
         blockers.append("exact_registration_payload_not_ready")
         blockers.extend(exact_registration_matrix.get("blockers") or [])
@@ -165,9 +173,13 @@ def collect_r4_live_probes(
         "reply_provider_ready": reply_ok,
         "delivery_observation_ready": delivery_ok,
         "exact_message_ready": exact_ok,
-        "registration_contract_ready": registration_ok and exact_registration_ok,
+        "registration_contract_ready": registration_ok and exact_registration_ok and eligibility_ok,
         "exact_registration_payload_ready": exact_registration_ok,
         "exact_registration_payload_matrix": exact_registration_matrix,
+        "r4_live_gmail_scenario_eligibility": eligibility_matrix.get(
+            "r4_live_gmail_scenario_eligibility"
+        ),
+        "live_gmail_scenario_eligibility_matrix": eligibility_matrix,
         "mutation_contract_ready": bool(mut.allowed),
         "orphan_isolation_ready": True,
         "sender_profile_email": sender_readiness.profile_email,

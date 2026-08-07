@@ -561,6 +561,13 @@ def _send_inbound_trigger_for_scenario(
         evaluation_run_id=evaluation_run_id,
         campaign_id=campaign_id,
     )
+    from app.evaluation.profile_testbot.qualification.coworker_r4_registry import (
+        R4_EXECUTE_AI_MODE,
+        R4_EXECUTION_MODE,
+        R4_LIVE_QUALITY_CAMPAIGN_TYPE,
+        R4_TENANT_ID,
+    )
+
     outcome, _events = send_scenario_email(
         evaluation_run_id=evaluation_run_id,
         scenario_id=scenario.scenario_id,
@@ -570,6 +577,10 @@ def _send_inbound_trigger_for_scenario(
         base_subject=scenario.input.subject,
         message_body=body,
         config=backend.config,
+        registration_ai_mode=R4_EXECUTE_AI_MODE,
+        registration_campaign_type=R4_LIVE_QUALITY_CAMPAIGN_TYPE,
+        registration_execution_mode=R4_EXECUTION_MODE,
+        registration_tenant_id=R4_TENANT_ID,
     )
     ctx.send_outcome = outcome
     ctx.inbound_provider_message_id = outcome.sender_gmail_message_id

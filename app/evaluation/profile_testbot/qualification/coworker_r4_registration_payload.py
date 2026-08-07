@@ -7,6 +7,7 @@ from typing import Any
 from uuid import uuid4
 
 from app.evaluation.live.config import LiveEvalConfig, get_live_eval_config
+from app.evaluation.live.errors import LiveEvalSafetyError
 from app.evaluation.live.schemas import LiveEvalRunRegisterRequest
 from app.evaluation.profile_testbot.qualification.coworker_r4_registration_contract import (
     R4RegistrationContext,
@@ -189,6 +190,8 @@ def validate_exact_r4_registration_payload(
     config: LiveEvalConfig | None = None,
 ) -> dict[str, Any]:
     config = config or get_live_eval_config()
+    from app.evaluation.live.safety import validate_live_gmail_registration
+
     result = validate_r4_registration_contract(
         R4RegistrationContractRequest(
             tenant_id=request.tenant_id,
@@ -207,7 +210,24 @@ def validate_exact_r4_registration_payload(
             recipient_allowlist=config.recipient_emails,
         )
     )
+    live_gmail_blockers: list[str] = []
+    live_gmail_eligible = False
+    try:
+        validate_live_gmail_registration(
+            transport_mode=request.transport_mode,
+            scenario_id=request.scenario_id,
+            ai_mode=request.ai_mode,
+            campaign_type=request.campaign_type,
+            execution_mode=request.execution_mode,
+            tenant_id=request.tenant_id,
+        )
+        live_gmail_eligible = True
+    except LiveEvalSafetyError as exc:
+        live_gmail_blockers.append(str(exc))
+
     ctx = request.registration_context
+    passed = result.registration_contract_valid and live_gmail_eligible
+    blockers = list(result.registration_blockers) + live_gmail_blockers
     return {
         "scenario_id": request.scenario_id,
         "evaluation_run_id": request.evaluation_run_id,
@@ -219,8 +239,9 @@ def validate_exact_r4_registration_payload(
         in {e.strip().lower() for e in config.recipient_emails},
         "schema_valid": True,
         "registration_contract_valid": result.registration_contract_valid,
-        "registration_blockers": list(result.registration_blockers),
-        "passed": result.registration_contract_valid,
+        "live_gmail_scenario_eligible": live_gmail_eligible,
+        "registration_blockers": blockers,
+        "passed": passed,
     }
 
 

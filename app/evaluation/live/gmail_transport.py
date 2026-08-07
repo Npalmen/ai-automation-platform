@@ -433,11 +433,32 @@ def send_scenario_email(
     base_subject: str = "Laddbox offert villa",
     message_body: str | None = None,
     config: LiveEvalConfig | None = None,
+    registration_ai_mode: str | None = None,
+    registration_campaign_type: str | None = None,
+    registration_execution_mode: str | None = None,
+    registration_tenant_id: str | None = None,
 ) -> tuple[SendOutcome, list[dict[str, Any]]]:
     """Send exactly one synthetic email. Returns outcome and telemetry events."""
     config = config or get_live_eval_config()
     require_live_eval_external_mutation_enabled(config)
-    require_scenario_allowed_for_live_gmail(scenario_id)
+    from app.evaluation.live.safety import validate_live_gmail_registration
+
+    if (
+        registration_ai_mode
+        and registration_campaign_type
+        and registration_execution_mode
+        and registration_tenant_id
+    ):
+        validate_live_gmail_registration(
+            transport_mode="live_gmail",
+            scenario_id=scenario_id,
+            ai_mode=registration_ai_mode,
+            campaign_type=registration_campaign_type,
+            execution_mode=registration_execution_mode,
+            tenant_id=registration_tenant_id,
+        )
+    else:
+        require_scenario_allowed_for_live_gmail(scenario_id)
 
     if checkpoint is not None:
         assert_journal_send_budget(checkpoint)

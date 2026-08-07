@@ -354,10 +354,11 @@ def validate_live_gmail_registration(
     scenario_id: str,
     ai_mode: str,
     campaign_type: str | None = None,
+    execution_mode: str | None = None,
+    tenant_id: str | None = None,
 ) -> None:
     if transport_mode != "live_gmail":
         return
-    require_scenario_allowed_for_live_gmail(scenario_id)
     from app.evaluation.profile_testbot.campaign.scenario_gate import (
         is_profile_testbot_quality_scenario,
         is_profile_testbot_semi_auto_scenario,
@@ -365,15 +366,38 @@ def validate_live_gmail_registration(
     from app.evaluation.profile_testbot.qualification.coworker_r3_registration_contract import (
         is_r3_frozen_live_canary_scenario,
     )
+    from app.evaluation.profile_testbot.qualification.coworker_r4_live_gmail_eligibility import (
+        is_r4_reviewed_live_gmail_context,
+        require_r4_reviewed_live_gmail_scenario_eligible,
+    )
     from app.evaluation.profile_testbot.qualification.coworker_r4_registration_contract import (
         REVIEWED_LIVE_LLM_BODY,
         is_r4_registry_scenario,
     )
     from app.evaluation.profile_testbot.qualification.coworker_r4_registry import (
+        R4_EXECUTION_MODE,
         R4_LIVE_QUALITY_CAMPAIGN_TYPE as _R4_CT,
+        R4_TENANT_ID,
     )
 
-    # R4 branch must run before overlapping R3 scenario force-path.
+    if is_r4_reviewed_live_gmail_context(
+        transport_mode=transport_mode,
+        ai_mode=ai_mode,
+        campaign_type=campaign_type,
+        execution_mode=execution_mode,
+        tenant_id=tenant_id,
+    ):
+        require_r4_reviewed_live_gmail_scenario_eligible(
+            scenario_id,
+            transport_mode=transport_mode,
+            ai_mode=ai_mode,
+            campaign_type=campaign_type,
+            execution_mode=execution_mode,
+            tenant_id=tenant_id or R4_TENANT_ID,
+        )
+        return
+
+    # Incomplete R4 signals must fail before legacy 2F.2/full-system gate.
     if ai_mode == REVIEWED_LIVE_LLM_BODY or campaign_type == _R4_CT:
         if ai_mode != REVIEWED_LIVE_LLM_BODY:
             raise LiveEvalSafetyError(
@@ -383,9 +407,17 @@ def validate_live_gmail_registration(
             raise LiveEvalSafetyError(
                 "R4 reviewed-live requires campaign_type coworker_r4_live_quality_campaign"
             )
+        if execution_mode and execution_mode != R4_EXECUTION_MODE:
+            raise LiveEvalSafetyError(
+                f"R4 reviewed-live requires execution_mode {R4_EXECUTION_MODE!r}"
+            )
+        if tenant_id and tenant_id != R4_TENANT_ID:
+            raise LiveEvalSafetyError(f"R4 reviewed-live requires tenant_id {R4_TENANT_ID!r}")
         if not is_r4_registry_scenario(scenario_id):
             raise LiveEvalSafetyError(f"scenario_id {scenario_id!r} not in R4 registry")
-        return
+        raise LiveEvalSafetyError("R4 reviewed-live requires complete registration context")
+
+    require_scenario_allowed_for_live_gmail(scenario_id)
 
     if is_r3_frozen_live_canary_scenario(scenario_id):
         if ai_mode != "r3_frozen_approved_body":
