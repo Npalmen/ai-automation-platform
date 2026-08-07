@@ -1,0 +1,601 @@
+{
+  "campaign_type": "coworker_r4_live_quality_campaign",
+  "execution_mode": "r4_reviewed_live_candidate",
+  "ai_mode": "live_llm",
+  "tenant_id": "TENANT_LIVE_EVAL",
+  "profile_id": "niklas-demo-live-eval-v1",
+  "profile_hash": "d1046e8460f8e730380fc3a8dedfa67f2f71298f2eadd069219946327c58e5ef",
+  "runtime_sha": "b7fd95e075c16feee93a116a6062e402c1fee3df",
+  "runner_sha": "b7fd95e075c16feee93a116a6062e402c1fee3df",
+  "scenario_ids": [
+    "PTB-DCQ-0000",
+    "PTB-DCQ-0002",
+    "PTB-DCQ-0005",
+    "PTB-DCQ-0007",
+    "PTB-DCQ-0013",
+    "PTB-DCQ-0016",
+    "PTB-DCQ-0018",
+    "PTB-DCQ-0022",
+    "PTB-DCQ-0033",
+    "PTB-DCQ-0040",
+    "PTB-DCQ-0049",
+    "PTB-DCQ-0056",
+    "PTB-DCQ-0057",
+    "PTB-DCQ-0065",
+    "PTB-DCQ-0072",
+    "PTB-DCQ-0080",
+    "PTB-DCQ-0088",
+    "PTB-DCQ-0098",
+    "PTB-DCQ-0106",
+    "PTB-DCQ-0112",
+    "PTB-DCQ-0024",
+    "PTB-DCQ-0029",
+    "PTB-DCQ-0032",
+    "PTB-DCQ-0037",
+    "PTB-DCQ-0048",
+    "PTB-DCQ-0053",
+    "PTB-SEM-0020",
+    "PTB-SEM-0021",
+    "PTB-SEM-0023",
+    "PTB-SEM-0024",
+    "PTB-SEM-0025",
+    "PTB-SEM-0026",
+    "PTB-SEM-0027",
+    "PTB-SEM-0028",
+    "PTB-SEM-0032",
+    "PTB-SEM-0038"
+  ],
+  "send_scenario_ids": [
+    "PTB-DCQ-0000",
+    "PTB-DCQ-0002",
+    "PTB-DCQ-0005",
+    "PTB-DCQ-0007",
+    "PTB-DCQ-0013",
+    "PTB-DCQ-0016",
+    "PTB-DCQ-0018",
+    "PTB-DCQ-0022",
+    "PTB-DCQ-0033",
+    "PTB-DCQ-0040",
+    "PTB-DCQ-0049",
+    "PTB-DCQ-0056",
+    "PTB-DCQ-0057",
+    "PTB-DCQ-0065",
+    "PTB-DCQ-0072",
+    "PTB-DCQ-0080",
+    "PTB-DCQ-0088",
+    "PTB-DCQ-0098",
+    "PTB-DCQ-0106",
+    "PTB-DCQ-0112"
+  ],
+  "no_send_scenario_ids": [
+    "PTB-DCQ-0024",
+    "PTB-DCQ-0029",
+    "PTB-DCQ-0032",
+    "PTB-DCQ-0037",
+    "PTB-DCQ-0048",
+    "PTB-DCQ-0053",
+    "PTB-SEM-0020",
+    "PTB-SEM-0021",
+    "PTB-SEM-0023",
+    "PTB-SEM-0024",
+    "PTB-SEM-0025",
+    "PTB-SEM-0026",
+    "PTB-SEM-0027",
+    "PTB-SEM-0028",
+    "PTB-SEM-0032",
+    "PTB-SEM-0038"
+  ],
+  "scenario_rows": [
+    {
+      "scenario_id": "PTB-DCQ-0000",
+      "family": "solar_installation_new",
+      "language": "sv",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "service_specific_prequalification"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0002",
+      "family": "solar_installation_new",
+      "language": "en",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "english"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0005",
+      "family": "solar_installation_new",
+      "language": "sv",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "no_name_phone",
+        "service_specific_prequalification"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0007",
+      "family": "solar_installation_new",
+      "language": "sv",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "multi_turn",
+        "no_name_phone"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0013",
+      "family": "solar_installation_followup",
+      "language": "sv",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "no_name_phone"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0016",
+      "family": "battery_installation_new",
+      "language": "sv",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "service_specific_prequalification"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0018",
+      "family": "battery_installation_new",
+      "language": "en",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "no_name_phone",
+        "service_specific_prequalification",
+        "english"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0022",
+      "family": "battery_installation_new",
+      "language": "sv",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "multi_turn",
+        "no_name_phone"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0033",
+      "family": "ev_charger_new",
+      "language": "sv",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "multi_turn",
+        "service_specific_prequalification"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0040",
+      "family": "ev_charger_known_facts",
+      "language": "sv",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "no_name_phone",
+        "service_specific_prequalification"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0049",
+      "family": "solar_battery_combined",
+      "language": "sv",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "service_specific_prequalification"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0056",
+      "family": "existing_support_symptom",
+      "language": "sv",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "no_name_phone"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0057",
+      "family": "existing_support_symptom",
+      "language": "sv",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "multi_turn",
+        "no_name_phone"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0065",
+      "family": "existing_support_followup",
+      "language": "sv",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "multi_turn",
+        "no_name_phone"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0072",
+      "family": "job_status_request",
+      "language": "sv",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "multi_turn",
+        "no_name_phone"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0080",
+      "family": "job_status_no_contact",
+      "language": "sv",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "multi_turn",
+        "no_name_phone"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0088",
+      "family": "complaint_warranty",
+      "language": "sv",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "service_specific_prequalification",
+        "complaint",
+        "r3_hold_override_excluded"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0098",
+      "family": "general_consultation",
+      "language": "en",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "service_specific_prequalification",
+        "english"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0106",
+      "family": "missing_attachment",
+      "language": "en",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "service_specific_prequalification",
+        "english"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0112",
+      "family": "multi_turn_continuation",
+      "language": "sv",
+      "expected_send_behavior": "send_after_approval",
+      "planned_gmail_send": true,
+      "planned_no_send": false,
+      "tags": [
+        "planned_send",
+        "multi_turn",
+        "no_name_phone"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0024",
+      "family": "battery_installation_known_facts",
+      "language": "en",
+      "expected_send_behavior": "draft_for_approval",
+      "planned_gmail_send": false,
+      "planned_no_send": true,
+      "tags": [
+        "planned_no_send",
+        "no_name_phone",
+        "english",
+        "hold_draft"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0029",
+      "family": "battery_installation_known_facts",
+      "language": "sv",
+      "expected_send_behavior": "draft_for_approval",
+      "planned_gmail_send": false,
+      "planned_no_send": true,
+      "tags": [
+        "planned_no_send",
+        "multi_turn",
+        "hold_draft"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0032",
+      "family": "ev_charger_new",
+      "language": "en",
+      "expected_send_behavior": "draft_for_approval",
+      "planned_gmail_send": false,
+      "planned_no_send": true,
+      "tags": [
+        "planned_no_send",
+        "no_name_phone",
+        "english",
+        "hold_draft"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0037",
+      "family": "ev_charger_new",
+      "language": "sv",
+      "expected_send_behavior": "draft_for_approval",
+      "planned_gmail_send": false,
+      "planned_no_send": true,
+      "tags": [
+        "planned_no_send",
+        "multi_turn",
+        "hold_draft"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0048",
+      "family": "solar_battery_combined",
+      "language": "sv",
+      "expected_send_behavior": "draft_for_approval",
+      "planned_gmail_send": false,
+      "planned_no_send": true,
+      "tags": [
+        "planned_no_send",
+        "no_name_phone",
+        "hold_draft"
+      ]
+    },
+    {
+      "scenario_id": "PTB-DCQ-0053",
+      "family": "solar_battery_combined",
+      "language": "sv",
+      "expected_send_behavior": "draft_for_approval",
+      "planned_gmail_send": false,
+      "planned_no_send": true,
+      "tags": [
+        "planned_no_send",
+        "hold_draft"
+      ]
+    },
+    {
+      "scenario_id": "PTB-SEM-0020",
+      "family": "invoice",
+      "language": "sv",
+      "expected_send_behavior": "reject",
+      "planned_gmail_send": false,
+      "planned_no_send": true,
+      "tags": [
+        "planned_no_send",
+        "hard_no_send"
+      ]
+    },
+    {
+      "scenario_id": "PTB-SEM-0021",
+      "family": "leads",
+      "language": "sv",
+      "expected_send_behavior": "hold",
+      "planned_gmail_send": false,
+      "planned_no_send": true,
+      "tags": [
+        "planned_no_send"
+      ]
+    },
+    {
+      "scenario_id": "PTB-SEM-0023",
+      "family": "spam",
+      "language": "sv",
+      "expected_send_behavior": "no_reply",
+      "planned_gmail_send": false,
+      "planned_no_send": true,
+      "tags": [
+        "planned_no_send",
+        "hard_no_send",
+        "threat"
+      ]
+    },
+    {
+      "scenario_id": "PTB-SEM-0024",
+      "family": "spam",
+      "language": "sv",
+      "expected_send_behavior": "reject",
+      "planned_gmail_send": false,
+      "planned_no_send": true,
+      "tags": [
+        "planned_no_send",
+        "hard_no_send",
+        "threat"
+      ]
+    },
+    {
+      "scenario_id": "PTB-SEM-0025",
+      "family": "support",
+      "language": "sv",
+      "expected_send_behavior": "reject",
+      "planned_gmail_send": false,
+      "planned_no_send": true,
+      "tags": [
+        "planned_no_send",
+        "hard_no_send"
+      ]
+    },
+    {
+      "scenario_id": "PTB-SEM-0026",
+      "family": "leads",
+      "language": "sv",
+      "expected_send_behavior": "hold",
+      "planned_gmail_send": false,
+      "planned_no_send": true,
+      "tags": [
+        "planned_no_send"
+      ]
+    },
+    {
+      "scenario_id": "PTB-SEM-0027",
+      "family": "leads",
+      "language": "sv",
+      "expected_send_behavior": "hold",
+      "planned_gmail_send": false,
+      "planned_no_send": true,
+      "tags": [
+        "planned_no_send"
+      ]
+    },
+    {
+      "scenario_id": "PTB-SEM-0028",
+      "family": "leads",
+      "language": "sv",
+      "expected_send_behavior": "hold",
+      "planned_gmail_send": false,
+      "planned_no_send": true,
+      "tags": [
+        "planned_no_send"
+      ]
+    },
+    {
+      "scenario_id": "PTB-SEM-0032",
+      "family": "leads",
+      "language": "sv",
+      "expected_send_behavior": "hold",
+      "planned_gmail_send": false,
+      "planned_no_send": true,
+      "tags": [
+        "planned_no_send"
+      ]
+    },
+    {
+      "scenario_id": "PTB-SEM-0038",
+      "family": "leads",
+      "language": "sv",
+      "expected_send_behavior": "hold",
+      "planned_gmail_send": false,
+      "planned_no_send": true,
+      "tags": [
+        "planned_no_send"
+      ]
+    }
+  ],
+  "total_scenarios": 36,
+  "maximum_gmail_sends": 20,
+  "minimum_no_send": 16,
+  "required_coverage": {
+    "families_min": 15,
+    "multi_turn_min": 10,
+    "no_name_phone_min": 10,
+    "service_prequalification_min": 10
+  },
+  "coverage": {
+    "scenario_count": 36,
+    "family_count": 19,
+    "coworker_family_count": 15,
+    "planned_sends": 20,
+    "planned_no_send": 16,
+    "multi_turn_count": 10,
+    "no_name_phone_count": 15,
+    "service_prequalification_count": 10,
+    "family_distribution": {
+      "solar_installation_new": 4,
+      "solar_installation_followup": 1,
+      "battery_installation_new": 3,
+      "ev_charger_new": 3,
+      "ev_charger_known_facts": 1,
+      "solar_battery_combined": 3,
+      "existing_support_symptom": 2,
+      "existing_support_followup": 1,
+      "job_status_request": 1,
+      "job_status_no_contact": 1,
+      "complaint_warranty": 1,
+      "general_consultation": 1,
+      "missing_attachment": 1,
+      "multi_turn_continuation": 1,
+      "battery_installation_known_facts": 2,
+      "invoice": 1,
+      "leads": 6,
+      "spam": 2,
+      "support": 1
+    }
+  },
+  "prompt_version": "coworker_constrained_llm_v5",
+  "model_id": "gpt-4o-mini",
+  "renderer_template_version": "digital_coworker_constrained_llm_v5",
+  "renderer_policy_version": "digital_coworker_renderer_v1",
+  "validator_version": "post_render_validator_v4",
+  "plan_policy_version": "customer_reply_plan_v3",
+  "playbook_contract_version": "service_playbook_contract_v1",
+  "automatic_gmail": false,
+  "production_activation": false,
+  "no_automatic_retry": true,
+  "no_drafts": true,
+  "external_write_allowlist": [
+    "gmail_reply"
+  ],
+  "recipient_allowlist": {
+    "domain": "sol-f.se",
+    "local_prefix": "ni"
+  },
+  "r3_hold_override_generalized": false,
+  "manifest_semantic_hash": "bdebc3ce422aee302fdafad748e3e9b93a3deda8effe5deb90b49853e09144f5"
+}

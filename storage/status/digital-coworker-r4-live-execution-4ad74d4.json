@@ -1,0 +1,2082 @@
+{
+  "mode": "execute",
+  "generated_at": "2026-08-07T22:21:44Z",
+  "campaign_id": "b4dcd6a8-9bda-4ce4-8b63-4e7a54176605",
+  "candidate_runtime_sha": "b7fd95e075c16feee93a116a6062e402c1fee3df",
+  "executor_runtime_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d",
+  "manifest_semantic_hash": "bdebc3ce422aee302fdafad748e3e9b93a3deda8effe5deb90b49853e09144f5",
+  "candidate_package_semantic_hash": "6e6c37aaa57df1464fbc367701c0cfbfaf500f697ffae5cec3a50d2dda116254",
+  "human_review_sha256": "7dced592907fb6fcbb89e632f1e37246cd120ace2a453e0aaa198397f5f0b57b",
+  "manifest_blockers": [],
+  "binding_blockers": [],
+  "candidates_overall_status": "PASS",
+  "candidates_source": "storage\\status\\digital-coworker-r4-candidates-b7fd95e.json",
+  "human_review_source": "storage\\status\\digital-coworker-r4-human-review-scored-b7fd95e.json",
+  "candidates_regenerated": false,
+  "llm_calls": 0,
+  "gmail_sends": 20,
+  "gmail_drafts": 0,
+  "external_writes": 0,
+  "new_trigger_emails": 0,
+  "automatic_gmail": false,
+  "production_activation": false,
+  "r3_hold_override_generalized": false,
+  "ai_mode_registration": "reviewed_live_llm_body",
+  "backend_wired": true,
+  "execute_backend_type": "r4_live_eval_semi_auto_backend",
+  "execute_callback_available": true,
+  "reuses_live_semi_auto_backend": true,
+  "gmail_client_new": false,
+  "oauth_client_new": false,
+  "http_client_new": false,
+  "campaign_registration": {
+    "campaign_id": "b4dcd6a8-9bda-4ce4-8b63-4e7a54176605",
+    "tenant_id": "TENANT_LIVE_EVAL",
+    "campaign_type": "coworker_r4_live_quality_campaign",
+    "execution_mode": "r4_reviewed_live_candidate",
+    "ai_mode": "reviewed_live_llm_body",
+    "scenario_count": 36,
+    "planned_sends": 20,
+    "planned_no_send": 16,
+    "send_budget": 20,
+    "no_automatic_retry": true,
+    "drafts": "forbidden",
+    "candidate_runtime_sha": "b7fd95e075c16feee93a116a6062e402c1fee3df",
+    "executor_runtime_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d",
+    "manifest_semantic_hash": "bdebc3ce422aee302fdafad748e3e9b93a3deda8effe5deb90b49853e09144f5",
+    "candidate_package_semantic_hash": "6e6c37aaa57df1464fbc367701c0cfbfaf500f697ffae5cec3a50d2dda116254",
+    "human_review_sha256": "7dced592907fb6fcbb89e632f1e37246cd120ace2a453e0aaa198397f5f0b57b",
+    "profile_id": "niklas-demo-live-eval-v1",
+    "profile_hash": "d1046e8460f8e730380fc3a8dedfa67f2f71298f2eadd069219946327c58e5ef",
+    "scenario_ids": [
+      "PTB-DCQ-0000",
+      "PTB-DCQ-0002",
+      "PTB-DCQ-0005",
+      "PTB-DCQ-0007",
+      "PTB-DCQ-0013",
+      "PTB-DCQ-0016",
+      "PTB-DCQ-0018",
+      "PTB-DCQ-0022",
+      "PTB-DCQ-0033",
+      "PTB-DCQ-0040",
+      "PTB-DCQ-0049",
+      "PTB-DCQ-0056",
+      "PTB-DCQ-0057",
+      "PTB-DCQ-0065",
+      "PTB-DCQ-0072",
+      "PTB-DCQ-0080",
+      "PTB-DCQ-0088",
+      "PTB-DCQ-0098",
+      "PTB-DCQ-0106",
+      "PTB-DCQ-0112",
+      "PTB-DCQ-0024",
+      "PTB-DCQ-0029",
+      "PTB-DCQ-0032",
+      "PTB-DCQ-0037",
+      "PTB-DCQ-0048",
+      "PTB-DCQ-0053",
+      "PTB-SEM-0020",
+      "PTB-SEM-0021",
+      "PTB-SEM-0023",
+      "PTB-SEM-0024",
+      "PTB-SEM-0025",
+      "PTB-SEM-0026",
+      "PTB-SEM-0027",
+      "PTB-SEM-0028",
+      "PTB-SEM-0032",
+      "PTB-SEM-0038"
+    ],
+    "send_scenario_ids": [
+      "PTB-DCQ-0000",
+      "PTB-DCQ-0002",
+      "PTB-DCQ-0005",
+      "PTB-DCQ-0007",
+      "PTB-DCQ-0013",
+      "PTB-DCQ-0016",
+      "PTB-DCQ-0018",
+      "PTB-DCQ-0022",
+      "PTB-DCQ-0033",
+      "PTB-DCQ-0040",
+      "PTB-DCQ-0049",
+      "PTB-DCQ-0056",
+      "PTB-DCQ-0057",
+      "PTB-DCQ-0065",
+      "PTB-DCQ-0072",
+      "PTB-DCQ-0080",
+      "PTB-DCQ-0088",
+      "PTB-DCQ-0098",
+      "PTB-DCQ-0106",
+      "PTB-DCQ-0112"
+    ],
+    "no_send_scenario_ids": [
+      "PTB-DCQ-0024",
+      "PTB-DCQ-0029",
+      "PTB-DCQ-0032",
+      "PTB-DCQ-0037",
+      "PTB-DCQ-0048",
+      "PTB-DCQ-0053",
+      "PTB-SEM-0020",
+      "PTB-SEM-0021",
+      "PTB-SEM-0023",
+      "PTB-SEM-0024",
+      "PTB-SEM-0025",
+      "PTB-SEM-0026",
+      "PTB-SEM-0027",
+      "PTB-SEM-0028",
+      "PTB-SEM-0032",
+      "PTB-SEM-0038"
+    ],
+    "body_hashes": {
+      "PTB-DCQ-0000": "0ac564e1147cc4af0147f4ebc1c183f1077eeae6ef11c22bc0ad46dd77a89404",
+      "PTB-DCQ-0002": "3c344e0c47b65c6aa7aa097a27e9ff6b724e6e8d063af87829d85bd621a66f21",
+      "PTB-DCQ-0005": "490750d6a4cb5f9a54dc187d1188008066b0edf4eaeafca5f45db3344216bc21",
+      "PTB-DCQ-0007": "4b63ced7d7d870ff5c24f0ae2c9dc8ae7ad43e69f06471977aa003e42306c333",
+      "PTB-DCQ-0013": "acfe958f53e2898f4fc7b5f96976af6a44389ddefa94d4ff6688e1c5fc7dde2b",
+      "PTB-DCQ-0016": "cc651bfe696af791af4eb79fc88d64bc69a3fe8b3c41e8cfcad33332de4393f6",
+      "PTB-DCQ-0018": "147f99e7f16f63b39f2d34a7434bffa24dc362b8244fce2fdb4476f6a94166b1",
+      "PTB-DCQ-0022": "950bc0e5d471bb02e76f48e5a447ac9bd649520fc66baa9892d711e79cd6b759",
+      "PTB-DCQ-0033": "7741532585cfe97e35a11027ad713344e681c668ca98ef1d06b18731ed9d38d4",
+      "PTB-DCQ-0040": "57a65ee30e18cc75835f326f38031c776e849f15b968f477865fc7c766af60d3",
+      "PTB-DCQ-0049": "8cdcaeef8f549cb562e19c47154eb762bea4d68eb5615f05ed713d30cd81790a",
+      "PTB-DCQ-0056": "fe9c229056be27d6b13b60ec3d1ddf99015f9d748a9ffcd06b220e67d3952c04",
+      "PTB-DCQ-0057": "90b1c480664bb40a05020bbd2cdbca3b60596b04c10192e9bf885a1670cad8a2",
+      "PTB-DCQ-0065": "c1e54ee926b013eab4816c28af572daf9b628677318fccac751b812f9f95478a",
+      "PTB-DCQ-0072": "637a2a15e375afa46f4992042e70f8c41d0257ce5db448b33f7da637e27eb699",
+      "PTB-DCQ-0080": "cfaaa5ff4859da001ea7471ef7f356937d290b52c7a3371f76b49c09a0b626d4",
+      "PTB-DCQ-0088": "7ef9def72b71f0981155eb157e22b2dc2b551fcb230bad832ccb731d93f2895e",
+      "PTB-DCQ-0098": "298166f88a0ba2250584dc5079900558f61dc3167cc5bfee14cfded32dccfaab",
+      "PTB-DCQ-0106": "3cd25112563ffaff07ca0e891a4defe763f9c1d4b42694d3d528f24c24d65f88",
+      "PTB-DCQ-0112": "4efa657778e4d2a0c369383941ee4cd13ceec9d2a3d0972373a199856253b089"
+    },
+    "automatic_gmail": false,
+    "production_activation": false
+  },
+  "structural_readiness": {
+    "r3_prerequisite_pass": true,
+    "r3_qualifying_sha": "5e9b1839d9a4ac5ac6aef1795d88a2eff5f06517",
+    "r4_manifest_valid": true,
+    "r4_scenario_count": 36,
+    "r4_family_count": 15,
+    "r4_planned_sends": 20,
+    "r4_planned_no_send": 16,
+    "r4_multi_turn_count": 10,
+    "r4_no_name_phone_count": 15,
+    "r4_service_prequalification_count": 10,
+    "constrained_llm_ready": true,
+    "renderer_version_match": true,
+    "validator_version_match": true,
+    "prompt_version_match": true,
+    "model_id": "gpt-4o-mini",
+    "profile_hash_match": true,
+    "candidate_body_hashes_valid": true,
+    "human_review_complete": true,
+    "human_review_failures": 0,
+    "tenant_intake_ready": null,
+    "sender_gmail_ready": null,
+    "recipient_gmail_ready": null,
+    "reply_provider_ready": null,
+    "approval_lifecycle_ready": true,
+    "no_automatic_retry": true,
+    "orphan_isolation_ready": true,
+    "gmail_drafts": 0,
+    "external_writes_before_execute": 0,
+    "campaign_type": "coworker_r4_live_quality_campaign",
+    "execution_mode": "r4_reviewed_live_candidate",
+    "ai_mode": "live_llm",
+    "skip_live_probes": true,
+    "provenance_audit_pass": true,
+    "constrained_llm_candidate_count": 20,
+    "blockers": [],
+    "execute_blockers": [],
+    "r4_campaign_ready_for_dry_run": true,
+    "r4_campaign_ready_for_manual_execution": true,
+    "manual_execution_confirmation_required": true
+  },
+  "approval_validation": {
+    "valid": true,
+    "blockers": []
+  },
+  "approval_artifact_hash": "4483363cd4b39fcc1c66f30451f179c5363f0b3e9c5b90251e31ad72206f2a16",
+  "full_live_jit": {
+    "jit_type": "full_live_jit",
+    "full_live_jit": true,
+    "passed": true,
+    "blockers": [],
+    "candidate_runtime_sha": "b7fd95e075c16feee93a116a6062e402c1fee3df",
+    "executor_runtime_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d",
+    "api_build_git_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d",
+    "worker_build_git_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d",
+    "runner_build_git_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d",
+    "live_probes_collected": true,
+    "live_probe_bundle": {
+      "api_build_git_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d",
+      "worker_build_git_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d",
+      "runner_build_git_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d",
+      "runtime_report": {
+        "approved_runtime_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d",
+        "runner_runtime_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d",
+        "api_runtime_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d",
+        "worker_runtime_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d",
+        "runtime_sha_consistent": true,
+        "runtime_readiness_endpoint_verified": true,
+        "blocking_failures": [],
+        "live_execution_blockers": [],
+        "authoritative_runtime_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d"
+      },
+      "tenant_intake_ready": true,
+      "sender_gmail_ready": true,
+      "recipient_gmail_ready": true,
+      "reply_provider_ready": true,
+      "delivery_observation_ready": true,
+      "exact_message_ready": true,
+      "registration_contract_ready": true,
+      "exact_registration_payload_ready": true,
+      "exact_registration_payload_matrix": {
+        "exact_send_registration_payload_ready": "20/20",
+        "exact_no_send_registration_payload_ready": "16/16",
+        "exact_registration_payload_ready": "36/36",
+        "sender_allowlist_ready": "36/36",
+        "registration_context_present": "36/36",
+        "send_ready_count": 20,
+        "no_send_ready_count": 16,
+        "blockers": [],
+        "passed": true
+      },
+      "r4_live_gmail_scenario_eligibility": "36/36",
+      "live_gmail_scenario_eligibility_matrix": {
+        "r4_live_gmail_scenario_eligibility": "36/36",
+        "r4_send_scenario_eligibility": "20/20",
+        "r4_no_send_scenario_eligibility": "16/16",
+        "r4_live_trigger_scenario_eligibility": "35/35",
+        "r4_local_quarantine_scenario_eligibility": "1/1",
+        "ready_count": 36,
+        "send_ready_count": 20,
+        "no_send_ready_count": 16,
+        "trigger_ready_count": 35,
+        "local_quarantine_ready_count": 1,
+        "blockers": [],
+        "passed": true
+      },
+      "mutation_contract_ready": true,
+      "orphan_isolation_ready": true,
+      "sender_profile_email": "qvarsken@gmail.com",
+      "recipient_credential_source": "live_eval_recipient_env",
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "gmail_triggers": 0,
+      "external_writes": 0,
+      "probe_blockers": [],
+      "sender_readiness": {
+        "ready": true,
+        "issues": []
+      },
+      "recipient_readiness": {
+        "recipient_oauth_configured": true,
+        "recipient_token_refresh_passed": true,
+        "recipient_gmail_api_passed": true,
+        "recipient_mailbox_identity_match": true,
+        "recipient_required_scopes_present": true,
+        "recipient_list_labels_passed": true,
+        "recipient_read_query_passed": true,
+        "recipient_delivery_observation_ready": true,
+        "recipient_credential_source": "live_eval_recipient_env",
+        "delivery_observation_credential_source": "live_eval_recipient_env",
+        "credential_source_match": true,
+        "delivery_mailbox_identity_match": true,
+        "delivery_observation_path_ready": true,
+        "blockers": [],
+        "granted_scopes": [
+          "https://www.googleapis.com/auth/gmail.modify"
+        ],
+        "profile_email_redacted": "ni…@sol-f.se"
+      },
+      "reply_provider_readiness": {
+        "provider_source": "live_eval_recipient_env",
+        "provider_name": "google_mail",
+        "reply_provider_source": "live_eval_recipient_env",
+        "reply_adapter_provider": "google_mail",
+        "sender_mailbox_identity_redacted": "ni…@sol-f.se",
+        "expected_reply_recipient_redacted": "qv…@gmail.com",
+        "send_scope_verified": true,
+        "read_scope_verified": true,
+        "reply_send_scope_verified": true,
+        "reply_read_scope_verified": true,
+        "reply_mailbox_identity_match": true,
+        "thread_binding_valid": true,
+        "approval_binding_valid": true,
+        "frozen_body_binding_valid": true,
+        "tenant_google_mail_used": false,
+        "stub_fallback_possible": false,
+        "reply_provider_ready": true,
+        "ready": true,
+        "blockers": [],
+        "tenant_id": "TENANT_LIVE_EVAL",
+        "campaign_type": "coworker_r3_frozen_live_canary",
+        "execution_mode": "r3_frozen_approved_body",
+        "internal_stub_disabled_for_r3": true,
+        "tenant_google_mail_not_used": true
+      },
+      "tenant_intake": {
+        "tenant_config_exists": true,
+        "tenant_id_match": true,
+        "is_test_tenant": true,
+        "lifecycle_status": "active",
+        "lifecycle_active": true,
+        "intake_enabled": true,
+        "intake_cutoff_present": true,
+        "intake_cutoff_parseable": true,
+        "intake_cutoff_not_future": true,
+        "intake_cutoff_fresh": true,
+        "intake_cutoff_at_redacted": "2026-08-07…+00:00",
+        "intake_cutoff_age_seconds": 315,
+        "required_integrations_present": true,
+        "required_job_types_present": true,
+        "tenant_intake_ready": true,
+        "tenant_intake_blockers": [],
+        "ready": true
+      },
+      "mutation_contract": {
+        "allowed": true,
+        "blockers": []
+      }
+    },
+    "manifest_semantic_hash": "bdebc3ce422aee302fdafad748e3e9b93a3deda8effe5deb90b49853e09144f5",
+    "candidate_package_semantic_hash": "6e6c37aaa57df1464fbc367701c0cfbfaf500f697ffae5cec3a50d2dda116254",
+    "human_review_sha256": "7dced592907fb6fcbb89e632f1e37246cd120ace2a453e0aaa198397f5f0b57b",
+    "body_hash_bindings": "20/20",
+    "constrained_llm_provenance": "20/20",
+    "no_send_ready": "16/16",
+    "human_review_complete": true,
+    "exact_registration_payload_ready": "36/36",
+    "exact_send_registration_payload_ready": "20/20",
+    "exact_no_send_registration_payload_ready": "16/16",
+    "exact_registration_payload_matrix": {
+      "exact_send_registration_payload_ready": "20/20",
+      "exact_no_send_registration_payload_ready": "16/16",
+      "exact_registration_payload_ready": "36/36",
+      "sender_allowlist_ready": "36/36",
+      "registration_context_present": "36/36",
+      "send_ready_count": 20,
+      "no_send_ready_count": 16,
+      "blockers": [],
+      "passed": true
+    },
+    "r4_live_gmail_scenario_eligibility": "36/36",
+    "r4_live_trigger_scenario_eligibility": "35/35",
+    "r4_local_quarantine_scenario_eligibility": "1/1",
+    "live_gmail_scenario_eligibility_matrix": {
+      "r4_live_gmail_scenario_eligibility": "36/36",
+      "r4_send_scenario_eligibility": "20/20",
+      "r4_no_send_scenario_eligibility": "16/16",
+      "r4_live_trigger_scenario_eligibility": "35/35",
+      "r4_local_quarantine_scenario_eligibility": "1/1",
+      "ready_count": 36,
+      "send_ready_count": 20,
+      "no_send_ready_count": 16,
+      "trigger_ready_count": 35,
+      "local_quarantine_ready_count": 1,
+      "blockers": [],
+      "passed": true
+    },
+    "structural_readiness": {
+      "r3_prerequisite_pass": true,
+      "r3_qualifying_sha": "5e9b1839d9a4ac5ac6aef1795d88a2eff5f06517",
+      "r4_manifest_valid": true,
+      "r4_scenario_count": 36,
+      "r4_family_count": 15,
+      "r4_planned_sends": 20,
+      "r4_planned_no_send": 16,
+      "r4_multi_turn_count": 10,
+      "r4_no_name_phone_count": 15,
+      "r4_service_prequalification_count": 10,
+      "constrained_llm_ready": true,
+      "renderer_version_match": true,
+      "validator_version_match": true,
+      "prompt_version_match": true,
+      "model_id": "gpt-4o-mini",
+      "profile_hash_match": true,
+      "candidate_body_hashes_valid": true,
+      "human_review_complete": true,
+      "human_review_failures": 0,
+      "tenant_intake_ready": true,
+      "sender_gmail_ready": true,
+      "recipient_gmail_ready": true,
+      "reply_provider_ready": true,
+      "approval_lifecycle_ready": true,
+      "no_automatic_retry": true,
+      "orphan_isolation_ready": true,
+      "gmail_drafts": 0,
+      "external_writes_before_execute": 0,
+      "campaign_type": "coworker_r4_live_quality_campaign",
+      "execution_mode": "r4_reviewed_live_candidate",
+      "ai_mode": "live_llm",
+      "skip_live_probes": false,
+      "provenance_audit_pass": true,
+      "constrained_llm_candidate_count": 20,
+      "blockers": [],
+      "execute_blockers": [],
+      "r4_campaign_ready_for_dry_run": true,
+      "r4_campaign_ready_for_manual_execution": true,
+      "manual_execution_confirmation_required": true
+    },
+    "gmail_sends": 0,
+    "gmail_drafts": 0,
+    "gmail_triggers": 0,
+    "external_writes": 0,
+    "automatic_gmail": false,
+    "production_activation": false,
+    "send_scenario_ids": [
+      "PTB-DCQ-0000",
+      "PTB-DCQ-0002",
+      "PTB-DCQ-0005",
+      "PTB-DCQ-0007",
+      "PTB-DCQ-0013",
+      "PTB-DCQ-0016",
+      "PTB-DCQ-0018",
+      "PTB-DCQ-0022",
+      "PTB-DCQ-0033",
+      "PTB-DCQ-0040",
+      "PTB-DCQ-0049",
+      "PTB-DCQ-0056",
+      "PTB-DCQ-0057",
+      "PTB-DCQ-0065",
+      "PTB-DCQ-0072",
+      "PTB-DCQ-0080",
+      "PTB-DCQ-0088",
+      "PTB-DCQ-0098",
+      "PTB-DCQ-0106",
+      "PTB-DCQ-0112"
+    ],
+    "no_send_scenario_ids": [
+      "PTB-DCQ-0024",
+      "PTB-DCQ-0029",
+      "PTB-DCQ-0032",
+      "PTB-DCQ-0037",
+      "PTB-DCQ-0048",
+      "PTB-DCQ-0053",
+      "PTB-SEM-0020",
+      "PTB-SEM-0021",
+      "PTB-SEM-0023",
+      "PTB-SEM-0024",
+      "PTB-SEM-0025",
+      "PTB-SEM-0026",
+      "PTB-SEM-0027",
+      "PTB-SEM-0028",
+      "PTB-SEM-0032",
+      "PTB-SEM-0038"
+    ]
+  },
+  "mailbox_baseline": {
+    "baseline_at": "2026-08-07T22:21:58Z",
+    "campaign_id": "b4dcd6a8-9bda-4ce4-8b63-4e7a54176605",
+    "existing_draft_count": 0,
+    "r3_campaign_subject_tokens": [],
+    "r3_provider_message_ids_redacted": [],
+    "existing_r4_subject_tokens": [],
+    "sender_mailbox_identity": "qvarsken@gmail.com",
+    "recipient_mailbox_identity": "niklas.palm@sol-f.se",
+    "mutations_performed": false,
+    "gmail_sends": 0,
+    "gmail_drafts": 0,
+    "gmail_triggers": 0,
+    "external_writes": 0,
+    "passed": true,
+    "blockers": [],
+    "subject_prefix": "KROWOLF-R4/b4dcd6a8-9bda-4ce4-8b63-4e7a54176605"
+  },
+  "execute_gate_binding": {
+    "executor_runtime_sha": "4ad74d4ac19011d5edfb8ea160112f649052422d",
+    "campaign_id": "b4dcd6a8-9bda-4ce4-8b63-4e7a54176605",
+    "approval_artifact_hash": "4483363cd4b39fcc1c66f30451f179c5363f0b3e9c5b90251e31ad72206f2a16",
+    "manifest_semantic_hash": "bdebc3ce422aee302fdafad748e3e9b93a3deda8effe5deb90b49853e09144f5",
+    "candidate_package_semantic_hash": "6e6c37aaa57df1464fbc367701c0cfbfaf500f697ffae5cec3a50d2dda116254",
+    "human_review_sha256": "7dced592907fb6fcbb89e632f1e37246cd120ace2a453e0aaa198397f5f0b57b",
+    "full_live_jit_passed": true,
+    "mailbox_baseline_passed": true
+  },
+  "live_executor_wired_after_gates": true,
+  "backend_invoked": true,
+  "scenario_outcomes": [
+    {
+      "scenario_id": "PTB-DCQ-0000",
+      "evaluation_run_id": "1c033a3c-5151-4dad-8693-97d709c10695",
+      "approval_operation_id": "48d9105d-3b8b-4a18-8fb7-cd6828d020e2",
+      "reply_operation_id": "f1c65ac1-10cb-4043-a3d9-c9c13a18c368",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…d725",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…532b",
+      "reply_thread_id_redacted": "19fd…1463",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:22:04Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:22:14Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:22:15Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:22:17Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:22:23Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:22:29Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0002",
+      "evaluation_run_id": "1c3610f5-5cb0-48ba-87f0-a3ae1f5efef2",
+      "approval_operation_id": "080e325a-9d75-4357-92e6-43210239b6bd",
+      "reply_operation_id": "d9899828-f214-49ee-9c58-154d73a14138",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…1032",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…71de",
+      "reply_thread_id_redacted": "19fd…afe3",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:22:35Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:22:45Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:22:46Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:22:48Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:22:54Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:23:01Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0005",
+      "evaluation_run_id": "2bb7216a-3f37-4e72-b7ae-7544654c6dd8",
+      "approval_operation_id": "021e9d16-f9b1-4372-93f9-07a2171b0998",
+      "reply_operation_id": "ce7107ea-f0e9-45d3-8581-d5839937f835",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…858b",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…9ee3",
+      "reply_thread_id_redacted": "19fd…df00",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:23:06Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:23:17Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:23:18Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:23:20Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:23:25Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:23:33Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0007",
+      "evaluation_run_id": "c872ae48-813b-4c87-a892-b116e16bdb79",
+      "approval_operation_id": "c280df40-9794-41c3-8b31-94efec3af6f5",
+      "reply_operation_id": "4e977ad6-3fe6-4e01-882b-654c6dcd07b0",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…2d3d",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…9a2e",
+      "reply_thread_id_redacted": "19fd…8b33",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:23:39Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:23:49Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:23:50Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:23:52Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:23:57Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:24:04Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0013",
+      "evaluation_run_id": "a432feb9-6782-4c62-acc7-8b860ff4b705",
+      "approval_operation_id": "236857db-e46b-43cc-b218-cd5a22a5bb5d",
+      "reply_operation_id": "e5e9e2cf-4bec-4135-a672-d25c8294cf57",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…806c",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…283d",
+      "reply_thread_id_redacted": "19fd…94ad",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:24:10Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:24:20Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:24:21Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:24:23Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:24:29Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:24:36Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0016",
+      "evaluation_run_id": "b4ddab05-eb74-497e-b589-7fcb5d1ff316",
+      "approval_operation_id": "370a6ce6-0d2e-4e06-8501-2f646756c1c1",
+      "reply_operation_id": "3ff5e928-caa8-48d6-be93-a585b639e646",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…03ec",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…9489",
+      "reply_thread_id_redacted": "19fd…78f6",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:24:42Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:24:52Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:24:53Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:24:55Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:25:01Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:25:08Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0018",
+      "evaluation_run_id": "8571a0ba-5c99-4022-9073-a6bc8821597d",
+      "approval_operation_id": "2d87a226-f8fc-41ca-9f4d-fce6e62975e3",
+      "reply_operation_id": "aef6e35f-d62d-4d49-921b-95de65f825ce",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…e6ec",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…ff68",
+      "reply_thread_id_redacted": "19fd…3320",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:25:14Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:25:24Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:25:25Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:25:27Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:25:33Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:25:40Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0022",
+      "evaluation_run_id": "3467ada6-2242-4194-9777-e251c7a26327",
+      "approval_operation_id": "3a91ba0d-b3c1-4093-b119-600739c9ccde",
+      "reply_operation_id": "591c7049-bcac-47bf-b8de-8799b3f36ba1",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…c4c0",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…51e8",
+      "reply_thread_id_redacted": "19fd…02d5",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:25:46Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:25:57Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:25:58Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:26:00Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:26:06Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:26:13Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0033",
+      "evaluation_run_id": "b6ead57c-84fb-48b3-9b51-8a928c4974b9",
+      "approval_operation_id": "01701c2b-6b31-41b7-b8f7-aed983ce1932",
+      "reply_operation_id": "23048571-b90e-4185-aac9-0d86f50ff761",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…f176",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…2cd3",
+      "reply_thread_id_redacted": "19fd…e991",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:26:19Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:26:29Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:26:30Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:26:32Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:26:38Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:26:45Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0040",
+      "evaluation_run_id": "ad5b762e-5a5d-4b19-b535-39c18341efd8",
+      "approval_operation_id": "9c88f1c7-0b58-4d07-8d11-c228a30c388b",
+      "reply_operation_id": "f1b9feb9-c264-41d9-b059-9088f56e950a",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…e89d",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…475d",
+      "reply_thread_id_redacted": "19fd…f408",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:26:51Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:27:01Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:27:03Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:27:04Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:27:10Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:27:18Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0049",
+      "evaluation_run_id": "0c4b9d21-71d4-4c8d-adfa-32ff6c19f69c",
+      "approval_operation_id": "0d05dc94-d709-4933-9937-963ec470359b",
+      "reply_operation_id": "04b1e7dd-a8a2-41f0-921f-fbd818614d84",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…4e85",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…559b",
+      "reply_thread_id_redacted": "19fd…8754",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:27:23Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:27:33Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:27:35Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:27:36Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:27:43Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:27:50Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0056",
+      "evaluation_run_id": "aacf07e5-00d7-4a6e-9a5c-f6b81af61e98",
+      "approval_operation_id": "fcd72ab2-e57e-4175-8f2d-1d2978507882",
+      "reply_operation_id": "1248ad68-2201-4642-9503-9a5d95af6ee3",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…405f",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…0252",
+      "reply_thread_id_redacted": "19fd…9be8",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:27:56Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:28:06Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:28:08Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:28:09Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:28:15Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:28:23Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0057",
+      "evaluation_run_id": "1dcf66a3-1873-41a9-83b9-a672465e801f",
+      "approval_operation_id": "da731023-74fc-4268-a7d2-becbd2c75103",
+      "reply_operation_id": "56c8ae63-c861-40fd-b61f-61f29afa9cb8",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…de22",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…8065",
+      "reply_thread_id_redacted": "19fd…ed14",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:28:29Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:28:38Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:28:40Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:28:41Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:28:47Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:28:54Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0065",
+      "evaluation_run_id": "1b45315b-86d2-4ea4-8f89-6031f69729e6",
+      "approval_operation_id": "4abd552c-9b55-41e3-835d-28dc96851ed1",
+      "reply_operation_id": "346af157-7320-4600-a605-bb5275ddcd4d",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…f617",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…a052",
+      "reply_thread_id_redacted": "19fd…0d99",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:28:59Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:29:09Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:29:10Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:29:12Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:29:18Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:29:25Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0072",
+      "evaluation_run_id": "5ef2edc7-709a-4b59-947a-0902691f3d80",
+      "approval_operation_id": "1d1e5425-ea34-45fa-bbbf-91c75cc89c81",
+      "reply_operation_id": "29c39315-d3ca-4d7c-8d66-ca8421f09f19",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…880c",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…500c",
+      "reply_thread_id_redacted": "19fd…8bae",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:29:31Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:29:41Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:29:42Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:29:44Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:29:50Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:29:57Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0080",
+      "evaluation_run_id": "27800a3f-6eda-4f09-999b-71ad388e5aeb",
+      "approval_operation_id": "bc94b5fe-6f7a-4b18-9b85-a8573bb450ea",
+      "reply_operation_id": "13bf7192-e736-426f-a84e-f3d053546f40",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…eddd",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…b5b6",
+      "reply_thread_id_redacted": "19fd…616d",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:30:03Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:30:13Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:30:14Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:30:16Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:30:22Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:30:29Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0088",
+      "evaluation_run_id": "0e717b90-9107-4773-bb66-69c241d8e3c1",
+      "approval_operation_id": "a0aab0ab-4363-4c70-8def-45c0a4721213",
+      "reply_operation_id": "7b0c9a60-551f-4450-a3ba-21e49ef42177",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…f672",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…506d",
+      "reply_thread_id_redacted": "19fd…f182",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:30:35Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:30:45Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:30:46Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "r4_0088_provenance",
+          "at": "2026-08-07T22:30:46Z",
+          "details": {
+            "base_policy": "hold_for_review",
+            "r4_contract": "r4_reviewed_hold_to_pending_v1",
+            "authorization": "approval_required",
+            "reviewed_body_hash": "7ef9def72b71f0981155eb157e22b2dc2b551fcb230bad832ccb731d93f2895e",
+            "r3_override_reused": false,
+            "stages": [
+              "base_policy_hold",
+              "r4_reviewed_body_materialization",
+              "pending_approval",
+              "explicit_approval",
+              "gmail_execution"
+            ]
+          }
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:30:48Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:30:54Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:31:02Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": {
+        "base_policy": "hold_for_review",
+        "r4_contract": "r4_reviewed_hold_to_pending_v1",
+        "authorization": "approval_required",
+        "reviewed_body_hash": "7ef9def72b71f0981155eb157e22b2dc2b551fcb230bad832ccb731d93f2895e",
+        "r3_override_reused": false,
+        "stages": [
+          "base_policy_hold",
+          "r4_reviewed_body_materialization",
+          "pending_approval",
+          "explicit_approval",
+          "gmail_execution"
+        ]
+      },
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0098",
+      "evaluation_run_id": "62565d97-a1aa-414a-818e-fcbd451746ca",
+      "approval_operation_id": "4dfb950c-db8a-4a81-88f4-67b62b1f4e01",
+      "reply_operation_id": "3180db23-a739-4ee7-bf81-268f51e964b9",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…42d0",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…0502",
+      "reply_thread_id_redacted": "19fd…d43a",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:31:08Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:31:18Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:31:19Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:31:21Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:31:27Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:31:34Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0106",
+      "evaluation_run_id": "b024df7d-bf90-491b-a63c-6ac086b50a8d",
+      "approval_operation_id": "4064337a-1d7f-4e67-ae29-b6d88f171bd2",
+      "reply_operation_id": "8cb06361-6a96-4250-aeac-1ce59074fa23",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…e529",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…7c19",
+      "reply_thread_id_redacted": "19fd…2c5f",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:31:40Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:31:50Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:31:52Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:31:53Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:32:00Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:32:07Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0112",
+      "evaluation_run_id": "1e11595b-d21b-4531-81ae-9e5c7c8029f5",
+      "approval_operation_id": "be31e508-0f35-46d4-bff8-2154c90492a3",
+      "reply_operation_id": "b2102113-a885-467d-8a03-d5556a6e980b",
+      "planned_gmail_send": true,
+      "inbound_trigger_sent": true,
+      "trigger_provider_message_id_redacted": "19fd…c0b2",
+      "trigger_delivery_observed": true,
+      "job_id": "",
+      "trusted_snapshot_verified": true,
+      "approval_state": "approved",
+      "approval_executed": true,
+      "adapter_provider": "google_mail",
+      "provider_status": "succeeded",
+      "reply_provider_message_id_redacted": "19fd…0455",
+      "reply_thread_id_redacted": "19fd…f890",
+      "reply_delivery_observed": true,
+      "recipient_match": true,
+      "thread_match": true,
+      "body_hash_match": true,
+      "duplicate_count": 0,
+      "gmail_drafts": 0,
+      "gmail_sends": 1,
+      "execution_outcome": "gmail_reply_sent",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "inbound_trigger_sent",
+          "at": "2026-08-07T22:32:13Z"
+        },
+        {
+          "event": "trigger_delivery_observed",
+          "at": "2026-08-07T22:32:24Z",
+          "job_id": ""
+        },
+        {
+          "event": "trusted_snapshot_verified",
+          "at": "2026-08-07T22:32:25Z",
+          "approval_state": "pending"
+        },
+        {
+          "event": "reviewed_body_bound",
+          "at": "2026-08-07T22:32:27Z"
+        },
+        {
+          "event": "approval_executed",
+          "at": "2026-08-07T22:32:33Z",
+          "decision": "approved"
+        },
+        {
+          "event": "reply_verified",
+          "at": "2026-08-07T22:32:40Z",
+          "passed": true
+        }
+      ],
+      "r4_0088_provenance": null,
+      "llm_calls": 0,
+      "candidates_regenerated": false,
+      "reply_rfc_message_id_redacted": "caek….com",
+      "thread_match_basis": "combination",
+      "status": "passed"
+    },
+    {
+      "scenario_id": "PTB-DCQ-0024",
+      "evaluation_run_id": "e1118587-8fc5-4014-8b8c-9998d1d2a07a",
+      "planned_gmail_send": false,
+      "expected_behavior": "draft_for_approval",
+      "actual_policy_result": "approval_required",
+      "approval_state": "pending",
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "external_executions": 0,
+      "r4_reviewed_body_applied": false,
+      "status": "passed",
+      "unknown_outcome": false,
+      "audit_events": [],
+      "inbound_trigger_sent": true,
+      "job_id": ""
+    },
+    {
+      "scenario_id": "PTB-DCQ-0029",
+      "evaluation_run_id": "b086dd9e-b58a-4a95-a500-4801013e4483",
+      "planned_gmail_send": false,
+      "expected_behavior": "draft_for_approval",
+      "actual_policy_result": "approval_required",
+      "approval_state": "pending",
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "external_executions": 0,
+      "r4_reviewed_body_applied": false,
+      "status": "passed",
+      "unknown_outcome": false,
+      "audit_events": [],
+      "inbound_trigger_sent": true,
+      "job_id": ""
+    },
+    {
+      "scenario_id": "PTB-DCQ-0032",
+      "evaluation_run_id": "d5b57fcf-b20e-48f0-8507-e9153d8f5f87",
+      "planned_gmail_send": false,
+      "expected_behavior": "draft_for_approval",
+      "actual_policy_result": "approval_required",
+      "approval_state": "pending",
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "external_executions": 0,
+      "r4_reviewed_body_applied": false,
+      "status": "passed",
+      "unknown_outcome": false,
+      "audit_events": [],
+      "inbound_trigger_sent": true,
+      "job_id": ""
+    },
+    {
+      "scenario_id": "PTB-DCQ-0037",
+      "evaluation_run_id": "360c6a66-f79e-495a-a224-b758efc4becc",
+      "planned_gmail_send": false,
+      "expected_behavior": "draft_for_approval",
+      "actual_policy_result": "approval_required",
+      "approval_state": "pending",
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "external_executions": 0,
+      "r4_reviewed_body_applied": false,
+      "status": "passed",
+      "unknown_outcome": false,
+      "audit_events": [],
+      "inbound_trigger_sent": true,
+      "job_id": ""
+    },
+    {
+      "scenario_id": "PTB-DCQ-0048",
+      "evaluation_run_id": "13fc7792-68c2-40e2-a4d3-4389abbe666e",
+      "planned_gmail_send": false,
+      "expected_behavior": "draft_for_approval",
+      "actual_policy_result": "approval_required",
+      "approval_state": "pending",
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "external_executions": 0,
+      "r4_reviewed_body_applied": false,
+      "status": "passed",
+      "unknown_outcome": false,
+      "audit_events": [],
+      "inbound_trigger_sent": true,
+      "job_id": ""
+    },
+    {
+      "scenario_id": "PTB-DCQ-0053",
+      "evaluation_run_id": "fda393c9-b504-4b13-ab17-f0e912defc16",
+      "planned_gmail_send": false,
+      "expected_behavior": "draft_for_approval",
+      "actual_policy_result": "approval_required",
+      "approval_state": "pending",
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "external_executions": 0,
+      "r4_reviewed_body_applied": false,
+      "status": "passed",
+      "unknown_outcome": false,
+      "audit_events": [],
+      "inbound_trigger_sent": true,
+      "job_id": ""
+    },
+    {
+      "scenario_id": "PTB-SEM-0020",
+      "evaluation_run_id": "37613ff4-5cb7-428e-9101-19ecbf061284",
+      "planned_gmail_send": false,
+      "expected_behavior": "reject",
+      "actual_policy_result": "hold_for_review",
+      "approval_state": "hold",
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "external_executions": 0,
+      "r4_reviewed_body_applied": false,
+      "status": "passed",
+      "unknown_outcome": false,
+      "audit_events": [],
+      "inbound_trigger_sent": true,
+      "job_id": ""
+    },
+    {
+      "scenario_id": "PTB-SEM-0021",
+      "evaluation_run_id": "61d35723-69df-4145-9ebe-725fa62fc078",
+      "planned_gmail_send": false,
+      "expected_behavior": "hold",
+      "actual_policy_result": "hold_for_review",
+      "approval_state": "hold",
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "external_executions": 0,
+      "r4_reviewed_body_applied": false,
+      "status": "passed",
+      "unknown_outcome": false,
+      "audit_events": [],
+      "inbound_trigger_sent": true,
+      "job_id": ""
+    },
+    {
+      "scenario_id": "PTB-SEM-0023",
+      "evaluation_run_id": "119b9c51-1f35-4ef7-8a2a-739f005f5a0c",
+      "planned_gmail_send": false,
+      "expected_behavior": "no_reply",
+      "actual_policy_result": "intake_suppressed",
+      "approval_state": null,
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "external_executions": 0,
+      "r4_reviewed_body_applied": false,
+      "status": "passed",
+      "unknown_outcome": false,
+      "audit_events": [
+        {
+          "event": "expected_intake_suppression",
+          "intake_suppression_reason": "newsletter_disabled",
+          "job_created": false
+        }
+      ],
+      "inbound_trigger_sent": true,
+      "execution_outcome": "expected_intake_suppression",
+      "intake_suppressed": true,
+      "intake_suppression_reason": "newsletter_disabled",
+      "job_created": false,
+      "job_id": "",
+      "approval_count": 0,
+      "trigger_delivery_observed": true,
+      "_r4_no_send_intake_suppression": {
+        "eligible": true,
+        "blockers": [],
+        "scenario_id": "PTB-SEM-0023",
+        "intake_suppression_reason": "newsletter_disabled",
+        "expected_send_behavior": "no_reply"
+      }
+    },
+    {
+      "scenario_id": "PTB-SEM-0024",
+      "evaluation_run_id": "11ff167e-0744-4548-a0a2-f02b042c6789",
+      "planned_gmail_send": false,
+      "expected_behavior": "reject",
+      "actual_policy_result": "reject_no_reply",
+      "approval_state": null,
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "external_executions": 0,
+      "r4_reviewed_body_applied": false,
+      "status": "passed",
+      "unknown_outcome": false,
+      "audit_events": []
+    },
+    {
+      "scenario_id": "PTB-SEM-0025",
+      "evaluation_run_id": "becb1a00-7b19-41b0-96ed-5e6d33423830",
+      "planned_gmail_send": false,
+      "expected_behavior": "reject",
+      "actual_policy_result": "hold_for_review",
+      "approval_state": "hold",
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "external_executions": 0,
+      "r4_reviewed_body_applied": false,
+      "status": "passed",
+      "unknown_outcome": false,
+      "audit_events": [],
+      "inbound_trigger_sent": true,
+      "job_id": ""
+    },
+    {
+      "scenario_id": "PTB-SEM-0026",
+      "evaluation_run_id": "d2896e07-c526-4e3e-93af-beffc31931c5",
+      "planned_gmail_send": false,
+      "expected_behavior": "hold",
+      "actual_policy_result": "hold_for_review",
+      "approval_state": "hold",
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "external_executions": 0,
+      "r4_reviewed_body_applied": false,
+      "status": "passed",
+      "unknown_outcome": false,
+      "audit_events": [],
+      "inbound_trigger_sent": true,
+      "job_id": ""
+    },
+    {
+      "scenario_id": "PTB-SEM-0027",
+      "evaluation_run_id": "32ea13ab-ab1f-4b17-bfbb-819e608c5bee",
+      "planned_gmail_send": false,
+      "expected_behavior": "hold",
+      "actual_policy_result": "hold_for_review",
+      "approval_state": "hold",
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "external_executions": 0,
+      "r4_reviewed_body_applied": false,
+      "status": "passed",
+      "unknown_outcome": false,
+      "audit_events": [],
+      "inbound_trigger_sent": true,
+      "job_id": ""
+    },
+    {
+      "scenario_id": "PTB-SEM-0028",
+      "evaluation_run_id": "8f8f910b-c063-4807-9e9a-7ee2601734ff",
+      "planned_gmail_send": false,
+      "expected_behavior": "hold",
+      "actual_policy_result": "hold_for_review",
+      "approval_state": "hold",
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "external_executions": 0,
+      "r4_reviewed_body_applied": false,
+      "status": "passed",
+      "unknown_outcome": false,
+      "audit_events": [],
+      "inbound_trigger_sent": true,
+      "job_id": ""
+    },
+    {
+      "scenario_id": "PTB-SEM-0032",
+      "evaluation_run_id": "06482015-ee86-4c0d-ad31-8e4c9c69f89a",
+      "planned_gmail_send": false,
+      "expected_behavior": "hold",
+      "actual_policy_result": "hold_for_review",
+      "approval_state": "hold",
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "external_executions": 0,
+      "r4_reviewed_body_applied": false,
+      "status": "passed",
+      "unknown_outcome": false,
+      "audit_events": [],
+      "inbound_trigger_sent": true,
+      "job_id": ""
+    },
+    {
+      "scenario_id": "PTB-SEM-0038",
+      "evaluation_run_id": "c87f8343-0863-4d13-91cd-402259900c06",
+      "planned_gmail_send": false,
+      "expected_behavior": "hold",
+      "actual_policy_result": "hold_for_review",
+      "approval_state": "hold",
+      "gmail_sends": 0,
+      "gmail_drafts": 0,
+      "external_executions": 0,
+      "r4_reviewed_body_applied": false,
+      "status": "passed",
+      "unknown_outcome": false,
+      "audit_events": [],
+      "inbound_trigger_sent": true,
+      "job_id": ""
+    }
+  ],
+  "overall_status": "PASS"
+}

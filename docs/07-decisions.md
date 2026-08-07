@@ -873,3 +873,17 @@ Reference: `docs/plans/production-pilot-p1-observability-fix-plan.md`, `app/prod
 
 **Reference:** `docs/reply-quality/r3-live-canary-result.md`, `app/evaluation/profile_testbot/qualification/coworker_r4_*.py`
 
+## DEC-052 — R5 reply-quality closure and registry VALID (2026-08-08)
+
+**Status:** Active — digital coworker reply quality chapter
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **R4 Attempt 12 is sole PASS** | Campaign `b4dcd6a8-…`, executor `4ad74d4…`, candidate `b7fd95e…`; Attempts 1–11 permanently excluded |
+| 2 | **Registry provenance binds qualifying runtime** | `PROFILE_DRIVEN_DIGITAL_COWORKER_REPLY_QUALITY_QUALIFIED` → `VALID` with `source_sha=4ad74d4…` and Release Gate `31220948265` (PR #183 executor merge) |
+| 3 | **Closure PR evidence is separate** | R5 closure merge SHA / post-merge CI runs document closure only; they do not replace registry provenance |
+| 4 | **R2 PASS is human review** | Scored artifact `7dced592…` with 0 FAIL / 0 PENDING supersedes stale parent-plan `R2_PRECHECK: FAIL` |
+| 5 | **Activation stays off** | `PROFILE_DRIVEN_AUTOMATIC_GMAIL_QUALIFIED` and `PROFILE_DRIVEN_TESTBOT_PASS` remain PENDING; automatic Gmail false; production activation false |
+
+**Reference:** `docs/plans/profile-driven-digital-coworker-reply-quality-r5-closure.md`, `app/evaluation/profile_testbot/qualification/coworker_reply_quality_closure.py`, `storage/status/r5-closure-evidence-freeze-4ad74d4.json`
+

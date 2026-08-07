@@ -50,6 +50,7 @@ CAND = Path("storage/status/digital-coworker-r4-candidates-b7fd95e.json")
 REV = Path("storage/status/digital-coworker-r4-human-review-scored-b7fd95e.json")
 MAN = Path("storage/status/digital-coworker-r4-manifest-b7fd95e.json")
 EXECUTOR = "9c743968361cfa986017704167bf35342748bbca"
+RECIPIENT = "niklas.palm@sol-f.se"
 
 
 pytestmark = pytest.mark.skipif(
@@ -65,6 +66,17 @@ def locked():
         "review": json.loads(REV.read_text(encoding="utf-8")),
         "manifest": json.loads(MAN.read_text(encoding="utf-8")),
     }
+
+
+@pytest.fixture
+def r4_jit_allowlist(monkeypatch):
+    cfg = MagicMock()
+    cfg.sender_emails = {"qvarsken@gmail.com"}
+    cfg.recipient_emails = {RECIPIENT}
+    monkeypatch.setattr(
+        "app.evaluation.live.config.get_live_eval_config",
+        lambda: cfg,
+    )
 
 
 def test_execute_missing_approval_blocks_before_gmail(tmp_path, locked):
@@ -286,7 +298,7 @@ def test_full_jit_requires_live_probes(locked, monkeypatch):
     assert any("tenant_intake" in b or "sender_gmail" in b for b in jit["blockers"])
 
 
-def test_full_jit_pass_with_probe_flags(locked):
+def test_full_jit_pass_with_probe_flags(locked, r4_jit_allowlist):
     jit = run_r4_full_live_jit(
         candidate_runtime_sha=R4_LOCKED_CANDIDATE_RUNTIME_SHA,
         executor_runtime_sha=EXECUTOR,
@@ -308,13 +320,14 @@ def test_full_jit_pass_with_probe_flags(locked):
         orphan_isolation_ready=True,
         run_live_probes=True,
         auto_collect_live_probes=False,
+        recipient_email=RECIPIENT,
     )
     assert jit["passed"] is True
     assert jit["gmail_sends"] == 0
     assert jit["live_probes_collected"] is False
 
 
-def test_full_jit_auto_collect_invoked(locked, monkeypatch):
+def test_full_jit_auto_collect_invoked(locked, r4_jit_allowlist, monkeypatch):
     calls = {"n": 0}
 
     def fake_collect(**kwargs):
@@ -348,6 +361,7 @@ def test_full_jit_auto_collect_invoked(locked, monkeypatch):
         human_review_path=REV,
         run_live_probes=True,
         auto_collect_live_probes=True,
+        recipient_email=RECIPIENT,
     )
     assert calls["n"] == 1
     assert jit["passed"] is True
