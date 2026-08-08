@@ -568,6 +568,43 @@ def provision_tenant_defaults(engine: Engine) -> None:
         log.warning("provision_tenant_defaults failed (non-fatal): %s", exc)
 
 
+_CUSTOMER_WORKSPACE_AUTH_MIGRATION_STATEMENTS: list[str] = [
+    """
+    CREATE TABLE IF NOT EXISTS customer_workspace_users (
+        id                  VARCHAR(36)  PRIMARY KEY,
+        tenant_id           VARCHAR(32)  NOT NULL,
+        email               VARCHAR(256) NOT NULL,
+        password_hash       TEXT         NOT NULL,
+        display_name        VARCHAR(256) NOT NULL,
+        role                VARCHAR(32)  NOT NULL DEFAULT 'customer_viewer',
+        status              VARCHAR(32)  NOT NULL DEFAULT 'active',
+        created_at            TIMESTAMPTZ  NOT NULL,
+        updated_at            TIMESTAMPTZ  NOT NULL,
+        password_changed_at   TIMESTAMPTZ
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_customer_workspace_users_tenant ON customer_workspace_users (tenant_id)",
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_customer_workspace_users_active_email
+        ON customer_workspace_users (lower(email))
+        WHERE status = 'active'
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS customer_workspace_sessions (
+        id                  VARCHAR(36)  PRIMARY KEY,
+        user_id             VARCHAR(36)  NOT NULL,
+        tenant_id           VARCHAR(32)  NOT NULL,
+        token_hash          TEXT         NOT NULL,
+        expires_at          TIMESTAMPTZ  NOT NULL,
+        revoked_at          TIMESTAMPTZ,
+        created_at          TIMESTAMPTZ  NOT NULL
+    )
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_customer_workspace_sessions_token_hash ON customer_workspace_sessions (token_hash)",
+    "CREATE INDEX IF NOT EXISTS ix_customer_workspace_sessions_user ON customer_workspace_sessions (user_id)",
+    "CREATE INDEX IF NOT EXISTS ix_customer_workspace_sessions_tenant ON customer_workspace_sessions (tenant_id)",
+]
+
 def ensure_runtime_schema(engine: Engine) -> None:
     """Add any columns/tables that exist in ORM models but may be missing from older DB instances."""
     try:
@@ -635,6 +672,10 @@ def ensure_runtime_schema(engine: Engine) -> None:
             for ddl in _LIVE_EVAL_026_MIGRATION_STATEMENTS:
                 conn.execute(text(ddl))
                 log.debug("Live eval 026 R4 registration context migration OK")
+
+            for ddl in _CUSTOMER_WORKSPACE_AUTH_MIGRATION_STATEMENTS:
+                conn.execute(text(ddl))
+                log.debug("Customer workspace auth migration OK")
 
         log.info(
             "Runtime schema safeguard complete (%d column(s), %d table/index statement(s), %d onboarding statement(s), %d slice2b statement(s), %d operator alerts statement(s), %d onboarding 2.0 statement(s), %d decision record statement(s), %d integration selection statement(s), %d live eval runs statement(s), %d live eval runs 019 statement(s), %d live eval events statement(s), %d live eval 026 R4 registration statement(s) checked)",

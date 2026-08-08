@@ -4,10 +4,10 @@ overview: Koppla den färdiga kundarbetsytan till säker tenantisolerad produkti
 todos:
   - id: connected-a-current-truth
     content: Audita aktuell main efter avslutade parallella spår och lås integrationsgränser
-    status: pending
+    status: completed
   - id: connected-b-customer-auth
     content: Bygg serververifierad kundsession och tenantbunden autentisering
-    status: pending
+    status: completed
   - id: connected-c-workspace-api
     content: Implementera tenantisolerat read-only workspace-API
     status: pending

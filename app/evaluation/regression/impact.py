@@ -13,6 +13,16 @@ IMPACT_RULES: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
     (("app/domain/customer/",), ("customer-domain-manifest-contract", "pg-eval-suite", "full-function-contract")),
     (("app/api/routes/end_customer",), ("customer-domain-manifest-contract", "pg-eval-suite")),
     (("migrations/",), ("migration-chain-bootstrap", "pg-eval-suite")),
+    (
+        (
+            "app/repositories/postgres/schema_migrations.py",
+            "app/repositories/postgres/customer_workspace_",
+            "tests/test_customer_workspace_auth_migration_pg.py",
+            "tests/test_customer_session_auth.py",
+            "tests/test_customer_workspace_user_provisioning.py",
+        ),
+        ("migration-chain-bootstrap", "customer-workspace-auth-migration-pg", "release-gate-hermetic"),
+    ),
     ((".github/workflows/",), ("workflow-live-eval-contract",)),
     (("app/evaluation/",), ("regression-registry-contract", "tbr-scenarios", "full-function-contract", "customer-domain-manifest-contract")),
     (("app/core/settings.py", "app/core/settings/",), ("release-gate-hermetic", "full-function-contract")),
