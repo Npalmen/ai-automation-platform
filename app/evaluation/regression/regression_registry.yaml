@@ -239,3 +239,36 @@ suites:
       - platform
     tags:
       - migration
+
+  - id: customer-workspace-auth-migration-pg
+    chapter: H
+    description: PostgreSQL customer workspace auth indexes and uniqueness constraints
+    tier:
+      - main_pg
+      - nightly
+    command:
+      - python
+      - -m
+      - pytest
+      - -q
+      - --tb=short
+      - tests/test_customer_workspace_auth_migration_pg.py
+      - -m
+      - integration_db
+    required_paths:
+      - app/repositories/postgres/schema_migrations.py
+      - app/repositories/postgres/customer_workspace_user_models.py
+      - app/repositories/postgres/customer_workspace_session_models.py
+      - tests/test_customer_workspace_auth_migration_pg.py
+    database: postgres
+    network: forbidden
+    external_write_budget: 0
+    artifact_schema: continuous_regression_report_v1
+    timeout_class: short
+    repeat_run: false
+    cleanup_required: true
+    owners:
+      - platform
+    tags:
+      - migration
+      - customer_workspace
