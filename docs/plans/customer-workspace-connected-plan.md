@@ -10,7 +10,7 @@ todos:
     status: completed
   - id: connected-c-workspace-api
     content: Implementera tenantisolerat read-only workspace-API
-    status: in_progress
+    status: completed
   - id: connected-d-tenant-security
     content: Verifera tenantisolering, cross-tenant denial och säkerhetsgränser
     status: pending
