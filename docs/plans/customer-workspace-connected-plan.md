@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: connected-d-tenant-security
     content: Verifera tenantisolering, cross-tenant denial och säkerhetsgränser
-    status: pending
+    status: in_progress
   - id: connected-e-frontend-connection
     content: Koppla befintlig kundfrontend från mockadapter till riktig read-only data
     status: pending

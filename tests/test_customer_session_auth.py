@@ -250,6 +250,16 @@ class TestMeAndLogout:
         client.cookies.set(CUSTOMER_SESSION_COOKIE, login.cookies[CUSTOMER_SESSION_COOKIE])
         assert client.get("/auth/customer/me").status_code == 401
 
+    def test_session_repository_failure_fail_closed(self, client, db):
+        _seed_user(db)
+        login = _login(client)
+        client.cookies.set(CUSTOMER_SESSION_COOKIE, login.cookies[CUSTOMER_SESSION_COOKIE])
+        with patch(
+            "app.core.customer_session.CustomerWorkspaceSessionRepository.get_active_by_token_hash",
+            side_effect=RuntimeError("db down"),
+        ):
+            assert client.get("/auth/customer/me").status_code == 401
+
 
 class TestSecurityBoundaries:
     def test_x_tenant_id_ignored_on_login(self, client, db):
