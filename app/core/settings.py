@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     # When empty, same-origin is derived from the incoming request URL.
     ALLOWED_ORIGINS: str = ""
 
+    # Customer workspace session TTL (seconds). Default 8 hours.
+    CUSTOMER_SESSION_MAX_AGE_SECONDS: int = 8 * 3600
+
     @field_validator("ADMIN_ROLE")
     @classmethod
     def validate_admin_role(cls, value: str) -> str:
