@@ -46,8 +46,8 @@ def test_customer_workspace_auth_tables_and_indexes():
 
         Session = sessionmaker(bind=engine)
         db = Session()
-        user_id = f"u-{uuid4()}"
-        session_id = f"s-{uuid4()}"
+        user_id = str(uuid4())
+        session_id = str(uuid4())
         email = f"auth-migration-{uuid4().hex[:12]}@example.com"
         token_hash = f"hash-{uuid4().hex}"
         try:
@@ -73,7 +73,7 @@ def test_customer_workspace_auth_tables_and_indexes():
                         (:user_id, 'T2', :email, 'hash', 'B', 'customer_viewer', 'active', NOW(), NOW())
                         """
                     ),
-                    {"user_id": f"u-{uuid4()}", "email": email},
+                    {"user_id": str(uuid4()), "email": email},
                 )
                 db.commit()
             db.rollback()
@@ -101,7 +101,7 @@ def test_customer_workspace_auth_tables_and_indexes():
                         """
                     ),
                     {
-                        "session_id": f"s-{uuid4()}",
+                        "session_id": str(uuid4()),
                         "user_id": user_id,
                         "token_hash": token_hash,
                     },
