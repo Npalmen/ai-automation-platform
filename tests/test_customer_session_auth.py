@@ -258,9 +258,17 @@ class TestSecurityBoundaries:
         assert response.status_code == 200
         assert response.json()["tenant_id"] == "TENANT_1001"
 
-    def test_no_workspace_v1_routes(self, client):
+    def test_workspace_v1_routes_are_get_only(self, client):
         schema = client.get("/openapi.json").json()
-        assert not any(path.startswith("/workspace/v1") for path in schema.get("paths", {}))
+        workspace_paths = {
+            path: methods
+            for path, methods in schema.get("paths", {}).items()
+            if path.startswith("/workspace/v1")
+        }
+        assert workspace_paths, "expected connected workspace routes"
+        for path, methods in workspace_paths.items():
+            http_methods = {m.lower() for m in methods if m.lower() not in {"parameters"}}
+            assert http_methods == {"get"}, f"{path} must be GET-only, got {http_methods}"
 
     def test_wrong_origin_blocked(self, client, db):
         _seed_user(db)
