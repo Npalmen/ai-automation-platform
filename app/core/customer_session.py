@@ -130,9 +130,13 @@ def resolve_customer_session(
     if not raw_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated.")
 
-    session = CustomerWorkspaceSessionRepository.get_active_by_token_hash(
-        db, hash_session_token(raw_token)
-    )
+    try:
+        session = CustomerWorkspaceSessionRepository.get_active_by_token_hash(
+            db, hash_session_token(raw_token)
+        )
+    except Exception:
+        logger.exception("customer_session_lookup_failed")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated.") from None
     if session is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated.")
 

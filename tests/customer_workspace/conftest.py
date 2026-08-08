@@ -25,9 +25,15 @@ from app.repositories.postgres.database import Base
 from app.repositories.postgres.job_models import JobRecord
 from app.repositories.postgres.tenant_config_models import TenantConfigRecord
 
+from tests.customer_workspace.security_helpers import (
+    TENANT_A,
+    TENANT_B,
+    WorkspaceSeedContext,
+    seed_tenant_a_canary_bundle,
+    seed_tenant_b_canary_bundle,
+)
+
 STRONG_PASSWORD = "fifteen-char-pass!"
-TENANT_A = "TENANT_1001"
-TENANT_B = "TENANT_2002"
 
 
 def _test_settings():
@@ -142,6 +148,27 @@ def login(client, email="viewer@example.com", password=STRONG_PASSWORD):
 def authed_client(client, db):
     seed_user(db)
     response = login(client)
+    assert response.status_code == 200, response.text
+    client.cookies.set(CUSTOMER_SESSION_COOKIE, response.cookies[CUSTOMER_SESSION_COOKIE])
+    return client
+
+
+@pytest.fixture()
+def seed_context():
+    return WorkspaceSeedContext()
+
+
+@pytest.fixture()
+def dual_tenant_seed(db, seed_context):
+    seed_tenant_a_canary_bundle(db, seed_context)
+    seed_tenant_b_canary_bundle(db, seed_context)
+    return seed_context
+
+
+@pytest.fixture()
+def authed_client_a(client, db, dual_tenant_seed):
+    seed_user(db, tenant_id=TENANT_A, email="viewer-a@example.com")
+    response = login(client, email="viewer-a@example.com")
     assert response.status_code == 200, response.text
     client.cookies.set(CUSTOMER_SESSION_COOKIE, response.cookies[CUSTOMER_SESSION_COOKIE])
     return client
