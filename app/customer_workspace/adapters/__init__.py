@@ -1,0 +1,1 @@
+"""Customer workspace API adapters."""

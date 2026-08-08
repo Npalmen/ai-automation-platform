@@ -8592,6 +8592,14 @@ app.include_router(integration_invitations_public_router)
 app.include_router(customer_auth_router)
 app.include_router(customer_workspace_users_router)
 
+from app.customer_workspace.routes import router as customer_workspace_router
+
+app.include_router(
+    customer_workspace_router,
+    prefix="/workspace/v1",
+    tags=["customer-workspace"],
+)
+
 from app.evaluation.live.routes import router as live_eval_router
 
 app.include_router(live_eval_router)
